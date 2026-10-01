@@ -69,4 +69,27 @@ async function call(p,{m='GET',b,ck,pt,csrf=true}={}){const h={};if(b)h['Content
  r=await call('/portal/requests',{pt:M2});t('sessão do Médio encerrada',r.s===401);
  r=await call('/portal/login',{m:'POST',b:{codigo:'MED-2604',senha:pw('MED-2604')}});t('Médio desativado não entra',r.s===401);
  r=await call('/admin/user-active',{m:'POST',ck:G,b:{tipo:'interno',codigo:'NAT-3301',ativo:false}});t('gerente não se desativa',r.s===400);
+
+ // ---- v4.2.0 ----
+ r=await call('/data?module=equipe',{ck:G});t('instalador criou as 5 fichas de Equipe',r.j.rows.length===5);
+ await call('/data?module=equipe&id='+r.j.rows.find(x=>x.titulo==='Maria Eduarda').id,{m:'DELETE',ck:G});
+ r=await call('/admin/seed-equipe',{m:'POST',ck:G,b:{}});t('seed recria só a ficha que falta (1)',r.s===200&&r.j.criados===1);
+ r=await call('/admin/seed-equipe',{m:'POST',ck:G,b:{}});t('seed é idempotente (0)',r.j.criados===0);
+ r=await call('/data?module=equipe',{ck:G});const eqAnt=r.j.rows.find(x=>x.titulo==='Antônio Filho');t('ficha com capacidade 40',eqAnt&&eqAnt.capacidadeSemanal==='40');
+ await call('/data?module=equipe&id='+eqAnt.id,{m:'PUT',ck:G,b:{email:'antonio@teste.com'}});
+ const MAILLOG=process.env.MAILLOG;
+ r=await call('/data?module=tarefas',{m:'POST',ck:G,b:{titulo:'Atribuída ao Antônio',responsavel:'Antônio Filho',prazo:'2020-01-01'}});const tid=r.j.id;
+ if(MAILLOG){const ml=require('fs').readFileSync(MAILLOG,'utf8');t('e-mail de atribuição enviado ao Antônio',ml.includes('antonio@teste.com')&&ml.includes('Nova atribuição'));}
+ const E2=(await call('/auth/login',{m:'POST',b:{codigo:'EDU-3305',senha:pw('EDU-3305')}})).c.split(';')[0];
+ r=await call('/data?module=tarefas&id='+tid,{m:'PUT',ck:E2,b:{responsavel:'Monique Vilante'}});t('Equipe não reatribui item de outra pessoa',r.s===403);
+ r=await call('/data?module=tarefas&id='+tid,{m:'PUT',ck:E2,b:{status:'EM ANDAMENTO'}});t('Equipe ainda edita outros campos (colaboração)',r.s===200);
+ r=await call('/data?module=tarefas&id='+tid,{m:'PUT',ck:G,b:{responsavel:'Monique Vilante'}});t('Gerente reatribui',r.s===200);
+ r=await call('/auth/forgot',{m:'POST',b:{codigo:'ALU-3304',tipo:'interno'},csrf:false});t('esqueci senha: resposta genérica',r.s===200&&r.j.ok);
+ r=await call('/auth/forgot',{m:'POST',b:{codigo:'NAO-EXISTE',tipo:'interno'},csrf:false});t('esqueci senha: não revela se existe',r.s===200&&r.j.mensagem.includes('Se o código existir'));
+ r=await call('/admin/users',{ck:G});t('Acessos marca quem pediu nova senha',r.j.find(x=>x.codigo==='ALU-3304').pediuReset===true&&!r.j.find(x=>x.codigo==='EDU-3305').pediuReset);
+ await call('/admin/reset-password',{m:'POST',ck:G,b:{tipo:'interno',codigo:'ALU-3304'}});
+ r=await call('/admin/users',{ck:G});t('após redefinir, marcação some',r.j.find(x=>x.codigo==='ALU-3304').pediuReset===false);
+ r=await call('/portal/requests',{m:'POST',pt:(await call('/portal/login',{m:'POST',b:{codigo:'FIN-2603',senha:pw('FIN-2603')}})).j.token,b:{titulo:'Teste e-mail',objetivo:'x',segmento:'Anos Finais',prioridade:'NORMAL'}});
+ if(MAILLOG){const ml=require('fs').readFileSync(MAILLOG,'utf8');t('e-mail à Gerente de nova demanda do Portal',ml.includes('Nova demanda: Teste e-mail'));}
+ await call('/data?module=tarefas',{m:'POST',ck:G,b:{titulo:'Prazo vencido do Antônio',responsavel:'Antônio Filho',prazo:'2020-01-02'}});
  console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0)})();

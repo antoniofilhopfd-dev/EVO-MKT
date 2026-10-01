@@ -47,8 +47,10 @@ try{
             $importados[$mod]=$n;
         }
     }
+    $fichas=seedEquipe('instalador');
     file_put_contents($lock,now());
     echo "INSTALAÇÃO CONCLUÍDA\n\nSenhas temporárias (anote AGORA; não serão exibidas de novo; troque no primeiro acesso):\n";
     foreach($pw as $k=>$v)echo " - $k: $v\n";
+    echo "\nFichas de Equipe criadas: $fichas (ajuste e-mail e capacidade em Equipe).\n";
     echo "\nRegistros importados por módulo: ".json_encode($importados,JSON_UNESCAPED_UNICODE)."\n\nApague install.php do servidor.\n";
 }catch(Throwable $e){http_response_code(500);echo 'Erro: '.$e->getMessage()."\n";}

@@ -118,8 +118,32 @@ function teamMayDelete(array $u,array $row):bool{
 // ---------- e-mail (opcional, melhor esforço; configure 'notify_to' e 'mail_from' em config.php) ----------
 function notifyMail(string $assunto,string $texto,?string $to=null):void{
     $c=cfg();$to=$to??($c['notify_to']??'');if($to==='')return;
+    if(!empty($c['mail_log'])){@file_put_contents($c['mail_log'],json_encode(['to'=>$to,'assunto'=>$assunto,'texto'=>$texto],JSON_UNESCAPED_UNICODE)."\n",FILE_APPEND);return;}
     $from=$c['mail_from']??('nao-responda@'.($_SERVER['HTTP_HOST']??'localhost'));
     $h="From: EVO MKT <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
     try{if(!@mail($to,'=?UTF-8?B?'.base64_encode('[EVO MKT] '.$assunto).'?=',$texto,$h))throw new RuntimeException('mail() falhou');}
     catch(Throwable $e){@file_put_contents(__DIR__.'/../storage/erro.log',date('c').' mail: '.$e->getMessage()."\n",FILE_APPEND);}
+}
+
+function emailForPerson(string $name):string{
+    $n=mb_strtolower(trim($name));if($n==='')return '';
+    foreach(listRows('equipe') as $r){if(mb_strtolower(trim($r['titulo']??''))===$n&&filter_var($r['email']??'',FILTER_VALIDATE_EMAIL))return $r['email'];}
+    return '';
+}
+/** Avisa a pessoa quando um item passa a ser dela (melhor esforço; precisa de e-mail na ficha da Equipe). */
+function notifyAssignment(string $mod,array $new,?array $old,string $actorName):void{
+    if(!in_array($mod,['tarefas','projetos','conteudos','eventos','solicitacoes','agenda'],true))return;
+    $resp=trim($new['responsavel']??'');if($resp===''||mb_strtolower($resp)===mb_strtolower($actorName))return;
+    if($old&&mb_strtolower(trim($old['responsavel']??''))===mb_strtolower($resp))return;
+    $to=emailForPerson($resp);if($to==='')return;
+    notifyMail('Nova atribuição: '.($new['titulo']??$new['id']),"Olá, $resp!\n\n$actorName atribuiu a você: ".($new['titulo']??'')."\nMódulo: $mod · Prazo: ".($new['prazo']??'—')."\n\nAcesse o EVO MKT para ver os detalhes.",$to);
+}
+/** Cria a ficha de Equipe (capacidade, e-mail, função) de cada acesso interno que ainda não tem. */
+function seedEquipe(string $ator):int{
+    $n=0;$have=array_map(fn($r)=>mb_strtolower(trim($r['titulo']??'')),listRows('equipe'));
+    foreach(q('SELECT codigo,nome,role,label FROM users WHERE ativo=1 ORDER BY codigo') as $u){
+        if(in_array(mb_strtolower($u['nome']),$have,true))continue;
+        insertRow('equipe',['titulo'=>$u['nome'],'status'=>'ATIVO','funcao'=>$u['label'],'nivelAcesso'=>$u['role']==='manager'?'Administrador':'Marketing','capacidadeSemanal'=>'40','ativo'=>'SIM','email'=>'','codigoInterno'=>$u['codigo']],$ator);$n++;
+    }
+    return $n;
 }

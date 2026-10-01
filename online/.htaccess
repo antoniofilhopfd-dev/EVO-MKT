@@ -4,7 +4,7 @@ RewriteCond %{HTTPS} !=on
 RewriteCond %{HTTP:X-Forwarded-Proto} !https
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 RewriteRule ^api/(.*)$ api/index.php [L,QSA]
-<FilesMatch "^(config(\.sample)?\.php|install\.php\.done|.*\.sqlite|.*\.log)$">
+<FilesMatch "^(config(\.sample)?\.php|install\.php\.done|cron_alertas\.php|.*\.sqlite|.*\.log)$">
   Require all denied
 </FilesMatch>
 <IfModule mod_headers.c>

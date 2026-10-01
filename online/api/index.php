@@ -89,9 +89,16 @@ try{
         if($u['role']!=='manager'&&!in_array($mod,TEAM_WRITE,true)&&!($mod==='lixeira'))fail(403,'Seu perfil não pode alterar este módulo.');
         if($u['role']!=='manager'&&$mod==='lixeira'&&$method==='DELETE')fail(403,'Exclusão permanente apenas para a Gerente.');
         autoBackupIfDue();
-        if($method==='POST')out(insertRow($mod,body(),$u['codigo']),201);
+        if($method==='POST'){$novo=insertRow($mod,body(),$u['codigo']);notifyAssignment($mod,$novo,null,$u['nome']);out($novo,201);}
         if($id==='')fail(400,'Informe o id.');
-        if($method==='PUT')out(updateRow($mod,$id,body(),$u['codigo']));
+        if($method==='PUT'){
+            $patch=body();$antes=getRow($mod,$id)??fail(404,'Registro não encontrado.');
+            if($u['role']!=='manager'&&array_key_exists('responsavel',$patch)){
+                $dono=trim($antes['responsavel']??'');$novoResp=trim(strv($patch['responsavel']));
+                if($dono!==''&&mb_strtolower($dono)!==mb_strtolower($u['nome'])&&$novoResp!==$dono)fail(403,'Só a Gerente ou o responsável atual pode reatribuir este item.');
+            }
+            $dep=updateRow($mod,$id,$patch,$u['codigo']);notifyAssignment($mod,$dep,$antes,$u['nome']);out($dep);
+        }
         if($method==='DELETE'){
             $alvo=getRow($mod,$id)??fail(404,'Registro não encontrado.');
             if(!teamMayDelete($u,$alvo))fail(403,'Você só pode excluir itens criados por você ou atribuídos a você.');
@@ -154,8 +161,8 @@ try{
     }
     case $path==='/admin/users': {
         requireManager();$o=[];
-        foreach(q('SELECT codigo,nome,role,label,ativo,must_change FROM users ORDER BY codigo') as $r){$o[]=['tipo'=>'interno','codigo'=>$r['codigo'],'nome'=>$r['nome'],'perfil'=>$r['label'],'ativo'=>(bool)$r['ativo'],'trocarSenha'=>(bool)$r['must_change']];}
-        foreach(q('SELECT codigo,nome,perfil,segmentos,ativo,must_change FROM portal_users ORDER BY codigo') as $r){$o[]=['tipo'=>'portal','codigo'=>$r['codigo'],'nome'=>$r['nome'],'perfil'=>implode(', ',json_decode($r['segmentos'],true)),'ativo'=>(bool)$r['ativo'],'trocarSenha'=>(bool)$r['must_change']];}
+        foreach(q('SELECT codigo,nome,role,label,ativo,must_change FROM users ORDER BY codigo') as $r){$o[]=['tipo'=>'interno','codigo'=>$r['codigo'],'nome'=>$r['nome'],'perfil'=>$r['label'],'ativo'=>(bool)$r['ativo'],'trocarSenha'=>(bool)$r['must_change'],'pediuReset'=>pediuReset($r['codigo']),'email'=>emailForPerson($r['nome'])];}
+        foreach(q('SELECT codigo,nome,perfil,segmentos,ativo,must_change FROM portal_users ORDER BY codigo') as $r){$o[]=['tipo'=>'portal','codigo'=>$r['codigo'],'nome'=>$r['nome'],'perfil'=>implode(', ',json_decode($r['segmentos'],true)),'ativo'=>(bool)$r['ativo'],'trocarSenha'=>(bool)$r['must_change'],'pediuReset'=>pediuReset($r['codigo']),'email'=>''];}
         out($o);
     }
     case $path==='/admin/user-active' && $method==='POST': {
@@ -165,6 +172,14 @@ try{
         if(!q("SELECT 1 FROM $tab WHERE codigo=?",[$cod])->fetch())fail(404,'Usuário não encontrado.');
         q("UPDATE $tab SET ativo=? WHERE codigo=?",[$on,$cod]);if(!$on)q('DELETE FROM sessions WHERE codigo=?',[$cod]);
         audit($m['codigo'],($on?'ativar:':'desativar:').$cod);out(['ok'=>true]);
+    }
+    case $path==='/admin/seed-equipe' && $method==='POST': {$m=requireManager();out(['criados'=>seedEquipe($m['codigo'])]);}
+    case $path==='/auth/forgot' && $method==='POST': {
+        $in=body();$cod=strtoupper(trim((string)($in['codigo']??'')));$tipo=(($in['tipo']??'')==='portal')?'portal':'int';
+        rateCheck('forgot|'.ip(),10);rateFail('forgot|'.ip());
+        $tab=$tipo==='portal'?'portal_users':'users';$u=$cod!==''?q("SELECT nome FROM $tab WHERE codigo=? AND ativo=1",[$cod])->fetch():false;
+        if($u){audit($cod,'esqueci-senha');notifyMail('Pedido de redefinição de senha',"{$u['nome']} ($cod) pediu a redefinição da senha.\nEntre em Administração → Acessos e gere uma senha temporária.");}
+        out(['ok'=>true,'mensagem'=>'Se o código existir, a Gerente foi avisada e vai gerar uma senha temporária para você.']);
     }
     case $path==='/admin/audit': {
         requireManager();$lim=min(500,max(10,(int)qs('limit')?:100));
@@ -231,7 +246,7 @@ try{
 
 function checkCsrfOrPortal(string $path):void{
     // Rotas públicas de login e chamadas do Portal (token em cabeçalho) não dependem de cookie.
-    if($path==='/auth/login'||$path==='/portal/login')return;
+    if($path==='/auth/login'||$path==='/portal/login'||$path==='/auth/forgot')return;
     if(isset($_SERVER['HTTP_X_PORTAL_TOKEN'])&&portalUser()!==null&&internalUser()===null)return;
     checkCsrf();
 }
@@ -248,13 +263,14 @@ function portalRestrictedUpdate(array $u,string $method,string $mod,string $id):
     }
     foreach(UPDATE_FIELDS as $k)if(array_key_exists($k,$in))$row[$k]=strv($in[$k]);
     $ap=mb_strtoupper(trim($row['aprovacaoSolicitante']??''));$t=now();
-    if($ap==='APROVADO'){
+    $traz=fn(string $k)=>array_key_exists($k,$in);  // só avalia transições quando o pedido traz o campo (avaliação posterior à aprovação não é nova aprovação)
+    if($traz('aprovacaoSolicitante')&&$ap==='APROVADO'){
         str_contains($cur,'AGUARDANDO APROVAÇÃO')||fail(409,'Esta demanda não está aguardando aprovação.');
         $row['status']='CONCLUÍDA';$row['triagemStatus']='CONCLUÍDA';if(($row['aprovadoSolicitanteEm']??'')==='')$row['aprovadoSolicitanteEm']=$t;
-    }elseif($ap==='AJUSTES SOLICITADOS'){
+    }elseif($traz('aprovacaoSolicitante')&&$ap==='AJUSTES SOLICITADOS'){
         str_contains($cur,'AGUARDANDO APROVAÇÃO')||fail(409,'Esta demanda não está aguardando aprovação.');
         $row['status']='EM EXECUÇÃO';$row['triagemStatus']='DISTRIBUÍDA';if(($row['respondidoSolicitanteEm']??'')==='')$row['respondidoSolicitanteEm']=$t;
-    }elseif(trim($row['respostaSolicitante']??'')!==''){
+    }elseif($traz('respostaSolicitante')&&trim($row['respostaSolicitante']??'')!==''){
         (str_contains($cur,'AGUARDANDO SOLICITANTE')||str_contains($cur,'DEVOLVIDA PARA AJUSTES'))||fail(409,'Esta demanda não está aguardando resposta.');
         $row['status']='EM ANÁLISE';$row['triagemStatus']='EM TRIAGEM';if(($row['respondidoSolicitanteEm']??'')==='')$row['respondidoSolicitanteEm']=$t;
     }
@@ -296,4 +312,10 @@ function serveFile(string $rel,?array $portal):never{
     $mime=['pdf'=>'application/pdf','png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','gif'=>'image/gif','webp'=>'image/webp','mp4'=>'video/mp4','txt'=>'text/plain'][strtolower(pathinfo($fp,PATHINFO_EXTENSION))]??'application/octet-stream';
     header_remove('Content-Type');header('Content-Type: '.$mime);header('Content-Disposition: inline; filename="'.basename($fp).'"');header('X-Content-Type-Options: nosniff');header("Content-Security-Policy: sandbox");
     readfile($fp);exit;
+}
+
+function pediuReset(string $cod):bool{
+    $a=q("SELECT MAX(id) m FROM audit_log WHERE ator=? AND acao='esqueci-senha'",[$cod])->fetch()['m']??null;if(!$a)return false;
+    $b=q('SELECT MAX(id) m FROM audit_log WHERE acao=?',['reset-senha:'.$cod])->fetch()['m']??null;
+    return !$b||(int)$a>(int)$b;
 }

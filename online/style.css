@@ -158,3 +158,45 @@ header{min-width:0}.crumb{min-width:0;flex:0 1 auto}.topactions{min-width:0;flex
 .sidebar-collapsed .brand{padding:18px 0 14px}
 .login-logo{width:200px;min-width:150px;height:auto;margin:0 0 22px}
 @media print{#content::before{height:44px;margin:0 0 18px}}
+
+/* v4.2.0 — acabamento visual com a fonte Objectivity */
+body{font-size:15px}
+.btn,.softbtn,.control,select,input,textarea,.view-switch button{font-size:14px}
+.btn,.softbtn{white-space:nowrap}
+.personal-breakdown>div{gap:10px}
+/* gráfico de barras do Dashboard: a linha não pode ter 7px de altura (só a barra interna) */
+.bar-list>div{height:auto;background:none;border-radius:0;overflow:visible}
+.bar-list>div>div{height:8px;background:#edf0f5;border-radius:99px;overflow:hidden}
+.bar-list span,.bar-list b{font-size:12.5px}
+.toast{pointer-events:none;max-width:340px}
+/* Solicitações: ações de triagem em linha (antes empilhavam em coluna) */
+.triage-row{grid-template-columns:minmax(0,1fr) auto}
+.triage-row .triage-actions{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;max-width:480px}
+.triage-actions .executor-select{width:160px}.triage-actions .negotiated-date{width:150px}
+
+/* Tarefas (quadro) — cartões com responsável e atraso */
+.kb-owner{display:flex;align-items:center;gap:7px}.kb-avatar{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#e9efff;color:var(--blue);font:700 11px/1 inherit;font-style:normal}
+.kb-late{color:var(--danger);font-weight:700}
+/* Eventos (linha do tempo) */
+.tl-wrap{display:grid;gap:18px}.tl-section h3{margin:0 0 6px}.tl-month{margin:16px 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.timeline{list-style:none;margin:0;padding:0 0 0 0;position:relative}
+.tl-item{display:grid;grid-template-columns:64px 22px minmax(0,1fr);gap:10px;align-items:start;padding:8px 0;position:relative}
+.tl-item:before{content:'';position:absolute;left:75px;top:0;bottom:0;width:2px;background:#e2e4ec}
+.tl-date{text-align:center;line-height:1.1}.tl-date b{display:block;font-size:24px;color:var(--blue2)}.tl-date span{font-size:11px;text-transform:uppercase;color:var(--muted)}
+.tl-dot{width:14px;height:14px;border-radius:50%;background:var(--blue);border:3px solid #fff;box-shadow:0 0 0 2px var(--blue);margin:8px 0 0 -1px;position:relative;z-index:1}
+.tl-item.live .tl-dot{background:var(--orange);box-shadow:0 0 0 2px var(--orange)}.tl-item.post .tl-dot{background:#1e7e4d;box-shadow:0 0 0 2px #1e7e4d}.tl-item.past{opacity:.7}
+.tl-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px}.tl-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.tl-card p{margin:6px 0;color:var(--muted);font-size:13px}.tl-card footer{display:flex;gap:12px;font-size:12px;color:var(--muted)}.tl-card footer em{font-style:normal;font-weight:700;color:var(--blue)}.tl-warn{color:#b45309}
+.tl-past summary{cursor:pointer;font-weight:700;color:var(--muted)}
+/* Campanhas (cartões de resultado) */
+.camp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.camp-card{background:#fff;border:1px solid var(--border);border-top:5px solid var(--blue);border-radius:16px;padding:16px;display:grid;gap:10px;align-content:start}
+.camp-card.good{border-top-color:#1e7e4d}.camp-card.warn{border-top-color:var(--orange)}.camp-card.bad{border-top-color:var(--danger)}.camp-card.neutral{border-top-color:#9aa3b8}
+.camp-top{display:flex;justify-content:space-between;align-items:center}.camp-top small{color:var(--muted)}.camp-card h4{margin:0;font-size:17px}
+.camp-obj{margin:0;color:var(--muted);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.camp-bar{height:8px;border-radius:99px;background:#edf0f5;overflow:hidden}.camp-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--orange))}.camp-period small{display:block;margin-top:5px;color:var(--muted);font-size:12px}
+.camp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}.camp-stats div{background:#f7f8fc;border-radius:10px;padding:8px 10px}.camp-stats dt{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.camp-stats dd{margin:3px 0 0;font-weight:700;font-size:13px}
+
+.view-switch button{white-space:nowrap}
+
+.forgot{text-align:center;margin:12px 0 0;font-size:13px}.forgot a{color:var(--blue);font-weight:700}.login-ok{background:#eaf7ef;color:#1e7e4d;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:13px}.badge.warn{background:#fff3e0;color:#b45309}

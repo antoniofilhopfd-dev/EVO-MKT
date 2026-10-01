@@ -7,12 +7,12 @@ D=${1:-/tmp/evo-test}; HERE=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$HERE/.."
 mkdir -p "$D" && cp -r "$ROOT"/. "$D"/ && rm -f "$D/config.php" "$D/storage/installed.lock" "$D/storage/evo.sqlite"
 if [ "$DB" = "mysql" ]; then
 cat > "$D/config.php" <<C
-<?php return ['db'=>['driver'=>'mysql','host'=>'127.0.0.1','name'=>'evotest','user'=>'evo','pass'=>'evopass'],'install_key'=>'chave-de-teste-123','timezone'=>'America/Recife','session_hours'=>12,'max_upload_mb'=>20,'backup_keep'=>30];
+<?php return ['db'=>['driver'=>'mysql','host'=>'127.0.0.1','name'=>'evotest','user'=>'evo','pass'=>'evopass'],'install_key'=>'chave-de-teste-123','timezone'=>'America/Recife','session_hours'=>12,'max_upload_mb'=>20,'backup_keep'=>30,'notify_to'=>'gerente@teste.com','mail_log'=>__DIR__.'/storage/mail.log'];
 C
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "DROP DATABASE IF EXISTS evotest; CREATE DATABASE evotest CHARACTER SET utf8mb4;" || mysql -uroot -e "DROP DATABASE IF EXISTS evotest; CREATE DATABASE evotest CHARACTER SET utf8mb4;"
 else
 cat > "$D/config.php" <<C
-<?php return ['db'=>['driver'=>'sqlite','path'=>__DIR__.'/storage/evo.sqlite'],'install_key'=>'chave-de-teste-123','timezone'=>'America/Recife','session_hours'=>12,'max_upload_mb'=>20,'backup_keep'=>30];
+<?php return ['db'=>['driver'=>'sqlite','path'=>__DIR__.'/storage/evo.sqlite'],'install_key'=>'chave-de-teste-123','timezone'=>'America/Recife','session_hours'=>12,'max_upload_mb'=>20,'backup_keep'=>30,'notify_to'=>'gerente@teste.com','mail_log'=>__DIR__.'/storage/mail.log'];
 C
 fi
 mkdir -p "$D/storage/import" && cp -r "$REPO/DADOS" "$D/storage/import/DADOS"
