@@ -216,3 +216,9 @@ body{font-size:15px}
 }
 @media(max-width:720px){.search{flex:1 1 60px;min-width:60px}.search input{padding-right:6px}#newBtn{padding:8px 11px;margin-left:2px}.topactions{gap:6px}.notify-btn{flex:0 0 auto}}
 @media(max-width:720px){.toolbar-actions{flex-wrap:wrap;justify-content:flex-start;max-width:100%}.search{min-width:40px}.search input{font-size:13px}.topactions{padding-right:2px}}
+
+/* Integrações */
+.int-note{background:#eef3ff;border:1px solid #d5e0fb;border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:13px;color:#2b3a6b}
+.int-card .uri-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.int-card .uri-row small{flex:1 1 100%;color:var(--muted)}.int-card code,.card code{background:#f1f3f9;padding:4px 7px;border-radius:6px;font-size:12px;word-break:break-all}
+.int-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.check-row{display:flex;gap:8px;align-items:center;font-size:13px;margin:8px 0}
+.int-card .btn{display:inline-block;text-decoration:none}

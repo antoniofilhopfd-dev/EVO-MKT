@@ -14,6 +14,12 @@
 ## v4.1.x
 - Logos e fonte oficiais, PWA, Administração, importação CSV, auditoria, backups.
 
+## v4.3.0
+- **Instagram (Meta Graph API):** conexão OAuth, métricas automáticas na tela Instagram, **publicação e agendamento** de posts/reels/stories (JPEG ou vídeo) com fila e cron, renovação de token.
+- **Google:** Agenda em 2 vias, Drive (entregas por solicitação, automático ou manual), Planilhas (relatórios por módulo).
+- Segredos criptografados (AES-256-GCM), logs, `cron_integracoes.php`, `GUIA_INTEGRACOES.md`.
+- Testes com servidores simulados da Meta e do Google.
+
 ## v4.2.1
 - Governança: anel da meta mostra o valor real (estava fixo em 70%) e o texto não se sobrepõe mais.
 - Instagram/Tráfego: cabeçalho não fica mais cortado; celular: títulos, valores e botões ajustados.

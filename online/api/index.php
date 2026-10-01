@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/lib.php';
+require __DIR__.'/integrations.php';
+require __DIR__.'/google.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
@@ -136,11 +138,85 @@ try{
         $saved=saveUploads($id,'ENTREGA');
         $cur=array_filter(array_map('trim',explode('|',$row['arquivosEntrega']??'')));
         $row['arquivosEntrega']=implode(' | ',array_merge($cur,$saved));$row['atualizadoEm']=now();saveRow('solicitacoes',$row);
-        audit($u['codigo'],'upload-entrega','solicitacoes',$id);out(['files'=>$saved]);
+        audit($u['codigo'],'upload-entrega','solicitacoes',$id);
+        if(setting('g_auto_drive_entregas')==='1'&&gConnected()){try{gDriveSendEntregas($id);}catch(Throwable $e){intLog('google','erro','Drive automático: '.$e->getMessage());}}
+        out(['files'=>$saved]);
     }
     case $path==='/file': {
         $u=requireInternal();serveFile(qs('path'),null);
     }
+
+    // ---------- Integrações (Instagram / Google) ----------
+    case $path==='/public/media': serveSignedMedia();
+    case $path==='/integrations/meta/callback' || $path==='/integrations/google/callback': {
+        $svc=str_contains($path,'meta')?'meta':'google';
+        $dest='/?page=administracao&int=';
+        try{
+            if(!checkState((string)($_GET['state']??''),$svc))throw new RuntimeException('Sessão de conexão expirada. Tente de novo.');
+            if(!empty($_GET['error']))throw new RuntimeException('Autorização negada: '.($_GET['error_description']??$_GET['error']));
+            $svc==='meta'?metaFinishConnect((string)($_GET['code']??'')):gFinishConnect((string)($_GET['code']??''));
+            audit('integracao:'.$svc,'conectado');
+            header('Location: '.$dest.$svc.'_ok');
+        }catch(Throwable $e){
+            intLog($svc,'erro',$e->getMessage());
+            header('Location: '.$dest.$svc.'_erro&msg='.rawurlencode(mb_substr($e->getMessage(),0,200)));
+        }
+        http_response_code(302);exit;
+    }
+    case $path==='/integrations/status': {
+        requireManager();ensureIntegrationSchema();
+        $exp=(int)setting('meta_token_expira','0');
+        out(['instagram'=>['configurado'=>setting('meta_app_id')!==''&&setting('meta_app_secret')!=='','appId'=>setting('meta_app_id'),'conectado'=>metaConnected(),'usuario'=>setting('ig_username'),'pagina'=>setting('meta_page_name'),'expiraEm'=>$exp?date('c',$exp):'','ultimaSync'=>setting('ig_last_sync')],
+            'google'=>['configurado'=>setting('g_client_id')!==''&&setting('g_client_secret')!=='','clientId'=>setting('g_client_id'),'conectado'=>gConnected(),'email'=>setting('g_email'),'ultimaAgenda'=>setting('g_last_cal_sync'),'planilhaUrl'=>setting('g_sheet_url'),'ultimaPlanilha'=>setting('g_last_sheet_export'),'driveAuto'=>setting('g_auto_drive_entregas')==='1','driveFolder'=>setting('g_drive_folder_id'),'planilhaModulos'=>setting('g_sheet_modules',implode(',',GSHEET_DEFAULT_MODULES))],
+            'redirectUris'=>['meta'=>publicUrl().'/api/integrations/meta/callback','google'=>publicUrl().'/api/integrations/google/callback'],
+            'cron'=>'php '.dirname(__DIR__).'/cron_integracoes.php']);
+    }
+    case $path==='/integrations/settings' && $method==='POST': {
+        $u=requireManager();$in=body();
+        foreach(['meta_app_id','meta_app_secret','g_client_id','g_client_secret'] as $k){if(isset($in[$k])&&trim(strv($in[$k]))!=='')setSetting($k,trim(strv($in[$k])));}
+        if(isset($in['g_auto_drive_entregas']))setSetting('g_auto_drive_entregas',!empty($in['g_auto_drive_entregas'])?'1':'0');
+        if(isset($in['g_sheet_modules'])){$mm=array_values(array_filter(array_map('trim',explode(',',strv($in['g_sheet_modules']))),fn($m)=>isset(MODULES[$m])));setSetting('g_sheet_modules',implode(',',$mm));}
+        audit($u['codigo'],'integracoes-config');out(['ok'=>true]);
+    }
+    case $path==='/integrations/meta/connect': {requireManager();ensureIntegrationSchema();header('Location: '.metaConnectUrl());http_response_code(302);exit;}
+    case $path==='/integrations/google/connect': {requireManager();ensureIntegrationSchema();header('Location: '.gConnectUrl());http_response_code(302);exit;}
+    case $path==='/integrations/meta/token' && $method==='POST': {
+        $u=requireManager();$in=body();$tok=trim(strv($in['token']??''));if($tok==='')fail(400,'Informe o token.');
+        setSetting('meta_token',$tok);setSetting('meta_token_expira','0');
+        try{if(trim(strv($in['ig_user_id']??''))!==''){setSetting('ig_user_id',trim(strv($in['ig_user_id'])));}else{metaDiscoverAccount();}}catch(Throwable $e){fail(400,$e->getMessage());}
+        audit($u['codigo'],'instagram-token-manual');out(['ok'=>true]);
+    }
+    case $path==='/integrations/meta/disconnect' && $method==='POST': {$u=requireManager();foreach(['meta_token','meta_token_expira','ig_user_id','ig_username','meta_page_name'] as $k)setSetting($k,'');audit($u['codigo'],'instagram-desconectado');out(['ok'=>true]);}
+    case $path==='/integrations/google/disconnect' && $method==='POST': {$u=requireManager();foreach(['g_refresh_token','g_access_token','g_access_expira','g_email'] as $k)setSetting($k,'');audit($u['codigo'],'google-desconectado');out(['ok'=>true]);}
+    case $path==='/integrations/instagram/sync' && $method==='POST': {
+        $u=requireManager();try{metaRefreshIfNeeded();$n=igSync();}catch(Throwable $e){intLog('instagram','erro',$e->getMessage());fail(502,$e->getMessage());}
+        out(['periodos'=>$n]);
+    }
+    case $path==='/integrations/instagram/queue': {
+        requireInternal();ensureIntegrationSchema();$st=[];foreach(q('SELECT * FROM ig_publish')->fetchAll() as $s)$st[$s['conteudo_id']]=$s;$o=[];
+        foreach(listRows('conteudos') as $r){
+            if(($r['publicarInstagram']??'')!=='SIM')continue;
+            $s=$st[$r['id']]??null;
+            $o[]=['id'=>$r['id'],'titulo'=>$r['titulo']??'','status'=>$r['status']??'','publicacaoEm'=>$r['publicacaoEm']??'','formato'=>$r['formato']??'','midia'=>$r['midiaInstagram']??'','publicado'=>!empty($r['instagramMediaId']),'link'=>$r['instagramLink']??'','estado'=>$s['status']??'','erro'=>$s['erro']??''];
+        }
+        out($o);
+    }
+    case $path==='/integrations/instagram/media' && $method==='POST': {$u=requireInternal();$rel=igSaveMedia(qs('id'));audit($u['codigo'],'instagram-midia','conteudos',qs('id'));out(['midia'=>$rel]);}
+    case $path==='/integrations/instagram/publish' && $method==='POST': {
+        $u=requireInternal();$in=body();
+        try{$r=igPublish(strv($in['id']??''),$u['codigo']);}catch(Throwable $e){
+            igMarkError(strv($in['id']??''),$e->getMessage());
+            intLog('instagram','erro',$e->getMessage());fail(502,$e->getMessage());}
+        audit($u['codigo'],'instagram-publicado','conteudos',strv($in['id']??''));out($r);
+    }
+    case $path==='/integrations/google/calendar/sync' && $method==='POST': {requireManager();try{out(gCalendarSync());}catch(Throwable $e){intLog('google','erro',$e->getMessage());fail(502,$e->getMessage());}}
+    case $path==='/integrations/google/sheets/export' && $method==='POST': {requireManager();try{$r=gSheetsExport();out(['abas'=>$r,'url'=>setting('g_sheet_url')]);}catch(Throwable $e){intLog('google','erro',$e->getMessage());fail(502,$e->getMessage());}}
+    case $path==='/integrations/google/drive/send-entregas' && $method==='POST': {
+        requireManager();$n=0;
+        try{foreach(listRows('solicitacoes') as $r){if(!empty($r['arquivosEntrega']))$n+=gDriveSendEntregas($r['id']);}}catch(Throwable $e){intLog('google','erro',$e->getMessage());fail(502,$e->getMessage());}
+        out(['arquivos'=>$n]);
+    }
+    case $path==='/integrations/log': {requireManager();ensureIntegrationSchema();out(q('SELECT quando,servico,nivel,msg FROM integration_log ORDER BY id DESC LIMIT 40')->fetchAll());}
 
     // ---------- Portal do Solicitante ----------
     case $path==='/portal/login' && $method==='POST': {
