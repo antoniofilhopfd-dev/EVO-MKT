@@ -521,7 +521,7 @@ function bindGoButtons(){$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.g
 const EDITORIAL_FORMATS=['Feed','Carrossel','Stories','Reels','Vídeo','Foto','Outro'];
 function editorialPrefs(){return pref('editorial',{targetPerWeek:5,targetReels:4,targetStories:12,targetCampaignCoverage:3})}
 function saveEditorialPrefs(v){setPref('editorial',v)}
-function monthKey(v){return String(v||'').slice(0,7)}
+
 function editorialSnapshot(data){
  const now=new Date(),month=now.toISOString().slice(0,7),next30=new Date(now);next30.setDate(now.getDate()+30);
  const contents=(data.conteudos||[]), campaigns=(data.campanhas||[]), events=(data.eventos||[]), ep=editorialPrefs();

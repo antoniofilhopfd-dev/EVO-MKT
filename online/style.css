@@ -114,3 +114,23 @@ body{overflow-x:hidden}.notify-btn{width:40px;height:40px;border:1px solid var(-
 .meta-prep p{margin:0;color:#4e596a;font-size:13px;line-height:1.5}
 .compare-table td,.compare-table th{padding:8px 10px}
 @media(max-width:1050px){.social-kpis.six{grid-template-columns:repeat(2,1fr)}.traffic-kpis.four{grid-template-columns:repeat(2,1fr)}}
+
+/* v4.1.0 online — administração */
+.admin-overlay{position:fixed;inset:0;background:rgba(10,20,50,.5);display:grid;place-items:center;z-index:9999;padding:16px}
+.admin-box{background:#fff;border-radius:16px;padding:22px;max-width:620px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.admin-box h3{margin:0 0 8px}.admin-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.temp-pass{font:700 26px/1 ui-monospace,Consolas,monospace;letter-spacing:.08em;background:#eef3ff;border:1px dashed #1e3a8a;border-radius:10px;padding:16px;text-align:center;user-select:all}
+.admin-tabs{margin:6px 0 14px}.admin-form{display:grid;gap:10px}.admin-form label{display:grid;gap:4px;font-size:12px;font-weight:700;color:#4e596a}
+.admin-form input,.admin-form textarea{font:inherit;padding:9px 10px;border:1px solid var(--border);border-radius:8px}
+.notice-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #edf0f5}.notice-row small{display:block;color:#7d8494}.notice-row p{margin:6px 0 0}
+
+/* cabeçalho adaptável (evita estouro em janelas menores) */
+header{min-width:0}.crumb{min-width:0;flex:0 1 auto}.topactions{min-width:0;flex:1 1 auto;justify-content:flex-end;flex-wrap:nowrap}
+.search{flex:1 1 150px;min-width:110px;max-width:330px}.search input{min-width:0;width:100%}
+@media(max-width:1500px){.search kbd{display:none}.internal-user small{display:none}}
+@media(max-width:1250px){#backupBtn{display:none}.internal-logout{padding:4px 6px}}
+@media(max-width:1000px){#newBtn{font-size:0;padding:8px 12px}#newBtn:before{content:'+';font-size:18px}.crumb small{display:none}}
+/* evita que tabelas/cartões largos estiquem a página (grades CSS com min-width:auto) */
+.social-cockpit,.traffic-cockpit{grid-template-columns:minmax(0,1fr)}
+#content [class*="grid"]>*,#content [class*="cockpit"]>*,#content .distinct-history{min-width:0}
+.distinct-history{overflow-x:auto}

@@ -67,13 +67,13 @@ function getRow(string $mod,string $id):?array{$r=q('SELECT data FROM records WH
 function cleanInput(array $in):array{$o=[];foreach($in as $k=>$v){if(!is_string($k)||!preg_match('/^[A-Za-z][A-Za-z0-9_]{0,63}$/',$k))continue;$s=strv($v);if(strlen($s)>20000)fail(400,"Campo '$k' muito longo.");$o[$k]=$s;}return $o;}
 function insertRow(string $mod,array $row,string $ator):array{
  $row=cleanInput($row);unset($row['id']);$id=newId($mod);$t=now();
- $row=['id'=>$id]+$row;$row['criadoEm']=$t;$row['atualizadoEm']=$t;
+ $row=['id'=>$id]+$row;$row['criadoEm']=$t;$row['atualizadoEm']=$t;$row['criadoPor']=$ator;
  q('INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES(?,?,?,?,?)',[$mod,$id,json_encode($row,JSON_UNESCAPED_UNICODE),$t,$t]);
  mergeHeaders($mod,array_keys($row));audit($ator,'criar',$mod,$id);return $row;}
 function saveRow(string $mod,array $row):void{$t=$row['atualizadoEm'];q('UPDATE records SET data=?,atualizado_em=? WHERE modulo=? AND id=?',[json_encode($row,JSON_UNESCAPED_UNICODE),$t,$mod,$row['id']]);mergeHeaders($mod,array_keys($row));}
 function updateRow(string $mod,string $id,array $patch,string $ator):array{
  $cur=getRow($mod,$id)??fail(404,'Registro não encontrado.');$patch=cleanInput($patch);
- unset($patch['id'],$patch['criadoEm']);$new=array_merge($cur,$patch);$new['atualizadoEm']=now();saveRow($mod,$new);audit($ator,'editar',$mod,$id);return $new;}
+ unset($patch['id'],$patch['criadoEm'],$patch['criadoPor'],$patch['atualizadoPor']);$new=array_merge($cur,$patch);$new['atualizadoEm']=now();$new['atualizadoPor']=$ator;saveRow($mod,$new);audit($ator,'editar',$mod,$id);return $new;}
 function trashRow(string $mod,string $id,string $ator):void{
  $cur=getRow($mod,$id)??fail(404,'Registro não encontrado.');
  if($mod==='lixeira'){q('DELETE FROM records WHERE modulo=? AND id=?',['lixeira',$id]);audit($ator,'excluir-permanente','lixeira',$id);return;}
@@ -92,7 +92,7 @@ function autoBackupIfDue():void{$dir=__DIR__.'/../storage/backups';$f=glob("$dir
 
 // ---------- sessão / auth ----------
 function ip():string{return $_SERVER['REMOTE_ADDR']??'-';}
-function rateCheck(string $chave):void{$lim=time()-900;q('DELETE FROM login_attempts WHERE quando<?',[$lim]);$n=(int)q('SELECT COUNT(*) c FROM login_attempts WHERE chave=?',[$chave])->fetch()['c'];if($n>=5)fail(429,'Muitas tentativas. Aguarde 15 minutos.');}
+function rateCheck(string $chave,int $max=5):void{$lim=time()-900;q('DELETE FROM login_attempts WHERE quando<?',[$lim]);$n=(int)q('SELECT COUNT(*) c FROM login_attempts WHERE chave=?',[$chave])->fetch()['c'];if($n>=$max)fail(429,'Muitas tentativas. Aguarde 15 minutos.');}
 function rateFail(string $chave):void{q('INSERT INTO login_attempts(chave,quando) VALUES(?,?)',[$chave,time()]);}
 function startSession(string $tipo,string $codigo):string{$tok=bin2hex(random_bytes(32));$h=(int)(cfg()['session_hours']??12);q('INSERT INTO sessions(token_hash,tipo,codigo,expira) VALUES(?,?,?,?)',[hash('sha256',$tok),$tipo,$codigo,time()+$h*3600]);q('DELETE FROM sessions WHERE expira<?',[time()]);return $tok;}
 function sessionFor(string $tok,string $tipo):?array{if($tok==='')return null;$r=q('SELECT * FROM sessions WHERE token_hash=? AND tipo=? AND expira>?',[hash('sha256',$tok),$tipo,time()])->fetch();if(!$r)return null;
@@ -108,3 +108,18 @@ function strongPassword(string $p):void{if(strlen($p)<10||!preg_match('/[A-Za-z]
 function genPassword():string{$a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';$s='';for($i=0;$i<12;$i++)$s.=$a[random_int(0,strlen($a)-1)];return $s;}
 function allowedSegment(array $u,string $seg):bool{foreach($u['segmentos'] as $s)if(mb_strtolower(trim($s))===mb_strtolower(trim($seg)))return true;return false;}
 function publicRow(array $r):array{$o=[];foreach(PUBLIC_FIELDS as $k)if(array_key_exists($k,$r))$o[$k]=$r[$k];return $o;}
+
+// ---------- permissão por registro (Equipe só exclui o que criou ou é responsável) ----------
+function teamMayDelete(array $u,array $row):bool{
+    if($u['role']==='manager')return true;
+    $resp=trim($row['responsavel']??'');
+    return ($row['criadoPor']??'')===$u['codigo']||$resp===''||mb_strtolower($resp)===mb_strtolower($u['nome']);
+}
+// ---------- e-mail (opcional, melhor esforço; configure 'notify_to' e 'mail_from' em config.php) ----------
+function notifyMail(string $assunto,string $texto,?string $to=null):void{
+    $c=cfg();$to=$to??($c['notify_to']??'');if($to==='')return;
+    $from=$c['mail_from']??('nao-responda@'.($_SERVER['HTTP_HOST']??'localhost'));
+    $h="From: EVO MKT <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+    try{if(!@mail($to,'=?UTF-8?B?'.base64_encode('[EVO MKT] '.$assunto).'?=',$texto,$h))throw new RuntimeException('mail() falhou');}
+    catch(Throwable $e){@file_put_contents(__DIR__.'/../storage/erro.log',date('c').' mail: '.$e->getMessage()."\n",FILE_APPEND);}
+}

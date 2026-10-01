@@ -12,4 +12,5 @@ RewriteRule ^api/(.*)$ api/index.php [L,QSA]
   Header set X-Frame-Options "DENY"
   Header set Referrer-Policy "same-origin"
   Header set Strict-Transport-Security "max-age=31536000"
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>

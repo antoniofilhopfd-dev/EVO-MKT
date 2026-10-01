@@ -39,7 +39,7 @@ try{
     // ---------- autenticação interna ----------
     case $path==='/auth/login' && $method==='POST': {
         $in=body();$cod=strtoupper(trim((string)($in['codigo']??'')));$sen=(string)($in['senha']??'');
-        $key='int|'.ip().'|'.$cod;rateCheck($key);rateCheck('ip|'.ip());
+        $key='int|'.ip().'|'.$cod;rateCheck($key);rateCheck('ip|'.ip(),40);
         $u=q('SELECT * FROM users WHERE codigo=? AND ativo=1',[$cod])->fetch();
         if(!$u||!password_verify($sen,$u['pass_hash'])){rateFail($key);rateFail('ip|'.ip());audit($cod?:'?','login-falhou');fail(401,'Código ou senha inválidos.');}
         $tok=startSession('int',$cod);
@@ -93,6 +93,8 @@ try{
         if($id==='')fail(400,'Informe o id.');
         if($method==='PUT')out(updateRow($mod,$id,body(),$u['codigo']));
         if($method==='DELETE'){
+            $alvo=getRow($mod,$id)??fail(404,'Registro não encontrado.');
+            if(!teamMayDelete($u,$alvo))fail(403,'Você só pode excluir itens criados por você ou atribuídos a você.');
             if($mod==='lixeira')makeBackup('preexclusao');
             trashRow($mod,$id,$u['codigo']);out(['ok'=>true]);
         }
@@ -136,7 +138,7 @@ try{
     // ---------- Portal do Solicitante ----------
     case $path==='/portal/login' && $method==='POST': {
         $in=body();$cod=strtoupper(trim((string)($in['codigo']??'')));$sen=(string)($in['senha']??'');
-        $key='por|'.ip().'|'.$cod;rateCheck($key);rateCheck('ip|'.ip());
+        $key='por|'.ip().'|'.$cod;rateCheck($key);rateCheck('ip|'.ip(),40);
         $u=q('SELECT * FROM portal_users WHERE codigo=? AND ativo=1',[$cod])->fetch();
         if(!$u||!password_verify($sen,$u['pass_hash'])){rateFail($key);rateFail('ip|'.ip());audit($cod?:'?','portal-login-falhou');fail(401,'Código ou senha inválidos.');}
         $tok=startSession('por',$cod);audit($cod,'portal-login');
@@ -149,6 +151,27 @@ try{
         strongPassword((string)($in['nova']??''));
         q('UPDATE portal_users SET pass_hash=?,must_change=0 WHERE codigo=?',[password_hash((string)$in['nova'],PASSWORD_DEFAULT),$u['codigo']]);
         out(['ok'=>true]);
+    }
+    case $path==='/admin/users': {
+        requireManager();$o=[];
+        foreach(q('SELECT codigo,nome,role,label,ativo,must_change FROM users ORDER BY codigo') as $r){$o[]=['tipo'=>'interno','codigo'=>$r['codigo'],'nome'=>$r['nome'],'perfil'=>$r['label'],'ativo'=>(bool)$r['ativo'],'trocarSenha'=>(bool)$r['must_change']];}
+        foreach(q('SELECT codigo,nome,perfil,segmentos,ativo,must_change FROM portal_users ORDER BY codigo') as $r){$o[]=['tipo'=>'portal','codigo'=>$r['codigo'],'nome'=>$r['nome'],'perfil'=>implode(', ',json_decode($r['segmentos'],true)),'ativo'=>(bool)$r['ativo'],'trocarSenha'=>(bool)$r['must_change']];}
+        out($o);
+    }
+    case $path==='/admin/user-active' && $method==='POST': {
+        $m=requireManager();$in=body();$tipo=(string)($in['tipo']??'');$cod=strtoupper(trim((string)($in['codigo']??'')));$on=!empty($in['ativo'])?1:0;
+        $tab=$tipo==='portal'?'portal_users':($tipo==='interno'?'users':fail(400,'Tipo inválido.'));
+        if($tipo==='interno'&&$cod===$m['codigo']&&!$on)fail(400,'Você não pode desativar o próprio acesso.');
+        if(!q("SELECT 1 FROM $tab WHERE codigo=?",[$cod])->fetch())fail(404,'Usuário não encontrado.');
+        q("UPDATE $tab SET ativo=? WHERE codigo=?",[$on,$cod]);if(!$on)q('DELETE FROM sessions WHERE codigo=?',[$cod]);
+        audit($m['codigo'],($on?'ativar:':'desativar:').$cod);out(['ok'=>true]);
+    }
+    case $path==='/admin/audit': {
+        requireManager();$lim=min(500,max(10,(int)qs('limit')?:100));
+        out(q('SELECT quando,ator,acao,modulo,registro,ip FROM audit_log ORDER BY id DESC LIMIT '.$lim)->fetchAll());
+    }
+    case $path==='/manager/notices/remove' && $method==='POST': {
+        $u=requireManager();$in=body();$id=(string)($in['id']??'');q('DELETE FROM notices WHERE id=?',[$id]);audit($u['codigo'],'aviso-removido',$id);out(['ok'=>true]);
     }
     case $path==='/portal/notices': {
         $u=requirePortal();$o=[];
@@ -184,7 +207,9 @@ try{
         foreach(CREATE_FIELDS as $k)if(array_key_exists($k,$in))$row[$k]=strv($in[$k]);
         if(trim($row['solicitanteNome']??'')!=='')$row['solicitante']=$row['solicitanteNome'];
         if(($row['aprovacaoSolicitante']??'')==='')$row['aprovacaoSolicitante']='PENDENTE';
-        out(publicRow(insertRow('solicitacoes',$row,'portal:'.$u['codigo'])),201);
+        $novo=insertRow('solicitacoes',$row,'portal:'.$u['codigo']);
+        notifyMail('Nova demanda: '.$novo['titulo'],"Solicitante: {$novo['solicitante']}\nSegmento: {$novo['segmento']}\nPrioridade: {$novo['prioridade']}\nPrazo desejado: {$novo['prazo']}\nID: {$novo['id']}");
+        out(publicRow($novo),201);
     }
     case $path==='/portal/upload' && $method==='POST': {
         $u=requirePortal();$id=qs('id');$row=getRow('solicitacoes',$id)??fail(404,'Demanda não encontrada.');
@@ -234,6 +259,7 @@ function portalRestrictedUpdate(array $u,string $method,string $mod,string $id):
         $row['status']='EM ANÁLISE';$row['triagemStatus']='EM TRIAGEM';if(($row['respondidoSolicitanteEm']??'')==='')$row['respondidoSolicitanteEm']=$t;
     }
     $row['atualizadoEm']=$t;saveRow('solicitacoes',$row);audit('portal:'.$u['codigo'],'editar','solicitacoes',$id);
+    if($ap==='APROVADO'||$ap==='AJUSTES SOLICITADOS')notifyMail('Demanda '.($ap==='APROVADO'?'aprovada':'com ajustes solicitados').': '.($row['titulo']??$id),'ID: '.$id.' · Segmento: '.($row['segmento']??''));
     out(['ok'=>true]);
 }
 function saveUploads(string $id,string $sub):array{

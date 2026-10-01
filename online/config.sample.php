@@ -10,6 +10,8 @@ return [
     // sqlite: 'path' => __DIR__.'/storage/evo.sqlite',
   ],
   'install_key' => 'TROQUE_POR_UMA_CHAVE_LONGA', // exigida por install.php (use uma vez e apague o arquivo)
+  'notify_to' => '',                 // e-mail da Gerente para avisos de nova demanda/aprovação (opcional)
+  'mail_from' => '',                 // remetente, ex.: nao-responda@seudominio.com.br (opcional)
   'timezone' => 'America/Recife',
   'session_hours' => 12,
   'max_upload_mb' => 20,

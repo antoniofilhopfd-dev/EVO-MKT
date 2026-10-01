@@ -18,11 +18,25 @@ Versão **online** do EVO MKT: PHP 8.1+ e MySQL, sem Node e sem `.exe`. A versã
 6. **Apague `install.php`**, `storage/import/` e confira que `config.php` não abre no navegador.
 7. Entre em `https://SEU-DOMINIO/`, troque a senha. Entregue ao Portal os códigos `INF-2601`, `INI-2602`, `FIN-2603`, `MED-2604`, `AUZ-2605` com cada senha temporária.
 
-Esqueceu uma senha? A Gerente usa `POST /api/admin/reset-password` (gera senha temporária; hoje sem botão na tela).
+## Administração (menu Sistema → Administração, só Gerente)
+- **Acessos:** redefinir senha (senha temporária exibida uma vez), ativar/desativar equipe e Portal.
+- **Avisos do Portal:** publicar/remover avisos por segmento.
+- **Auditoria:** últimos 200 eventos (login, criar, editar, excluir, backup, reset).
+- **Backups:** criar, listar e **baixar** backups (`.json.gz`). Baixe cópias e guarde fora do servidor.
+- **Entrega:** botão de envio de arquivos finais na tela de Solicitações; o solicitante baixa pelo Portal.
+- **Tráfego/Instagram → Importar CSV:** aceita exportação do Gerenciador de Anúncios / Insights (`;` ou `,`, valores pt-BR), ignora duplicados e mostra prévia antes de gravar.
+- **E-mail (opcional):** preencha `notify_to` e `mail_from` em `config.php` para avisar a Gerente de nova demanda e de aprovações/ajustes. Usa `mail()` da hospedagem (melhor esforço).
+
+Esqueceu a senha? A Gerente redefine em Administração → Acessos. Se for a própria Gerente, redefina direto no banco (tabela `users`) ou reinstale com `install.php` em banco novo.
+
+## Testes (na pasta `tests/`)
+`DB=mysql tests/run_all.sh` (ou sem `DB=` para SQLite) monta um site de teste, instala e roda API (55 verificações) e interface (19) em Chromium; `responsive.test.js` verifica estouro horizontal em 1280/1024/800 px. Última execução: tudo passou em **MariaDB 10.11** e SQLite, com a política de segurança (CSP) ativa.
 
 ## Limites conhecidos
 - Hospedagem compartilhada costuma limitar upload (`upload_max_filesize`); o sistema aceita até 20 MB por arquivo (`max_upload_mb`) e só tipos seguros (PDF, imagens, Office, vídeo MP4/MOV, ZIP…).
 - Dados dos alunos/escola ficam num servidor externo: use senhas fortes e mantenha o backup baixado fora do servidor (`/api/backup/download`).
-- Testado com PHP 8.3 + SQLite e navegador Chromium; **MySQL real da Hostinger ainda não foi testado** (SQL escrito para ser compatível).
+- Testado com PHP 8.3 + MariaDB 10.11 e SQLite, em Chromium. **Não** foi testado no ambiente real da Hostinger (versão de PHP, `mail()`, limites de upload e `.htaccess` dependem do plano).
 - Os arquivos `.exe` e `runtime_src` não são usados na versão online.
+- Recuperação de senha por e-mail não existe (a Gerente redefine). Permissão por registro existe só para exclusão (Equipe exclui o que criou ou é responsável); edição é por módulo.
+- `app.js` continua um arquivo grande; a diferenciação visual de Tarefas/Eventos/Campanhas não foi alterada nesta versão.
 - Os códigos de acesso antigos do Portal que estão em `storage/portal/acessos.json` (versão local) não são usados aqui, mas estão no repositório: gere novos se esse repositório não for privado.
