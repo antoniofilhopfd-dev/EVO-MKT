@@ -43,3 +43,7 @@ Esqueceu a senha? A Gerente redefine em Administração → Acessos. Se for a pr
 
 ## Usar como app (PWA)
 No seu domínio com HTTPS, o sistema é instalável como app: no Chrome/Edge (computador) use o ícone de instalar na barra de endereço ou o botão **Instalar app**; no celular, "Adicionar à tela inicial". O Portal do Solicitante também instala (`/solicitante.html`). O app guarda só a "casca" (telas); os dados sempre vêm do servidor, então exige internet.
+
+## Identidade visual (Guia de uso da marca 2023)
+Logos aplicadas conforme o guia: logo bicolor em fundo branco (login, Portal, relatórios impressos) e versão com "evolução" em branco + símbolo laranja sobre o azul do menu; símbolo isolado (laranja) no menu recolhido, no favicon e nos ícones do app (sobre azul #063996). Paleta oficial nas variáveis do sistema (#063996, #FF7800, #00275F); roxo só no Portal do Infantil.
+**Fonte:** o guia define *Objectivity* (Bold/Medium/Regular). Ela é licenciada e não veio no pacote; hoje o sistema usa a fonte padrão do aparelho. Para aplicar, envie os arquivos `.woff2` da Objectivity e eu configuro.
