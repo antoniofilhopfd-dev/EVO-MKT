@@ -279,13 +279,27 @@ try{
         }
         $codes=[];
         if($novo==='codigo'){
-            foreach(q('SELECT codigo,nome FROM users WHERE ativo=1 ORDER BY codigo')->fetchAll() as $r)$codes[]=['tipo'=>'interno','codigo'=>$r['codigo'],'nome'=>$r['nome'],'acesso'=>issueAccessCode('users',$r['codigo'])];
+            foreach(q('SELECT codigo,nome FROM users WHERE ativo=1 ORDER BY codigo')->fetchAll() as $r)$codes[]=['tipo'=>'interno','codigo'=>$r['codigo'],'nome'=>$r['nome'],'acesso'=>issueAccessCode('users',$r['codigo'],$r['codigo']!==$m['codigo'])];
             foreach(q('SELECT codigo,nome FROM portal_users WHERE ativo=1 ORDER BY codigo')->fetchAll() as $r)$codes[]=['tipo'=>'portal','codigo'=>$r['codigo'],'nome'=>$r['nome'],'acesso'=>issueAccessCode('portal_users',$r['codigo'])];
             q('UPDATE users SET must_change=0 WHERE role<>?',['manager']);
             q('DELETE FROM sessions WHERE codigo<>?',[$m['codigo']]);
         }
         setSetting('login_modo',$novo);audit($m['codigo'],'modo-acesso:'.$novo);
         out(['modo'=>$novo,'codigos'=>$codes]);
+    }
+    case $path==='/admin/codes' && $method==='POST': {
+        $m=requireManager();$in=body();ensureAccessSchema();
+        // consulta dos códigos: sempre pede a senha de administração (mesmo fora do modo código)
+        $row=q('SELECT pass_hash FROM users WHERE codigo=?',[$m['codigo']])->fetch();
+        $key='codes|'.$m['codigo'];rateCheck($key,5);
+        if(!$row||!password_verify((string)($in['senhaAdmin']??''),$row['pass_hash'])){if(isset($in['senhaAdmin']))rateFail($key);fail(403,'Confirme sua senha de administração.');}
+        $out=[];
+        foreach(['users'=>'interno','portal_users'=>'portal'] as $tab=>$tipo)foreach(q("SELECT codigo,nome,acesso_enc FROM $tab WHERE ativo=1 ORDER BY codigo")->fetchAll() as $r){
+            $c='';if(!empty($r['acesso_enc'])){try{$c=decryptSecret($r['acesso_enc']);}catch(Throwable){}}
+            $out[]=['tipo'=>$tipo,'codigo'=>$r['codigo'],'nome'=>$r['nome'],'acesso'=>$c];
+        }
+        audit($m['codigo'],'ver-codigos');
+        out(['modo'=>loginMode(),'codigos'=>$out]);
     }
     case $path==='/admin/seed-equipe' && $method==='POST': {$m=requireManager();out(['criados'=>seedEquipe($m['codigo'])]);}
     case $path==='/auth/forgot' && $method==='POST': {

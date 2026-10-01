@@ -17,3 +17,6 @@ Modo opcional. Padrão continua **código + senha**.
 
 ## Voltar atrás
 Administração → Acessos → **Voltar ao acesso por senha**.
+
+## Consultar os códigos (v4.5.0)
+Administração → Acessos → **Ver códigos de acesso** (pede a senha de administração). Mostra o código atual de cada pessoa. Códigos criados antes da v4.5.0 aparecem em branco: use **Gerar novo código** na pessoa. Os códigos ficam cifrados no banco com a `app_key` — **não troque a `app_key`** depois de gerar os códigos (os códigos deixariam de valer).

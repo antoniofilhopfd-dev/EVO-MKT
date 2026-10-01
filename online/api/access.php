@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  * Modo de acesso "somente código" (2 letras + 4 números), com proteções extras:
- *  - códigos aleatórios, guardados só como HMAC (o servidor não consegue ler o código depois);
+ *  - códigos aleatórios, guardados como HMAC (para login) e cifrados com a app_key (para a Gerente consultar na Administração);
  *  - limite de tentativas por IP + atraso progressivo + modo de proteção global (só aparelhos já conhecidos entram);
  *  - alerta por e-mail e auditoria a cada aparelho novo;
  *  - ações sensíveis da Gerente exigem a "senha de administração" (confirmação extra).
@@ -22,6 +22,11 @@ function ensureAccessSchema(): void
     foreach (['users', 'portal_users'] as $tab) {
         try {
             db()->exec("ALTER TABLE $tab ADD COLUMN acesso_hmac VARCHAR(64) NULL");
+        } catch (Throwable) {
+            // coluna já existe
+        }
+        try {
+            db()->exec("ALTER TABLE $tab ADD COLUMN acesso_enc TEXT NULL");
         } catch (Throwable) {
             // coluna já existe
         }
@@ -57,13 +62,15 @@ function genAccessCode(): string
     }
     throw new RuntimeException('Não foi possível gerar um código único.');
 }
-function issueAccessCode(string $tab, string $codigo): string
+function issueAccessCode(string $tab, string $codigo, bool $dropSessions = true): string
 {
     ensureAccessSchema();
     $c = genAccessCode();
-    q("UPDATE $tab SET acesso_hmac=? WHERE codigo=?", [accessHmac($c), $codigo]);
-    q('DELETE FROM sessions WHERE codigo=?', [$codigo]);
-    q('DELETE FROM trusted_devices WHERE codigo=?', [$codigo]);
+    q("UPDATE $tab SET acesso_hmac=?,acesso_enc=? WHERE codigo=?", [accessHmac($c), encryptSecret($c), $codigo]);
+    if ($dropSessions) {
+        q('DELETE FROM sessions WHERE codigo=?', [$codigo]);
+        q('DELETE FROM trusted_devices WHERE codigo=?', [$codigo]);
+    }
     return $c;
 }
 

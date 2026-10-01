@@ -14,6 +14,10 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  t('códigos gerados no formato 2 letras + 4 números',codes.length>=10&&codes.every(c=>/^[A-HJ-NP-Z]{2}[0-9]{4}$/.test(c)));
  const rows=await p.$$eval('.admin-overlay tbody tr',a=>a.map(r=>[...r.cells].map(c=>c.innerText.trim())));
  const code=k=>rows.find(r=>r[1]===k)[2];
+ await p.click('.admin-overlay [data-close]');await p.waitForSelector('#viewCodes');await p.click('#viewCodes');await p.waitForSelector('.admin-overlay .temp-pass');
+ const seen=await p.$$eval('.admin-overlay .temp-pass',a=>a.map(e=>e.innerText.trim()));
+ t('Gerente consulta os códigos de cada pessoa (iguais aos gerados)',seen.length===codes.length&&seen.every((c,i)=>c===codes[i]));
+ await p.click('.admin-overlay [data-close]');
  // login interno sem senha
  const p2=await (await b.newContext()).newPage();p2.on('pageerror',e=>errs.push(e.message));
  await p2.goto(BASE+'/');await p2.waitForSelector('#internalCode');await p2.waitForTimeout(400);
