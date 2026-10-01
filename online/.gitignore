@@ -1,0 +1,9 @@
+config.php
+storage/*.sqlite
+storage/erro.log
+storage/installed.lock
+storage/import/
+storage/ANEXOS/*
+storage/backups/*
+!storage/ANEXOS/.gitkeep
+!storage/backups/.gitkeep

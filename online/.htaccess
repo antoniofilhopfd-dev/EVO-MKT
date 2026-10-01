@@ -1,0 +1,15 @@
+Options -Indexes
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+<FilesMatch "^(config(\.sample)?\.php|install\.php\.done|.*\.sqlite|.*\.log)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "DENY"
+  Header set Referrer-Policy "same-origin"
+  Header set Strict-Transport-Security "max-age=31536000"
+</IfModule>
