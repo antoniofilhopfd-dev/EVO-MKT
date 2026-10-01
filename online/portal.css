@@ -13,3 +13,5 @@
 /* v4.1.1 — logo oficial */
 .login-logo{display:block;width:230px;max-width:80%;height:auto;margin:0 0 18px}.top-logo{height:31px;width:auto;display:block}.brand-text{border-left:1px solid #d9deea;padding-left:12px}
 @media(max-width:700px){.brand-text{display:none}}
+/* v4.1.2 — tamanho da logo conforme o guia */
+.login-logo{width:200px;min-width:150px;height:auto;margin:0 0 22px}.top-logo{width:150px;min-width:150px;height:auto}
