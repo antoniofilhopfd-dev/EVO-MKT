@@ -14,6 +14,9 @@
 ## v4.1.x
 - Logos e fonte oficiais, PWA, Administração, importação CSV, auditoria, backups.
 
+## v4.3.1
+- `diagnostico.php` (confere PHP, extensões, banco, permissões, proteção de config/storage, rotas /api, limites de upload, e-mail e planilhas a importar), `PRE_INSTALACAO.md` (checklist) e `config.pronto.php` com chaves geradas.
+
 ## v4.3.0
 - **Instagram (Meta Graph API):** conexão OAuth, métricas automáticas na tela Instagram, **publicação e agendamento** de posts/reels/stories (JPEG ou vídeo) com fila e cron, renovação de token.
 - **Google:** Agenda em 2 vias, Drive (entregas por solicitação, automático ou manual), Planilhas (relatórios por módulo).

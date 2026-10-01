@@ -1,4 +1,6 @@
-# EVO MKT Online v4.1.0 — Implantação na Hostinger (hospedagem compartilhada)
+# EVO MKT Online — Implantação na Hostinger (hospedagem compartilhada)
+
+> **Comece por `PRE_INSTALACAO.md`** (checklist passo a passo) e use `diagnostico.php` para conferir o servidor antes de instalar.
 
 Versão **online** do EVO MKT: PHP 8.1+ e MySQL, sem Node e sem `.exe`. A versão local (Windows, XLSX) continua intacta nas pastas `web/` e `DADOS/`.
 
