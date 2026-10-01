@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__.'/lib.php';
 require __DIR__.'/integrations.php';
 require __DIR__.'/google.php';
+require __DIR__.'/access.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
@@ -41,6 +42,15 @@ try{
     // ---------- autenticação interna ----------
     case $path==='/auth/login' && $method==='POST': {
         $in=body();$cod=strtoupper(trim((string)($in['codigo']??'')));$sen=(string)($in['senha']??'');
+        if(loginMode()==='codigo'){
+            codeLoginGuard();
+            $u=validCodeFormat($cod)?q('SELECT * FROM users WHERE acesso_hmac=? AND ativo=1',[accessHmac($cod)])->fetch():false;
+            if(!$u)codeLoginFail('?');
+            $tok=startSession('int',$u['codigo']);
+            setcookie('evo_sid',$tok,['expires'=>time()+((int)(cfg()['session_hours']??12))*3600,'path'=>'/','httponly'=>true,'samesite'=>'Strict','secure'=>!empty($_SERVER['HTTPS'])||($_SERVER['HTTP_X_FORWARDED_PROTO']??'')==='https']);
+            audit($u['codigo'],'login');registerDevice('int',$u['codigo'],$u['nome']);
+            out(['user'=>['code'=>$u['codigo'],'name'=>$u['nome'],'role'=>$u['role'],'label'=>$u['label']],'mustChange'=>$u['role']==='manager'&&(bool)$u['must_change']]);
+        }
         $key='int|'.ip().'|'.$cod;rateCheck($key);rateCheck('ip|'.ip(),40);
         $u=q('SELECT * FROM users WHERE codigo=? AND ativo=1',[$cod])->fetch();
         if(!$u||!password_verify($sen,$u['pass_hash'])){rateFail($key);rateFail('ip|'.ip());audit($cod?:'?','login-falhou');fail(401,'Código ou senha inválidos.');}
@@ -68,9 +78,10 @@ try{
         audit($u['codigo'],'senha-alterada');out(['ok'=>true]);
     }
     case $path==='/admin/reset-password' && $method==='POST': {
-        $m=requireManager();$in=body();$tipo=(string)($in['tipo']??'');$cod=strtoupper(trim((string)($in['codigo']??'')));
+        $m=requireManager();$in=body();stepUp($m,$in);$tipo=(string)($in['tipo']??'');$cod=strtoupper(trim((string)($in['codigo']??'')));
         $tab=$tipo==='portal'?'portal_users':($tipo==='interno'?'users':fail(400,'Tipo inválido.'));
         if(!q("SELECT 1 FROM $tab WHERE codigo=?",[$cod])->fetch())fail(404,'Usuário não encontrado.');
+        if(loginMode()==='codigo'){$novo=issueAccessCode($tab,$cod);audit($m['codigo'],'reset-codigo:'.$cod);out(['codigo'=>$cod,'senhaTemporaria'=>$novo,'modo'=>'codigo']);}
         $p=genPassword();q("UPDATE $tab SET pass_hash=?,must_change=1 WHERE codigo=?",[password_hash($p,PASSWORD_DEFAULT),$cod]);
         q('DELETE FROM sessions WHERE codigo=?',[$cod]);audit($m['codigo'],'reset-senha:'.$cod);
         out(['codigo'=>$cod,'senhaTemporaria'=>$p]);
@@ -172,7 +183,7 @@ try{
             'cron'=>'php '.dirname(__DIR__).'/cron_integracoes.php']);
     }
     case $path==='/integrations/settings' && $method==='POST': {
-        $u=requireManager();$in=body();
+        $u=requireManager();$in=body();stepUp($u,$in);
         foreach(['meta_app_id','meta_app_secret','g_client_id','g_client_secret'] as $k){if(isset($in[$k])&&trim(strv($in[$k]))!=='')setSetting($k,trim(strv($in[$k])));}
         if(isset($in['g_auto_drive_entregas']))setSetting('g_auto_drive_entregas',!empty($in['g_auto_drive_entregas'])?'1':'0');
         if(isset($in['g_sheet_modules'])){$mm=array_values(array_filter(array_map('trim',explode(',',strv($in['g_sheet_modules']))),fn($m)=>isset(MODULES[$m])));setSetting('g_sheet_modules',implode(',',$mm));}
@@ -181,13 +192,13 @@ try{
     case $path==='/integrations/meta/connect': {requireManager();ensureIntegrationSchema();header('Location: '.metaConnectUrl());http_response_code(302);exit;}
     case $path==='/integrations/google/connect': {requireManager();ensureIntegrationSchema();header('Location: '.gConnectUrl());http_response_code(302);exit;}
     case $path==='/integrations/meta/token' && $method==='POST': {
-        $u=requireManager();$in=body();$tok=trim(strv($in['token']??''));if($tok==='')fail(400,'Informe o token.');
+        $u=requireManager();$in=body();stepUp($u,$in);$tok=trim(strv($in['token']??''));if($tok==='')fail(400,'Informe o token.');
         setSetting('meta_token',$tok);setSetting('meta_token_expira','0');
         try{if(trim(strv($in['ig_user_id']??''))!==''){setSetting('ig_user_id',trim(strv($in['ig_user_id'])));}else{metaDiscoverAccount();}}catch(Throwable $e){fail(400,$e->getMessage());}
         audit($u['codigo'],'instagram-token-manual');out(['ok'=>true]);
     }
-    case $path==='/integrations/meta/disconnect' && $method==='POST': {$u=requireManager();foreach(['meta_token','meta_token_expira','ig_user_id','ig_username','meta_page_name'] as $k)setSetting($k,'');audit($u['codigo'],'instagram-desconectado');out(['ok'=>true]);}
-    case $path==='/integrations/google/disconnect' && $method==='POST': {$u=requireManager();foreach(['g_refresh_token','g_access_token','g_access_expira','g_email'] as $k)setSetting($k,'');audit($u['codigo'],'google-desconectado');out(['ok'=>true]);}
+    case $path==='/integrations/meta/disconnect' && $method==='POST': {$u=requireManager();stepUp($u,body());foreach(['meta_token','meta_token_expira','ig_user_id','ig_username','meta_page_name'] as $k)setSetting($k,'');audit($u['codigo'],'instagram-desconectado');out(['ok'=>true]);}
+    case $path==='/integrations/google/disconnect' && $method==='POST': {$u=requireManager();stepUp($u,body());foreach(['g_refresh_token','g_access_token','g_access_expira','g_email'] as $k)setSetting($k,'');audit($u['codigo'],'google-desconectado');out(['ok'=>true]);}
     case $path==='/integrations/instagram/sync' && $method==='POST': {
         $u=requireManager();try{metaRefreshIfNeeded();$n=igSync();}catch(Throwable $e){intLog('instagram','erro',$e->getMessage());fail(502,$e->getMessage());}
         out(['periodos'=>$n]);
@@ -221,6 +232,13 @@ try{
     // ---------- Portal do Solicitante ----------
     case $path==='/portal/login' && $method==='POST': {
         $in=body();$cod=strtoupper(trim((string)($in['codigo']??'')));$sen=(string)($in['senha']??'');
+        if(loginMode()==='codigo'){
+            codeLoginGuard();
+            $u=validCodeFormat($cod)?q('SELECT * FROM portal_users WHERE acesso_hmac=? AND ativo=1',[accessHmac($cod)])->fetch():false;
+            if(!$u)codeLoginFail('?');
+            $tok=startSession('por',$u['codigo']);audit($u['codigo'],'portal-login');registerDevice('por',$u['codigo'],$u['nome']);
+            out(['token'=>$tok,'mustChange'=>false,'user'=>['id'=>$u['codigo'],'codigo'=>$u['codigo'],'nome'=>$u['nome'],'perfil'=>$u['perfil'],'segmentos'=>json_decode($u['segmentos'],true),'ativo'=>true]]);
+        }
         $key='por|'.ip().'|'.$cod;rateCheck($key);rateCheck('ip|'.ip(),40);
         $u=q('SELECT * FROM portal_users WHERE codigo=? AND ativo=1',[$cod])->fetch();
         if(!$u||!password_verify($sen,$u['pass_hash'])){rateFail($key);rateFail('ip|'.ip());audit($cod?:'?','portal-login-falhou');fail(401,'Código ou senha inválidos.');}
@@ -242,12 +260,32 @@ try{
         out($o);
     }
     case $path==='/admin/user-active' && $method==='POST': {
-        $m=requireManager();$in=body();$tipo=(string)($in['tipo']??'');$cod=strtoupper(trim((string)($in['codigo']??'')));$on=!empty($in['ativo'])?1:0;
+        $m=requireManager();$in=body();stepUp($m,$in);$tipo=(string)($in['tipo']??'');$cod=strtoupper(trim((string)($in['codigo']??'')));$on=!empty($in['ativo'])?1:0;
         $tab=$tipo==='portal'?'portal_users':($tipo==='interno'?'users':fail(400,'Tipo inválido.'));
         if($tipo==='interno'&&$cod===$m['codigo']&&!$on)fail(400,'Você não pode desativar o próprio acesso.');
         if(!q("SELECT 1 FROM $tab WHERE codigo=?",[$cod])->fetch())fail(404,'Usuário não encontrado.');
         q("UPDATE $tab SET ativo=? WHERE codigo=?",[$on,$cod]);if(!$on)q('DELETE FROM sessions WHERE codigo=?',[$cod]);
         audit($m['codigo'],($on?'ativar:':'desativar:').$cod);out(['ok'=>true]);
+    }
+    case $path==='/auth/mode': {out(['modo'=>loginMode()]);}
+    case $path==='/admin/mode' && $method==='POST': {
+        $m=requireManager();$in=body();$novo=($in['modo']??'')==='codigo'?'codigo':(($in['modo']??'')==='senha'?'senha':fail(400,'Modo inválido.'));
+        ensureAccessSchema();
+        if(loginMode()==='codigo')stepUp($m,$in);
+        else{
+            // ao ligar o modo por código, confirma a senha de administração agora (a Gerente acabou de entrar com senha)
+            $row=q('SELECT pass_hash FROM users WHERE codigo=?',[$m['codigo']])->fetch();
+            if(!password_verify((string)($in['senhaAdmin']??''),$row['pass_hash']))fail(403,'Confirme sua senha de administração.');
+        }
+        $codes=[];
+        if($novo==='codigo'){
+            foreach(q('SELECT codigo,nome FROM users WHERE ativo=1 ORDER BY codigo')->fetchAll() as $r)$codes[]=['tipo'=>'interno','codigo'=>$r['codigo'],'nome'=>$r['nome'],'acesso'=>issueAccessCode('users',$r['codigo'])];
+            foreach(q('SELECT codigo,nome FROM portal_users WHERE ativo=1 ORDER BY codigo')->fetchAll() as $r)$codes[]=['tipo'=>'portal','codigo'=>$r['codigo'],'nome'=>$r['nome'],'acesso'=>issueAccessCode('portal_users',$r['codigo'])];
+            q('UPDATE users SET must_change=0 WHERE role<>?',['manager']);
+            q('DELETE FROM sessions WHERE codigo<>?',[$m['codigo']]);
+        }
+        setSetting('login_modo',$novo);audit($m['codigo'],'modo-acesso:'.$novo);
+        out(['modo'=>$novo,'codigos'=>$codes]);
     }
     case $path==='/admin/seed-equipe' && $method==='POST': {$m=requireManager();out(['criados'=>seedEquipe($m['codigo'])]);}
     case $path==='/auth/forgot' && $method==='POST': {

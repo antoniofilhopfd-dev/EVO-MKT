@@ -3,7 +3,7 @@
 HERE=$(cd "$(dirname "$0")" && pwd); D=${EVO_TEST_DIR:-/tmp/evo-test}; PIDF=$D.pid; rc=0
 [ -f /tmp/evo-mock.pid ] && kill "$(cat /tmp/evo-mock.pid)" 2>/dev/null
 (exec php -S 127.0.0.1:8099 "$HERE/mock_apis.php" >/dev/null 2>&1) & echo $! > /tmp/evo-mock.pid; sleep 1
-for suite in api integrations ui ui2 ui3; do
+for suite in api acesso integrations ui ui2 ui3 ui4; do
   [ -f "$PIDF" ] && kill "$(cat $PIDF)" 2>/dev/null && sleep 0.5
   "$HERE/setup.sh" "$D" >/dev/null || exit 2
   (cd "$D" && PHP_CLI_SERVER_WORKERS=4 exec php -S 127.0.0.1:8080 -t . tests/router.php >"$D/php.log" 2>&1) & echo $! > "$PIDF"; sleep 1
