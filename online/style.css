@@ -134,3 +134,8 @@ header{min-width:0}.crumb{min-width:0;flex:0 1 auto}.topactions{min-width:0;flex
 .social-cockpit,.traffic-cockpit{grid-template-columns:minmax(0,1fr)}
 #content [class*="grid"]>*,#content [class*="cockpit"]>*,#content .distinct-history{min-width:0}
 .distinct-history{overflow-x:auto}
+/* calendário: 7 colunas sempre cabem na janela (1fr sozinho cresce com o texto) */
+.calendar{grid-template-columns:repeat(7,minmax(0,1fr))}.calendar .day{min-width:0;overflow:hidden}
+.cal-item{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+@media(min-width:1180px){.week-grid{grid-template-columns:repeat(7,minmax(0,1fr))}}
+.calendar-title{text-transform:none}.calendar-title:first-letter{text-transform:uppercase}

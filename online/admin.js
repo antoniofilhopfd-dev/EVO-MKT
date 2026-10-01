@@ -53,3 +53,5 @@ function importCsv(module){
     $('#csvGo',o.el).onclick=async()=>{$('#csvGo',o.el).disabled=true;let n=0;try{for(const r of fresh){await api(`/data?module=${module}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)});n++}}catch(e){toast('Falha após '+n+' registro(s): '+e.message,'bad')}invalidate(module);o.close();toast(`${n} registro(s) importado(s)`);module==='trafego'?renderTrafficWorkspace(true):renderInstagramWorkspace(true)}};
   inp.click();
 }
+/* Botão "Instalar app" (PWA) quando o navegador oferece */
+window.addEventListener('evo-can-install',()=>{if(document.getElementById('installBtn'))return;const t=document.querySelector('.topactions');if(!t)return;const b=document.createElement('button');b.id='installBtn';b.className='btn secondary';b.textContent='Instalar app';b.onclick=async()=>{if(await evoInstallApp())b.remove()};t.insertBefore(b,t.firstChild)});

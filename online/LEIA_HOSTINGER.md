@@ -40,3 +40,6 @@ Esqueceu a senha? A Gerente redefine em Administração → Acessos. Se for a pr
 - Recuperação de senha por e-mail não existe (a Gerente redefine). Permissão por registro existe só para exclusão (Equipe exclui o que criou ou é responsável); edição é por módulo.
 - `app.js` continua um arquivo grande; a diferenciação visual de Tarefas/Eventos/Campanhas não foi alterada nesta versão.
 - Os códigos de acesso antigos do Portal que estão em `storage/portal/acessos.json` (versão local) não são usados aqui, mas estão no repositório: gere novos se esse repositório não for privado.
+
+## Usar como app (PWA)
+No seu domínio com HTTPS, o sistema é instalável como app: no Chrome/Edge (computador) use o ícone de instalar na barra de endereço ou o botão **Instalar app**; no celular, "Adicionar à tela inicial". O Portal do Solicitante também instala (`/solicitante.html`). O app guarda só a "casca" (telas); os dados sempre vêm do servidor, então exige internet.
