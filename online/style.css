@@ -200,3 +200,19 @@ body{font-size:15px}
 .view-switch button{white-space:nowrap}
 
 .forgot{text-align:center;margin:12px 0 0;font-size:13px}.forgot a{color:var(--blue);font-weight:700}.login-ok{background:#eaf7ef;color:#1e7e4d;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:13px}.badge.warn{background:#fff3e0;color:#b45309}
+
+/* v4.2.1 — acabamento: anel da meta, cabeçalhos dos painéis e celular */
+.goal-ring{position:relative;background:conic-gradient(#063996 0 var(--p,0%),#edf0f5 var(--p,0%) 100%);box-shadow:none}
+.goal-ring:before{content:'';position:absolute;inset:16px;border-radius:50%;background:#fff}
+.goal-ring>*{position:relative}
+.social-hero,.traffic-hero{height:auto}
+@media(max-width:720px){
+ header{gap:8px}.crumb{flex:1 1 0;min-width:0}.crumb strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .topactions{flex:0 0 auto}.internal-user>div:not(.internal-avatar),.internal-logout{display:none}
+ .search{min-width:0;flex:1 1 90px}
+ .traffic-kpis strong,.social-kpis strong{font-size:20px;overflow-wrap:anywhere}
+ .traffic-kpis.four,.social-kpis.six{grid-template-columns:1fr 1fr}
+ .social-hero h1,.traffic-hero h1{font-size:24px}
+}
+@media(max-width:720px){.search{flex:1 1 60px;min-width:60px}.search input{padding-right:6px}#newBtn{padding:8px 11px;margin-left:2px}.topactions{gap:6px}.notify-btn{flex:0 0 auto}}
+@media(max-width:720px){.toolbar-actions{flex-wrap:wrap;justify-content:flex-start;max-width:100%}.search{min-width:40px}.search input{font-size:13px}.topactions{padding-right:2px}}

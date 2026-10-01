@@ -13,3 +13,7 @@
 
 ## v4.1.x
 - Logos e fonte oficiais, PWA, Administração, importação CSV, auditoria, backups.
+
+## v4.2.1
+- Governança: anel da meta mostra o valor real (estava fixo em 70%) e o texto não se sobrepõe mais.
+- Instagram/Tráfego: cabeçalho não fica mais cortado; celular: títulos, valores e botões ajustados.
