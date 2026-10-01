@@ -1,0 +1,16 @@
+EVO MKT v3.6.0
+
+PLANEJAMENTO EDITORIAL
+- Acesse Gestão > Planejamento Editorial.
+- Veja formatos, perfis, segmentos, campanhas e publicações dos próximos 30 dias.
+- Ajuste metas editoriais no botão "Metas editoriais".
+- Alertas de qualidade editorial não alteram registros automaticamente.
+
+FECHAMENTO MENSAL
+- Acesse Gestão > Fechamento Mensal.
+- Escolha o mês no seletor.
+- Veja produção, pendências, atrasos e comparação com o mês anterior.
+- Registre aprendizados e foco do próximo ciclo.
+- Exporte CSV ou use Imprimir / PDF.
+
+Os dados continuam nos mesmos 19 arquivos XLSX.

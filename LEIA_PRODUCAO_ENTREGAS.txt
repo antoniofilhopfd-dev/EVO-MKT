@@ -1,0 +1,11 @@
+EVO MKT v3.3.6 — PRODUÇÃO E ENTREGAS
+
+1. Abra Conteúdos, Projetos, Eventos ou Solicitações.
+2. Na coluna Ações, use o botão ▱ Produção.
+3. Registre uma nova versão informando caminho de rede/local ou URL.
+4. Escolha EM PRODUÇÃO, EM REVISÃO ou FINAL.
+5. Uma versão FINAL pode ser enviada para aprovação.
+6. A aba Arquivos > Entregas reúne automaticamente os arquivos finais.
+7. Use “Adicionar à Biblioteca” para criar um registro permanente em EVO_MKT_ARQUIVOS.xlsx.
+
+IMPORTANTE: o EVO MKT interno registra referências de arquivo. Ele não copia arquivos internos para dentro do app nesta versão.

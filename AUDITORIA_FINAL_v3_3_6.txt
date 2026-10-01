@@ -1,0 +1,26 @@
+EVO MKT v3.3.6 — AUDITORIA FINAL
+
+Base: v3.3.5 Aprovação Interna
+Foco: Produção, controle de versões e biblioteca de entregas.
+
+VALIDAÇÕES
+- app.js: node --check OK
+- portal.js: node --check OK
+- EVO_MKT_LOCAL.exe: Windows GUI x64 preservado
+- EVO_MKT_SOLICITANTE.exe: Windows GUI x64 preservado
+- EVO_MKT_PORTAL_REDE.exe: Windows GUI x64 preservado
+- 19/19 XLSX válidos como pacotes OOXML
+- 19/19 XLSX byte a byte idênticos à v3.3.5
+- nenhuma nova planilha criada
+
+FUNCIONALIDADES
+- botão Produção em Conteúdos, Projetos, Eventos e Solicitações
+- histórico de versões por item
+- estados EM PRODUÇÃO / EM REVISÃO / FINAL
+- aprovação específica do arquivo final
+- notificações pessoais para aprovação de arquivo final
+- Arquivos com Biblioteca geral e Entregas
+- inclusão opcional da entrega final na planilha EVO_MKT_ARQUIVOS.xlsx
+
+LIMITAÇÃO DELIBERADA
+- o runtime interno homologado não possui upload genérico reutilizável; portanto, arquivos internos são referências de caminho local/rede ou URL. O upload real permanece disponível no Portal de Solicitações.

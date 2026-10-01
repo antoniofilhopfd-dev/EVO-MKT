@@ -1,0 +1,11 @@
+EVO MKT — RECUPERAÇÃO E DIAGNÓSTICO
+
+1. Feche o aplicativo.
+2. Copie a pasta DADOS atual antes de qualquer tentativa de restauração.
+3. Nunca restaure um backup por cima sem guardar a versão atual.
+4. Se apenas a interface falhar, preserve DADOS e ANEXOS e reinstale/recopie o código.
+5. Se uma planilha estiver inválida, restaure somente após confirmar qual arquivo está com erro.
+6. Abra Sistema > Manutenção e rode o Autoteste.
+7. Exporte o pacote de diagnóstico para suporte, se necessário.
+
+O pacote de diagnóstico não inclui códigos internos nem conteúdo das planilhas.

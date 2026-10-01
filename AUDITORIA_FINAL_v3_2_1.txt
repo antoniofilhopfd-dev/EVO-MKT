@@ -1,0 +1,8 @@
+EVO MKT v3.2.1 — Auditoria final
+- Códigos fixos aplicados nos Portais local e em rede
+- Migração dos cinco acessos padrão preparada
+- Isolamento por segmento preservado
+- app.js e portal.js: sintaxe OK
+- EVO_MKT_SOLICITANTE.exe: Windows GUI x64
+- EVO_MKT_PORTAL_REDE.exe: Windows GUI x64
+- 19/19 XLSX preservados byte a byte em relação à v3.2.0

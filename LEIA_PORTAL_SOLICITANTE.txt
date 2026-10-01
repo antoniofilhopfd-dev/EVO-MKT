@@ -1,0 +1,11 @@
+EVO MKT — PORTAL DO SOLICITANTE
+
+Códigos fixos de acesso:
+Coordenação Infantil: INF-2601
+Coordenação Anos Iniciais: INI-2602
+Coordenação Anos Finais: FIN-2603
+Coordenação Ensino Médio: MED-2604
+Auzilair: AUZ-2605
+
+Cada acesso visualiza somente os segmentos autorizados.
+O Marketing mantém acesso completo pelo EVO_MKT_LOCAL.exe.

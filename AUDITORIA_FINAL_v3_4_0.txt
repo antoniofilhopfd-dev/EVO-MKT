@@ -1,0 +1,22 @@
+EVO MKT v3.4.0 — AUDITORIA FINAL
+
+Base: v3.3.6 Produção e Entregas
+Nova camada: Governança Operacional
+
+Validações:
+- app.js: node --check OK
+- portal.js: node --check OK
+- 19/19 XLSX válidos
+- 19/19 XLSX byte a byte idênticos à v3.3.6
+- EVO_MKT_LOCAL.exe preservado
+- EVO_MKT_SOLICITANTE.exe preservado
+- EVO_MKT_PORTAL_REDE.exe preservado
+- 3 executáveis Windows GUI x64
+- runtime local /api/health respondeu com 19 módulos
+- nova área Governança presente
+- score de risco, capacidade, metas, alertas preventivos e relatório disponíveis
+- nenhuma nova planilha criada
+- nenhum dado de teste adicionado
+
+Observação:
+O executável interno foi preservado para manter o runtime estável. A versão funcional da interface é 3.4.0; o identificador interno do runtime continua o homologado anteriormente.

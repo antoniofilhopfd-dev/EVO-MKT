@@ -1,0 +1,10 @@
+EVO MKT v3.3.3 — AUDITORIA FINAL
+
+- app.js: node --check OK
+- portal.js: node --check OK
+- 3 executáveis: Windows GUI x64
+- 19/19 XLSX válidos
+- 19/19 XLSX preservados byte a byte em relação à v3.3.2
+- nenhum registro de homologação incluído no pacote final
+- colaboração homologada em cópia separada: comentário/@menção, ajuda, bloqueio, dependência, referência de arquivo e conclusão de etapa
+- nenhuma nova planilha criada

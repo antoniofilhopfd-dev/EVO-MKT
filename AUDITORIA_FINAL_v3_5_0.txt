@@ -1,0 +1,14 @@
+EVO MKT v3.5.0 — AUDITORIA FINAL
+
+- app.js: node --check OK
+- portal.js: node --check OK
+- Nova rota Gestão > Estratégia: OK
+- Dashboard integrado: OK
+- Central Operacional integrada: OK
+- Relatório Planejamento estratégico: OK
+- Configuração de página inicial com Estratégia: OK
+- 19/19 XLSX presentes
+- 19/19 XLSX byte a byte idênticos à v3.4.0
+- Nenhuma nova planilha criada
+- Três executáveis preservados
+- Runtime principal não recompilado

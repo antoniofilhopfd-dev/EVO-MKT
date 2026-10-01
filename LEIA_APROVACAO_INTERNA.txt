@@ -1,0 +1,11 @@
+EVO MKT — APROVAÇÃO INTERNA v3.3.5
+
+1. Abra o EVO MKT normalmente e entre com o código do integrante.
+2. Ao chegar a uma etapa chamada Revisão ou Aprovação, o fluxo abre uma aprovação interna.
+3. O aprovador verá o item em Marketing > Aprovações.
+4. Aprovar encaminha ao próximo aprovador da cadeia ou avança o fluxo quando a cadeia termina.
+5. Reprovar exige motivo e devolve automaticamente o item à etapa anterior.
+6. A partir da segunda passagem por aprovação, use "Comparar versões" para ver o que mudou.
+7. A Gerente pode configurar a cadeia de aprovadores na própria tela Aprovações.
+
+Observação: a comparação de versões é feita por snapshot dos campos do registro. Não é comparação binária de arquivos anexados.

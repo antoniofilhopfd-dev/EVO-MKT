@@ -1,0 +1,24 @@
+EVO MKT v4.0.0 — FINAL COMPLETO
+
+1) SISTEMA INTERNO DO MARKETING
+Abra: EVO_MKT_LOCAL.exe
+
+2) PORTAL LOCAL DO SOLICITANTE
+Abra: EVO_MKT_SOLICITANTE.exe
+
+3) PORTAL EM REDE
+Abra no computador central do Marketing: EVO_MKT_PORTAL_REDE.exe
+As coordenadoras acessam pelo navegador usando o endereço exibido/gerado pelo Portal em Rede.
+
+ANTES DE QUALQUER ATUALIZAÇÃO
+- Entre como Gerente.
+- Abra Sistema > Manutenção.
+- Execute o Autoteste.
+- Crie um backup.
+- Preserve sempre DADOS/ e ANEXOS/.
+
+MANUTENÇÃO
+Sistema > Manutenção concentra diagnóstico, Modo Seguro, suporte e recuperação.
+
+DADOS
+Os 19 XLSX da pasta DADOS continuam sendo a fonte oficial.

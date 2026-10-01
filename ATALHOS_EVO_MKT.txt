@@ -1,0 +1,18 @@
+EVO MKT — ATALHOS
+Ctrl+K  Busca global
+Ctrl+N  Novo registro no módulo atual
+Alt+H   Hoje
+Alt+M   Minha Área
+Alt+C   Calendário
+Alt+G   Governança (Gerente)
+Alt+S   Saúde do Sistema (Gerente)
+?       Ajuda de atalhos
+Esc     Fecha modal/ajuda
+
+Comandos na busca global (prefixo >):
+>backup
+>manutencao
+>saude
+>central dados
+>modo seguro
+>sair modo seguro

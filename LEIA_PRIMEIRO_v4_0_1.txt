@@ -1,0 +1,19 @@
+EVO MKT v4.0.1 — CORREÇÃO DE INICIALIZAÇÃO
+
+1. Extraia o ZIP inteiro para uma pasta normal do Windows.
+2. Abra apenas EVO_MKT_LOCAL.exe.
+3. Não abra EVO_MKT_CORE.exe manualmente; ele é o núcleo interno do aplicativo.
+
+Correção desta versão:
+- detecta servidor EVO MKT já aberto e reutiliza a instância;
+- evita disputa entre duas instâncias na porta 3210;
+- encerra somente instâncias antigas/travadas do EVO MKT antes de reiniciar;
+- verifica /api/health antes de considerar a abertura concluída;
+- cria storage\\logs automaticamente;
+- grava diagnóstico em storage\\logs\\launcher.log.
+
+Se ainda houver erro, envie os arquivos:
+- storage\\logs\\launcher.log
+- storage\\logs\\evo-mkt.log
+
+Os 19 XLSX permanecem na pasta DADOS e não foram alterados nesta correção.

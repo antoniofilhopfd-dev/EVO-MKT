@@ -1,0 +1,22 @@
+EVO MKT v3.3.1 — ACESSO INTERNO DA EQUIPE
+
+Códigos iniciais:
+
+Gerente de Marketing
+Natália Mello: NAT-3301
+
+Equipe de Marketing
+Antônio Filho: ANT-3302
+Monique Vilante: MON-3303
+Aluizo Junior: ALU-3304
+Maria Eduarda: EDU-3305
+
+COMPORTAMENTO
+- A Gerente entra com acesso completo à interface interna.
+- Os demais integrantes entram diretamente em Minha Área.
+- Integrantes não veem as áreas administrativas na navegação.
+- Use o botão Sair no topo para trocar de perfil.
+
+IMPORTANTE
+Este controle interno é uma camada local de organização/permissões da interface.
+Não deve ser tratado como uma barreira de segurança de servidor em computador compartilhado com acesso técnico aos arquivos locais.

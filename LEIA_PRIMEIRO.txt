@@ -1,0 +1,39 @@
+EVO MKT v3.3.6 — Produção e Entregas · Padrão AF+
+
+ABERTURA NORMAL DO MARKETING
+- Use somente EVO_MKT_LOCAL.exe.
+- Dados ficam em DADOS/*.xlsx.
+- Não requer Node.js, npm, Next.js, Hostinger ou PostgreSQL.
+
+PORTAL DO SOLICITANTE EM REDE
+- No computador do Marketing, abra EVO_MKT_PORTAL_REDE.exe.
+- Envie às coordenadoras o endereço exibido na tela.
+- Elas acessam pelo navegador e não precisam instalar o app.
+- Consulte LEIA_PORTAL_REDE.txt para o passo a passo completo.
+
+PORTAL LOCAL / EMERGÊNCIA
+- EVO_MKT_SOLICITANTE.exe continua disponível para uso local no mesmo computador quando necessário.
+
+BACKUP
+- A pasta backups guarda cópias automáticas criadas pelas operações críticas.
+
+
+GESTÃO INTERNA DA EQUIPE
+- Minha Área: tarefas, agenda, prazos e produtividade do integrante.
+- Equipe: visão da Gerente com carga, atrasos, prazos e produtividade por período.
+- Nenhuma nova planilha é necessária.
+
+
+COLABORAÇÃO INTERNA
+- Consulte LEIA_COLABORACAO_INTERNA.txt para comentários, @menções, ajuda, bloqueios, dependências e etapas.
+
+v3.3.5 — APROVAÇÃO INTERNA
+A área Aprovações agora possui fila individual, cadeia de aprovadores, reprovação com retorno automático, comparação de snapshots e métricas de tempo.
+
+
+v3.3.6 — PRODUÇÃO E ENTREGAS
+- Controle de versões em Conteúdos, Projetos, Eventos e Solicitações.
+- Estados de arquivo: EM PRODUÇÃO, EM REVISÃO e FINAL.
+- Arquivos internos são referências por caminho de rede/local ou URL.
+- Arquivos finais podem ser aprovados internamente e registrados na Biblioteca.
+- Consulte LEIA_PRODUCAO_ENTREGAS.txt.

@@ -1,0 +1,15 @@
+EVO MKT v3.3.1 — AUDITORIA FINAL
+
+- Login interno local implementado: OK
+- Perfil Gerente: OK
+- Perfis Equipe: OK
+- Abertura direta em Minha Área: OK
+- Navegação filtrada por perfil: OK
+- Busca global filtrada por perfil: OK
+- Responsável automático quando vazio: OK
+- app.js node --check: OK
+- portal.js node --check: OK
+- Runtime local preservado: OK
+- Portal local preservado: OK
+- Portal em Rede preservado: OK
+- 19 XLSX preservados byte a byte: OK

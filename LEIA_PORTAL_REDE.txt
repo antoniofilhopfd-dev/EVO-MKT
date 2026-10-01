@@ -1,0 +1,31 @@
+EVO MKT — PORTAL DO SOLICITANTE NA REDE LOCAL
+
+NO COMPUTADOR DO MARKETING
+1. Extraia o ZIP inteiro para uma pasta local.
+2. Abra EVO_MKT_LOCAL.exe normalmente para usar o sistema interno.
+3. Para disponibilizar o Portal às coordenadoras, abra EVO_MKT_PORTAL_REDE.exe.
+4. Na primeira execução, o Windows Firewall pode perguntar se deseja permitir o acesso. Permita somente em REDES PRIVADAS.
+5. Uma tela "Portal do Solicitante em Rede" mostrará o endereço que deve ser enviado às coordenadoras.
+6. O mesmo endereço também é gravado em PORTAL_REDE_URL.txt e PORTAL_REDE.url.
+7. Mantenha EVO_MKT_PORTAL_REDE.exe aberto enquanto o Portal precisar ficar disponível.
+
+NOS COMPUTADORES DAS COORDENADORAS
+1. O computador precisa estar na mesma rede local do computador do Marketing.
+2. Abra no navegador o endereço informado pelo Marketing, por exemplo:
+   http://192.168.x.x:3211/solicitante.html
+3. Entre com o código do seu segmento.
+4. Cada pessoa verá somente as demandas dos segmentos autorizados.
+
+IMPORTANTE
+- Não é necessário instalar o EVO MKT nos computadores das coordenadoras.
+- Os dados permanecem no computador central do Marketing.
+- Não encaminhe a porta 3211 para a internet.
+- O servidor bloqueia IPs que não pertençam à rede local privada.
+- Se o IP do computador do Marketing mudar, execute novamente EVO_MKT_PORTAL_REDE.exe e use o endereço mostrado na tela.
+
+NOVO NA v3.2.2
+- Na aba Solicitações do EVO MKT, use “Avisos do Portal” para publicar comunicados.
+- Avisos podem ser gerais ou específicos por segmento.
+- O Portal agora possui Início, Nova demanda, Minhas demandas e Meu histórico.
+- Demandas podem ser marcadas como recorrentes e repetidas a partir do histórico.
+- Após uma entrega concluída, o solicitante pode avaliar de 1 a 5 estrelas.

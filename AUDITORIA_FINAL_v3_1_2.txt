@@ -1,0 +1,16 @@
+EVO MKT v3.1.2 — AUDITORIA FINAL
+
+- 19/19 XLSX válidos estruturalmente.
+- 19/19 XLSX preservados byte a byte em relação à v3.1.1.
+- web/app.js: node --check OK.
+- web/portal.js: node --check OK.
+- EVO_MKT_LOCAL.exe: Windows GUI x64.
+- EVO_MKT_SOLICITANTE.exe: Windows GUI x64, runtime restrito próprio.
+- Nenhum arquivo VBS no pacote.
+- Portal bloqueia módulos internos.
+- Portal filtra campos públicos da solicitação.
+- Portal impede alteração de executor/status arbitrário.
+- Isolamento por segmento validado.
+- Upload incremental de anexos validado.
+- XLSX produzido pelo Portal reaberto com sucesso.
+- Transições responder ajuste / aprovar entrega testadas.

@@ -1,0 +1,32 @@
+EVO MKT v3.2.0 — AUDITORIA FINAL
+
+Arquitetura
+- EVO_MKT_LOCAL.exe: Windows GUI x64
+- EVO_MKT_SOLICITANTE.exe: Windows GUI x64
+- EVO_MKT_PORTAL_REDE.exe: Windows GUI x64
+- Runtime do Portal em Rede: Go, sem Node/npm/Next/VBS/CMD
+
+Validações
+- web/app.js: sintaxe JavaScript OK
+- web/portal.js: sintaxe JavaScript OK
+- runtime_src/portal/main.go: compilação/teste Go OK
+- runtime_src/portal_rede/main.go: compilação/teste Go OK
+- 19/19 XLSX válidos
+- 19/19 XLSX preservados byte a byte em relação à v3.1.2
+- Nenhum acesso/código de teste pré-gravado no pacote
+
+Testes funcionais realizados em cópia separada
+- servidor em 0.0.0.0:3211
+- acesso por IP privado da rede: OK
+- página administrativa acessível apenas por loopback: OK
+- login por segmento: OK
+- criação de demanda em rede: OK
+- isolamento Infantil x Anos Iniciais: OK
+- upload de arquivo final pelo computador do Marketing: OK
+- mudança automática para aguardando aprovação: OK
+- arquivo final disponível ao solicitante autenticado: OK
+- proteção contra IP público implementada
+- verificação de alteração concorrente antes da substituição do XLSX implementada
+
+Observação Windows
+Na primeira execução de EVO_MKT_PORTAL_REDE.exe, o Windows Firewall pode solicitar autorização. Permitir apenas em Redes privadas.

@@ -1,0 +1,16 @@
+EVO MKT v3.3.0 — AUDITORIA FINAL
+Data: 27/09/2026
+
+- Interface: v3.3.0 Gestão da Equipe
+- Core/runtime local preservado e funcional
+- app.js: node --check OK
+- portal.js: node --check OK
+- EVO_MKT_LOCAL.exe: Windows GUI x64
+- EVO_MKT_SOLICITANTE.exe: Windows GUI x64
+- EVO_MKT_PORTAL_REDE.exe: Windows GUI x64
+- 19/19 XLSX válidos
+- 19/19 XLSX preservados byte a byte em relação à v3.2.2
+- Minha Área adicionada sem nova planilha
+- Gestão da Equipe adicionada sem nova planilha
+- Produtividade configurável em 7/30/90 dias
+- Nenhum dado de homologação adicionado ao pacote

@@ -1,0 +1,13 @@
+EVO MKT v3.3.4 — AUTOMAÇÃO DE FLUXOS
+
+1. Entre como Gerente (Natália) e abra Gestão > Fluxos.
+2. Configure o responsável, SLA e checklist de cada etapa.
+3. Em Tarefas, Conteúdos, Solicitações, Projetos ou Eventos, clique no botão Fluxo (⇢) ou abra Colaborar.
+4. Clique em Iniciar fluxo.
+5. Marque o checklist da etapa.
+6. Clique em Concluir etapa e avançar.
+7. Se a próxima etapa tiver responsável configurado, o item será transferido automaticamente.
+8. Se houver bloqueio ou dependência ainda aberta, o avanço é impedido.
+9. A Gerente acompanha gargalos e SLAs em Gestão > Fluxos.
+
+Observação: as configurações de fluxo ficam no computador principal do EVO MKT. Os dados dos itens continuam nos XLSX já existentes.

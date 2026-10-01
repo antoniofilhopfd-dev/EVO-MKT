@@ -1,0 +1,26 @@
+EVO MKT — ATUALIZAÇÃO SEGURA
+Versão da interface: 4.0.0
+
+REGRA PRINCIPAL
+Nunca substitua ou apague a pasta DADOS ao atualizar somente o aplicativo.
+
+ANTES DE ATUALIZAR
+1. Feche EVO_MKT_LOCAL.exe e os Portais.
+2. Abra Sistema > Manutenção e confira a integridade.
+3. Crie um backup.
+4. Faça também uma cópia manual da pasta DADOS, se a atualização for importante.
+
+ATUALIZAÇÃO DE CÓDIGO
+- Preserve DADOS/.
+- Preserve ANEXOS/ quando já houver arquivos reais do Portal.
+- Substitua apenas os arquivos de código/interface/executáveis indicados pela versão nova.
+- Não misture arquivos de duas versões se não houver instrução específica.
+
+DEPOIS
+1. Abra EVO_MKT_LOCAL.exe.
+2. Entre como Gerente.
+3. Abra Sistema > Manutenção.
+4. Execute o Autoteste.
+5. Confira Saúde do Sistema e um módulo de leitura.
+
+Se ocorrer erro, não continue gravando dados até identificar se o problema está na interface, runtime ou XLSX.

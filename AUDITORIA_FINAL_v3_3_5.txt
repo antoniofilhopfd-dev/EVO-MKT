@@ -1,0 +1,9 @@
+EVO MKT v3.3.5 — AUDITORIA FINAL
+
+- app.js: node --check OK
+- portal.js: node --check OK
+- 19/19 XLSX preservados byte a byte em relação à v3.3.4
+- Nenhuma nova planilha criada
+- Três executáveis Windows preservados
+- Runtime testado em cópia separada com persistência de campos de aprovação/cadeia/histórico
+- Dados temporários de homologação não fazem parte deste pacote

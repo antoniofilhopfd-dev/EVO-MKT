@@ -1,0 +1,18 @@
+EVO MKT v3.3.3 — COLABORAÇÃO INTERNA
+
+1. Abra EVO_MKT_LOCAL.exe.
+2. Entre com seu código interno.
+3. Na Minha Área, use o botão COLABORAR em um item atribuído.
+4. Também é possível abrir COLABORAR pela coluna Ações de Tarefas, Projetos, Conteúdos, Eventos e Solicitações.
+
+A timeline permite:
+- comentários;
+- @menções;
+- referências de arquivo/URL;
+- pedido de ajuda;
+- bloqueio/desbloqueio;
+- dependência;
+- conclusão de etapa.
+
+REFERÊNCIAS DE ARQUIVO
+Use caminhos compartilhados da rede (ex.: \\servidor\\marketing\\arquivo.pdf) ou URLs acessíveis pela equipe.

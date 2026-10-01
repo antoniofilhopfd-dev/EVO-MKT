@@ -1,0 +1,19 @@
+EVO MKT v3.1.0 — AUDITORIA PORTAL DO SOLICITANTE
+
+- Runtime local Go: OK
+- EVO_MKT_LOCAL.exe Windows GUI x64: OK
+- EVO_MKT_SOLICITANTE.exe Windows GUI x64: OK
+- Portal separado do sistema interno: OK
+- Login local por código: OK
+- Escopo por segmento: OK
+- Teste cruzado: Anos Iniciais não vê demanda Infantil: OK
+- Mini-briefing: OK
+- Criação de demanda: OK
+- Upload de arquivo: OK
+- Arquivo vinculado à solicitação: OK
+- Fila da Gerente de Marketing: OK
+- Executor definido internamente pelo Marketing: OK
+- Mesma EVO_MKT_SOLICITACOES.xlsx: OK
+- 19/19 XLSX preservados byte a byte em relação à v3.0: OK
+- JavaScript app.js: sintaxe OK
+- JavaScript portal.js: sintaxe OK

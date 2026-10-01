@@ -1,0 +1,53 @@
+[
+  {
+    "id": "coord-infantil",
+    "nome": "Coordenação Infantil",
+    "perfil": "COORDENACAO",
+    "segmentos": [
+      "Infantil"
+    ],
+    "codigo": "B82802",
+    "ativo": true
+  },
+  {
+    "id": "coord-iniciais",
+    "nome": "Coordenação Anos Iniciais",
+    "perfil": "COORDENACAO",
+    "segmentos": [
+      "Anos Iniciais"
+    ],
+    "codigo": "DEACCE",
+    "ativo": true
+  },
+  {
+    "id": "coord-finais",
+    "nome": "Coordenação Anos Finais",
+    "perfil": "COORDENACAO",
+    "segmentos": [
+      "Anos Finais"
+    ],
+    "codigo": "F4699E",
+    "ativo": true
+  },
+  {
+    "id": "coord-medio",
+    "nome": "Coordenação Ensino Médio",
+    "perfil": "COORDENACAO",
+    "segmentos": [
+      "Ensino Médio"
+    ],
+    "codigo": "5F36F6",
+    "ativo": true
+  },
+  {
+    "id": "auzilair",
+    "nome": "Auzilair",
+    "perfil": "COORDENACAO_ATENDIMENTO_GRAFICA",
+    "segmentos": [
+      "Infantil",
+      "Gráfica Infantil"
+    ],
+    "codigo": "3CAC53",
+    "ativo": true
+  }
+]

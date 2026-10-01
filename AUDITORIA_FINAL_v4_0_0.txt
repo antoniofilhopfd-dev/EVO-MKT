@@ -1,0 +1,59 @@
+EVO MKT v4.0.0 — AUDITORIA FINAL
+
+INTERFACE
+- app.js: node --check OK
+- portal.js: node --check OK
+- index.html: parse OK
+- solicitante.html: parse OK
+- Interface funcional: 4.0.0
+
+RUNTIME PRINCIPAL
+- Runtime preservado da base homologada
+- Inicialização Linux de homologação: OK
+- Escuta local: 127.0.0.1:3210
+- /api/health: OK
+- /api/heartbeat: OK
+- Runtime reporta identificador interno homologado 3.1.2
+- 19 módulos reconhecidos
+
+PORTAL LOCAL
+- Runtime de homologação iniciou em 127.0.0.1:3211
+- Executável Windows preservado
+
+EXECUTÁVEIS WINDOWS
+- EVO_MKT_LOCAL.exe: PE32+ Windows GUI x64
+- EVO_MKT_SOLICITANTE.exe: PE32+ Windows GUI x64
+- EVO_MKT_PORTAL_REDE.exe: PE32+ Windows GUI x64
+
+DADOS
+- 19/19 XLSX válidos estruturalmente
+- 19/19 XLSX byte a byte idênticos à v3.6.0
+- Nenhuma nova planilha criada
+- DADOS permanece a fonte oficial
+
+DEPENDÊNCIAS
+- Nenhum .vbs
+- Nenhum package.json/package-lock/node_modules
+- Não requer Node/npm/Next para abrir no Windows
+
+V4.0.0
+- Central de Manutenção
+- Modo Seguro de interface
+- Autoteste somente leitura
+- Pacote de diagnóstico
+- Snapshot JSON de consulta
+- Exportação/importação de preferências
+- Limpeza segura de cache/rascunhos/log técnico
+- Log técnico local limitado
+- Alto contraste e escala de texto
+- Bloqueio opcional por inatividade
+- Atalhos finais e ajuda `?`
+- Comandos administrativos na busca global
+- Melhorias de impressão e clique
+- Guias de atualização, recuperação e segurança
+- Pacote final Windows-only
+
+LIMITES CONHECIDOS
+- Login interno da equipe e Modo Seguro são controles da interface local, não ACL do runtime principal.
+- O Portal do Solicitante permanece com runtime próprio restrito.
+- O runtime principal não foi recompilado nesta revisão para evitar risco ao CRUD/XLSX.

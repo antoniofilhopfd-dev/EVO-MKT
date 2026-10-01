@@ -1,0 +1,14 @@
+EVO MKT v3.3.2 — Trabalho Individual
+Auditoria final
+
+- Evolução incremental da v3.3.1.
+- Nenhuma nova planilha criada.
+- 19/19 XLSX válidos e preservados no pacote final.
+- app.js: node --check OK.
+- portal.js: node --check OK.
+- EVO_MKT_LOCAL.exe: preservado.
+- EVO_MKT_SOLICITANTE.exe: preservado.
+- EVO_MKT_PORTAL_REDE.exe: preservado.
+- Fluxo testado em cópia separada: atribuição, confirmação de recebimento, início de execução e transferência de tarefa.
+- Novos campos são criados somente quando a ação correspondente é usada.
+- Dados temporários de homologação não fazem parte deste pacote.

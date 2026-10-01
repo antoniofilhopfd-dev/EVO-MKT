@@ -1,0 +1,7 @@
+EVO MKT — SEGURANÇA E LIMITES
+
+- O Portal do Solicitante possui runtime próprio e restrito, com isolamento por segmento.
+- O login interno da equipe organiza acesso e navegação da interface local; ele não substitui controle de acesso de sistema operacional ou permissões de arquivos da pasta DADOS.
+- O Modo Seguro da interface bloqueia criação/edição na interface, mas não é um bloqueio do runtime para outras aplicações.
+- Proteja a pasta do EVO MKT no Windows com permissões adequadas se vários usuários tiverem acesso físico ao computador.
+- Códigos de acesso não são incluídos no pacote de diagnóstico.

@@ -1,0 +1,37 @@
+AUDITORIA FINAL — EVO MKT v3.0.0 FINAL ESTÁVEL
+
+Arquitetura
+- Executável Windows GUI x64: OK
+- Runtime local Go: OK
+- Frontend local pronto: OK
+- Node/npm/Next/VBS/CMD: não necessários
+- Banco remoto obrigatório: não
+
+Dados
+- Planilhas XLSX: 19
+- XLSX válidos: 19/19
+- XLSX preservados byte a byte desde v2.3.0: 19/19
+
+Interface
+- Páginas/módulos mapeados: 25
+- app.js: 76554 bytes
+- style.css: 33979 bytes
+- Hoje/Dashboard/Central Operacional: implementados
+- Calendário Dia/Semana/Mês + drag-and-drop: implementado
+- Kanban + drag-and-drop: implementado
+- Busca Ctrl+K + operadores: implementada
+- Filtros salvos, favoritos, recentes, paginação: implementados
+- Ações em massa: implementadas
+- Relatórios + impressão/PDF: implementados
+- Central de Dados/Backup/Saúde: implementados
+
+Validações executadas
+- JavaScript: node --check OK
+- Runtime /health: versão 3.0.0 OK
+- Heartbeat: OK
+- Leitura de módulos: OK
+- CRUD em cópia de teste: OK
+- Exclusão -> Lixeira em cópia de teste: OK
+- Backup em cópia de teste: OK
+- Busca da API: OK
+- Executável Windows reconhecido como PE32+ GUI x64: OK

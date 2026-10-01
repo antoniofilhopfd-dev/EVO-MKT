@@ -1,0 +1,12 @@
+EVO MKT v3.5.0 — ESTRATÉGIA E QUALIDADE
+
+1. Entre com o perfil da Gerente.
+2. Abra Gestão > Estratégia.
+3. Use “Configurar metas” para definir metas do mês.
+4. Use “Editar foco” para registrar o direcionamento principal do período.
+5. A auditoria de qualidade é somente indicativa: ela não altera registros automaticamente.
+6. O mapa por segmento usa os registros existentes de Conteúdos, Campanhas, Projetos e Eventos.
+7. Campanhas ativas sem conteúdo vinculado aparecem como pendência de qualidade.
+8. “+ Decisão” registra decisões estratégicas localmente no computador da Gerente.
+9. O relatório Planejamento estratégico fica em Gestão > Relatórios.
+10. Nenhuma nova planilha foi criada nesta versão.

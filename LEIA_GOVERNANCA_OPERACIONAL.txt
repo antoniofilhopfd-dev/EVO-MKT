@@ -1,0 +1,17 @@
+EVO MKT — GOVERNANÇA OPERACIONAL
+
+Acesse Gestão > Governança com o perfil Gerente.
+
+A tela reúne:
+- risco crítico e alto
+- alertas preventivos antes do vencimento
+- motivo do score de risco
+- carga/capacidade por integrante
+- sugestões de redistribuição (não automáticas)
+- metas mensais
+- meta de pontualidade
+- limite máximo de atrasos
+- gargalos por bloqueio, dependência e SLA interno
+- exportação CSV dos riscos
+
+As metas ficam nas preferências locais e não criam nova planilha.

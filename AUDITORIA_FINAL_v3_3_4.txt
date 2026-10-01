@@ -1,0 +1,11 @@
+EVO MKT v3.3.4 — AUDITORIA FINAL
+
+- Evolução incremental sobre v3.3.3.
+- app.js validado com node --check.
+- portal.js validado com node --check.
+- 3 executáveis Windows GUI x64 preservados.
+- 19/19 XLSX preservados byte a byte em relação à v3.3.3.
+- Nenhuma nova planilha criada.
+- Fluxo homologado em cópia separada: criação de item, início de fluxo, checklist, avanço e troca de responsável.
+- Registros de teste não fazem parte do pacote final.
+- Runtime principal preservado.

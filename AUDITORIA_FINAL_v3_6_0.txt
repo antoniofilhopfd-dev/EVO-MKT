@@ -1,0 +1,18 @@
+EVO MKT v3.6.0 — AUDITORIA FINAL
+
+[OK] app.js validado com node --check
+[OK] portal.js validado com node --check
+[OK] runtime local respondeu /api/health
+[OK] runtime reconheceu 19 módulos
+[OK] 19/19 XLSX válidos
+[OK] 19/19 XLSX byte a byte idênticos à v3.5.0
+[OK] EVO_MKT_LOCAL.exe: Windows GUI x64
+[OK] EVO_MKT_SOLICITANTE.exe: Windows GUI x64
+[OK] EVO_MKT_PORTAL_REDE.exe: Windows GUI x64
+[OK] Nenhuma nova planilha criada
+[OK] Planejamento Editorial presente
+[OK] Fechamento Mensal presente
+[OK] Relatórios integrados
+[OK] Dashboard e Central Operacional integrados
+
+Observação: executáveis foram preservados; a versão funcional da interface é 3.6.0.

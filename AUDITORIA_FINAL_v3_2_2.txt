@@ -1,0 +1,27 @@
+EVO MKT v3.2.2 — AUDITORIA FINAL
+Data: 27/09/2026
+
+VALIDAÇÕES
+- app.js: node --check OK
+- portal.js: node --check OK
+- runtime Portal local: Go build OK
+- runtime Portal em Rede: Go build OK
+- EVO_MKT_LOCAL.exe: Windows GUI x64
+- EVO_MKT_SOLICITANTE.exe: Windows GUI x64
+- EVO_MKT_PORTAL_REDE.exe: Windows GUI x64
+- 19/19 XLSX válidos e preservados byte a byte em relação à v3.2.1
+- códigos fixos e isolamento por segmento preservados
+- aviso por segmento testado no Portal em Rede
+- criação de demanda recorrente testada
+- campo Solicitado por gravado e devolvido ao Portal
+- avaliação antecipada bloqueada pelo backend
+- acesso de outro segmento não visualiza demanda do Infantil
+
+NOVO NA v3.2.2
+- Início com avisos, resumo e próximas entregas
+- identidade visual por segmento
+- Solicitado por / relatório por coordenadora
+- demanda recorrente + repetir demanda
+- avaliação 1–5 + comentário
+- relatório/histórico do Portal
+- gerenciador local de avisos do Marketing
