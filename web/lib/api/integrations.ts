@@ -2,38 +2,63 @@ import { Ctx } from '../ctx';
 import { q, q1 } from '../db';
 import { requireInternal, requireManager, stepUp } from '../auth';
 import { audit, listRows, MODULES } from '../records';
-import { setSetting, setting } from '../settings';
-import { env, fail, now, Row, strv } from '../util';
+import { intLog, setSetting, setting } from '../settings';
+import { fail, now, Row, strv } from '../util';
+import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
+import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded } from '../integrations/meta';
+import { gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { json } from './handlers';
 
-const GSHEET_DEFAULT = 'tarefas,conteudos,solicitacoes,campanhas,eventos,instagram,trafego';
-const publicUrl = (c: Ctx) => (env('PUBLIC_URL') || `${c.url.protocol}//${c.url.host}`).replace(/\/+$/, '');
+const redirect = (to: string) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store' } });
+const bad = (svc: string, e: any): never => {
+  void intLog(svc, 'erro', e.message);
+  return fail(502, e.message);
+};
 
-/** Estado e configurações das integrações. Conexão OAuth, sincronizações e publicações entram na etapa seguinte da migração. */
-export async function integrationsRoute(c: Ctx) {
+/** Rotas /integrations/* e /public/media. */
+export async function integrationsRoute(c: Ctx): Promise<Response> {
   const { path, method } = c;
-  const todo = () => fail(501, 'Esta integração ainda está sendo migrada para a nova versão (próxima etapa).');
   switch (true) {
+    case path === '/public/media': {
+      const rel = verifySignedMedia(c.qs('p'), parseInt(c.qs('e'), 10) || 0, c.qs('s'));
+      const f = await q1('SELECT mime,conteudo FROM arquivos WHERE caminho=?', [rel]);
+      if (!f) fail(404, 'Arquivo não encontrado.');
+      const buf = f.conteudo as Buffer;
+      return new Response(new Uint8Array(buf), { headers: { 'Content-Type': f.mime, 'Content-Length': String(buf.length), 'Cache-Control': 'no-store' } });
+    }
+    case path === '/integrations/meta/callback' || path === '/integrations/google/callback': {
+      const svc = path.includes('meta') ? 'meta' : 'google';
+      const dest = '/?page=administracao&int=';
+      try {
+        if (!checkState(c.qs('state'), svc)) throw new Error('Sessão de conexão expirada. Tente de novo.');
+        if (c.qs('error')) throw new Error('Autorização negada: ' + (c.qs('error_description') || c.qs('error')));
+        if (svc === 'meta') await metaFinishConnect(c.qs('code'));
+        else await gFinishConnect(c.qs('code'));
+        await audit('integracao:' + svc, 'conectado');
+        return redirect(dest + svc + '_ok');
+      } catch (e: any) {
+        await intLog(svc, 'erro', e.message);
+        return redirect(`${dest}${svc}_erro&msg=${encodeURIComponent(String(e.message).slice(0, 200))}`);
+      }
+    }
     case path === '/integrations/status': {
       await requireManager(c);
       const exp = parseInt(await setting('meta_token_expira', '0'), 10) || 0;
       return json({
         instagram: {
           configurado: (await setting('meta_app_id')) !== '' && (await setting('meta_app_secret')) !== '',
-          appId: await setting('meta_app_id'),
-          conectado: (await setting('meta_token')) !== '' && (await setting('ig_user_id')) !== '',
-          usuario: await setting('ig_username'), pagina: await setting('meta_page_name'),
+          appId: await setting('meta_app_id'), conectado: await metaConnected(), usuario: await setting('ig_username'), pagina: await setting('meta_page_name'),
           expiraEm: exp ? now(new Date(exp * 1000)) : '', ultimaSync: await setting('ig_last_sync'),
         },
         google: {
           configurado: (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '',
-          clientId: await setting('g_client_id'), conectado: (await setting('g_refresh_token')) !== '', email: await setting('g_email'),
+          clientId: await setting('g_client_id'), conectado: await gConnected(), email: await setting('g_email'),
           ultimaAgenda: await setting('g_last_cal_sync'), planilhaUrl: await setting('g_sheet_url'), ultimaPlanilha: await setting('g_last_sheet_export'),
           driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
-          planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT),
+          planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
-        redirectUris: { meta: publicUrl(c) + '/api/integrations/meta/callback', google: publicUrl(c) + '/api/integrations/google/callback' },
-        cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c) + '/api/cron/integracoes',
+        redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
+        cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
       });
     }
     case path === '/integrations/settings' && method === 'POST': {
@@ -44,6 +69,29 @@ export async function integrationsRoute(c: Ctx) {
       if (input.g_auto_drive_entregas !== undefined) await setSetting('g_auto_drive_entregas', input.g_auto_drive_entregas ? '1' : '0');
       if (input.g_sheet_modules !== undefined) await setSetting('g_sheet_modules', strv(input.g_sheet_modules).split(',').map((m) => m.trim()).filter((m) => m in MODULES).join(','));
       await audit(u.codigo, 'integracoes-config');
+      return json({ ok: true });
+    }
+    case path === '/integrations/meta/connect': {
+      await requireManager(c);
+      return redirect(await metaConnectUrl());
+    }
+    case path === '/integrations/google/connect': {
+      await requireManager(c);
+      try { return redirect(await gConnectUrl()); } catch (e: any) { return fail(400, e.message); }
+    }
+    case path === '/integrations/meta/token' && method === 'POST': {
+      const u = await requireManager(c);
+      const input = await c.body();
+      await stepUp(u, input);
+      const tok = strv(input.token).trim();
+      if (!tok) fail(400, 'Informe o token.');
+      await setSetting('meta_token', tok);
+      await setSetting('meta_token_expira', '0');
+      try {
+        if (strv(input.ig_user_id).trim()) await setSetting('ig_user_id', strv(input.ig_user_id).trim());
+        else await metaDiscoverAccount();
+      } catch (e: any) { fail(400, e.message); }
+      await audit(u.codigo, 'instagram-token-manual');
       return json({ ok: true });
     }
     case path === '/integrations/meta/disconnect' && method === 'POST': {
@@ -60,6 +108,10 @@ export async function integrationsRoute(c: Ctx) {
       await audit(u.codigo, 'google-desconectado');
       return json({ ok: true });
     }
+    case path === '/integrations/instagram/sync' && method === 'POST': {
+      await requireManager(c);
+      try { await metaRefreshIfNeeded(); return json({ periodos: await igSync() }); } catch (e: any) { return bad('instagram', e); }
+    }
     case path === '/integrations/instagram/queue': {
       await requireInternal(c);
       const st: Record<string, Row> = {};
@@ -72,12 +124,47 @@ export async function integrationsRoute(c: Ctx) {
       }
       return json(o);
     }
+    case path === '/integrations/instagram/media' && method === 'POST': {
+      const u = await requireInternal(c);
+      const form = await c.req.formData();
+      const f = (form.getAll('files')[0] ?? form.get('file')) as File | string | null;
+      const rel = await igSaveMedia(c.qs('id'), f && typeof f !== 'string' ? f : null);
+      await audit(u.codigo, 'instagram-midia', 'conteudos', c.qs('id'));
+      return json({ midia: rel });
+    }
+    case path === '/integrations/instagram/publish' && method === 'POST': {
+      const u = await requireInternal(c);
+      const id = strv((await c.body()).id);
+      try {
+        const r = await igPublish(id, u.codigo);
+        await audit(u.codigo, 'instagram-publicado', 'conteudos', id);
+        return json(r);
+      } catch (e: any) {
+        await igMarkError(id, e.message);
+        return bad('instagram', e);
+      }
+    }
+    case path === '/integrations/google/calendar/sync' && method === 'POST': {
+      await requireManager(c);
+      try { return json(await gCalendarSync()); } catch (e: any) { return bad('google', e); }
+    }
+    case path === '/integrations/google/sheets/export' && method === 'POST': {
+      await requireManager(c);
+      try { return json({ abas: await gSheetsExport(), url: await setting('g_sheet_url') }); } catch (e: any) { return bad('google', e); }
+    }
+    case path === '/integrations/google/drive/send-entregas' && method === 'POST': {
+      await requireManager(c);
+      let n = 0;
+      try {
+        for (const r of await listRows('solicitacoes')) if (r.arquivosEntrega) n += await gDriveSendEntregas(r.id);
+      } catch (e: any) { return bad('google', e); }
+      return json({ arquivos: n });
+    }
     case path === '/integrations/log': {
       await requireManager(c);
       return json(await q('SELECT quando,servico,nivel,msg FROM integration_log ORDER BY id DESC LIMIT 40'));
     }
     default:
-      void q1;
-      return todo();
+      return fail(404, 'Rota não encontrada.');
   }
 }

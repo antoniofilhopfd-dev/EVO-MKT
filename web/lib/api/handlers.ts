@@ -16,6 +16,9 @@ import { saveUploads, serveFile } from '../files';
 import { intLog, setSetting, setting } from '../settings';
 import { cleanInput, env, fail, HttpError, lower, now, Row, strv } from '../util';
 import { integrationsRoute } from './integrations';
+import { cronRoute } from './cron';
+import { importModule } from '../xlsx';
+import { gConnected, gDriveSendEntregas } from '../integrations/google';
 
 export const json = (data: unknown, status = 200, headers: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
@@ -30,6 +33,9 @@ export async function route(c: Ctx): Promise<Out> {
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
 
   switch (true) {
+    case path.startsWith('/cron/'):
+      return cronRoute(c);
+
     case path === '/setup':
       return setupRoute(c);
 
@@ -167,6 +173,9 @@ export async function route(c: Ctx): Promise<Out> {
       row.atualizadoEm = now();
       await saveRow('solicitacoes', row);
       await audit(u.codigo, 'upload-entrega', 'solicitacoes', id);
+      if ((await setting('g_auto_drive_entregas')) === '1' && (await gConnected())) {
+        try { await gDriveSendEntregas(id); } catch (e: any) { await intLog('google', 'erro', 'Drive automático: ' + e.message); }
+      }
       return json({ files: saved });
     }
     case path === '/file': {
@@ -270,6 +279,20 @@ export async function route(c: Ctx): Promise<Out> {
           out.push({ tipo, codigo: r.codigo, nome: r.nome, acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       await audit(m.codigo, 'ver-codigos');
       return json({ modo: await loginMode(), codigos: out });
+    }
+    case path === '/admin/import' && method === 'POST': {
+      // Importa planilhas EVO_MKT_<MODULO>.xlsx (sistema antigo). Não sobrescreve nada: IDs já usados são ignorados.
+      const m = await requireManager(c);
+      const form = await c.req.formData();
+      await stepUp(m, { senhaAdmin: form.get('senhaAdmin') ?? undefined });
+      const res: Row = {};
+      for (const f of form.getAll('files')) {
+        if (typeof f === 'string') continue;
+        const mod = f.name.match(/^EVO_MKT_([A-Z]+)\.xlsx$/i)?.[1].toLowerCase() ?? '';
+        if (!(mod in MODULES)) { res[f.name] = 'ignorado (nome fora do padrão EVO_MKT_MODULO.xlsx)'; continue; }
+        try { res[mod] = await importModule(mod, new Uint8Array(await f.arrayBuffer()), m.codigo); } catch (e: any) { res[f.name] = 'erro: ' + e.message; }
+      }
+      return json({ importados: res });
     }
     case path === '/admin/seed-equipe' && method === 'POST': {
       const m = await requireManager(c);
@@ -412,7 +435,7 @@ function tabOf(tipo: string): 'users' | 'portal_users' {
 
 async function checkCsrfOrPortal(c: Ctx): Promise<void> {
   // Rotas públicas de login e chamadas do Portal (token em cabeçalho) não dependem de cookie.
-  if (['/auth/login', '/portal/login', '/auth/forgot'].includes(c.path)) return;
+  if (['/auth/login', '/portal/login', '/auth/forgot'].includes(c.path) || c.path.startsWith('/cron/')) return;
   if (c.header('x-portal-token') && (await portalUser(c)) !== null && (await internalUser(c)) === null) return;
   checkCsrf(c);
 }

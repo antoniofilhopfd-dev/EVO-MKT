@@ -3,7 +3,9 @@
   "version": "5.0.0",
   "private": true,
   "description": "EVO MKT — Next.js + MySQL (Hostinger Node.js Web App)",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "prebuild": "node scripts/prebuild.mjs",
     "dev": "node scripts/prebuild.mjs && next dev",
@@ -14,6 +16,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "fflate": "^0.8.3",
     "mysql2": "^3.14.0",
     "next": "^16.4.0",
     "nodemailer": "^7.0.0",

@@ -63,3 +63,29 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 /** IP da requisição corrente (para a auditoria), sem passar o contexto por todas as funções. */
 export const reqStore = new AsyncLocalStorage<{ ip: string }>();
 export const currentIp = () => reqStore.getStore()?.ip ?? '-';
+
+// ---------- datas no fuso do sistema ----------
+export interface LocalParts { y: number; m: number; d: number; h: number; mi: number; s: number }
+export function localParts(d: Date): LocalParts {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: env('TIMEZONE', 'America/Recife'), hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(d);
+  const p: Record<string, number> = {};
+  for (const x of parts) if (x.type !== 'literal') p[x.type] = +x.value;
+  return { y: p.year, m: p.month, d: p.day, h: p.hour, mi: p.minute, s: p.second };
+}
+const pad2 = (n: number) => String(n).padStart(2, '0');
+export const fmtDate = (d: Date) => { const p = localParts(d); return `${p.y}-${pad2(p.m)}-${pad2(p.d)}`; };
+export const fmtDateTimeLocal = (d: Date) => { const p = localParts(d); return `${p.y}-${pad2(p.m)}-${pad2(p.d)}T${pad2(p.h)}:${pad2(p.mi)}`; };
+/** Interpreta "YYYY-MM-DDTHH:MM[:SS]" no fuso do sistema (ou usa o deslocamento, se a string já tiver um). */
+export function parseLocal(s: string): Date {
+  if (/(Z|[+-]\d{2}:?\d{2})$/.test(s)) return new Date(s);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!m) return new Date(NaN);
+  const guess = Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0));
+  const p = localParts(new Date(guess));
+  const asUtc = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s);
+  return new Date(guess - (asUtc - guess));
+}
+export const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86400_000);
