@@ -7,7 +7,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  const ctx=await b.newContext({viewport:{width:1440,height:1000}});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
  p.on('dialog',d=>d.accept(d.type()==='prompt'?'SenhaForte2026x':undefined));
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');
- await p.evaluate(()=>{adminTab='acessos';go('administracao')});await p.waitForSelector('#modeBtn');
+ await p.waitForSelector('.today-banner');await p.evaluate(()=>{adminTab='acessos';go('administracao')});await p.waitForSelector('#modeBtn');
  t('botão para ativar acesso só por código aparece',/código/i.test(await p.$eval('#modeBtn',e=>e.innerText)));
  await p.click('#modeBtn');await p.waitForSelector('.admin-overlay .temp-pass');
  const codes=await p.$$eval('.admin-overlay .temp-pass',a=>a.map(e=>e.innerText.trim()));

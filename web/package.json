@@ -1,0 +1,29 @@
+{
+  "name": "evo-mkt-web",
+  "version": "5.0.0",
+  "private": true,
+  "description": "EVO MKT — Next.js + MySQL (Hostinger Node.js Web App)",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "prebuild": "node scripts/prebuild.mjs",
+    "dev": "node scripts/prebuild.mjs && next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "node scripts/prebuild.mjs && tsc --noEmit",
+    "gerar:segredos": "node scripts/gerar-segredos.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "mysql2": "^3.14.0",
+    "next": "^16.4.0",
+    "nodemailer": "^7.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}

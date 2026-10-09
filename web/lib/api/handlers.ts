@@ -1,0 +1,508 @@
+import { timingSafeEqual } from 'node:crypto';
+import { Ctx, setCookie } from '../ctx';
+import { q, q1, run } from '../db';
+import { genPassword, hashPassword, randHex, sha256, strongPassword, verifyPassword } from '../crypto';
+import {
+  allowedSegment, checkAdminPassword, checkCsrf, codeLoginFail, codeLoginGuard, internalUser, issueAccessCode, loginMode, portalUser, rateCheck,
+  rateFail, registerDevice, requireInternal, requireManager, requirePortal, sessionTokenFromCookie, setSessionCookie, startSession, stepUp, validCodeFormat,
+} from '../auth';
+import { accessHmac, decryptSecret } from '../crypto';
+import { notifyMail } from '../mail';
+import {
+  ALLOWED_EXT, audit, autoBackupIfDue, CREATE_FIELDS, EVO_VERSION, getRow, headersOf, insertRow, listRows, makeBackup, MODULES, notifyAssignment,
+  emailForPerson, publicRow, saveRow, seedEquipe, TEAM_WRITE, teamMayDelete, trashRow, UPDATE_FIELDS, updateRow,
+} from '../records';
+import { saveUploads, serveFile } from '../files';
+import { intLog, setSetting, setting } from '../settings';
+import { cleanInput, env, fail, HttpError, lower, now, Row, strv } from '../util';
+import { integrationsRoute } from './integrations';
+
+export const json = (data: unknown, status = 200, headers: Record<string, string> = {}): Response =>
+  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
+
+type Out = Response;
+const asUser = (u: Row) => ({ code: u.codigo, name: u.nome, role: u.role, label: u.label });
+const portalOut = (u: Row, segs: unknown) => ({ id: u.codigo, codigo: u.codigo, nome: u.nome, perfil: u.perfil, segmentos: segs, ativo: true });
+const upper = (v: unknown) => strv(v).trim().toUpperCase();
+
+export async function route(c: Ctx): Promise<Out> {
+  const { method, path } = c;
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
+
+  switch (true) {
+    case path === '/setup':
+      return setupRoute(c);
+
+    case path === '/heartbeat':
+      return json({ ok: true });
+
+    case path === '/health': {
+      await requireInternal(c);
+      const mods: Row[] = [];
+      let total = 0;
+      for (const m of Object.keys(MODULES)) {
+        const r = (await q1('SELECT COUNT(*) c,COALESCE(SUM(LENGTH(data)),0) s,MAX(atualizado_em) m FROM records WHERE modulo=?', [m]))!;
+        total += Number(r.c);
+        mods.push({ module: m, file: `tabela:${m}`, ok: true, records: Number(r.c), size: Number(r.s), modified: r.m });
+      }
+      return json({ ok: true, version: EVO_VERSION, records: total, dataDir: 'Banco de dados', modules: mods });
+    }
+
+    // ---------- autenticação interna ----------
+    case path === '/auth/login' && method === 'POST': {
+      const input = await c.body();
+      const cod = upper(input.codigo);
+      const sen = strv(input.senha);
+      if ((await loginMode()) === 'codigo') {
+        await codeLoginGuard(c);
+        const u = validCodeFormat(cod) ? await q1('SELECT * FROM users WHERE acesso_hmac=? AND ativo=1', [accessHmac(cod)]) : undefined;
+        if (!u) return codeLoginFail(c, '?');
+        setSessionCookie(c, await startSession('int', u.codigo));
+        await audit(u.codigo, 'login');
+        await registerDevice(c, 'int', u.codigo, u.nome);
+        return json({ user: asUser(u), mustChange: u.role === 'manager' && !!u.must_change });
+      }
+      const key = `int|${c.ip}|${cod}`;
+      await rateCheck(key);
+      await rateCheck('ip|' + c.ip, 40);
+      const u = await q1('SELECT * FROM users WHERE codigo=? AND ativo=1', [cod]);
+      if (!u || !verifyPassword(sen, u.pass_hash)) {
+        await rateFail(key);
+        await rateFail('ip|' + c.ip);
+        await audit(cod || '?', 'login-falhou');
+        fail(401, 'Código ou senha inválidos.');
+      }
+      setSessionCookie(c, await startSession('int', cod));
+      await audit(cod, 'login');
+      return json({ user: asUser(u), mustChange: !!u.must_change });
+    }
+    case path === '/auth/me': {
+      const u = await requireInternal(c);
+      return json({ user: asUser(u), mustChange: !!u.must_change });
+    }
+    case path === '/auth/logout' && method === 'POST': {
+      const t = sessionTokenFromCookie(c);
+      if (t) await run('DELETE FROM sessions WHERE token_hash=?', [sha256(t)]);
+      setCookie(c, 'evo_sid', '', { expire: true });
+      return json({ ok: true });
+    }
+    case path === '/auth/password' && method === 'POST': {
+      const u = await requireInternal(c);
+      const input = await c.body();
+      const row = (await q1('SELECT pass_hash FROM users WHERE codigo=?', [u.codigo]))!;
+      if (!verifyPassword(strv(input.atual), row.pass_hash)) fail(403, 'Senha atual incorreta.');
+      strongPassword(strv(input.nova));
+      await run('UPDATE users SET pass_hash=?,must_change=0 WHERE codigo=?', [hashPassword(strv(input.nova)), u.codigo]);
+      await audit(u.codigo, 'senha-alterada');
+      return json({ ok: true });
+    }
+    case path === '/admin/reset-password' && method === 'POST': {
+      const m = await requireManager(c);
+      const input = await c.body();
+      await stepUp(m, input);
+      const tab = tabOf(strv(input.tipo));
+      const cod = upper(input.codigo);
+      if (!(await q1(`SELECT 1 FROM ${tab} WHERE codigo=?`, [cod]))) fail(404, 'Usuário não encontrado.');
+      if ((await loginMode()) === 'codigo') {
+        const novo = await issueAccessCode(tab, cod);
+        await audit(m.codigo, 'reset-codigo:' + cod);
+        return json({ codigo: cod, senhaTemporaria: novo, modo: 'codigo' });
+      }
+      const p = genPassword();
+      await run(`UPDATE ${tab} SET pass_hash=?,must_change=1 WHERE codigo=?`, [hashPassword(p), cod]);
+      await run('DELETE FROM sessions WHERE codigo=?', [cod]);
+      await audit(m.codigo, 'reset-senha:' + cod);
+      return json({ codigo: cod, senhaTemporaria: p });
+    }
+
+    // ---------- dados internos ----------
+    case path === '/data':
+      return dataRoute(c);
+    case path === '/search': {
+      const u = await requireInternal(c);
+      const term = lower(c.qs('q'));
+      if (!term) return json([]);
+      const res: Row[] = [];
+      outer: for (const m of Object.keys(MODULES)) {
+        if (m === 'configuracoes' && u.role !== 'manager') continue;
+        for (const r of await listRows(m)) {
+          if (lower(Object.values(r).join(' ')).includes(term)) {
+            res.push({ ...r, module: m });
+            if (res.length >= 300) break outer;
+          }
+        }
+      }
+      return json(res);
+    }
+    case path === '/backup' && method === 'POST': {
+      const u = await requireManager(c);
+      const f = await makeBackup('manual');
+      await audit(u.codigo, 'backup', '', f);
+      return json({ ok: true, file: f });
+    }
+    case path === '/backup/list': {
+      await requireManager(c);
+      return json((await q('SELECT nome FROM backups ORDER BY nome DESC')).map((r) => r.nome));
+    }
+    case path === '/backup/download': {
+      await requireManager(c);
+      const f = c.qs('file').split('/').pop() || '';
+      if (!/^evo_backup_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]+\.json\.gz$/.test(f)) fail(400, 'Arquivo inválido.');
+      const r = await q1('SELECT conteudo FROM backups WHERE nome=?', [f]);
+      if (!r) fail(404, 'Não encontrado.');
+      return new Response(new Uint8Array(r.conteudo as Buffer), { headers: { 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${f}"`, 'Cache-Control': 'no-store' } });
+    }
+    case path === '/portal/users': {
+      await requireManager(c);
+      const o = (await q('SELECT codigo,nome,perfil,segmentos,ativo FROM portal_users ORDER BY nome')).map((r) => ({ ...r, segmentos: JSON.parse(r.segmentos), id: r.codigo, ativo: !!r.ativo }));
+      return json(o);
+    }
+    case path === '/manager/upload' && method === 'POST': {
+      const u = await requireInternal(c);
+      const id = c.qs('id');
+      const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Solicitação não encontrada.');
+      const saved = await saveUploads(c, id, 'ENTREGA');
+      const cur = String(row.arquivosEntrega ?? '').split('|').map((s) => s.trim()).filter(Boolean);
+      row.arquivosEntrega = [...cur, ...saved].join(' | ');
+      row.atualizadoEm = now();
+      await saveRow('solicitacoes', row);
+      await audit(u.codigo, 'upload-entrega', 'solicitacoes', id);
+      return json({ files: saved });
+    }
+    case path === '/file': {
+      await requireInternal(c);
+      return serveFile(c.qs('path'), null);
+    }
+
+    // ---------- Integrações (Instagram / Google) ----------
+    case path.startsWith('/integrations/') || path === '/public/media':
+      return integrationsRoute(c);
+
+    // ---------- Portal do Solicitante ----------
+    case path === '/portal/login' && method === 'POST': {
+      const input = await c.body();
+      const cod = upper(input.codigo);
+      const sen = strv(input.senha);
+      if ((await loginMode()) === 'codigo') {
+        await codeLoginGuard(c);
+        const u = validCodeFormat(cod) ? await q1('SELECT * FROM portal_users WHERE acesso_hmac=? AND ativo=1', [accessHmac(cod)]) : undefined;
+        if (!u) return codeLoginFail(c, '?');
+        const tok = await startSession('por', u.codigo);
+        await audit(u.codigo, 'portal-login');
+        await registerDevice(c, 'por', u.codigo, u.nome);
+        return json({ token: tok, mustChange: false, user: portalOut(u, JSON.parse(u.segmentos)) });
+      }
+      const key = `por|${c.ip}|${cod}`;
+      await rateCheck(key);
+      await rateCheck('ip|' + c.ip, 40);
+      const u = await q1('SELECT * FROM portal_users WHERE codigo=? AND ativo=1', [cod]);
+      if (!u || !verifyPassword(sen, u.pass_hash)) {
+        await rateFail(key);
+        await rateFail('ip|' + c.ip);
+        await audit(cod || '?', 'portal-login-falhou');
+        fail(401, 'Código ou senha inválidos.');
+      }
+      const tok = await startSession('por', cod);
+      await audit(cod, 'portal-login');
+      return json({ token: tok, mustChange: !!u.must_change, user: portalOut(u, JSON.parse(u.segmentos)) });
+    }
+    case path === '/portal/password' && method === 'POST': {
+      const u = await requirePortal(c);
+      const input = await c.body();
+      const row = (await q1('SELECT pass_hash FROM portal_users WHERE codigo=?', [u.codigo]))!;
+      if (!verifyPassword(strv(input.atual), row.pass_hash)) fail(403, 'Senha atual incorreta.');
+      strongPassword(strv(input.nova));
+      await run('UPDATE portal_users SET pass_hash=?,must_change=0 WHERE codigo=?', [hashPassword(strv(input.nova)), u.codigo]);
+      return json({ ok: true });
+    }
+    case path === '/admin/users': {
+      await requireManager(c);
+      const o: Row[] = [];
+      for (const r of await q('SELECT codigo,nome,role,label,ativo,must_change FROM users ORDER BY codigo'))
+        o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome) });
+      for (const r of await q('SELECT codigo,nome,perfil,segmentos,ativo,must_change FROM portal_users ORDER BY codigo'))
+        o.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, perfil: JSON.parse(r.segmentos).join(', '), ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: '' });
+      return json(o);
+    }
+    case path === '/admin/user-active' && method === 'POST': {
+      const m = await requireManager(c);
+      const input = await c.body();
+      await stepUp(m, input);
+      const tipo = strv(input.tipo);
+      const tab = tabOf(tipo);
+      const cod = upper(input.codigo);
+      const on = input.ativo ? 1 : 0;
+      if (tipo === 'interno' && cod === m.codigo && !on) fail(400, 'Você não pode desativar o próprio acesso.');
+      if (!(await q1(`SELECT 1 FROM ${tab} WHERE codigo=?`, [cod]))) fail(404, 'Usuário não encontrado.');
+      await run(`UPDATE ${tab} SET ativo=? WHERE codigo=?`, [on, cod]);
+      if (!on) await run('DELETE FROM sessions WHERE codigo=?', [cod]);
+      await audit(m.codigo, (on ? 'ativar:' : 'desativar:') + cod);
+      return json({ ok: true });
+    }
+    case path === '/auth/mode':
+      return json({ modo: await loginMode() });
+    case path === '/admin/mode' && method === 'POST': {
+      const m = await requireManager(c);
+      const input = await c.body();
+      const novo = input.modo === 'codigo' ? 'codigo' : input.modo === 'senha' ? 'senha' : fail(400, 'Modo inválido.');
+      if ((await loginMode()) === 'codigo') await stepUp(m, input);
+      else if (!(await checkAdminPassword(m, input.senhaAdmin, 'step|' + m.codigo))) fail(403, 'Confirme sua senha de administração.');
+      const codes: Row[] = [];
+      if (novo === 'codigo') {
+        for (const r of await q('SELECT codigo,nome FROM users WHERE ativo=1 ORDER BY codigo'))
+          codes.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, acesso: await issueAccessCode('users', r.codigo, r.codigo !== m.codigo) });
+        for (const r of await q('SELECT codigo,nome FROM portal_users WHERE ativo=1 ORDER BY codigo'))
+          codes.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, acesso: await issueAccessCode('portal_users', r.codigo) });
+        await run('UPDATE users SET must_change=0 WHERE role<>?', ['manager']);
+        await run('DELETE FROM sessions WHERE codigo<>?', [m.codigo]);
+      }
+      await setSetting('login_modo', novo);
+      await audit(m.codigo, 'modo-acesso:' + novo);
+      return json({ modo: novo, codigos: codes });
+    }
+    case path === '/admin/codes' && method === 'POST': {
+      const m = await requireManager(c);
+      const input = await c.body();
+      if (!(await checkAdminPassword(m, input.senhaAdmin, 'codes|' + m.codigo))) fail(403, 'Confirme sua senha de administração.');
+      const out: Row[] = [];
+      for (const [tab, tipo] of [['users', 'interno'], ['portal_users', 'portal']] as const)
+        for (const r of await q(`SELECT codigo,nome,acesso_enc FROM ${tab} WHERE ativo=1 ORDER BY codigo`))
+          out.push({ tipo, codigo: r.codigo, nome: r.nome, acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
+      await audit(m.codigo, 'ver-codigos');
+      return json({ modo: await loginMode(), codigos: out });
+    }
+    case path === '/admin/seed-equipe' && method === 'POST': {
+      const m = await requireManager(c);
+      return json({ criados: await seedEquipe(m.codigo) });
+    }
+    case path === '/auth/forgot' && method === 'POST': {
+      const input = await c.body();
+      const cod = upper(input.codigo);
+      const tab = input.tipo === 'portal' ? 'portal_users' : 'users';
+      await rateCheck('forgot|' + c.ip, 10);
+      await rateFail('forgot|' + c.ip);
+      const u = cod ? await q1(`SELECT nome FROM ${tab} WHERE codigo=? AND ativo=1`, [cod]) : undefined;
+      if (u) {
+        await audit(cod, 'esqueci-senha');
+        await notifyMail('Pedido de redefinição de senha', `${u.nome} (${cod}) pediu a redefinição da senha.\nEntre em Administração → Acessos e gere uma senha temporária.`);
+      }
+      return json({ ok: true, mensagem: 'Se o código existir, a Gerente foi avisada e vai gerar uma senha temporária para você.' });
+    }
+    case path === '/admin/audit': {
+      await requireManager(c);
+      const lim = Math.min(500, Math.max(10, parseInt(c.qs('limit'), 10) || 100));
+      return json(await q('SELECT quando,ator,acao,modulo,registro,ip FROM audit_log ORDER BY id DESC LIMIT ' + lim));
+    }
+    case path === '/manager/notices/remove' && method === 'POST': {
+      const u = await requireManager(c);
+      const id = strv((await c.body()).id);
+      await run('DELETE FROM notices WHERE id=?', [id]);
+      await audit(u.codigo, 'aviso-removido', '', id);
+      return json({ ok: true });
+    }
+    case path === '/portal/notices': {
+      const u = await requirePortal(c);
+      const o: Row[] = [];
+      for (const r of await q('SELECT data FROM notices')) {
+        const n = JSON.parse(r.data);
+        if (!n.ativo) continue;
+        const segs: string[] = n.segmentos ?? [];
+        let ok = !segs.length;
+        for (const s of segs) if (s === '*' || allowedSegment(u, String(s))) ok = true;
+        if (ok) o.push(n);
+      }
+      o.sort((a, b) => String(b.criadoEm ?? '').localeCompare(String(a.criadoEm ?? '')));
+      return json({ rows: o });
+    }
+    case path === '/manager/notices': {
+      const u = await requireManager(c);
+      if (method === 'GET') return json({ rows: (await q('SELECT data FROM notices')).map((r) => JSON.parse(r.data)) });
+      const input = cleanInput(await c.body());
+      const id = input.id ?? 'AVI-' + randHex(6);
+      const n = {
+        id, titulo: input.titulo ?? '', mensagem: input.mensagem ?? '',
+        segmentos: String(input.segmentos ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+        ativo: (input.ativo ?? 'true') !== 'false', criadoEm: now(),
+      };
+      if (!n.titulo.trim()) fail(400, 'Informe o título do aviso.');
+      await run('DELETE FROM notices WHERE id=?', [id]);
+      await run('INSERT INTO notices(id,data) VALUES(?,?)', [id, JSON.stringify(n)]);
+      await audit(u.codigo, 'aviso', '', id);
+      return json(n);
+    }
+    case path === '/portal/requests': {
+      const u = await requirePortal(c);
+      if (method === 'GET') return json({ rows: (await listRows('solicitacoes')).filter((r) => allowedSegment(u, r.segmento ?? '')).map(publicRow) });
+      if (method !== 'POST') fail(405, 'Método não permitido.');
+      const input = await c.body();
+      const seg = strv(input.segmento);
+      if (!allowedSegment(u, seg)) fail(403, 'Segmento não autorizado.');
+      if (!strv(input.titulo).trim() || !strv(input.objetivo).trim()) fail(400, 'Título e objetivo são obrigatórios.');
+      if (strv(input.prioridade).toUpperCase() === 'URGENTE' && !strv(input.motivoUrgencia).trim()) fail(400, 'Motivo da urgência é obrigatório.');
+      const row: Row = {
+        titulo: strv(input.titulo), status: 'AGUARDANDO TRIAGEM', prioridade: strv(input.prioridade), segmento: seg, prazo: strv(input.prazo),
+        descricao: strv(input.objetivo), origem: 'PORTAL_SOLICITANTE', solicitante: u.nome, triagemStatus: 'AGUARDANDO TRIAGEM', gerenteTriagem: 'Gerente de Marketing',
+      };
+      for (const k of CREATE_FIELDS) if (k in input) row[k] = strv(input[k]);
+      if (String(row.solicitanteNome ?? '').trim()) row.solicitante = row.solicitanteNome;
+      if (!row.aprovacaoSolicitante) row.aprovacaoSolicitante = 'PENDENTE';
+      const novo = await insertRow('solicitacoes', row, 'portal:' + u.codigo);
+      await notifyMail('Nova demanda: ' + novo.titulo, `Solicitante: ${novo.solicitante}\nSegmento: ${novo.segmento}\nPrioridade: ${novo.prioridade}\nPrazo desejado: ${novo.prazo}\nID: ${novo.id}`);
+      return json(publicRow(novo), 201);
+    }
+    case path === '/portal/upload' && method === 'POST': {
+      const u = await requirePortal(c);
+      const id = c.qs('id');
+      const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
+      if (!allowedSegment(u, row.segmento ?? '')) fail(403, 'Demanda de outro segmento.');
+      const saved = await saveUploads(c, id, '');
+      const cur = String(row.anexos ?? '').split('|').map((s) => s.trim()).filter(Boolean);
+      row.anexos = [...cur, ...saved].join(' | ');
+      row.atualizadoEm = now();
+      await saveRow('solicitacoes', row);
+      await audit('portal:' + u.codigo, 'upload', 'solicitacoes', id);
+      return json({ files: saved });
+    }
+    case path === '/portal/file': {
+      const u = await requirePortal(c);
+      return serveFile(c.qs('path'), u);
+    }
+    default:
+      return fail(404, 'Rota não encontrada.');
+  }
+}
+
+/** Instalação única: cria as contas com senhas temporárias e mostra UMA vez. Protegida por SETUP_KEY; trava depois de usada. */
+async function setupRoute(c: Ctx): Promise<Response> {
+  const text = (t: string, status = 200) => new Response(t, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+  const key = env('SETUP_KEY');
+  const given = c.qs('key');
+  if (!key || key.length < 16) return text('SETUP_KEY não configurada (mínimo 16 caracteres).\n', 503);
+  const a = Buffer.from(given), b = Buffer.from(key);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    await new Promise((r) => setTimeout(r, 1500));
+    return text('Chave inválida.\n', 403);
+  }
+  if (await q1("SELECT 1 FROM app_meta WHERE k='setup_done'")) return text('Já instalado. Remova a variável SETUP_KEY do painel.\n', 409);
+  const pw: string[] = [];
+  const internos = [['NAT-3301', 'Natália Mello', 'manager', 'Gerente de Marketing'], ['ANT-3302', 'Antônio Filho', 'team', 'Equipe de Marketing'], ['MON-3303', 'Monique Vilante', 'team', 'Equipe de Marketing'], ['ALU-3304', 'Aluizo Junior', 'team', 'Equipe de Marketing'], ['EDU-3305', 'Maria Eduarda', 'team', 'Equipe de Marketing']];
+  for (const [cod, nome, role, label] of internos) {
+    if (await q1('SELECT 1 FROM users WHERE codigo=?', [cod])) continue;
+    const p = genPassword();
+    await run('INSERT INTO users(codigo,nome,role,label,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [cod, nome, role, label, hashPassword(p)]);
+    pw.push(` - interno ${cod} (${nome}): ${p}`);
+  }
+  const portal: [string, string, string, string[]][] = [['INF-2601', 'Coordenação Infantil', 'COORDENACAO', ['Infantil']], ['INI-2602', 'Coordenação Anos Iniciais', 'COORDENACAO', ['Anos Iniciais']], ['FIN-2603', 'Coordenação Anos Finais', 'COORDENACAO', ['Anos Finais']], ['MED-2604', 'Coordenação Ensino Médio', 'COORDENACAO', ['Ensino Médio']], ['AUZ-2605', 'Auzilair', 'COORDENACAO_ATENDIMENTO_GRAFICA', ['Infantil', 'Gráfica Infantil']]];
+  for (const [cod, nome, perfil, segs] of portal) {
+    if (await q1('SELECT 1 FROM portal_users WHERE codigo=?', [cod])) continue;
+    const p = genPassword();
+    await run('INSERT INTO portal_users(codigo,nome,perfil,segmentos,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [cod, nome, perfil, JSON.stringify(segs), hashPassword(p)]);
+    pw.push(` - portal ${cod} (${nome}): ${p}`);
+  }
+  const fichas = await seedEquipe('instalador');
+  await run("INSERT INTO app_meta(k,v) VALUES('setup_done',?)", [now()]);
+  return text(`INSTALAÇÃO CONCLUÍDA\n\nSenhas temporárias (anote AGORA; não serão exibidas de novo; troque no primeiro acesso):\n${pw.join('\n')}\n\nFichas de Equipe criadas: ${fichas}.\n\nAgora remova a variável SETUP_KEY do painel da Hostinger e reinicie o app.\n`);
+}
+
+function tabOf(tipo: string): 'users' | 'portal_users' {
+  if (tipo === 'portal') return 'portal_users';
+  if (tipo === 'interno') return 'users';
+  return fail(400, 'Tipo inválido.');
+}
+
+async function checkCsrfOrPortal(c: Ctx): Promise<void> {
+  // Rotas públicas de login e chamadas do Portal (token em cabeçalho) não dependem de cookie.
+  if (['/auth/login', '/portal/login', '/auth/forgot'].includes(c.path)) return;
+  if (c.header('x-portal-token') && (await portalUser(c)) !== null && (await internalUser(c)) === null) return;
+  checkCsrf(c);
+}
+
+async function pediuReset(cod: string): Promise<boolean> {
+  const a = (await q1("SELECT MAX(id) m FROM audit_log WHERE ator=? AND acao='esqueci-senha'", [cod]))?.m ?? null;
+  if (!a) return false;
+  const b = (await q1('SELECT MAX(id) m FROM audit_log WHERE acao=?', ['reset-senha:' + cod]))?.m ?? null;
+  return !b || Number(a) > Number(b);
+}
+
+async function dataRoute(c: Ctx): Promise<Response> {
+  const { method } = c;
+  const mod = c.qs('module');
+  const id = c.qs('id');
+  const portal = await portalUser(c);
+  if (portal && !(await internalUser(c))) return portalRestrictedUpdate(c, portal, mod, id);
+  const u = await requireInternal(c);
+  if (!(mod in MODULES)) fail(404, 'Módulo desconhecido.');
+  if (mod === 'configuracoes' && method !== 'GET' && u.role !== 'manager') fail(403, 'Somente a Gerente altera configurações.');
+  if (method === 'GET') {
+    if (id) return json((await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.'));
+    return json({ headers: await headersOf(mod), rows: await listRows(mod) });
+  }
+  if (u.role !== 'manager' && !TEAM_WRITE.includes(mod) && mod !== 'lixeira') fail(403, 'Seu perfil não pode alterar este módulo.');
+  if (u.role !== 'manager' && mod === 'lixeira' && method === 'DELETE') fail(403, 'Exclusão permanente apenas para a Gerente.');
+  await autoBackupIfDue();
+  if (method === 'POST') {
+    const novo = await insertRow(mod, await c.body(), u.codigo);
+    await notifyAssignment(mod, novo, null, u.nome);
+    return json(novo, 201);
+  }
+  if (!id) fail(400, 'Informe o id.');
+  if (method === 'PUT') {
+    const patch = await c.body();
+    const antes = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
+    if (u.role !== 'manager' && 'responsavel' in patch) {
+      const dono = String(antes.responsavel ?? '').trim();
+      const novoResp = strv(patch.responsavel).trim();
+      if (dono && lower(dono) !== lower(u.nome) && novoResp !== dono) fail(403, 'Só a Gerente ou o responsável atual pode reatribuir este item.');
+    }
+    const dep = await updateRow(mod, id, patch, u.codigo);
+    await notifyAssignment(mod, dep, antes, u.nome);
+    return json(dep);
+  }
+  if (method === 'DELETE') {
+    const alvo = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
+    if (!teamMayDelete(u, alvo)) fail(403, 'Você só pode excluir itens criados por você ou atribuídos a você.');
+    if (mod === 'lixeira') await makeBackup('preexclusao');
+    await trashRow(mod, id, u.codigo);
+    return json({ ok: true });
+  }
+  return fail(405, 'Método não permitido.');
+}
+
+async function portalRestrictedUpdate(c: Ctx, u: Row, mod: string, id: string): Promise<Response> {
+  if (c.method !== 'PUT') fail(403, 'Operação não permitida ao Portal.');
+  if (mod !== 'solicitacoes') fail(403, 'Módulo não permitido.');
+  const input = await c.body();
+  const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
+  if (!allowedSegment(u, row.segmento ?? '')) fail(403, 'Demanda de outro segmento.');
+  const cur = `${row.status ?? ''} ${row.triagemStatus ?? ''}`.toLocaleUpperCase('pt-BR');
+  const nota = strv(input.avaliacaoNota).trim();
+  if (nota) {
+    if (!cur.includes('CONCLUÍDA')) fail(409, 'A avaliação só pode ser enviada após a conclusão.');
+    if (!/^\d+$/.test(nota) || +nota < 1 || +nota > 5) fail(400, 'Avaliação deve estar entre 1 e 5.');
+  }
+  for (const k of UPDATE_FIELDS) if (k in input) row[k] = strv(input[k]);
+  const ap = String(row.aprovacaoSolicitante ?? '').trim().toLocaleUpperCase('pt-BR');
+  const t = now();
+  const traz = (k: string) => k in input; // só avalia transições quando o pedido traz o campo
+  if (traz('aprovacaoSolicitante') && ap === 'APROVADO') {
+    if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
+    row.status = 'CONCLUÍDA'; row.triagemStatus = 'CONCLUÍDA';
+    if (!row.aprovadoSolicitanteEm) row.aprovadoSolicitanteEm = t;
+  } else if (traz('aprovacaoSolicitante') && ap === 'AJUSTES SOLICITADOS') {
+    if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
+    row.status = 'EM EXECUÇÃO'; row.triagemStatus = 'DISTRIBUÍDA';
+    if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
+  } else if (traz('respostaSolicitante') && String(row.respostaSolicitante ?? '').trim()) {
+    if (!(cur.includes('AGUARDANDO SOLICITANTE') || cur.includes('DEVOLVIDA PARA AJUSTES'))) fail(409, 'Esta demanda não está aguardando resposta.');
+    row.status = 'EM ANÁLISE'; row.triagemStatus = 'EM TRIAGEM';
+    if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
+  }
+  row.atualizadoEm = t;
+  await saveRow('solicitacoes', row);
+  await audit('portal:' + u.codigo, 'editar', 'solicitacoes', id);
+  if (ap === 'APROVADO' || ap === 'AJUSTES SOLICITADOS')
+    await notifyMail(`Demanda ${ap === 'APROVADO' ? 'aprovada' : 'com ajustes solicitados'}: ${row.titulo ?? id}`, `ID: ${id} · Segmento: ${row.segmento ?? ''}`);
+  return json({ ok: true });
+}
+
+export { HttpError, ALLOWED_EXT, EVO_VERSION, intLog, setting };

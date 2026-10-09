@@ -1,0 +1,39 @@
+{
+ "name": "EVO MKT — Marketing",
+ "short_name": "EVO MKT",
+ "description": "Gestão de marketing do Colégio Evolução",
+ "start_url": "/",
+ "scope": "/",
+ "display": "standalone",
+ "background_color": "#F5F6FA",
+ "theme_color": "#063996",
+ "lang": "pt-BR",
+ "icons": [
+  {
+   "src": "/icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "/icons/icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Calendário",
+   "url": "/?page=calendario"
+  },
+  {
+   "name": "Minha Área",
+   "url": "/?page=minhaarea"
+  }
+ ]
+}
