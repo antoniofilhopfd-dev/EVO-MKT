@@ -69,7 +69,7 @@ hPanel → **Avançado → Cron Jobs** (ou um serviço externo de cron que chame
 | 1x por dia (3h) | `curl -fsS -H "Authorization: Bearer SEU_CRON_SECRET" "https://evomkt.antoniopfd.com/api/cron/integracoes?tarefa=sincronizar"` |
 | 1x por dia (8h) | `curl -fsS -H "Authorization: Bearer SEU_CRON_SECRET" "https://evomkt.antoniopfd.com/api/cron/alertas"` |
 
-Cada um responde **200** com um JSON; sem o cabeçalho (ou com segredo errado) responde **401**. Os dois primeiros só fazem algo depois de conectar Instagram/Google (veja `GUIA_INTEGRACOES.md`; o endereço de retorno agora é `https://evomkt.antoniopfd.com/api/integrations/<meta|google>/callback`).
+Cada um responde **200** com um JSON; sem o cabeçalho (ou com segredo errado) responde **401**. Os dois primeiros só fazem algo depois de conectar Instagram/Google (veja `docs/GUIA_INTEGRACOES.md`; o endereço de retorno agora é `https://evomkt.antoniopfd.com/api/integrations/<meta|google>/callback`).
 > **Avisos no celular (Web Push)** ainda não existem neste sistema (os avisos são por e-mail). Se forem criados, o cron a cada 5 min seguirá o mesmo padrão: `.../api/push/enviar` com `Authorization: Bearer CRON_SECRET`.
 
 ## 7. Checklist de verificação
