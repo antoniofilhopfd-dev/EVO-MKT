@@ -1,7 +1,7 @@
-import { makeCtx } from '@/lib/ctx';
-import { ensureMigrated } from '@/lib/migrate';
-import { HttpError, reqStore } from '@/lib/util';
-import { json, route } from '@/lib/api/handlers';
+import { makeCtx } from '../../../lib/ctx';
+import { ensureMigrated } from '../../../lib/migrate';
+import { HttpError, reqStore } from '../../../lib/util';
+import { json, route } from '../../../lib/api/handlers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
