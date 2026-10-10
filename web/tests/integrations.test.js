@@ -103,4 +103,6 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/integrations/log',{ck:G});t('log das integrações registra as operações',r.s===200&&r.j.length>5&&r.j.some(l=>l.servico==='instagram')&&r.j.some(l=>l.servico==='google'));
  await call('/integrations/meta/disconnect',{m:'POST',ck:G,b:{}});r=await call('/integrations/instagram/sync',{m:'POST',ck:G,b:{}});t('desconectado: sincronizar avisa que não está conectado',r.s===502&&/não conectado/.test(r.j.error));
  await call('/integrations/google/disconnect',{m:'POST',ck:G,b:{}});r=await call('/integrations/status',{ck:G});t('desconectar Google',!r.j.google.conectado);
+ {const lg=(await call('/integrations/log',{ck:G})).j;const erros=lg.filter(l=>/^erro/i.test(l.nivel));const nt=await call('/notificacoes',{ck:G});const mails=fs.existsSync(process.env.MAILLOG||'/nonexistent')?fs.readFileSync(process.env.MAILLOG,'utf8'):'';
+  t('falha de integração (nível erro) vira notificação e e-mail à Gerência',erros.length>0&&nt.j.rows.some(n=>n.tipo==='integracao_falha')&&/falha na integração instagram/.test(mails),{erros:erros.length,notif:nt.j.rows.filter(n=>n.tipo==='integracao_falha').length})}
  console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0)})().catch(e=>{console.log('ERRO',e.stack.split('\n').slice(0,3).join(' | '));process.exit(1)});

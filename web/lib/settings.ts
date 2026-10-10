@@ -1,4 +1,5 @@
 import { registrarNotificacao } from './notificacoes';
+import { notifyMail } from './mail';
 import { q, q1, run } from './db';
 import { decryptSecret, encryptSecret } from './crypto';
 import { now } from './util';
@@ -16,7 +17,7 @@ export async function setSetting(k: string, v: string): Promise<void> {
 }
 export async function intLog(servico: string, nivel: string, msg: string): Promise<void> {
   try {
-    if (/^erro/i.test(nivel)) await registrarNotificacao('integracao_falha', 'gerencia', `Falha na integração ${servico}`, msg, 'integracoes', servico);
+    if (/^erro/i.test(nivel)) await avisarFalha(servico, msg);
     await run('INSERT INTO integration_log(quando,servico,nivel,msg) VALUES(?,?,?,?)', [now(), servico, nivel, msg.slice(0, 480)]);
     await run('DELETE FROM integration_log WHERE id < (SELECT m FROM (SELECT MAX(id)-500 m FROM integration_log) x)');
   } catch {
@@ -24,3 +25,11 @@ export async function intLog(servico: string, nivel: string, msg: string): Promi
   }
 }
 export { q };
+
+/** Falha de integração: registra na central e avisa a Gerência por e-mail (no máximo 1 e-mail por serviço a cada hora). */
+async function avisarFalha(servico: string, msg: string): Promise<void> {
+  await registrarNotificacao('integracao_falha', 'gerencia', `Falha na integração ${servico}`, msg, 'integracoes', servico);
+  const ult = await q1<{ quando: string }>("SELECT quando FROM notifications WHERE tipo='integracao_falha' AND registro=? ORDER BY id DESC LIMIT 1 OFFSET 1", [servico]);
+  if (ult && Date.now() - new Date(ult.quando).getTime() < 3600_000) return;
+  await notifyMail(`EVO MKT: falha na integração ${servico}`, `${msg}\n\nAbra Administração → Integrações para ver o registro.`);
+}

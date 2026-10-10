@@ -74,3 +74,10 @@ Na tela de Integrações, os dois endereços de redirecionamento aparecem pronto
 - "Redirect URI mismatch": o endereço cadastrado na Meta/Google precisa ser **idêntico** ao mostrado na tela (https, sem barra extra).
 - Conexão some após alguns dias no Google: o app ficou em modo "Testando" — publique-o ou use tipo Interno.
 - Em testes, tudo isso foi validado contra **servidores simulados** da Meta e do Google (não contra as contas reais): confira a primeira conexão e a primeira publicação com atenção.
+
+## Fonte de verdade da Agenda e avisos de falha (Etapa 05)
+- **Fonte de verdade: o EVO MKT.** O Google Agenda usado é um calendário próprio chamado "EVO MKT", criado pelo sistema; eventos de outros calendários da pessoa nunca são lidos nem alterados.
+- **EVO → Google:** agenda, calendário, eventos, conteúdos, tarefas e campanhas com data viram eventos; alterações e exclusões no EVO são refletidas.
+- **Google → EVO:** só **agenda** e **calendário** aceitam mudança de data/horário feita no Google; um evento novo criado direto no calendário "EVO MKT" entra como item do módulo Calendário (origem GOOGLE_AGENDA). Nos demais módulos o Google é apenas espelho: a edição lá é sobrescrita na próxima sincronização.
+- **Falhas:** todo erro de integração (nível `erro`) vira notificação na central e e-mail à Gerência (`NOTIFY_TO`), no máximo um e-mail por serviço a cada hora.
+- Sem credenciais do Meta/Google configuradas, nada é enviado; testes usam servidores simulados (`tests/mock_apis.php`). A homologação real depende de você conectar as contas.

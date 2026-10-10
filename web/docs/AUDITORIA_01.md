@@ -131,3 +131,9 @@ Limitação conhecida: o backup guarda os dados **no mesmo banco**; ele protege 
 - Notificações: tabela `notifications` (migração 007) e `/api/notificacoes`; registra complementação, entrega, conclusão, resposta do solicitante, atribuição de responsável e falha de integração; sino do cabeçalho mostra não lidas. Teste `notificacoes.test.js` (5).
 - Painel de indicadores também em Relatórios.
 - Pendente (Etapa 05/06): envio por e-mail das falhas de integração; simplificação Relatórios×Fechamento, Editorial×Conteúdos, Arquivos×anexos (decisão de produto, depende de confirmação).
+
+## Atualização da Etapa 05 (Integrações)
+- Falha de integração → notificação + e-mail à Gerência (limite de 1 por hora por serviço), testado em `integrations.test.js` (49).
+- Fonte de verdade da Agenda documentada em `GUIA_INTEGRACOES.md`.
+- Menu enxuto: Planejamento Editorial, Fechamento Mensal e Arquivos saíram do menu lateral (dados intactos), acessíveis por "Ver também" em Conteúdos, Relatórios, Tarefas e Solicitações.
+- Pendente: homologação com contas reais Meta/Google (depende de credenciais do usuário).
