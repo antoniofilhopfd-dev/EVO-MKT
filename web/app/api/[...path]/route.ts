@@ -2,6 +2,7 @@ import { makeCtx } from '../../../lib/ctx';
 import { ensureMigrated } from '../../../lib/migrate';
 import { HttpError, reqStore } from '../../../lib/util';
 import { json, route } from '../../../lib/api/handlers';
+import { diag } from '../../../lib/api/diag';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,8 +13,11 @@ async function handle(req: Request, ctx: { params: Promise<{ path?: string[] }> 
   return reqStore.run({ ip: c.ip }, async () => {
     let res: Response;
     try {
-      await ensureMigrated();
-      res = await route(c);
+      if (c.path === '/diag') res = await diag(c);
+      else {
+        if (c.path !== '/heartbeat') await ensureMigrated();
+        res = await route(c);
+      }
     } catch (e) {
       if (e instanceof HttpError) res = json({ error: e.message }, e.status);
       else {
