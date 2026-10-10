@@ -119,3 +119,9 @@ Pendentes desta etapa (não bloqueiam): A8 (criação 100% atômica, P3), A10 (l
 5. Anexos só mudam se o backup foi criado com "Incluir anexos". O dump do banco (phpMyAdmin) continua sendo a proteção contra perda total do servidor.
 
 Limitação conhecida: o backup guarda os dados **no mesmo banco**; ele protege contra erro humano e corrupção lógica, não contra perda do banco inteiro.
+
+
+## Atualização da Etapa 03 (Operação)
+- C (fluxo): transições estritas com tabela única (`lib/fluxo.ts`), retorno exige motivo, Portal usa as mesmas regras; histórico em `status_history`; sem duplicação ao distribuir/devolver/reabrir (testado). CONCLUÍDO.
+- D (SLA/indicadores): `lib/sla.ts` e `/api/indicadores` com definições e lista de origem; painel na Central Operacional. CONCLUÍDO. Pendente na Etapa 04: mesmo painel em Relatórios e notificações com registro.
+- Testes: `operacao.test.js` (36) e `ui8.test.js` (7).
