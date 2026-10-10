@@ -9,7 +9,7 @@ import {
 import { accessHmac, decryptSecret, encryptSecret } from '../crypto';
 import { notifyMail } from '../mail';
 import {
-  ALLOWED_EXT, audit, autoBackupIfDue, CREATE_FIELDS, EVO_VERSION, getRow, headersOf, insertRow, listRows, makeBackup, MODULES, notifyAssignment,
+  ALLOWED_EXT, audit, CREATE_FIELDS, EVO_VERSION, getRow, headersOf, insertRow, listRows, modifyRow, MODULES, notifyAssignment,
   emailForPerson, publicRow, saveRow, seedEquipe, TEAM_WRITE, teamMayDelete, trashRow, UPDATE_FIELDS, updateRow,
 } from '../records';
 import { saveUploads, serveFile } from '../files';
@@ -18,6 +18,7 @@ import { cleanInput, env, fail, HttpError, lower, now, Row, strv } from '../util
 import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
 import { importModule } from '../xlsx';
+import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
 import { gConnected, gDriveSendEntregas } from '../integrations/google';
 
 export const json = (data: unknown, status = 200, headers: Record<string, string> = {}): Response =>
@@ -145,9 +146,29 @@ export async function route(c: Ctx): Promise<Out> {
     }
     case path === '/backup' && method === 'POST': {
       const u = await requireManager(c);
-      const f = await makeBackup('manual');
+      const input = await c.body();
+      let f: string;
+      try {
+        f = await makeBackup('manual', { completo: !!input.completo });
+      } catch (e: any) {
+        return fail(500, 'Falha ao criar o backup: ' + String(e?.message ?? e).slice(0, 200));
+      }
       await audit(u.codigo, 'backup', '', f);
       return json({ ok: true, file: f });
+    }
+    case path === '/backup/validate': {
+      await requireManager(c);
+      return json(await validateBackup(c.qs('file')));
+    }
+    case path === '/backup/restore' && method === 'POST': {
+      // Restaura um backup (valida, guarda um backup de segurança antes e aplica tudo em uma transação).
+      const u = await requireManager(c);
+      const input = await c.body();
+      return json({ ok: true, ...(await restoreBackup(strv(input.file), u.codigo)) });
+    }
+    case path === '/backup/log': {
+      await requireManager(c);
+      return json(await backupLog(30));
     }
     case path === '/backup/list': {
       await requireManager(c);
@@ -171,10 +192,10 @@ export async function route(c: Ctx): Promise<Out> {
       const id = c.qs('id');
       const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Solicitação não encontrada.');
       const saved = await saveUploads(c, id, 'ENTREGA');
-      const cur = String(row.arquivosEntrega ?? '').split('|').map((s) => s.trim()).filter(Boolean);
-      row.arquivosEntrega = [...cur, ...saved].join(' | ');
-      row.atualizadoEm = now();
-      await saveRow('solicitacoes', row);
+      await modifyRow('solicitacoes', id, (r) => {
+        const cur = String(r.arquivosEntrega ?? '').split('|').map((s) => s.trim()).filter(Boolean);
+        return { ...r, arquivosEntrega: [...cur, ...saved].join(' | '), atualizadoEm: now() };
+      });
       await audit(u.codigo, 'upload-entrega', 'solicitacoes', id);
       if ((await setting('g_auto_drive_entregas')) === '1' && (await gConnected())) {
         try { await gDriveSendEntregas(id); } catch (e: any) { await intLog('google', 'erro', 'Drive automático: ' + e.message); }
@@ -467,10 +488,10 @@ export async function route(c: Ctx): Promise<Out> {
       const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
       if (!allowedSegment(u, row.segmento ?? '')) fail(403, 'Demanda de outro segmento.');
       const saved = await saveUploads(c, id, '');
-      const cur = String(row.anexos ?? '').split('|').map((s) => s.trim()).filter(Boolean);
-      row.anexos = [...cur, ...saved].join(' | ');
-      row.atualizadoEm = now();
-      await saveRow('solicitacoes', row);
+      await modifyRow('solicitacoes', id, (r) => {
+        const cur = String(r.anexos ?? '').split('|').map((s) => s.trim()).filter(Boolean);
+        return { ...r, anexos: [...cur, ...saved].join(' | '), atualizadoEm: now() };
+      });
       await audit('portal:' + u.codigo, 'upload', 'solicitacoes', id);
       return json({ files: saved });
     }
@@ -576,7 +597,7 @@ async function dataRoute(c: Ctx): Promise<Response> {
   if (portal && !(await internalUser(c))) return portalRestrictedUpdate(c, portal, mod, id);
   const u = await requireInternal(c);
   if (!(mod in MODULES)) fail(404, 'Módulo desconhecido.');
-  if (mod === 'configuracoes' && method !== 'GET' && u.role !== 'manager') fail(403, 'Somente a Gerente altera configurações.');
+  if (mod === 'configuracoes' && u.role !== 'manager') fail(403, 'Configurações são restritas à Gerente.');
   if (method === 'GET') {
     if (id) return json((await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.'));
     return json({ headers: await headersOf(mod), rows: await listRows(mod) });

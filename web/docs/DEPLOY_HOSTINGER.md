@@ -85,7 +85,7 @@ Cada um responde **200** com um JSON; sem o cabeçalho (ou com segredo errado) r
 
 ## 8. Cuidados finais
 1. **Troque segredos que já apareceram em conversas/prints** (senha do banco, `install_key`/`app_key` antigas, senhas temporárias) e use valores novos no painel. Trocar a `APP_KEY` invalida os códigos de acesso e as chaves de integração guardadas: depois dela, gere os códigos de novo (Acessos → Gerar novo código) e reconecte Instagram/Google.
-2. **Backup do banco com restauração testada:** hPanel → Bancos de dados → phpMyAdmin → *Exportar* (formato SQL). Teste *Importar* num banco de teste vazio e confira que as telas abrem com os dados. Faça isso antes de depender do sistema e depois periodicamente. (O backup da própria tela de Administração fica **dentro** do mesmo banco: serve para voltar atrás, não substitui o dump.)
+2. **Backup do banco com restauração testada:** hPanel → Bancos de dados → phpMyAdmin → *Exportar* (formato SQL). Teste *Importar* num banco de teste vazio e confira que as telas abrem com os dados. Faça isso antes de depender do sistema e depois periodicamente. (O backup da própria tela de Administração fica **dentro** do mesmo banco: serve para voltar atrás e pode ser **restaurado e validado** em Administração → Backups, mas não substitui o dump.)
 3. **Desligue o sistema antigo:** quando tudo estiver validado, tire do ar o PHP em `antoniopfd.com` (apague os arquivos de `public_html`, principalmente `config.php`, `reset_senha.php` e a pasta `storage`) e exporte antes uma cópia final.
 4. Mantenha `SETUP_KEY` **removida** depois da instalação.
 5. Atualize pelo Git: faça `push` na `main`; nunca edite arquivos direto no servidor.

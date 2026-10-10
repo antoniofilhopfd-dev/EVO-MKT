@@ -19,6 +19,11 @@ wb=openpyxl.Workbook();ws=wb.active;ws.append(['id','titulo','status','descricao
  t('ideia importada aparece no módulo Ideias',/Ideia vinda da planilha/.test(await p.$eval('#content',e=>e.innerText)));
  await p.evaluate(()=>{adminTab='backups';go('administracao')});await p.waitForSelector('#bkNow');await p.click('#bkNow');await p.waitForTimeout(1500);
  t('criar backup agora lista o arquivo gerado',/evo_backup_\d{8}_\d{6}_manual\.json\.gz/.test(await p.$eval('#adminBody',e=>e.innerText)));
+ await p.click('[data-bkval]');await p.waitForSelector('.admin-overlay');
+ t('botão Validar mostra "Backup válido" com as tabelas',/Backup válido[\s\S]*records[\s\S]*users/.test(await p.$eval('.admin-overlay',e=>e.innerText)));await p.click('.admin-overlay [data-close]');
+ t('registro de execuções aparece na aba',/Registro de execuções[\s\S]*criar/.test(await p.$eval('#adminBody',e=>e.innerText)));
+ await p.click('[data-bkrest]');await p.waitForSelector('.admin-overlay');
+ t('botão Restaurar (com dupla confirmação) mostra "Restauração concluída" e o backup de segurança',/Restauração concluída[\s\S]*prerestauracao/.test(await p.$eval('.admin-overlay',e=>e.innerText)));
  t('sem erros de JS',errs.length===0,errs.join('|'));
  await b.close();console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

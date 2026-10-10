@@ -1,4 +1,3 @@
-import { gzipSync } from 'node:zlib';
 import { q, q1, run, withTx } from './db';
 import { cleanInput, currentIp, fail, lower, now, Row, strv } from './util';
 import { notifyMail } from './mail';
@@ -80,12 +79,23 @@ export async function saveRow(mod: string, row: Row): Promise<void> {
   await run('UPDATE records SET data=?,atualizado_em=? WHERE modulo=? AND id=?', [JSON.stringify(row), row.atualizadoEm, mod, row.id]);
   await mergeHeaders(mod, Object.keys(row));
 }
+/** Lê o registro com trava (SELECT … FOR UPDATE), aplica `fn` e grava: duas edições simultâneas não se sobrescrevem. */
+export async function modifyRow(mod: string, id: string, fn: (cur: Row) => Row | Promise<Row>): Promise<Row> {
+  const nw = await withTx(async (c) => {
+    const [rs] = await c.query('SELECT data FROM records WHERE modulo=? AND id=? FOR UPDATE', [mod, id]);
+    const cur = (rs as Row[])[0];
+    if (!cur) fail(404, 'Registro não encontrado.');
+    const merged = await fn(JSON.parse(cur.data));
+    await c.query('UPDATE records SET data=?,atualizado_em=? WHERE modulo=? AND id=?', [JSON.stringify(merged), merged.atualizadoEm, mod, id]);
+    return merged;
+  });
+  await mergeHeaders(mod, Object.keys(nw));
+  return nw;
+}
 export async function updateRow(mod: string, id: string, patchIn: Row, ator: string): Promise<Row> {
-  const cur = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
   const patch = cleanInput(patchIn);
   for (const k of ['id', 'criadoEm', 'criadoPor', 'atualizadoPor']) delete patch[k];
-  const nw: Row = { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
-  await saveRow(mod, nw);
+  const nw = await modifyRow(mod, id, (cur) => ({ ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator }));
   await audit(ator, 'editar', mod, id);
   return nw;
 }
@@ -113,28 +123,6 @@ export function teamMayDelete(u: Row, row: Row): boolean {
   if (u.role === 'manager') return true;
   const resp = String(row.responsavel ?? '').trim();
   return (row.criadoPor ?? '') === u.codigo || resp === '' || lower(resp) === lower(u.nome);
-}
-
-// ---------- backup (guardado no próprio banco; os últimos BACKUP_KEEP) ----------
-const pad = (n: number) => String(n).padStart(2, '0');
-export async function makeBackup(motivo = 'manual'): Promise<string> {
-  const dump = {
-    versao: EVO_VERSION, em: now(), motivo,
-    records: await q('SELECT * FROM records'), headers: await q('SELECT * FROM module_headers'),
-    counters: await q('SELECT * FROM id_counters'), used_ids: await q('SELECT id FROM used_ids'), notices: await q('SELECT * FROM notices'),
-  };
-  const d = new Date();
-  const nome = `evo_backup_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${motivo.replace(/[^a-z0-9]/gi, '')}.json.gz`;
-  await run('INSERT INTO backups(nome,criado_em,conteudo) VALUES(?,?,?) ON DUPLICATE KEY UPDATE conteudo=VALUES(conteudo)', [nome, now(), gzipSync(Buffer.from(JSON.stringify(dump)), { level: 6 })]);
-  const keep = envInt('BACKUP_KEEP', 30);
-  const old = await q<{ nome: string }>('SELECT nome FROM backups ORDER BY nome DESC LIMIT 1000 OFFSET ?', [keep]);
-  for (const o of old) await run('DELETE FROM backups WHERE nome=?', [o.nome]);
-  return nome;
-}
-export async function autoBackupIfDue(): Promise<void> {
-  const r = await q1<{ m: string | null }>('SELECT MAX(criado_em) m FROM backups');
-  const last = r?.m ? Date.parse(r.m) : 0;
-  if (Date.now() - last > 86400_000) await makeBackup('auto');
 }
 
 // ---------- e-mail por pessoa / atribuição / fichas da Equipe ----------
