@@ -1,4 +1,4 @@
-// Calendário de Eventos x Calendário (geral). Uso: node ui7.test.js <install.out>
+// Calendário geral (com filtros) e sub-aba Calendário dentro de cada módulo. Uso: node ui7.test.js <install.out>
 const {chromium}=require(process.env.PLAYWRIGHT||'/opt/node-tools/node_modules/playwright');const fs=require('fs');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const BASE=process.env.BASE||'http://127.0.0.1:8080';
 let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(x).slice(0,300))};
@@ -12,20 +12,34 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await post('calendario',{titulo:'Reunião de pais',inicioEm:ds+'T19:00',fimEm:ds+'T20:00',tipoItem:'Reunião',status:'PLANEJADO'});
  await post('tarefas',{titulo:'Arte do cartaz',prazo:ds,status:'NOVO'});
  await post('conteudos',{titulo:'Post da feira',publicacaoEm:ds+'T10:00',status:'PROGRAMADO'});
- t('menu tem "Calendário de Eventos" ao lado de "Calendário"',(await p.$$eval('#nav .navitem',e=>e.map(x=>x.innerText))).filter(x=>/Calendário/.test(x)).length===2);
- await p.evaluate(()=>go('calev'));await p.waitForSelector('.upcoming-panel');
- let up=await p.$eval('.upcoming-panel',e=>e.innerText);
- t('Calendário de Eventos mostra o evento e a reunião',/Feira de Ciências/.test(up)&&/Reunião de pais/.test(up),up);
- t('Calendário de Eventos NÃO mostra tarefa nem conteúdo',!/Arte do cartaz|Post da feira/.test(up),up);
- t('título e botão do Calendário de Eventos',/Calendário de Eventos/.test(await p.$eval('.calendar-head',e=>e.innerText))&&/Novo evento/.test(await p.$eval('#calNew',e=>e.innerText)));
- await p.click('#calNew');await p.waitForSelector('#recordForm');
- t('"+ Novo evento" abre o formulário de evento (Tipo, Início, Fim)',/Tipo[\s\S]*Início[\s\S]*Fim/.test(await p.$eval('#formFields',e=>e.innerText)));await p.evaluate(()=>closeModal&&closeModal());
+ await post('campanhas',{titulo:'Matrículas 2027',dataInicio:ds,status:'PLANEJAMENTO'});
+ const nav=await p.$$eval('#nav .navitem',e=>e.map(x=>x.innerText.replace(/\s+/g,' ').trim()));
+ t('menu tem só um "Calendário" (sem "Calendário de Eventos")',nav.filter(x=>/Calendário/.test(x)).length===1&&!nav.some(x=>/Calendário de Eventos/.test(x)),nav.join('|'));
+ // geral com filtros
  await p.evaluate(()=>go('calendario'));await p.waitForSelector('.upcoming-panel');
- up=await p.$eval('.upcoming-panel',e=>e.innerText);
- t('Calendário geral mostra tarefa e conteúdo',/Arte do cartaz/.test(up)&&/Post da feira/.test(up),up);
- t('Calendário geral NÃO mostra eventos nem reuniões',!/Feira de Ciências|Reunião de pais/.test(up),up);
+ let up=await p.$eval('.upcoming-panel',e=>e.innerText);
+ t('Calendário geral mostra tarefa, conteúdo, campanha, evento e reunião',['Arte do cartaz','Post da feira','Matrículas 2027','Feira de Ciências','Reunião de pais'].every(x=>up.includes(x)),up);
+ await p.click('[data-calf="tarefas"]');await p.waitForTimeout(500);up=await p.$eval('.upcoming-panel',e=>e.innerText);
+ t('desmarcar "Tarefas" some com as tarefas e mantém o resto',!/Arte do cartaz/.test(up)&&/Feira de Ciências/.test(up),up);
+ await p.click('[data-calf="tarefas"]');await p.waitForTimeout(400);
  await p.click('#calNew');await p.waitForSelector('#recordForm');
- t('"+ Nova tarefa" abre o formulário de tarefa (Prazo, Prioridade)',/Prazo[\s\S]*Prioridade|Prioridade[\s\S]*Prazo/.test(await p.$eval('#formFields',e=>e.innerText)));
+ t('"+ Novo compromisso" abre o formulário com Tipo/Início/Fim',/Tipo[\s\S]*Início[\s\S]*Fim/.test(await p.$eval('#formFields',e=>e.innerText)));await p.evaluate(()=>closeModal());
+ // sub-aba Calendário em cada módulo
+ const casos=[['tarefas','Arte do cartaz',['Feira de Ciências','Post da feira','Matrículas 2027']],['conteudos','Post da feira',['Arte do cartaz','Feira de Ciências']],['eventos','Feira de Ciências',['Arte do cartaz','Post da feira']],['campanhas','Matrículas 2027',['Arte do cartaz','Feira de Ciências']]];
+ for(const [m,tem,naoTem] of casos){
+  await p.evaluate(m=>{setPref('view.'+m,'table');go(m)},m);await p.waitForSelector('.view-switch button[data-view="calendar"]');
+  t(`${m}: tem a sub-aba Calendário`,true);
+  await p.click('.view-switch button[data-view="calendar"]');await p.waitForSelector('.module-calendar-head');
+  const html=await p.$eval('#content',e=>e.innerText);
+  t(`${m}: calendário mostra só ${m} (tem "${tem}")`,html.includes(tem)&&naoTem.every(x=>!html.includes(x)),html.slice(0,200));
+ }
+ // criar clicando no dia dentro do módulo cria o item do módulo
+ await p.evaluate(()=>{setPref('view.tarefas','calendar');go('tarefas')});await p.waitForSelector('.module-calendar-head');
+ await p.click('.daynum');await p.waitForSelector('#recordForm');
+ t('clicar no dia em Tarefas abre formulário de tarefa (Prazo/Prioridade)',/Prazo[\s\S]*Prioridade|Prioridade[\s\S]*Prazo/.test(await p.$eval('#formFields',e=>e.innerText)));await p.evaluate(()=>closeModal());
+ // link antigo
+ await p.evaluate(()=>go('calev'));await p.waitForSelector('.module-calendar-head');
+ t('link antigo "calev" cai em Eventos → Calendário',/Feira de Ciências/.test(await p.$eval('#content',e=>e.innerText)));
  t('sem erros de JS',errs.length===0,errs.join('|'));
  await b.close();console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
