@@ -44,6 +44,6 @@ const tx=(n,txt,re)=>{const c=re.test(txt);t(n,c);if(!c)console.log('     texto 
  await p.click('#gCal');await p.waitForTimeout(1500);tx('sincronizar Agenda mostra resultado',await p.$eval('#toast',e=>e.innerText),/Agenda:/);
  await p.click('#gSheet');await p.waitForTimeout(2000);tx('exportar para Planilhas gera link da planilha',await p.$eval('#adminBody',e=>e.innerHTML),/docs\.google\.com\/spreadsheets/);
  await p.check('#gAuto');await p.waitForTimeout(500);t('ligar envio automático ao Drive',(await A('/integrations/status')).google.driveAuto===true);
- await p.screenshot({path:'/home/user/EVO-MKT/dist/telas/19_integracoes.png',fullPage:true});
+ await p.screenshot({path:'/tmp/evo-ui3-integracoes.png',fullPage:true});
  t('nenhum erro de JavaScript',errs.length===0);if(errs.length)console.log(errs);
  console.log(`\n${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0)})().catch(e=>{console.log('ERRO',e.message.split('\n').slice(0,2).join(' '));process.exit(1)});
