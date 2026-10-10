@@ -66,7 +66,8 @@ export function allowedSegment(u: Row, seg: string): boolean {
 export async function loginMode(): Promise<'senha' | 'codigo'> {
   return (await setting('login_modo', 'senha')) === 'codigo' ? 'codigo' : 'senha';
 }
-export const validCodeFormat = (c: string) => /^[A-HJ-NP-Z]{2}[0-9]{4}$/.test(c.trim().toUpperCase());
+/** Códigos: de 4 a 10 letras/números, sem espaços (os gerados automaticamente têm 2 letras + 4 números; a Gerente pode escolher outro). */
+export const validCodeFormat = (c: string) => /^[A-Z0-9]{4,10}$/.test(c.trim().toUpperCase());
 
 /** 2 letras (sem I e O) + 4 números, sem sequências óbvias. */
 export async function genAccessCode(): Promise<string> {

@@ -36,6 +36,11 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.evaluate(()=>{adminTab='acessos';go('administracao')});await p.waitForTimeout(500);
  const last=await p.evaluate(async()=>fetch('/api/admin/users/role',{method:'POST',headers:{'Content-Type':'application/json','X-EVO':'1'},body:JSON.stringify({codigo:'NAT-3301',perfil:'team'})}).then(async x=>[x.status,(await x.json()).error]));
  t('não deixa o sistema sem Gerente',last[0]===400,last);
+ // escolher o código pela tela (✎)
+ await p.click('#modeBtn');await p.waitForSelector('.admin-overlay .temp-pass');await p.click('.admin-overlay [data-close]');await p.waitForSelector('[data-setcode]');
+ p.removeAllListeners('dialog');p.on('dialog',d=>d.accept(/administração/i.test(d.message())?'Senha26x':'MARIA7'));
+ await p.click('[data-setcode^="interno|EDU-3305"]');await p.waitForTimeout(900);
+ t('✎ permite escolher o código e a tabela mostra o novo',(await p.$$eval('[data-acesso]',a=>a.map(e=>e.innerText.trim()))).includes('MARIA7'));
  t('sem erros de JS',errs.length===0,errs.join('|'));
  await b.close();console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

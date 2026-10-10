@@ -6,7 +6,7 @@ import {
   allowedSegment, checkAdminPassword, checkCsrf, codeLoginFail, codeLoginGuard, internalUser, issueAccessCode, loginMode, portalUser, rateCheck,
   rateFail, registerDevice, requireInternal, requireManager, requirePortal, sessionTokenFromCookie, setSessionCookie, startSession, stepUp, validCodeFormat,
 } from '../auth';
-import { accessHmac, decryptSecret } from '../crypto';
+import { accessHmac, decryptSecret, encryptSecret } from '../crypto';
 import { notifyMail } from '../mail';
 import {
   ALLOWED_EXT, audit, autoBackupIfDue, CREATE_FIELDS, EVO_VERSION, getRow, headersOf, insertRow, listRows, makeBackup, MODULES, notifyAssignment,
@@ -300,6 +300,27 @@ export async function route(c: Ctx): Promise<Out> {
       await run('DELETE FROM sessions WHERE codigo=? AND codigo<>?', [cod, m.codigo]); // quem mudou de perfil entra de novo
       await audit(m.codigo, `perfil:${cod}:${role}`);
       return json({ ok: true, perfil: role });
+    }
+    case path === '/admin/users/code' && method === 'POST': {
+      // A Gerente escolhe o código de acesso de uma ficha (4 a 10 letras/números, único).
+      const m = await requireManager(c);
+      const input = await c.body();
+      await stepUp(m, input);
+      const tab = tabOf(strv(input.tipo));
+      const cod = upper(input.codigo);
+      const novo = strv(input.acesso).trim().toUpperCase();
+      if (!(await q1(`SELECT 1 FROM ${tab} WHERE codigo=?`, [cod]))) fail(404, 'Ficha não encontrada.');
+      if (!validCodeFormat(novo)) fail(400, 'O código deve ter de 4 a 10 letras ou números, sem espaços nem acentos.');
+      const h = accessHmac(novo);
+      const dono = (await q1('SELECT codigo FROM users WHERE acesso_hmac=?', [h])) ?? (await q1('SELECT codigo FROM portal_users WHERE acesso_hmac=?', [h]));
+      if (dono && dono.codigo !== cod) fail(409, 'Esse código já está em uso por outra pessoa. Escolha outro.');
+      await run(`UPDATE ${tab} SET acesso_hmac=?,acesso_enc=? WHERE codigo=?`, [h, encryptSecret(novo), cod]);
+      if (cod !== m.codigo) {
+        await run('DELETE FROM sessions WHERE codigo=?', [cod]);
+        await run('DELETE FROM trusted_devices WHERE codigo=?', [cod]);
+      }
+      await audit(m.codigo, 'codigo-escolhido:' + cod);
+      return json({ ok: true, acesso: novo });
     }
     case path === '/admin/users/delete' && method === 'POST': {
       const m = await requireManager(c);
