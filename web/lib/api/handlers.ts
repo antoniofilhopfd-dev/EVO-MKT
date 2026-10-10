@@ -228,7 +228,7 @@ export async function route(c: Ctx): Promise<Out> {
       await requireManager(c);
       const o: Row[] = [];
       for (const r of await q('SELECT codigo,nome,role,label,ativo,must_change,acesso_enc FROM users ORDER BY codigo'))
-        o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome), acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
+        o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, role: r.role, perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome), acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       for (const r of await q('SELECT codigo,nome,perfil,segmentos,ativo,must_change,acesso_enc FROM portal_users ORDER BY codigo'))
         o.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, perfil: JSON.parse(r.segmentos).join(', '), ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: '', acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       return json(o);
@@ -246,6 +246,73 @@ export async function route(c: Ctx): Promise<Out> {
       await run(`UPDATE ${tab} SET ativo=? WHERE codigo=?`, [on, cod]);
       if (!on) await run('DELETE FROM sessions WHERE codigo=?', [cod]);
       await audit(m.codigo, (on ? 'ativar:' : 'desativar:') + cod);
+      return json({ ok: true });
+    }
+    case path === '/admin/users/create' && method === 'POST': {
+      const m = await requireManager(c);
+      const input = await c.body();
+      await stepUp(m, input);
+      const tipo = strv(input.tipo);
+      const tab = tabOf(tipo);
+      const nome = strv(input.nome).trim().slice(0, 120);
+      if (nome.length < 2) fail(400, 'Informe o nome.');
+      const sigla = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase().padEnd(3, 'X').slice(0, 3);
+      // ficha: 3 letras do nome + número sequencial da série (equipe 33xx, portal 26xx), nunca repetido
+      const base = tipo === 'interno' ? 3300 : 2600;
+      const used = (await q(`SELECT codigo FROM ${tab}`)).map((r) => parseInt(String(r.codigo).split('-')[1], 10) || 0);
+      let n = Math.max(base, ...used) + 1;
+      let codigo = `${sigla}-${n}`;
+      while (await q1('SELECT 1 FROM users WHERE codigo=? UNION SELECT 1 FROM portal_users WHERE codigo=?', [codigo, codigo])) codigo = `${sigla}-${++n}`;
+      const senha = genPassword();
+      if (tipo === 'interno') {
+        const role = input.perfil === 'manager' ? 'manager' : 'team';
+        await run('INSERT INTO users(codigo,nome,role,label,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [codigo, nome, role, role === 'manager' ? 'Gerente de Marketing' : 'Equipe de Marketing', hashPassword(senha)]);
+        await seedEquipe(m.codigo);
+      } else {
+        const segs = strv(input.segmentos).split(',').map((x) => x.trim()).filter(Boolean);
+        if (!segs.length) fail(400, 'Informe ao menos um segmento (ex.: Infantil, Anos Iniciais).');
+        await run('INSERT INTO portal_users(codigo,nome,perfil,segmentos,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [codigo, nome, 'COORDENACAO', JSON.stringify(segs), hashPassword(senha)]);
+      }
+      let acesso = senha;
+      let modo: 'senha' | 'codigo' = 'senha';
+      if ((await loginMode()) === 'codigo') {
+        acesso = await issueAccessCode(tab, codigo);
+        await run(`UPDATE ${tab} SET must_change=0 WHERE codigo=?`, [codigo]);
+        modo = 'codigo';
+      }
+      await audit(m.codigo, 'criar-ficha:' + codigo);
+      return json({ tipo, codigo, nome, modo, acesso }, 201);
+    }
+    case path === '/admin/users/role' && method === 'POST': {
+      // Muda o perfil de uma ficha da equipe: Gerente (acesso total) ou Equipe. Pode haver mais de uma Gerente.
+      const m = await requireManager(c);
+      const input = await c.body();
+      await stepUp(m, input);
+      const cod = upper(input.codigo);
+      const role = input.perfil === 'manager' ? 'manager' : 'team';
+      const alvo = await q1('SELECT codigo,role FROM users WHERE codigo=?', [cod]);
+      if (!alvo) fail(404, 'Ficha não encontrada.');
+      if (alvo.role === 'manager' && role === 'team' && Number((await q1("SELECT COUNT(*) c FROM users WHERE role='manager' AND ativo=1"))?.c) <= 1) fail(400, 'Precisa existir ao menos uma Gerente ativa.');
+      await run('UPDATE users SET role=?,label=? WHERE codigo=?', [role, role === 'manager' ? 'Gerente de Marketing' : 'Equipe de Marketing', cod]);
+      await run('DELETE FROM sessions WHERE codigo=? AND codigo<>?', [cod, m.codigo]); // quem mudou de perfil entra de novo
+      await audit(m.codigo, `perfil:${cod}:${role}`);
+      return json({ ok: true, perfil: role });
+    }
+    case path === '/admin/users/delete' && method === 'POST': {
+      const m = await requireManager(c);
+      const input = await c.body();
+      await stepUp(m, input);
+      const tipo = strv(input.tipo);
+      const tab = tabOf(tipo);
+      const cod = upper(input.codigo);
+      const alvo = await q1(`SELECT codigo${tipo === 'interno' ? ',role' : ''} FROM ${tab} WHERE codigo=?`, [cod]);
+      if (!alvo) fail(404, 'Ficha não encontrada.');
+      if (tipo === 'interno' && cod === m.codigo) fail(400, 'Você não pode excluir a própria ficha.');
+      if (tipo === 'interno' && alvo.role === 'manager' && Number((await q1("SELECT COUNT(*) c FROM users WHERE role='manager' AND ativo=1"))?.c) <= 1) fail(400, 'Não é possível excluir a única Gerente ativa.');
+      await run(`DELETE FROM ${tab} WHERE codigo=?`, [cod]);
+      await run('DELETE FROM sessions WHERE codigo=?', [cod]);
+      await run('DELETE FROM trusted_devices WHERE codigo=?', [cod]);
+      await audit(m.codigo, 'excluir-ficha:' + cod);
       return json({ ok: true });
     }
     case path === '/auth/mode':
