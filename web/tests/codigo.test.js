@@ -14,7 +14,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};
  [s,j]=await post('/admin/users/code',{tipo:'interno',codigo:'MON-3303',acesso:'ANTONIO',senhaAdmin:'Nat26ab'});t('código repetido de outra pessoa: 409',s===409,j);
  [s,j]=await post('/admin/users/code',{tipo:'interno',codigo:'MON-3303',acesso:'ab',senhaAdmin:'Nat26ab'});t('curto demais: 400',s===400,j);
  [s,j]=await post('/admin/users/code',{tipo:'interno',codigo:'MON-3303',acesso:'com espaço',senhaAdmin:'Nat26ab'});t('com espaço/acentos: 400',s===400,j);
- [s,j]=await post('/admin/users/code',{tipo:'interno',codigo:'MON-3303',acesso:'MONI2026',senhaAdmin:'errada1'});t('senha de administração errada: 403',s===403,j);
+ [s,j]=await post('/admin/users/code',{tipo:'interno',codigo:'MON-3303',acesso:'MONI2026'});t('nunca pede senha: troca o código sem senhaAdmin (200)',s===200,j);
  [s,j]=await post('/admin/users/code',{tipo:'portal',codigo:'INF-2601',acesso:'INFANTIL',senhaAdmin:'Nat26ab'});t('escolhe código também para o Portal',s===200,j);
  r=await fetch(B+'/portal/login',{method:'POST',headers:J,body:JSON.stringify({codigo:'infantil'})});t('Portal entra com o código escolhido',r.status===200);
  [s,j]=await post('/admin/users/code',{tipo:'interno',codigo:'ANT-3302',acesso:'ANT2026',senhaAdmin:'Nat26ab'});

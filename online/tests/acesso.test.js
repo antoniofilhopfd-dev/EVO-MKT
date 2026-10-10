@@ -11,9 +11,7 @@ const mails=()=>MAILLOG&&fs.existsSync(MAILLOG)?fs.readFileSync(MAILLOG,'utf8'):
  let r=await call('/auth/mode');t('modo padrão é "senha"',r.j.modo==='senha');
  // ---- Gerente entra com senha e liga o modo por código ----
  const GJ={};r=await call('/auth/login',{m:'POST',b:{codigo:'NAT-3301',senha:pw('NAT-3301')},jarOut:GJ});t('Gerente entra com senha (modo atual)',r.s===200);
- r=await call('/admin/mode',{m:'POST',cookies:GJ,b:{modo:'codigo'}});t('ligar o modo por código exige a senha de administração',r.s===403);
- r=await call('/admin/mode',{m:'POST',cookies:GJ,b:{modo:'codigo',senhaAdmin:'errada'}});t('senha de administração errada é recusada',r.s===403);
- r=await call('/admin/mode',{m:'POST',cookies:GJ,b:{modo:'codigo',senhaAdmin:pw('NAT-3301')}});const codes=r.j.codigos||[];
+ r=await call('/admin/mode',{m:'POST',cookies:GJ,b:{modo:'codigo'}});const codes=r.j.codigos||[];
  t('liga o modo e gera 10 códigos (5 equipe + 5 portal)',r.s===200&&codes.length===10&&codes.filter(c=>c.tipo==='portal').length===5,r.j);
  t('códigos têm 2 letras (sem I/O) + 4 números',codes.every(c=>/^[A-HJ-NP-Z]{2}[0-9]{4}$/.test(c.acesso)));
  t('códigos são únicos e sem sequências óbvias',new Set(codes.map(c=>c.acesso)).size===10&&codes.every(c=>!/(\d)\1{3}/.test(c.acesso)&&!/1234|4321|0000/.test(c.acesso)));
@@ -29,12 +27,11 @@ const mails=()=>MAILLOG&&fs.existsSync(MAILLOG)?fs.readFileSync(MAILLOG,'utf8'):
  r=await call('/auth/me',{cookies:AJ});t('sessão funciona',r.s===200);
  const n1=(mails().match(/Novo acesso/g)||[]).length;await call('/auth/login',{m:'POST',b:{codigo:C['ANT-3302']},cookies:{evo_dev:AJ.evo_dev}});
  if(MAILLOG)t('mesmo aparelho: não envia novo alerta',(mails().match(/Novo acesso/g)||[]).length===n1);
- const GJ2={};r=await call('/auth/login',{m:'POST',b:{codigo:C['NAT-3301']},jarOut:GJ2});t('Gerente entra com código e ainda precisa definir a senha de administração',r.s===200&&r.j.mustChange===true);
- // ---- ações sensíveis exigem confirmação ----
- r=await call('/admin/reset-password',{m:'POST',cookies:GJ2,b:{tipo:'interno',codigo:'ANT-3302'}});t('gerar novo código exige senha de administração',r.s===403);
- r=await call('/admin/user-active',{m:'POST',cookies:GJ2,b:{tipo:'portal',codigo:'MED-2604',ativo:false}});t('ativar/desativar acesso exige confirmação',r.s===403);
- r=await call('/integrations/settings',{m:'POST',cookies:GJ2,b:{meta_app_id:'X'}});t('salvar credenciais de integração exige confirmação',r.s===403);
- r=await call('/integrations/settings',{m:'POST',cookies:GJ2,b:{meta_app_id:'X',senhaAdmin:pw('NAT-3301')}});t('com a senha de administração, passa',r.s===200);
+ const GJ2={};r=await call('/auth/login',{m:'POST',b:{codigo:C['NAT-3301']},jarOut:GJ2});t('Gerente entra só com o código, sem pedir senha nem troca de senha',r.s===200&&r.j.mustChange===false);
+ // ---- o sistema nunca pede senha nas ações da Gerente ----
+ r=await call('/admin/user-active',{m:'POST',cookies:GJ2,b:{tipo:'portal',codigo:'MED-2604',ativo:false}});t('desativar acesso funciona sem senha',r.s===200);
+ await call('/admin/user-active',{m:'POST',cookies:GJ2,b:{tipo:'portal',codigo:'MED-2604',ativo:true}});
+ r=await call('/integrations/settings',{m:'POST',cookies:GJ2,b:{meta_app_id:'X'}});t('salvar credenciais de integração funciona sem senha',r.s===200);
  r=await call('/admin/mode',{m:'POST',cookies:AJ,b:{modo:'senha',senhaAdmin:'x'}});t('Equipe não muda o modo de acesso',r.s===403);
  r=await call('/admin/reset-password',{m:'POST',cookies:GJ2,b:{tipo:'interno',codigo:'ANT-3302',senhaAdmin:pw('NAT-3301')}});const novo=r.j.senhaTemporaria;
  t('novo código gerado (formato válido) e diferente do antigo',r.s===200&&/^[A-HJ-NP-Z]{2}[0-9]{4}$/.test(novo)&&novo!==C['ANT-3302']);

@@ -3,7 +3,7 @@ import { Ctx, setCookie } from '../ctx';
 import { q, q1, run } from '../db';
 import { genPassword, hashPassword, randHex, sha256, strongPassword, verifyPassword } from '../crypto';
 import {
-  allowedSegment, checkAdminPassword, checkCsrf, codeLoginFail, codeLoginGuard, internalUser, issueAccessCode, loginMode, portalUser, rateCheck,
+  allowedSegment, checkCsrf, codeLoginFail, codeLoginGuard, internalUser, issueAccessCode, loginMode, portalUser, rateCheck,
   rateFail, registerDevice, requireInternal, requireManager, requirePortal, sessionTokenFromCookie, setSessionCookie, startSession, stepUp, validCodeFormat,
 } from '../auth';
 import { accessHmac, decryptSecret, encryptSecret } from '../crypto';
@@ -69,7 +69,7 @@ export async function route(c: Ctx): Promise<Out> {
         setSessionCookie(c, await startSession('int', u.codigo));
         await audit(u.codigo, 'login');
         await registerDevice(c, 'int', u.codigo, u.nome);
-        return json({ user: asUser(u), mustChange: u.role === 'manager' && !!u.must_change });
+        return json({ user: asUser(u), mustChange: false });
       }
       const key = `int|${c.ip}|${cod}`;
       await rateCheck(key);
@@ -87,7 +87,7 @@ export async function route(c: Ctx): Promise<Out> {
     }
     case path === '/auth/me': {
       const u = await requireInternal(c);
-      return json({ user: asUser(u), mustChange: !!u.must_change });
+      return json({ user: asUser(u), mustChange: (await loginMode()) === 'senha' && !!u.must_change });
     }
     case path === '/auth/logout' && method === 'POST': {
       const t = sessionTokenFromCookie(c);
@@ -345,14 +345,13 @@ export async function route(c: Ctx): Promise<Out> {
       const m = await requireManager(c);
       const input = await c.body();
       const novo = input.modo === 'codigo' ? 'codigo' : input.modo === 'senha' ? 'senha' : fail(400, 'Modo inválido.');
-      if ((await loginMode()) === 'codigo') await stepUp(m, input);
-      else if (!(await checkAdminPassword(m, input.senhaAdmin, 'step|' + m.codigo))) fail(403, 'Confirme sua senha de administração.');
       const codes: Row[] = [];
       if (novo === 'codigo') {
-        for (const r of await q('SELECT codigo,nome FROM users WHERE ativo=1 ORDER BY codigo'))
-          codes.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, acesso: await issueAccessCode('users', r.codigo, r.codigo !== m.codigo) });
-        for (const r of await q('SELECT codigo,nome FROM portal_users WHERE ativo=1 ORDER BY codigo'))
-          codes.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, acesso: await issueAccessCode('portal_users', r.codigo) });
+        // quem já tem código (gerado ou escolhido pela Gerente) mantém; só quem não tem recebe um novo
+        for (const r of await q('SELECT codigo,nome,acesso_enc FROM users WHERE ativo=1 ORDER BY codigo'))
+          codes.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : await issueAccessCode('users', r.codigo, r.codigo !== m.codigo) });
+        for (const r of await q('SELECT codigo,nome,acesso_enc FROM portal_users WHERE ativo=1 ORDER BY codigo'))
+          codes.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : await issueAccessCode('portal_users', r.codigo) });
         await run('UPDATE users SET must_change=0 WHERE role<>?', ['manager']);
         await run('DELETE FROM sessions WHERE codigo<>?', [m.codigo]);
       }
@@ -362,8 +361,6 @@ export async function route(c: Ctx): Promise<Out> {
     }
     case path === '/admin/codes' && method === 'POST': {
       const m = await requireManager(c);
-      const input = await c.body();
-      if (!(await checkAdminPassword(m, input.senhaAdmin, 'codes|' + m.codigo))) fail(403, 'Confirme sua senha de administração.');
       const out: Row[] = [];
       for (const [tab, tipo] of [['users', 'interno'], ['portal_users', 'portal']] as const)
         for (const r of await q(`SELECT codigo,nome,acesso_enc FROM ${tab} WHERE ativo=1 ORDER BY codigo`))

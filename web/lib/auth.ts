@@ -136,18 +136,10 @@ export async function codeLoginFail(c: Ctx, quem: string): Promise<never> {
   return fail(401, 'Código inválido.');
 }
 
-// ---------- confirmação extra da Gerente (modo código) ----------
-export async function checkAdminPassword(m: Row, senha: unknown, key: string): Promise<boolean> {
-  await rateCheck(key, 5);
-  const row = await q1('SELECT pass_hash FROM users WHERE codigo=?', [m.codigo]);
-  if (!row || !verifyPassword(String(senha ?? ''), row.pass_hash)) {
-    if (senha !== undefined && senha !== null) await rateFail(key);
-    return false;
-  }
-  return true;
-}
-export async function stepUp(m: Row, input: Row): Promise<void> {
-  if ((await loginMode()) !== 'codigo') return;
-  if (!(await checkAdminPassword(m, input.senhaAdmin, 'step|' + m.codigo))) fail(403, 'Confirme sua senha de administração.');
+// ---------- ações sensíveis ----------
+// Decisão do cliente: o sistema NÃO pede senha em nenhuma ação (a sessão por código basta).
+// As ações perigosas pedem apenas uma confirmação simples na tela ("Tem certeza?").
+export async function stepUp(_m: Row, _input: Row): Promise<void> {
+  return;
 }
 export { q };

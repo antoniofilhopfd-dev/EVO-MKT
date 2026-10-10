@@ -4,7 +4,7 @@ const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegE
 let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(x).slice(0,300))};
 (async()=>{
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
- const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept('Senha26x'));
+ const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));const dl=[];p.on('dialog',d=>dl.push(d.message()));p.on('dialog',d=>d.accept('Senha26x'));
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');
  await p.evaluate(()=>{adminTab='acessos';go('administracao')});await p.waitForSelector('#newFicha');
  // nova ficha da equipe
@@ -41,6 +41,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  p.removeAllListeners('dialog');p.on('dialog',d=>d.accept(/administração/i.test(d.message())?'Senha26x':'MARIA7'));
  await p.click('[data-setcode^="interno|EDU-3305"]');await p.waitForTimeout(900);
  t('✎ permite escolher o código e a tabela mostra o novo',(await p.$$eval('[data-acesso]',a=>a.map(e=>e.innerText.trim()))).includes('MARIA7'));
+ t('o sistema não pediu senha de administração em nenhuma ação (só "Tem certeza?")',!dl.some(m=>/senha de administração|Confirme sua senha/i.test(m)),dl);
  t('sem erros de JS',errs.length===0,errs.join('|'));
  await b.close();console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
