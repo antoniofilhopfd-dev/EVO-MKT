@@ -3,7 +3,7 @@ import { q, q1 } from '../db';
 import { requireInternal, requireManager, stepUp } from '../auth';
 import { audit, listRows, MODULES } from '../records';
 import { intLog, setSetting, setting } from '../settings';
-import { fail, now, Row, strv } from '../util';
+import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded } from '../integrations/meta';
 import { gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
@@ -59,6 +59,34 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
+      });
+    }
+    case path === '/integrations/prontidao': {
+      await requireManager(c);
+      const origin = publicUrl(c.url.origin);
+      type Item = { id: string; ok: boolean; nivel: 'erro' | 'aviso'; titulo: string; como: string };
+      const it: Item[] = [];
+      const add = (id: string, ok: boolean, nivel: 'erro' | 'aviso', titulo: string, como: string) => it.push({ id, ok, nivel, titulo, como });
+      const pub = env('PUBLIC_URL');
+      add('public_url', /^https:\/\//.test(pub) && pub.replace(/\/+$/, '') === c.url.origin, 'erro', 'PUBLIC_URL é o endereço https do sistema', `Defina PUBLIC_URL=${c.url.origin} nas variáveis da Hostinger (precisa ser https e igual ao endereço de acesso).`);
+      add('app_key', env('APP_KEY').length >= 32, 'erro', 'APP_KEY com 32+ caracteres (criptografa os tokens)', 'Gere com "npm run gerar:segredos" e não troque depois de conectar.');
+      add('cron_secret', env('CRON_SECRET').length >= 16, 'erro', 'CRON_SECRET definido (protege o cron)', 'Defina CRON_SECRET (16+ caracteres) e use-o no cron da Hostinger.');
+      add('smtp', env('SMTP_HOST') !== '' && env('NOTIFY_TO') !== '', 'aviso', 'E-mail configurado (SMTP_* e NOTIFY_TO) para avisos de falha', 'Sem isso as falhas só aparecem na central de notificações.');
+      const metaCred = (await setting('meta_app_id')) !== '' && (await setting('meta_app_secret')) !== '';
+      add('meta_cred', metaCred, 'erro', 'Meta: App ID e App Secret salvos', 'Cole as credenciais na caixa Instagram (veja GUIA_INTEGRACOES.md).');
+      const metaOn = await metaConnected();
+      add('meta_conn', metaOn, 'erro', 'Meta: Instagram conectado', 'Clique em "Conectar com Facebook/Instagram" e aceite todas as permissões.');
+      const exp = parseInt(await setting('meta_token_expira', '0'), 10) || 0;
+      add('meta_token', !metaOn || (exp * 1000 - Date.now()) / 86400000 > 10, 'aviso', 'Meta: token com mais de 10 dias de validade', 'O cron renova sozinho; se faltar menos de 10 dias, o cron não está rodando — reconecte.');
+      const gCred = (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '';
+      add('g_cred', gCred, 'erro', 'Google: Client ID e Client Secret salvos', 'Cole as credenciais na caixa Google (veja GUIA_INTEGRACOES.md).');
+      add('g_conn', await gConnected(), 'erro', 'Google: conta conectada (Agenda, Drive, Planilhas)', 'Clique em "Conectar com Google" e aceite as permissões.');
+      const recente = async (k: string) => { const v = await setting(k); return v !== '' && Date.now() - new Date(v).getTime() < 2 * 86400000; };
+      add('cron_roda', (!metaOn || (await recente('ig_last_sync'))) && (!(await gConnected()) || (await recente('g_last_cal_sync'))), 'aviso', 'Sincronização rodou nos últimos 2 dias', 'Crie o cron da Hostinger (comando abaixo) ou use os botões "Sincronizar agora".');
+      return json({
+        pronto: it.every((x) => x.ok || x.nivel === 'aviso'), itens: it,
+        urls: { site: origin, privacidade: origin + '/privacidade.html', termos: origin + '/termos.html', metaRedirect: origin + '/api/integrations/meta/callback', googleRedirect: origin + '/api/integrations/google/callback' },
+        cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + origin + '/api/cron/integracoes?tarefa=sincronizar',
       });
     }
     case path === '/integrations/settings' && method === 'POST': {

@@ -6,6 +6,8 @@ Antes de tudo, nas **variáveis de ambiente** da Hostinger confira:
 - `PUBLIC_URL` → endereço do sistema: `https://evomkt.antoniopfd.com` (com **https**).
 - `APP_KEY` → texto aleatório de 40+ caracteres (`npm run gerar:segredos`). Ele criptografa os tokens salvos. **Não troque depois de conectar** (senão será preciso reconectar).
 
+**Comece pelo cartão "Prontidão"** no topo de Administração → Integrações: ele confere `PUBLIC_URL` (https), `APP_KEY`, `CRON_SECRET`, e-mail, credenciais, conexão e se o cron está rodando, e diz como corrigir cada item. Ele também mostra, prontos para copiar, os endereços da **Política de Privacidade** (`/privacidade.html`) e dos **Termos de Uso** (`/termos.html`), que a Meta e o Google pedem para o app ficar "Ativo/Em produção" — revise o texto antes (são páginas públicas do sistema) — e o comando do **cron** (Hostinger → Cron Jobs, a cada 10 minutos).
+
 Na tela de Integrações, os dois endereços de redirecionamento aparecem prontos com botão **Copiar**.
 
 ---
