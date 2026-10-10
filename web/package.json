@@ -9,7 +9,7 @@
   "scripts": {
     "prebuild": "node scripts/prebuild.mjs",
     "dev": "node scripts/prebuild.mjs && next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "typecheck": "node scripts/prebuild.mjs && tsc --noEmit",
     "gerar:segredos": "node scripts/gerar-segredos.mjs"
