@@ -9,7 +9,7 @@ import {
 import { accessHmac, decryptSecret, encryptSecret } from '../crypto';
 import { notifyMail } from '../mail';
 import {
-  ALLOWED_EXT, audit, CREATE_FIELDS, EVO_VERSION, getRow, headersOf, insertRow, listRows, modifyRow, MODULES, notifyAssignment,
+  ALLOWED_EXT, audit, CREATE_FIELDS, EVO_VERSION, getRow, headersOf, insertRow, listRows, logStatus, modifyRow, MODULES, notifyAssignment,
   emailForPerson, publicRow, saveRow, seedEquipe, TEAM_WRITE, teamMayDelete, trashRow, UPDATE_FIELDS, updateRow,
 } from '../records';
 import { saveUploads, serveFile } from '../files';
@@ -17,6 +17,8 @@ import { intLog, setSetting, setting } from '../settings';
 import { cleanInput, env, fail, HttpError, lower, now, Row, strv } from '../util';
 import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
+import { validarTransicaoSolicitacao } from '../fluxo';
+import { operacaoRoute } from './operacao';
 import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
 import { gConnected, gDriveSendEntregas } from '../integrations/google';
@@ -34,6 +36,8 @@ export async function route(c: Ctx): Promise<Out> {
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
 
   switch (true) {
+    case path === '/fluxo' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores':
+      return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);
 
@@ -637,35 +641,53 @@ async function portalRestrictedUpdate(c: Ctx, u: Row, mod: string, id: string): 
   if (c.method !== 'PUT') fail(403, 'Operação não permitida ao Portal.');
   if (mod !== 'solicitacoes') fail(403, 'Módulo não permitido.');
   const input = await c.body();
-  const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
-  if (!allowedSegment(u, row.segmento ?? '')) fail(403, 'Demanda de outro segmento.');
-  const cur = `${row.status ?? ''} ${row.triagemStatus ?? ''}`.toLocaleUpperCase('pt-BR');
-  const nota = strv(input.avaliacaoNota).trim();
-  if (nota) {
-    if (!cur.includes('CONCLUÍDA')) fail(409, 'A avaliação só pode ser enviada após a conclusão.');
-    if (!/^\d+$/.test(nota) || +nota < 1 || +nota > 5) fail(400, 'Avaliação deve estar entre 1 e 5.');
-  }
-  for (const k of UPDATE_FIELDS) if (k in input) row[k] = strv(input[k]);
+  const antes = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
+  if (!allowedSegment(u, antes.segmento ?? '')) fail(403, 'Demanda de outro segmento.');
+  const ator = 'portal:' + u.codigo;
+  // Tudo dentro de UMA transação com trava: o status, o histórico e os campos mudam juntos.
+  const row = await modifyRow('solicitacoes', id, async (cur0, conn) => {
+    const row: Row = { ...cur0 };
+    const cur = `${row.status ?? ''} ${row.triagemStatus ?? ''}`.toLocaleUpperCase('pt-BR');
+    const nota = strv(input.avaliacaoNota).trim();
+    if (nota) {
+      if (!cur.includes('CONCLUÍDA')) fail(409, 'A avaliação só pode ser enviada após a conclusão.');
+      if (!/^\d+$/.test(nota) || +nota < 1 || +nota > 5) fail(400, 'Avaliação deve estar entre 1 e 5.');
+    }
+    for (const k of UPDATE_FIELDS) if (k in input) row[k] = strv(input[k]);
+    const ap = String(row.aprovacaoSolicitante ?? '').trim().toLocaleUpperCase('pt-BR');
+    const t = now();
+    const traz = (k: string) => k in input; // só avalia transições quando o pedido traz o campo
+    const de = String(cur0.status ?? '');
+    let para = '';
+    let motivo = '';
+    if (traz('aprovacaoSolicitante') && ap === 'APROVADO') {
+      if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
+      para = 'CONCLUÍDA'; motivo = 'Entrega aprovada pelo solicitante';
+      row.triagemStatus = 'CONCLUÍDA';
+      if (!row.aprovadoSolicitanteEm) row.aprovadoSolicitanteEm = t;
+    } else if (traz('aprovacaoSolicitante') && ap === 'AJUSTES SOLICITADOS') {
+      if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
+      para = 'EM EXECUÇÃO'; motivo = 'Ajustes solicitados pelo solicitante' + (strv(input.respostaSolicitante).trim() ? ': ' + strv(input.respostaSolicitante).trim().slice(0, 300) : '');
+      row.triagemStatus = 'DISTRIBUÍDA';
+      if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
+    } else if (traz('respostaSolicitante') && String(row.respostaSolicitante ?? '').trim()) {
+      if (!(cur.includes('AGUARDANDO SOLICITANTE') || cur.includes('DEVOLVIDA PARA AJUSTES'))) fail(409, 'Esta demanda não está aguardando resposta.');
+      para = 'EM ANÁLISE'; motivo = 'Solicitante respondeu ao pedido de complementação';
+      row.triagemStatus = 'EM TRIAGEM';
+      if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
+    }
+    if (para) {
+      // a mesma regra única de transições vale para o Portal (retornos feitos pelo Portal têm motivo automático)
+      validarTransicaoSolicitacao(para === 'EM ANÁLISE' ? 'AGUARDANDO SOLICITANTE' : 'AGUARDANDO APROVAÇÃO DO SOLICITANTE', para, motivo, true);
+      row.status = para;
+      await logStatus(conn, 'solicitacoes', id, de, para, ator, motivo);
+    }
+    row.atualizadoEm = t;
+    return row;
+  });
   const ap = String(row.aprovacaoSolicitante ?? '').trim().toLocaleUpperCase('pt-BR');
-  const t = now();
-  const traz = (k: string) => k in input; // só avalia transições quando o pedido traz o campo
-  if (traz('aprovacaoSolicitante') && ap === 'APROVADO') {
-    if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
-    row.status = 'CONCLUÍDA'; row.triagemStatus = 'CONCLUÍDA';
-    if (!row.aprovadoSolicitanteEm) row.aprovadoSolicitanteEm = t;
-  } else if (traz('aprovacaoSolicitante') && ap === 'AJUSTES SOLICITADOS') {
-    if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
-    row.status = 'EM EXECUÇÃO'; row.triagemStatus = 'DISTRIBUÍDA';
-    if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
-  } else if (traz('respostaSolicitante') && String(row.respostaSolicitante ?? '').trim()) {
-    if (!(cur.includes('AGUARDANDO SOLICITANTE') || cur.includes('DEVOLVIDA PARA AJUSTES'))) fail(409, 'Esta demanda não está aguardando resposta.');
-    row.status = 'EM ANÁLISE'; row.triagemStatus = 'EM TRIAGEM';
-    if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
-  }
-  row.atualizadoEm = t;
-  await saveRow('solicitacoes', row);
-  await audit('portal:' + u.codigo, 'editar', 'solicitacoes', id);
-  if (ap === 'APROVADO' || ap === 'AJUSTES SOLICITADOS')
+  await audit(ator, 'editar', 'solicitacoes', id);
+  if ('aprovacaoSolicitante' in input && (ap === 'APROVADO' || ap === 'AJUSTES SOLICITADOS'))
     await notifyMail(`Demanda ${ap === 'APROVADO' ? 'aprovada' : 'com ajustes solicitados'}: ${row.titulo ?? id}`, `ID: ${id} · Segmento: ${row.segmento ?? ''}`);
   return json({ ok: true });
 }

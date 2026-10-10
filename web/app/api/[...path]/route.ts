@@ -19,7 +19,7 @@ async function handle(req: Request, ctx: { params: Promise<{ path?: string[] }> 
         res = await route(c);
       }
     } catch (e) {
-      if (e instanceof HttpError) res = json({ error: e.message }, e.status);
+      if (e instanceof HttpError) res = json({ error: e.message, ...(e.extra ?? {}) }, e.status);
       else {
         console.error('[api] erro interno:', e);
         res = json({ error: 'Erro interno do servidor.' }, 500);

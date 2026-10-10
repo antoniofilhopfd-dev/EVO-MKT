@@ -1,8 +1,10 @@
 export type Row = Record<string, any>;
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  extra?: Record<string, unknown>;
+  constructor(public status: number, message: string, extra?: Record<string, unknown>) {
     super(message);
+    this.extra = extra;
   }
 }
 export function fail(status: number, message: string): never {

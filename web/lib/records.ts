@@ -1,5 +1,6 @@
 import { q, q1, run, withTx } from './db';
 import { cleanInput, currentIp, fail, lower, now, Row, strv } from './util';
+import { validarTransicaoSolicitacao } from './fluxo';
 import { notifyMail } from './mail';
 import { env, envInt } from './util';
 
@@ -72,20 +73,28 @@ export async function insertRow(mod: string, input: Row, ator: string): Promise<
   const row: Row = { id, ...clean, criadoEm: t, atualizadoEm: t, criadoPor: ator };
   await run('INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES(?,?,?,?,?)', [mod, id, JSON.stringify(row), t, t]);
   await mergeHeaders(mod, Object.keys(row));
+  if (row.status) await logStatus(null, mod, id, '', String(row.status), ator, 'criação');
   await audit(ator, 'criar', mod, id);
   return row;
+}
+/** Registra uma mudança de status (na mesma transação quando `c` é informado). */
+export async function logStatus(c: { query: (sql: string, p: unknown[]) => Promise<unknown> } | null, mod: string, id: string, de: string, para: string, ator: string, motivo = '', campo = 'status'): Promise<void> {
+  const sql = 'INSERT INTO status_history(modulo,registro,campo,de,para,ator,quando,motivo) VALUES(?,?,?,?,?,?,?,?)';
+  const p = [mod, id, campo, de.slice(0, 120), para.slice(0, 120), ator.slice(0, 120), now(), motivo.slice(0, 500)];
+  if (c) await c.query(sql, p);
+  else await run(sql, p);
 }
 export async function saveRow(mod: string, row: Row): Promise<void> {
   await run('UPDATE records SET data=?,atualizado_em=? WHERE modulo=? AND id=?', [JSON.stringify(row), row.atualizadoEm, mod, row.id]);
   await mergeHeaders(mod, Object.keys(row));
 }
 /** Lê o registro com trava (SELECT … FOR UPDATE), aplica `fn` e grava: duas edições simultâneas não se sobrescrevem. */
-export async function modifyRow(mod: string, id: string, fn: (cur: Row) => Row | Promise<Row>): Promise<Row> {
+export async function modifyRow(mod: string, id: string, fn: (cur: Row, c: any) => Row | Promise<Row>): Promise<Row> {
   const nw = await withTx(async (c) => {
     const [rs] = await c.query('SELECT data FROM records WHERE modulo=? AND id=? FOR UPDATE', [mod, id]);
     const cur = (rs as Row[])[0];
     if (!cur) fail(404, 'Registro não encontrado.');
-    const merged = await fn(JSON.parse(cur.data));
+    const merged = await fn(JSON.parse(cur.data), c);
     await c.query('UPDATE records SET data=?,atualizado_em=? WHERE modulo=? AND id=?', [JSON.stringify(merged), merged.atualizadoEm, mod, id]);
     return merged;
   });
@@ -95,7 +104,18 @@ export async function modifyRow(mod: string, id: string, fn: (cur: Row) => Row |
 export async function updateRow(mod: string, id: string, patchIn: Row, ator: string): Promise<Row> {
   const patch = cleanInput(patchIn);
   for (const k of ['id', 'criadoEm', 'criadoPor', 'atualizadoPor']) delete patch[k];
-  const nw = await modifyRow(mod, id, (cur) => ({ ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator }));
+  const motivoInformado = strv(patch.motivoTransicao);
+  delete patch.motivoTransicao;
+  const nw = await modifyRow(mod, id, async (cur, c) => {
+    if (patch.status !== undefined && String(patch.status) !== String(cur.status ?? '')) {
+      let motivo = motivoInformado.trim();
+      if (mod === 'solicitacoes') motivo = validarTransicaoSolicitacao(String(cur.status ?? ''), String(patch.status), motivoInformado).motivo;
+      await logStatus(c, mod, id, String(cur.status ?? ''), String(patch.status), ator, motivo);
+    }
+    if (patch.responsavel !== undefined && String(patch.responsavel).trim() !== String(cur.responsavel ?? '').trim() && String(cur.responsavel ?? '').trim() !== '')
+      await logStatus(c, mod, id, String(cur.responsavel ?? ''), String(patch.responsavel), ator, motivoInformado.trim(), 'responsavel');
+    return { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
+  });
   await audit(ator, 'editar', mod, id);
   return nw;
 }
