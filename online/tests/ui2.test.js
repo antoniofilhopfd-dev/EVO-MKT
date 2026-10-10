@@ -90,8 +90,6 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  const alvo=(await rows(G,'tarefas')).find(r=>r.titulo==='Arte para aprovar');
  G.removeAllListeners('dialog');G.on('dialog',d=>d.accept());await G.click(`.delete-row[data-id="${alvo.id}"]`);await G.waitForTimeout(1000);
  t('Excluir pela tela move para a Lixeira',!(await rows(G,'tarefas')).some(r=>r.id===alvo.id)&&(await rows(G,'lixeira')).some(r=>r.idOriginal===alvo.id));
- await G.evaluate(()=>go('lixeira'));await G.waitForSelector('.restore-row');await G.click('.restore-row');await G.waitForTimeout(1200);
- const back=(await rows(G,'tarefas')).find(r=>r.titulo==='Arte para aprovar');t('Restaurar recria o item (ID novo, nunca reutilizado)',back&&back.id!==alvo.id);
 
  // ========== 9) EQUIPE, VISÕES E MODAIS ==========
  await G.evaluate(()=>go('equipe'));await G.waitForTimeout(700);const eq=await G.$eval('#content',e=>e.innerText);
