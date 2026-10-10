@@ -137,3 +137,10 @@ Limitação conhecida: o backup guarda os dados **no mesmo banco**; ele protege 
 - Fonte de verdade da Agenda documentada em `GUIA_INTEGRACOES.md`.
 - Menu enxuto: Planejamento Editorial, Fechamento Mensal e Arquivos saíram do menu lateral (dados intactos), acessíveis por "Ver também" em Conteúdos, Relatórios, Tarefas e Solicitações.
 - Pendente: homologação com contas reais Meta/Google (depende de credenciais do usuário).
+
+
+## Fechamento dos pendentes técnicos
+- A8: registro + cabeçalhos + status inicial agora gravados numa única transação (`insertRow`). CONCLUÍDO.
+- A10: o cron diário apaga sessões expiradas e tentativas de login com mais de 24 h (além da limpeza já feita no login). CONCLUÍDO.
+- A11: uploads conferem a assinatura do arquivo (PDF, PNG, JPG, GIF, WEBP, ZIP/Office, MP4/MOV) e recusam SVG com script; teste em `integridade` (22). CONCLUÍDO. Limite de tamanho continua dependendo do `max_allowed_packet` do MySQL (DEP. EXTERNA).
+- A14: paginação no servidor segue não implementada (volume atual não exige; reavaliar acima de ~5 mil registros por módulo).

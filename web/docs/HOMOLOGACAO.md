@@ -20,7 +20,7 @@ Estado verificado em 2026-10-10, suíte completa `tests/run-web.sh` (build de pr
 2. **Deploy:** o código está na `main`; só vale em produção depois de reimplantar na Hostinger. Confira `/api/health` e a versão no rodapé.
 3. **Backup do banco pela Hostinger** (phpMyAdmin) e teste de restauração fora do app: ação sua.
 4. **Segredos que passaram pelo chat** (senha do banco, `SESSION_SECRET`, `APP_KEY`, `SETUP_KEY`, `CRON_SECRET`, `RECOVERY_KEY`): trocar; remover `SETUP_KEY` e `RECOVERY_KEY` do painel.
-5. **Pendências técnicas menores:** criação atômica de registro (A8), limpeza periódica de sessões (A10), checagem do conteúdo real dos uploads (A11), paginação no servidor (A14, aceitável para o volume atual).
+5. **Pendência técnica menor:** paginação no servidor (A14), aceitável para o volume atual. A8, A10 e A11 foram fechadas.
 6. Demandas anteriores à migração 006 não têm histórico de status.
 7. Telas retiradas do menu (Planejamento Editorial, Fechamento Mensal, Arquivos) continuam existindo, com dados, pelos atalhos "Ver também".
 

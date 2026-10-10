@@ -53,11 +53,15 @@ export async function headersOf(mod: string): Promise<string[]> {
   const h = r ? JSON.parse(r.headers) : [];
   return Array.isArray(h) && h.length ? h : BASE_HEADERS;
 }
-export async function mergeHeaders(mod: string, keys: string[]): Promise<void> {
+type Exec = { query: (sql: string, p?: unknown[]) => Promise<unknown> };
+export async function mergeHeaders(mod: string, keys: string[], c?: Exec): Promise<void> {
   const h = await headersOf(mod);
   const add = keys.filter((k) => !h.includes(k));
   if (!add.length) return;
-  await run('INSERT INTO module_headers(modulo,headers) VALUES(?,?) ON DUPLICATE KEY UPDATE headers=VALUES(headers)', [mod, JSON.stringify([...h, ...add])]);
+  const sql = 'INSERT INTO module_headers(modulo,headers) VALUES(?,?) ON DUPLICATE KEY UPDATE headers=VALUES(headers)';
+  const args = [mod, JSON.stringify([...h, ...add])];
+  if (c) await c.query(sql, args);
+  else await run(sql, args);
 }
 export async function listRows(mod: string): Promise<Row[]> {
   return (await q<{ data: string }>('SELECT data FROM records WHERE modulo=? ORDER BY criado_em,id', [mod])).map((r) => JSON.parse(r.data));
@@ -72,9 +76,12 @@ export async function insertRow(mod: string, input: Row, ator: string): Promise<
   const id = await newId(mod);
   const t = now();
   const row: Row = { id, ...clean, criadoEm: t, atualizadoEm: t, criadoPor: ator };
-  await run('INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES(?,?,?,?,?)', [mod, id, JSON.stringify(row), t, t]);
-  await mergeHeaders(mod, Object.keys(row));
-  if (row.status) await logStatus(null, mod, id, '', String(row.status), ator, 'criação');
+  // registro, cabeçalhos e status inicial: tudo ou nada
+  await withTx(async (c) => {
+    await c.query('INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES(?,?,?,?,?)', [mod, id, JSON.stringify(row), t, t]);
+    await mergeHeaders(mod, Object.keys(row), c);
+    if (row.status) await logStatus(c, mod, id, '', String(row.status), ator, 'criação');
+  });
   await audit(ator, 'criar', mod, id);
   return row;
 }

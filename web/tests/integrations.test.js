@@ -86,13 +86,13 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  // ---------- Google Drive ----------
  const sid=(await call('/data?module=solicitacoes',{m:'POST',ck:G,b:{titulo:'Cartaz festa junina',status:'EM EXECUÇÃO',segmento:'Infantil'}})).j.id;
  const upE=async(name)=>{const fd=new FormData();fd.append('files',new Blob([jpg]),name);const rr=await fetch(API+'/manager/upload?id='+sid,{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return rr.status};
- t('entrega enviada (Drive automático desligado)',await upE('final1.png')===200);s2=await mock('/__state');t('nada vai ao Drive com o automático desligado',Object.keys(s2.files).length===0);
+ t('entrega enviada (Drive automático desligado)',await upE('final1.jpg')===200);s2=await mock('/__state');t('nada vai ao Drive com o automático desligado',Object.keys(s2.files).length===0);
  r=await call('/integrations/google/drive/send-entregas',{m:'POST',ck:G,b:{}});s2=await mock('/__state');const f1=Object.values(s2.files)[0];
  t('envia entregas pendentes ao Drive (pasta da solicitação)',r.j.arquivos===1&&f1&&f1.name.startsWith('final1')&&f1.size>0,r);
  const fold=Object.values(s2.folders);t('estrutura de pastas: EVO MKT — Entregas / SOL-xxxx — título',fold.some(f=>/Entregas/.test(f.name)&&!f.parent)&&fold.some(f=>f.name.startsWith(sid)&&f.parent));
  const sol=(await rows('solicitacoes')).find(s=>s.id===sid);t('link do Drive gravado na solicitação',/drive\.google\.com/.test(sol.entregaDriveLinks||''));
  r=await call('/integrations/google/drive/send-entregas',{m:'POST',ck:G,b:{}});t('reenviar não duplica arquivos',r.j.arquivos===0);
- await call('/integrations/settings',{m:'POST',ck:G,b:{g_auto_drive_entregas:true}});await upE('final2.png');s2=await mock('/__state');t('com o automático ligado, nova entrega vai sozinha ao Drive',Object.keys(s2.files).length===2);
+ await call('/integrations/settings',{m:'POST',ck:G,b:{g_auto_drive_entregas:true}});await upE('final2.jpg');s2=await mock('/__state');t('com o automático ligado, nova entrega vai sozinha ao Drive',Object.keys(s2.files).length===2);
  // ---------- Google Planilhas ----------
  r=await call('/integrations/google/sheets/export',{m:'POST',ck:G,b:{}});s2=await mock('/__state');
  t('exporta módulos para a planilha do Google',r.s===200&&/docs\.google\.com\/spreadsheets/.test(r.j.url)&&r.j.abas.tarefas>=0&&s2.values.tarefas&&s2.values.tarefas[0].includes('titulo')&&s2.values.conteudos.length>=4,r);

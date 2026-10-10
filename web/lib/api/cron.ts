@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { Ctx } from '../ctx';
+import { run } from '../db';
 import { env, fail, fmtDate, addDays, parseLocal, Row, now } from '../util';
 import { listRows, emailForPerson } from '../records';
 import { notifyMail } from '../mail';
@@ -53,6 +54,8 @@ async function integracoes(what: string): Promise<Row> {
 
 /** Alertas de prazo: a cada pessoa com e-mail na ficha da Equipe e o resumo da Gerente. */
 async function alertas(): Promise<Row> {
+  await run('DELETE FROM sessions WHERE expira<?', [Math.floor(Date.now() / 1000)]).catch(() => {});
+  await run('DELETE FROM login_attempts WHERE quando < ?', [Math.floor(Date.now() / 1000) - 86400]).catch(() => {});
   const hoje = fmtDate(new Date()), amanha = fmtDate(addDays(new Date(), 1));
   const FECHADOS = /CONCLU|PUBLICADO|APROVADO|CANCEL|ARQUIV|ENTREGUE|FINAL/i;
   type Item = { mod: string; titulo: string; due: string; resp: string; atraso: boolean };

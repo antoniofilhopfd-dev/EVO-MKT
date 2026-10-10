@@ -21,9 +21,11 @@ export async function saveUploads(c: Ctx, id: string, sub: string): Promise<stri
     const base = safePart(f.name.split(/[\\/]/).pop() || '') || 'arquivo';
     const ext = (base.includes('.') ? base.split('.').pop()! : '').toLowerCase();
     if (!ALLOWED_EXT.includes(ext)) fail(400, `Tipo de arquivo não permitido: .${ext}`);
+    const buf = Buffer.from(await f.arrayBuffer());
+    if (!conteudoCoerente(ext, buf)) fail(400, `O conteúdo de "${base}" não corresponde ao tipo .${ext}.`);
     let path = `${rel}/${base}`;
     if (await q1('SELECT 1 FROM arquivos WHERE caminho=?', [path])) path = `${rel}/${base.slice(0, base.length - ext.length - 1)}_${randHex(4)}.${ext}`;
-    await run('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)', [path, MIME[ext] ?? 'application/octet-stream', f.size, Buffer.from(await f.arrayBuffer()), now()]);
+    await run('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)', [path, MIME[ext] ?? 'application/octet-stream', f.size, buf, now()]);
     saved.push(path);
   }
   return saved;
@@ -48,3 +50,19 @@ export async function serveFile(rel: string, portal: Row | null): Promise<Respon
   });
 }
 export { audit, q };
+
+/** Confere a assinatura (primeiros bytes) dos formatos conhecidos e recusa SVG com script. Texto e formatos sem assinatura simples passam. */
+export function conteudoCoerente(ext: string, b: Buffer): boolean {
+  const at = (off: number, s: string) => b.subarray(off, off + s.length).toString('latin1') === s;
+  switch (ext) {
+    case 'pdf': return at(0, '%PDF');
+    case 'png': return at(0, '\x89PNG');
+    case 'jpg': case 'jpeg': return b[0] === 0xff && b[1] === 0xd8;
+    case 'gif': return at(0, 'GIF8');
+    case 'webp': return at(0, 'RIFF') && at(8, 'WEBP');
+    case 'zip': case 'docx': case 'xlsx': case 'pptx': return at(0, 'PK');
+    case 'mp4': case 'mov': return at(4, 'ftyp') || at(4, 'moov') || at(4, 'wide') || at(4, 'mdat');
+    case 'svg': return !/<script|\son\w+\s*=|javascript:/i.test(b.toString('utf8'));
+    default: return true;
+  }
+}

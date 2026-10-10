@@ -58,5 +58,12 @@ const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
  t('outro segmento NÃO altera a demanda alheia (403)',await st('PUT','/data?module=solicitacoes&id='+dem.id,P2,{avaliacaoNota:'5'})===403);
  t('caminho com ".." é recusado',[400,403].includes(await st('GET','/portal/file?path='+encodeURIComponent('ANEXOS/SOLICITACOES/../../etc/passwd'),P1)));
  const campos=Object.keys(lista2.rows[0]||{});t('Portal não recebe campos internos (criadoPor, comentarios…)',!JSON.stringify((await (await fetch(B+'/portal/requests',{headers:P1})).json()).rows).match(/criadoPor|comentariosInternos|gerenteTriagem/));
+ // ---- 7) uploads: o conteúdo precisa corresponder ao tipo ----
+ const envia=async(nome,conteudo,tipo)=>{const f=new FormData();f.append('files',new File([conteudo],nome,{type:tipo}));return (await fetch(B+'/portal/upload?id='+dem.id,{method:'POST',headers:P1,body:f})).status};
+ t('arquivo .png com texto dentro é recusado (400)',await envia('falso.png','isto não é imagem','image/png')===400);
+ t('PNG de verdade é aceito',await envia('real.png',Buffer.concat([Buffer.from([0x89]),Buffer.from('PNG\r\n\x1a\n....')]),'image/png')===200);
+ t('PDF falso é recusado, PDF de verdade é aceito',await envia('a.pdf','nada','application/pdf')===400&&await envia('b.pdf','%PDF-1.4 teste','application/pdf')===200);
+ t('SVG com script é recusado',await envia('x.svg','<svg><script>alert(1)</script></svg>','image/svg+xml')===400);
+ t('texto simples continua aceito',await envia('ok.txt','olá','text/plain')===200);
  console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
