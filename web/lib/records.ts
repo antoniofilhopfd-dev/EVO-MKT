@@ -1,3 +1,4 @@
+import { registrarNotificacao } from './notificacoes';
 import { q, q1, run, withTx } from './db';
 import { cleanInput, currentIp, fail, lower, now, Row, strv } from './util';
 import { validarTransicaoSolicitacao } from './fluxo';
@@ -106,7 +107,9 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
   for (const k of ['id', 'criadoEm', 'criadoPor', 'atualizadoPor']) delete patch[k];
   const motivoInformado = strv(patch.motivoTransicao);
   delete patch.motivoTransicao;
+  let prev: Row = {};
   const nw = await modifyRow(mod, id, async (cur, c) => {
+    prev = cur;
     if (patch.status !== undefined && String(patch.status) !== String(cur.status ?? '')) {
       let motivo = motivoInformado.trim();
       if (mod === 'solicitacoes') motivo = validarTransicaoSolicitacao(String(cur.status ?? ''), String(patch.status), motivoInformado).motivo;
@@ -117,7 +120,20 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
     return { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
   });
   await audit(ator, 'editar', mod, id);
+  if (mod === 'solicitacoes') await avisosDaSolicitacao(prev, nw, ator);
   return nw;
+}
+async function avisosDaSolicitacao(antes: Row, depois: Row, ator: string): Promise<void> {
+  const id = String(depois.id), titulo = String(depois.titulo ?? id), portal = `portal:${depois.segmento ?? ''}`;
+  const st = String(depois.status ?? '').toUpperCase();
+  if (st !== String(antes.status ?? '').toUpperCase()) {
+    if (st === 'AGUARDANDO SOLICITANTE') await registrarNotificacao('complementacao', portal, 'Pedido de complementação', `O Marketing precisa de mais informações em "${titulo}".`, 'solicitacoes', id);
+    if (st === 'AGUARDANDO APROVAÇÃO DO SOLICITANTE') await registrarNotificacao('entrega', portal, 'Entrega pronta para aprovação', `A entrega de "${titulo}" aguarda a conferência do solicitante.`, 'solicitacoes', id);
+    if (st === 'CONCLUÍDA') await registrarNotificacao('concluida', portal, 'Demanda concluída', `"${titulo}" foi concluída.`, 'solicitacoes', id);
+    if (ator.startsWith('portal:') && ['EM ANÁLISE', 'EM EXECUÇÃO', 'CONCLUÍDA'].includes(st)) await registrarNotificacao('resposta_solicitante', 'gerencia', 'Resposta do solicitante', `"${titulo}" teve retorno do solicitante.`, 'solicitacoes', id);
+  }
+  const novoResp = String(depois.responsavel ?? '').trim();
+  if (novoResp && novoResp !== String(antes.responsavel ?? '').trim()) await registrarNotificacao('responsavel', novoResp, 'Demanda atribuída a você', `"${titulo}" agora está com você.`, 'solicitacoes', id);
 }
 export async function trashRow(mod: string, id: string, ator: string): Promise<void> {
   const cur = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');

@@ -125,3 +125,9 @@ Limitação conhecida: o backup guarda os dados **no mesmo banco**; ele protege 
 - C (fluxo): transições estritas com tabela única (`lib/fluxo.ts`), retorno exige motivo, Portal usa as mesmas regras; histórico em `status_history`; sem duplicação ao distribuir/devolver/reabrir (testado). CONCLUÍDO.
 - D (SLA/indicadores): `lib/sla.ts` e `/api/indicadores` com definições e lista de origem; painel na Central Operacional. CONCLUÍDO. Pendente na Etapa 04: mesmo painel em Relatórios e notificações com registro.
 - Testes: `operacao.test.js` (36) e `ui8.test.js` (7).
+
+## Atualização da Etapa 04 (Interface e gestão)
+- F5 (estouro horizontal em celular): CORRIGIDO. Cabeçalho e barras de ferramentas quebram linha em ≤760 px; suíte `responsive` (6 larguras × todas as telas) passa e voltou ao conjunto padrão.
+- Notificações: tabela `notifications` (migração 007) e `/api/notificacoes`; registra complementação, entrega, conclusão, resposta do solicitante, atribuição de responsável e falha de integração; sino do cabeçalho mostra não lidas. Teste `notificacoes.test.js` (5).
+- Painel de indicadores também em Relatórios.
+- Pendente (Etapa 05/06): envio por e-mail das falhas de integração; simplificação Relatórios×Fechamento, Editorial×Conteúdos, Arquivos×anexos (decisão de produto, depende de confirmação).

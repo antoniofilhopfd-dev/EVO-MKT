@@ -21,3 +21,14 @@ async function painelIndicadores(){
  host.prepend(box);
  box.querySelectorAll('[data-ind]').forEach(b=>b.onclick=()=>{const i=d.indicadores.find(x=>x.id===b.dataset.ind);listaOrigem(i.titulo+' — '+i.definicao,i.ids,i.modulo)});
 }
+
+// Central de notificações (registro em /api/notificacoes)
+const NOTIF_ROTULO={complementacao:'Complementação',entrega:'Entrega',concluida:'Concluída',resposta_solicitante:'Resposta do solicitante',responsavel:'Atribuição',integracao_falha:'Falha de integração'};
+async function atualizarSinoNotificacoes(){try{const d=await api('/notificacoes');const b=$('#notifyBtn');if(b){b.classList.toggle('has-alerts',d.naoLidas>0);b.title=d.naoLidas?`${d.naoLidas} notificação(ões) não lida(s)`:'Notificações'}return d}catch{return null}}
+async function abrirNotificacoes(){
+ const d=await atualizarSinoNotificacoes();if(!d)return toast('Não foi possível carregar as notificações.','warn');
+ const o=adminOverlay(`<h3>Notificações</h3><div class="origem-list">${d.rows.map(n=>`<div class="notif ${n.lida?'lida':''}"><b>${esc(n.titulo)}</b><small>${esc(NOTIF_ROTULO[n.tipo]||n.tipo)} · ${esc(fmtQuando(n.quando))}${n.destino.startsWith('portal:')?' · enviado ao Portal ('+esc(n.destino.slice(7))+')':''}</small><div>${esc(n.texto)}</div></div>`).join('')||'<div class="empty compact">Nenhuma notificação registrada.</div>'}</div><div class="actions"><button class="btn soft" id="notifAll">Marcar todas como lidas</button><button class="btn soft" id="notifCentral">Abrir Central Operacional</button><button class="btn soft" data-close>Fechar</button></div>`);
+ o.el.querySelector('#notifAll').onclick=async()=>{await api('/notificacoes/lida',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({todas:true})});o.close();atualizarSinoNotificacoes()};
+ o.el.querySelector('#notifCentral').onclick=()=>{o.close();go(internalSession?.role==='manager'?'central':'minhaarea')};
+}
+setTimeout(()=>{if(typeof internalSession!=='undefined'&&internalSession)atualizarSinoNotificacoes()},2500);setInterval(()=>{if(typeof internalSession!=='undefined'&&internalSession)atualizarSinoNotificacoes()},90000);

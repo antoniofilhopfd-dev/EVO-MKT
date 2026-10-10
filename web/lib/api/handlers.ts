@@ -1,3 +1,4 @@
+import { registrarNotificacao } from '../notificacoes';
 import { timingSafeEqual } from 'node:crypto';
 import { Ctx, setCookie } from '../ctx';
 import { q, q1, run } from '../db';
@@ -36,7 +37,7 @@ export async function route(c: Ctx): Promise<Out> {
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
 
   switch (true) {
-    case path === '/fluxo' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores':
+    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores':
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);
@@ -687,6 +688,7 @@ async function portalRestrictedUpdate(c: Ctx, u: Row, mod: string, id: string): 
   });
   const ap = String(row.aprovacaoSolicitante ?? '').trim().toLocaleUpperCase('pt-BR');
   await audit(ator, 'editar', 'solicitacoes', id);
+  if (String(row.status ?? '') !== String(antes.status ?? '')) await registrarNotificacao('resposta_solicitante', 'gerencia', 'Resposta do solicitante', `"${row.titulo ?? id}" teve retorno do solicitante (${row.status}).`, 'solicitacoes', id);
   if ('aprovacaoSolicitante' in input && (ap === 'APROVADO' || ap === 'AJUSTES SOLICITADOS'))
     await notifyMail(`Demanda ${ap === 'APROVADO' ? 'aprovada' : 'com ajustes solicitados'}: ${row.titulo ?? id}`, `ID: ${id} · Segmento: ${row.segmento ?? ''}`);
   return json({ ok: true });

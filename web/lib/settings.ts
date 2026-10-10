@@ -1,3 +1,4 @@
+import { registrarNotificacao } from './notificacoes';
 import { q, q1, run } from './db';
 import { decryptSecret, encryptSecret } from './crypto';
 import { now } from './util';
@@ -15,6 +16,7 @@ export async function setSetting(k: string, v: string): Promise<void> {
 }
 export async function intLog(servico: string, nivel: string, msg: string): Promise<void> {
   try {
+    if (/^erro/i.test(nivel)) await registrarNotificacao('integracao_falha', 'gerencia', `Falha na integração ${servico}`, msg, 'integracoes', servico);
     await run('INSERT INTO integration_log(quando,servico,nivel,msg) VALUES(?,?,?,?)', [now(), servico, nivel, msg.slice(0, 480)]);
     await run('DELETE FROM integration_log WHERE id < (SELECT m FROM (SELECT MAX(id)-500 m FROM integration_log) x)');
   } catch {

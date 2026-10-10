@@ -1,4 +1,6 @@
 import { Ctx } from '../ctx';
+import { listarNotificacoes } from '../notificacoes';
+import { run } from '../db';
 import { q } from '../db';
 import { allowedSegment, requireInternal, requireManager, requirePortal } from '../auth';
 import { fluxoPublico, FINAL_SOLICITACAO } from '../fluxo';
@@ -67,6 +69,20 @@ export async function operacaoRoute(c: Ctx) {
     const r = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
     const hist = await q('SELECT campo,de,para,quando FROM status_history WHERE modulo=? AND registro=? ORDER BY id', ['solicitacoes', id]);
     return json(slaInfo(r, hist as any, hojeLocal()));
+  }
+  if (path === '/notificacoes') {
+    const u = await requireInternal(c);
+    const rows = await listarNotificacoes(String(u.nome), u.role === 'manager');
+    return json({ rows, naoLidas: rows.filter((r: Row) => !r.lida).length });
+  }
+  if (path === '/notificacoes/lida' && c.method === 'POST') {
+    const u = await requireInternal(c);
+    const b = await c.body();
+    const ids = Array.isArray(b.ids) ? b.ids.map(Number).filter(Boolean) : [];
+    const dest = u.role === 'manager' ? "destino IN ('gerencia',?) OR destino LIKE 'portal:%'" : 'destino=?';
+    if (b.todas) await run(`UPDATE notifications SET lida=1 WHERE ${dest}`, [String(u.nome)]);
+    else if (ids.length) await run(`UPDATE notifications SET lida=1 WHERE id IN (${ids.map(() => '?').join(',')}) AND (${dest})`, [...ids, String(u.nome)]);
+    return json({ ok: true });
   }
   if (path === '/indicadores') {
     await requireManager(c);
