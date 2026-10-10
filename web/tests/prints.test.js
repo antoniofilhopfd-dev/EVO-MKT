@@ -16,4 +16,5 @@ const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegE
  await p.evaluate(()=>go('hoje'));await p.waitForSelector('.today-banner');await p.evaluate(()=>abrirNotificacoes());await p.waitForSelector('.admin-overlay .notif');await p.screenshot({path:D+'/04_notificacoes.png'});await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
  await p.setViewportSize({width:360,height:740});const m=p;await m.reload();await m.waitForSelector('#nav .navitem',{state:'attached'});await m.waitForTimeout(1200);
  for(const [pg,f] of [['tarefas','05_celular_tarefas'],['solicitacoes','06_celular_solicitacoes'],['central','07_celular_central']]){await m.evaluate(x=>go(x),pg);await m.waitForTimeout(1200);await m.screenshot({path:D+'/'+f+'.png'})}
+ await p.setViewportSize({width:1366,height:850});await p.evaluate(()=>go('relatorios'));await p.waitForSelector('.see-also');await p.waitForTimeout(800);await p.screenshot({path:D+'/08_relatorios_ver_tambem.png'});
  await b.close()})();
