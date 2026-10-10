@@ -21,7 +21,7 @@ npm run dev                  # http://localhost:3000
 Segredos aleatórios: `npm run gerar:segredos`.
 
 ## Testes
-`tests/run-web.sh` sobe o app (build de produção) contra um MySQL/MariaDB local e roda as suítes HTTP e de tela (as de `../online/tests`, mais `importar` e `ui5`):
+`tests/run-web.sh` sobe o app (build de produção) contra um MySQL/MariaDB local e roda as suítes HTTP e de tela (as suítes de `tests/`):
 ```bash
 tests/run-web.sh                 # todas
 tests/run-web.sh api acesso      # algumas

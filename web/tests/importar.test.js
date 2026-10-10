@@ -2,7 +2,7 @@
 const fs=require('fs'),path=require('path'),{execFileSync}=require('child_process');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const B=(process.env.BASE||'http://127.0.0.1:8080')+'/api';
 let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',JSON.stringify(x).slice(0,300))};
-const os=require('os');const SRC=path.join(__dirname,'../../DADOS');const DADOS=fs.mkdtempSync(path.join(os.tmpdir(),'evo-dados-'));
+const os=require('os');const SRC=path.join(__dirname,'fixtures/DADOS');const DADOS=fs.mkdtempSync(path.join(os.tmpdir(),'evo-dados-'));
 // cópia das planilhas com linhas de exemplo (as de DADOS/ vêm só com cabeçalhos)
 execFileSync('python3',['-c',`
 import openpyxl,shutil,os,sys

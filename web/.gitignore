@@ -7,3 +7,4 @@ out/
 lib/migrations.generated.ts
 *.log
 .DS_Store
+*.tsbuildinfo

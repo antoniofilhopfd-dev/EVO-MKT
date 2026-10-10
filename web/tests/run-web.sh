@@ -2,7 +2,7 @@
 # Sobe o app Next.js (build de produção) contra um MySQL/MariaDB local e roda as suítes HTTP/UI do projeto.
 #   ./run-web.sh [suite...]      suítes: api acesso ui ui2 ui4 (padrão: todas as compatíveis)
 set -u
-HERE=$(cd "$(dirname "$0")" && pwd); WEB=$(cd "$HERE/.." && pwd); T="$WEB/../online/tests"
+HERE=$(cd "$(dirname "$0")" && pwd); WEB=$(cd "$HERE/.." && pwd); T="$HERE"
 D=${EVO_TEST_DIR:-/tmp/evo-web-test}; mkdir -p "$D"; PORT=${PORT:-8080}
 SUITES=${*:-api acesso integrations importar recover codigo backup integridade ui ui2 ui3 ui4 ui5 ui6 ui7}; rc=0
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 || { (mysqld_safe --user=mysql >/dev/null 2>&1 &); for i in $(seq 30); do mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 && break; sleep 1; done; }

@@ -66,8 +66,8 @@ Prioridade: P0 crítico · P1 alto · P2 médio · P3 baixo.
 | E4 | Planejamento Editorial × Conteúdos | PARCIAL | Editorial lê Conteúdos (sem cadastro duplo) | revisar telas |
 | E5 | Relatórios × Fechamento Mensal | PARCIAL | dois lugares calculam períodos | unificar fonte |
 | E6 | Arquivos × anexos por registro | PARCIAL | módulo Arquivos separado dos anexos de demanda | vincular por registro |
-| E7 | Cópias antigas na raiz de `web/` (`app.js`, `index.html`, `portal.js`, `portal.css`, `solicitante.html`, `style.css`) | **REDUNDANTE** | versionadas desde a base v4.0.2; diferentes de `public/`; o Next só serve `public/` | remover após confirmação |
-| E8 | Pasta `online/` (PHP legado), `dist/`, históricos `AUDITORIA_*`/`CHANGELOG_*` na raiz | REDUNDANTE | não são publicados | remover/arquivar após confirmação; mover testes compartilhados antes |
+| E7 | Cópias antigas na raiz de `web/` (`app.js`, `index.html`, `portal.js`, `portal.css`, `solicitante.html`, `style.css`) | REDUNDANTE → **removidas** | eram da base v4.0.2; o Next só serve `public/` | feito (autorizado) |
+| E8 | Pasta `online/` (PHP legado), `dist/`, `.exe`, `runtime_src/`, históricos `AUDITORIA_*`/`CHANGELOG_*` na raiz | REDUNDANTE → **removidos** | sem dados reais (`DADOS/` com 0 linhas); testes compartilhados movidos para `web/tests`; histórico preservado no Git (commit `8ff3dc6`) | feito (autorizado) |
 
 ## F. Integrações, notificações, interface, publicação
 
@@ -77,7 +77,7 @@ Prioridade: P0 crítico · P1 alto · P2 médio · P3 baixo.
 | F2 | Google Agenda/Drive/Planilhas | CONCLUÍDO só com simulação / DEP. EXTERNA | `integrations` | Idem; falta definir fonte de verdade por tipo (hoje: EVO é a fonte, edição no Google só altera título/data) | P1 |
 | F3 | Cron protegido por Bearer e idempotente | CONCLUÍDO | `api` (401/200), `integrations` (publicar não repete) | — | — |
 | F4 | Notificações: nova demanda, atribuição, aprovação/ajuste, prazos diários | CONCLUÍDO (código) | `api`, cron | **Faltam**: pedido de complementação, entrega concluída, falha de integração (só Instagram), troca de responsável com aviso ao anterior; **sem registro** de enviadas/falhas | P1 |
-| F5 | Interface responsiva e PWA | PARCIAL | `responsive.test.js` existia na versão PHP (não está no `run-web.sh`) | Não há teste mobile no pipeline atual; PWA não verificada na Hostinger | P1 |
+| F5 | Interface responsiva e PWA | **COM FALHA** | `tests/responsive.test.js` (rodar com `./run-web.sh responsive`): **35 telas com estouro horizontal** em 360/390/412 px (Tarefas, Conteúdos, Campanhas, Eventos, Administração, Configurações, Solicitações…, ~32 px em quase todas) e `eventos` também em 800 e 1024 px | Contraria o requisito "sem overflow lateral"; a suíte está FORA do conjunto padrão até a correção (Etapa 04) | P1 |
 | F6 | Estados de erro/carregamento/vazio e confirmação de ações destrutivas | PARCIAL | confirmações existem nas ações novas | Revisão tela a tela pendente | P2 |
 | F7 | Exportação CSV | CONCLUÍDO | `exportCSV` | PDF **não** existe | P3 |
 | F8 | Build de produção na Hostinger | CONCLUÍDO (local + deploy real do build) | log de build da Hostinger com Webpack | Cron, e-mail SMTP, uploads grandes e PWA no domínio real **não comprovados** | P1 |
