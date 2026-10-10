@@ -5,7 +5,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
 (async()=>{
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const ctx=await b.newContext({viewport:{width:1440,height:1000}});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
- p.on('dialog',d=>d.accept(d.type()==='prompt'?'SenhaForte2026x':undefined));
+ p.on('dialog',d=>d.accept(d.type()==='prompt'?'Senha26x':undefined));
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');
  await p.waitForSelector('.today-banner');await p.evaluate(()=>{adminTab='acessos';go('administracao')});await p.waitForSelector('#modeBtn');
  t('botão para ativar acesso só por código aparece',/código/i.test(await p.$eval('#modeBtn',e=>e.innerText)));
@@ -14,10 +14,9 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  t('códigos gerados no formato 2 letras + 4 números',codes.length>=10&&codes.every(c=>/^[A-HJ-NP-Z]{2}[0-9]{4}$/.test(c)));
  const rows=await p.$$eval('.admin-overlay tbody tr',a=>a.map(r=>[...r.cells].map(c=>c.innerText.trim())));
  const code=k=>rows.find(r=>r[1]===k)[2];
- await p.click('.admin-overlay [data-close]');await p.waitForSelector('#viewCodes');await p.click('#viewCodes');await p.waitForSelector('.admin-overlay .temp-pass');
- const seen=await p.$$eval('.admin-overlay .temp-pass',a=>a.map(e=>e.innerText.trim()));
- t('Gerente consulta os códigos de cada pessoa (iguais aos gerados)',seen.length===codes.length&&seen.every((c,i)=>c===codes[i]));
- await p.click('.admin-overlay [data-close]');
+ await p.click('.admin-overlay [data-close]');await p.waitForSelector('[data-acesso]');
+ const seen=await p.$$eval('[data-acesso]',a=>a.map(e=>e.innerText.trim()));
+ t('o código de cada pessoa aparece direto na tabela de Acessos (iguais aos gerados)',seen.length===codes.length&&seen.every((c,i)=>c===codes[i]));
  // login interno sem senha
  const p2=await (await b.newContext()).newPage();p2.on('pageerror',e=>errs.push(e.message));
  await p2.goto(BASE+'/');await p2.waitForSelector('#internalCode');await p2.waitForTimeout(400);

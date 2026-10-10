@@ -6,11 +6,11 @@ const tx=(n,txt,re)=>{const c=re.test(txt);t(n,c);if(!c)console.log('     texto 
 (async()=>{
  await fetch(MOCK+'/__reset',{method:'POST',body:'{}'});
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
- const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept('SenhaForte2026x'));
+ const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept('Senha26x'));
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');
  const A=(path,opt)=>p.evaluate(([a,o])=>api(a,o),[path,opt||{}]);
  const rows=async m=>(await A('/data?module='+m)).rows;
- await p.evaluate(()=>{adminTab='integracoes';go('administracao')});await p.waitForSelector('#metaForm');
+ await p.waitForSelector('.today-banner');await p.evaluate(()=>{adminTab='integracoes';go('administracao')});await p.waitForSelector('#metaForm');
  tx('aba Integrações mostra Instagram e Google não conectados',await p.$eval('#adminBody',e=>e.innerText),/Instagram[\s\S]*Não conectado[\s\S]*GOOGLE[\s\S]*Não conectado/i);
  tx('mostra os endereços de redirecionamento para cadastrar',await p.$eval('#adminBody',e=>e.innerText),/api\/integrations\/meta\/callback[\s\S]*api\/integrations\/google\/callback/);
  await p.fill('#metaForm [name=meta_app_id]','APPID');await p.fill('#metaForm [name=meta_app_secret]','META_SECRET');await p.click('#metaForm button[type=submit]');await p.waitForSelector('a[href="/api/integrations/meta/connect"]');

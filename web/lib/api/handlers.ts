@@ -227,10 +227,10 @@ export async function route(c: Ctx): Promise<Out> {
     case path === '/admin/users': {
       await requireManager(c);
       const o: Row[] = [];
-      for (const r of await q('SELECT codigo,nome,role,label,ativo,must_change FROM users ORDER BY codigo'))
-        o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome) });
-      for (const r of await q('SELECT codigo,nome,perfil,segmentos,ativo,must_change FROM portal_users ORDER BY codigo'))
-        o.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, perfil: JSON.parse(r.segmentos).join(', '), ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: '' });
+      for (const r of await q('SELECT codigo,nome,role,label,ativo,must_change,acesso_enc FROM users ORDER BY codigo'))
+        o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome), acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
+      for (const r of await q('SELECT codigo,nome,perfil,segmentos,ativo,must_change,acesso_enc FROM portal_users ORDER BY codigo'))
+        o.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, perfil: JSON.parse(r.segmentos).join(', '), ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: '', acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       return json(o);
     }
     case path === '/admin/user-active' && method === 'POST': {

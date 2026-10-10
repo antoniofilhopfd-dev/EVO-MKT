@@ -11,13 +11,13 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  const newPage=async(w=1440,h=900)=>{const p=await (await b.newContext({viewport:{width:w,height:h},acceptDownloads:true})).newPage();track(p);return p};
  fs.writeFileSync('/tmp/evo-brief.pdf','%PDF-1.4 briefing de teste');fs.writeFileSync('/tmp/evo-final.png',Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64'));
  const login=async(p,code,pass,newPass)=>{p.removeAllListeners('dialog');p.on('dialog',d=>d.accept(newPass||''));await p.goto(BASE+'/');await p.fill('#internalCode',code);await p.fill('#internalPass',pass);await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem',{timeout:6000})};
- const G=await newPage();await login(G,'NAT-3301',pw('NAT-3301'),'SenhaForte2026x');
+ const G=await newPage();await login(G,'NAT-3301',pw('NAT-3301'),'Senha26x');
  const A=(p,path,opt)=>p.evaluate(([a,o])=>api(a,o),[path,opt||{}]);
  const post=async(p,mod,o)=>{const r=await A(p,'/data?module='+mod,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});await p.evaluate(m=>invalidate(m),mod);return r};
  const rows=async(p,mod)=>(await A(p,'/data?module='+mod)).rows;
 
  // ========== 1) PORTAL: nova demanda com anexo ==========
- const P=await newPage();P.on('dialog',d=>d.accept('PortalForte2026x'));
+ const P=await newPage();P.on('dialog',d=>d.accept('Portal26'));
  await P.goto(BASE+'/solicitante.html');await P.fill('#code','FIN-2603');await P.fill('#pass',pw('FIN-2603'));await P.click('#login');await P.waitForSelector('.portal-shell',{timeout:6000});
  await P.click('[data-tab="new"]');await P.waitForSelector('#form');
  await P.fill('#form [name=solicitanteNome]','Coordenação Anos Finais');await P.fill('#form [name=titulo]','Banner Olimpíada de Matemática');
@@ -63,7 +63,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
 
  // ========== 6) MINHA ÁREA (Equipe) ==========
  await post(G,'tarefas',{titulo:'Legendas do mês',responsavel:'Antônio Filho',status:'NOVO',prazo:'2026-10-05',segmento:'Infantil'});
- const T=await newPage();await login(T,'ANT-3302',pw('ANT-3302'),'EquipeForte2026x');
+ const T=await newPage();await login(T,'ANT-3302',pw('ANT-3302'),'Equipe26');
  await T.evaluate(()=>{invalidate('tarefas');go('minhaarea')});await T.waitForSelector('.acknowledge-work',{timeout:5000});
  tx('Minha Área lista o trabalho atribuído',await T.$eval('#content',e=>e.innerText),/Legendas do m/i);
  await T.click('.acknowledge-work');await T.waitForTimeout(900);

@@ -6,7 +6,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  const b=await chromium.launch(process.env.CHROME?{executablePath:process.env.CHROME}:{executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const ctx=await b.newContext({viewport:{width:1440,height:900},acceptDownloads:true});const p=await ctx.newPage();
  const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/401|403|409/.test(m.text()))errs.push(m.text())});
- const prompts=['SenhaForte2026x'];p.on('dialog',d=>d.accept(prompts.length?prompts.shift():''));
+ const prompts=['Senha26x'];p.on('dialog',d=>d.accept(prompts.length?prompts.shift():''));
  await p.goto(BASE+'/');
  await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass','errada');await p.click('#internalLoginBtn');await p.waitForTimeout(400);
  t('senha errada recusada',/inválidos/.test(await p.$eval('#internalLoginError',e=>e.innerText)));
@@ -30,13 +30,13 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  // Administração
  await p.evaluate(()=>go('administracao'));await p.waitForSelector('[data-reset]');
  t('Acessos lista 10 usuários',(await p.$$('[data-reset]')).length===10);
- await p.click('[data-reset="portal|INF-2601"]');await p.waitForSelector('.temp-pass');t('reset mostra senha temporária de 12 caracteres',(await p.$eval('.temp-pass',e=>e.innerText.trim())).length===12);await p.click('[data-close]');
+ await p.click('[data-reset="portal|INF-2601"]');await p.waitForSelector('.temp-pass');t('reset mostra senha temporária de 8 caracteres',(await p.$eval('.temp-pass',e=>e.innerText.trim())).length===8);await p.click('[data-close]');
  await p.click('[data-tab=avisos]');await p.waitForSelector('#noticeForm');await p.fill('#noticeForm [name=titulo]','Reunião de pais');await p.fill('#noticeForm [name=mensagem]','Sábado 9h');await p.click('#noticeForm button');await p.waitForSelector('.notice-row');t('aviso publicado e listado',true);
  await p.click('[data-tab=auditoria]');await p.waitForSelector('.datatable tbody tr');t('auditoria exibe eventos',(await p.$$('.datatable tbody tr')).length>3);
  await p.click('[data-tab=backups]');await p.waitForSelector('#bkNow');await p.click('#bkNow');await p.waitForSelector('a[href*="backup/download"]');
  const [dl]=await Promise.all([p.waitForEvent('download'),p.click('a[href*="backup/download"]')]);t('baixa backup .json.gz',/evo_backup_.*\.json\.gz$/.test(dl.suggestedFilename()));
  // equipe não vê Administração
- const q=await (await b.newContext({viewport:{width:1440,height:900}})).newPage();q.on('dialog',d=>d.accept('EquipeForte2026x'));
+ const q=await (await b.newContext({viewport:{width:1440,height:900}})).newPage();q.on('dialog',d=>d.accept('Equipe26'));
  await q.goto(BASE+'/');await q.fill('#internalCode','ANT-3302');await q.fill('#internalPass',pw('ANT-3302'));await q.click('#internalLoginBtn');await q.waitForSelector('#nav .navitem');
  const tp=await q.$$eval('#nav .navitem',e=>e.map(x=>x.dataset.page));t('Equipe não vê Administração/Saúde/Manutenção',!tp.includes('administracao')&&!tp.includes('manutencao')&&!tp.includes('saude'));
  await q.evaluate(()=>go('administracao'));await q.waitForTimeout(400);t('Equipe forçando URL volta à Minha Área',(await q.evaluate(()=>state.page))==='minhaarea');
@@ -44,7 +44,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  await p.reload();await p.waitForSelector('#nav .navitem');t('recarregar mantém sessão',true);
  await p.click('#internalLogout');await p.waitForSelector('#internalLogin',{timeout:5000});t('logout',true);
  // portal
- const po=await (await b.newContext({viewport:{width:1280,height:800}})).newPage();po.on('dialog',d=>d.accept('PortalForte2026x'));
+ const po=await (await b.newContext({viewport:{width:1280,height:800}})).newPage();po.on('dialog',d=>d.accept('Portal26'));
  await po.goto(BASE+'/solicitante.html');await po.fill('#code','FIN-2603');await po.fill('#pass',pw('FIN-2603'));await po.click('#login');await po.waitForSelector('.portal-shell',{timeout:5000});t('Portal: login',true);
  t('Portal mostra aviso publicado',/Reunião de pais/.test(await po.$eval('#panel',e=>e.innerText)));
  console.log(`\n${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0)})();

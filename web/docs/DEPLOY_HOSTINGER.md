@@ -58,7 +58,7 @@ hPanel → **Segurança → SSL** → ativar o certificado (Let's Encrypt, gratu
 - **Caminho A (banco novo):** abra `https://evomkt.antoniopfd.com/api/setup?key=SUA_SETUP_KEY`. A página mostra as **senhas temporárias uma única vez**: anote. Depois **remova a variável `SETUP_KEY`** no painel e reinicie o app (a rota também trava sozinha depois de usada).
   - Para trazer as planilhas antigas: entre como Gerente → Administração → **Backups → Importar planilhas antigas (XLSX)**.
 - **Caminho B (banco antigo):** nada a fazer, entre com os acessos de sempre.
-- Entre com `NAT-3301`, troque a senha (mínimo 10 caracteres, letras e números) e, se quiser, ative o acesso só por código em Administração → Acessos.
+- Entre com `NAT-3301`, troque a senha (de 6 a 8 caracteres, com letras e números) e, se quiser, ative o acesso só por código em Administração → Acessos.
 
 ## 6. Tarefas agendadas (cron)
 hPanel → **Avançado → Cron Jobs** (ou um serviço externo de cron que chame a URL). Use o `CRON_SECRET`:

@@ -19,7 +19,7 @@ const mails=()=>MAILLOG&&fs.existsSync(MAILLOG)?fs.readFileSync(MAILLOG,'utf8'):
  t('códigos são únicos e sem sequências óbvias',new Set(codes.map(c=>c.acesso)).size===10&&codes.every(c=>!/(\d)\1{3}/.test(c.acesso)&&!/1234|4321|0000/.test(c.acesso)));
  const C={};codes.forEach(c=>C[c.codigo]=c.acesso);
  r=await call('/auth/mode');t('modo público informa "codigo"',r.j.modo==='codigo');
- r=await call('/admin/users',{cookies:GJ});t('lista de acessos não expõe os códigos',!JSON.stringify(r.j).includes(C['ANT-3302']));
+ r=await call('/admin/users',{cookies:GJ});t('lista de acessos mostra o código de cada pessoa à Gerente',r.j.find(x=>x.codigo==='ANT-3302').acesso===C['ANT-3302']);
  // ---- login só com código ----
  r=await call('/auth/login',{m:'POST',b:{codigo:'ANT-3302',senha:pw('ANT-3302')}});t('senha antiga deixa de valer no modo por código',r.s===401);
  const before=(mails().match(/Novo acesso: Antônio Filho/g)||[]).length;

@@ -8,8 +8,8 @@ async function call(p,{m='GET',b,ck,pt,csrf=true}={}){const h={};if(b)h['Content
  r=await call('/data?module=tarefas');t('sem sessão=401',r.s===401);
  r=await call('/auth/login',{m:'POST',b:{codigo:'NAT-3301',senha:pw('NAT-3301')}});t('login gerente',r.s===200&&r.j.mustChange===true);
  const G=r.c.split(';')[0];
- r=await call('/auth/password',{m:'POST',ck:G,b:{atual:pw('NAT-3301'),nova:'fraca'}});t('senha fraca recusada',r.s===400);
- r=await call('/auth/password',{m:'POST',ck:G,b:{atual:pw('NAT-3301'),nova:'SenhaForte2026x'}});t('troca senha',r.s===200);
+ r=await call('/auth/password',{m:'POST',ck:G,b:{atual:pw('NAT-3301'),nova:'fraca'}});t('senha fraca recusada',r.s===400);r=await call('/auth/password',{m:'POST',ck:G,b:{atual:pw('NAT-3301'),nova:'Senha2026longa'}});t('senha com mais de 8 caracteres recusada',r.s===400);
+ r=await call('/auth/password',{m:'POST',ck:G,b:{atual:pw('NAT-3301'),nova:'Senha26x'}});t('troca senha',r.s===200);
  r=await call('/data?module=tarefas',{ck:G});t('lista importada (acentos ok)',r.s===200&&r.j.rows.length===1&&r.j.rows[0].id==='TAR-0007'&&r.j.rows[0].descricao.includes('ç'));
  r=await call('/data?module=tarefas',{m:'POST',ck:G,b:{titulo:'Nova',status:'NOVO',custom:'x'}});t('cria TAR-0008 (continua contador)',r.s===201&&r.j.id==='TAR-0008');
  r=await call('/data?module=tarefas',{m:'POST',ck:G,b:{titulo:'CSRF'},csrf:false});t('POST sem X-EVO bloqueado',r.s===403);
@@ -45,7 +45,7 @@ async function call(p,{m='GET',b,ck,pt,csrf=true}={}){const h={};if(b)h['Content
  rr=await fetch(B+'/portal/file?path='+encodeURIComponent(jj.files[0]),{headers:{'X-Portal-Token':M}});t('download de outro segmento=403',rr.status===403);
  rr=await fetch(B+'/portal/file?path='+encodeURIComponent('ANEXOS/SOLICITACOES/../../config.php'),{headers:{'X-Portal-Token':P}});t('path traversal bloqueado',rr.status===400);
  let last;for(let i=0;i<6;i++)last=await call('/auth/login',{m:'POST',b:{codigo:'MON-3303',senha:'errada'+i}});t('rate limit 429',last.s===429);
- r=await call('/admin/reset-password',{m:'POST',ck:G,b:{tipo:'portal',codigo:'INF-2601'}});t('reset senha portal',r.s===200&&r.j.senhaTemporaria.length===12);const r2pass=r.j.senhaTemporaria;
+ r=await call('/admin/reset-password',{m:'POST',ck:G,b:{tipo:'portal',codigo:'INF-2601'}});t('reset senha portal',r.s===200&&r.j.senhaTemporaria.length===8);const r2pass=r.j.senhaTemporaria;
  r=await call('/portal/requests',{pt:P});t('sessão do portal revogada após reset',r.s===401);
 
  // ---- v4.1.0 ----

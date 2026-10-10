@@ -104,8 +104,8 @@ function requireInternal():array{return internalUser()??fail(401,'Sessão expira
 function requireManager():array{$u=requireInternal();if($u['role']!=='manager')fail(403,'Ação disponível apenas para a Gerente.');return $u;}
 function requirePortal():array{return portalUser()??fail(401,'Sessão expirada');}
 function checkCsrf():void{if(($_SERVER['HTTP_X_EVO']??'')!=='1')fail(403,'Requisição inválida.');}
-function strongPassword(string $p):void{if(strlen($p)<10||!preg_match('/[A-Za-z]/',$p)||!preg_match('/\d/',$p))fail(400,'A senha deve ter ao menos 10 caracteres, com letras e números.');}
-function genPassword():string{$a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';$s='';for($i=0;$i<12;$i++)$s.=$a[random_int(0,strlen($a)-1)];return $s;}
+function strongPassword(string $p):void{if(strlen($p)<6||strlen($p)>8||!preg_match('/[A-Za-z]/',$p)||!preg_match('/\d/',$p))fail(400,'A senha deve ter de 6 a 8 caracteres, com letras e números.');}
+function genPassword():string{$a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';$s='';for($i=0;$i<8;$i++)$s.=$a[random_int(0,strlen($a)-1)];return $s;}
 function allowedSegment(array $u,string $seg):bool{foreach($u['segmentos'] as $s)if(mb_strtolower(trim($s))===mb_strtolower(trim($seg)))return true;return false;}
 function publicRow(array $r):array{$o=[];foreach(PUBLIC_FIELDS as $k)if(array_key_exists($k,$r))$o[$k]=$r[$k];return $o;}
 

@@ -68,9 +68,9 @@ export function verifyPassword(p: string, hash: string): boolean {
 export function genPassword(): string {
   const a = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let s = '';
-  for (let i = 0; i < 12; i++) s += a[randomInt(a.length)];
+  for (let i = 0; i < 8; i++) s += a[randomInt(a.length)];
   return s;
 }
 export function strongPassword(p: string): void {
-  if (p.length < 10 || !/[A-Za-z]/.test(p) || !/\d/.test(p)) fail(400, 'A senha deve ter ao menos 10 caracteres, com letras e números.');
+  if (p.length < 6 || p.length > 8 || !/[A-Za-z]/.test(p) || !/\d/.test(p)) fail(400, 'A senha deve ter de 6 a 8 caracteres, com letras e números.');
 }
