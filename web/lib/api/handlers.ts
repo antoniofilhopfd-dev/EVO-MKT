@@ -36,6 +36,9 @@ export async function route(c: Ctx): Promise<Out> {
     case path.startsWith('/cron/'):
       return cronRoute(c);
 
+    case path === '/recover':
+      return recoverRoute(c);
+
     case path === '/setup':
       return setupRoute(c);
 
@@ -460,6 +463,39 @@ export async function route(c: Ctx): Promise<Out> {
     default:
       return fail(404, 'Rota não encontrada.');
   }
+}
+
+/** Recuperação de emergência de uma ficha da equipe (esqueceu o acesso). Exige RECOVERY_KEY no painel: cadastre, use e REMOVA. */
+async function recoverRoute(c: Ctx): Promise<Response> {
+  const text = (t: string, status = 200) => new Response(t, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+  const key = env('RECOVERY_KEY');
+  if (key.length < 16) return text('RECOVERY_KEY não configurada (mínimo 16 caracteres).\n', 503);
+  await rateCheck('recover|' + c.ip, 10);
+  const a = Buffer.from(c.qs('key')), b = Buffer.from(key);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    await rateFail('recover|' + c.ip);
+    await new Promise((r) => setTimeout(r, 1500));
+    return text('Chave inválida.\n', 403);
+  }
+  const cod = upper(c.qs('codigo'));
+  const u = await q1('SELECT codigo,nome,role FROM users WHERE codigo=?', [cod]);
+  if (!u) return text('Ficha não encontrada: ' + cod + '\n', 404);
+  if (c.qs('perfil') === 'manager' && u.role !== 'manager') {
+    await run("UPDATE users SET role='manager',label='Gerente de Marketing' WHERE codigo=?", [cod]);
+  }
+  await run('UPDATE users SET ativo=1 WHERE codigo=?', [cod]);
+  await run('DELETE FROM login_attempts');
+  let msg: string;
+  if ((await loginMode()) === 'codigo') {
+    msg = `Novo código de acesso de ${u.nome} (${cod}): ${await issueAccessCode('users', cod)}`;
+  } else {
+    const p = genPassword();
+    await run('UPDATE users SET pass_hash=?,must_change=1 WHERE codigo=?', [hashPassword(p), cod]);
+    await run('DELETE FROM sessions WHERE codigo=?', [cod]);
+    msg = `Senha temporária de ${u.nome} (${cod}): ${p}`;
+  }
+  await audit('recuperacao', 'recover:' + cod, '', c.qs('perfil'));
+  return text(`${msg}\n\nAgora REMOVA a variável RECOVERY_KEY do painel da Hostinger e reimplante.\n`);
 }
 
 /** Instalação única: cria as contas com senhas temporárias e mostra UMA vez. Protegida por SETUP_KEY; trava depois de usada. */
