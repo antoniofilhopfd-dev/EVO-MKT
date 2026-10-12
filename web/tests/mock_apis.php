@@ -14,6 +14,19 @@ if ($m !== 'GET' && !$in && $raw !== '' && !str_contains($_SERVER['CONTENT_TYPE'
 $S['calls'][] = "$m $p";
 if ($p === '/__reset') { $S = ['seq' => 0, 'containers' => [], 'published' => [], 'events' => [], 'folders' => [], 'files' => [], 'sheets' => [], 'values' => [], 'calls' => []]; j(['ok' => true]); }
 if ($p === '/__state') { j($S); }
+// ---------------- ANTHROPIC (simulado) ----------------
+if ($p === '/anthropic/v1/messages') {
+    $k = $_SERVER['HTTP_X_API_KEY'] ?? '';
+    if ($k !== 'sk-ant-teste') j(['type' => 'error', 'error' => ['type' => 'authentication_error', 'message' => 'invalid x-api-key']], 401);
+    $user = json_encode($in['messages'] ?? [], JSON_UNESCAPED_UNICODE);
+    $S['ia_ultimo'] = ['system' => $in['system'] ?? '', 'user' => $user, 'model' => $in['model'] ?? '', 'effort' => $in['output_config']['effort'] ?? ''];
+    $txt = str_contains($user, 'FORMATO_RUIM') ? 'não sei' : json_encode(['opcoes' => [
+        ['legenda' => 'Opção direta: matrículas abertas! [COMPLETAR: data limite]', 'hashtags' => ['#evolucao', '#matriculas', 'sem-hash']],
+        ['legenda' => 'Opção emocional para as famílias.', 'hashtags' => ['#familia']],
+        ['legenda' => 'Opção informativa.', 'hashtags' => []],
+        ['legenda' => 'Quarta opção descartada.', 'hashtags' => []]]]);
+    j(['id' => 'msg_test', 'type' => 'message', 'role' => 'assistant', 'model' => $in['model'] ?? '', 'content' => [['type' => 'text', 'text' => "```json\n$txt\n```"]], 'stop_reason' => 'end_turn', 'stop_sequence' => null, 'usage' => ['input_tokens' => 10, 'output_tokens' => 10]]);
+}
 // ---------------- META ----------------
 if (str_starts_with($p, '/graph')) {
     $g = substr($p, 6);
@@ -25,9 +38,13 @@ if (str_starts_with($p, '/graph')) {
         j(['access_token' => 'SHORT_TOKEN']);
     }
     if ($tok === '') j(['error' => ['message' => 'Missing access token']], 401);
-    if ($g === '/me/accounts') j(['data' => [['name' => 'Colégio Evolução', 'id' => 'p1', 'instagram_business_account' => ['id' => $IG, 'username' => 'evolucaopb']]]]);
+    if ($tok === 'EXPIRED_TOKEN') j(['error' => ['message' => 'Error validating access token: Session has expired', 'type' => 'OAuthException', 'code' => 190]], 400);
+    if ($g === '/me/permissions') { $all = ['instagram_basic', 'instagram_manage_insights', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'business_management']; $d = []; foreach ($all as $x) { $d[] = ['permission' => $x, 'status' => ($tok === 'LIMITED_TOKEN' && $x === 'instagram_content_publish') ? 'declined' : 'granted']; } j(['data' => $d]); }
+    if ($g === '/me/accounts') { $d = [['name' => 'Colégio Evolução', 'id' => 'p1', 'instagram_business_account' => ['id' => $IG, 'username' => 'evolucaopb']]]; if ($tok === 'MULTI_TOKEN') $d[] = ['name' => 'Outra Página', 'id' => 'p2', 'instagram_business_account' => ['id' => '17841499999999999', 'username' => 'outraconta']]; j(['data' => $d]); }
     if ($g === "/$IG") j(['followers_count' => 4600, 'follows_count' => 120, 'media_count' => 310, 'username' => 'evolucaopb']);
     if ($g === "/$IG/insights") {
+        if ($tok === 'NOVIEWS_TOKEN' && str_contains($_GET['metric'] ?? '', ',') ) j(['error' => ['message' => 'metric views is deprecated']], 400);
+        if ($tok === 'NOVIEWS_TOKEN' && ($_GET['metric'] ?? '') === 'views') j(['error' => ['message' => 'metric views is deprecated']], 400);
         $vals = ['reach' => 18000, 'views' => 26000, 'profile_views' => 1100, 'total_interactions' => 2300, 'likes' => 1500, 'comments' => 200, 'shares' => 110, 'saves' => 490];
         $d = []; foreach (explode(',', $_GET['metric'] ?? '') as $k) { $d[] = ['name' => $k, 'period' => 'day', 'total_value' => ['value' => $vals[$k] ?? 0]]; }
         j(['data' => $d]);

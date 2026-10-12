@@ -1,11 +1,13 @@
 import { Ctx } from '../ctx';
+import { gerarLegendas } from '../ia';
+import { rateCheck, rateFail } from '../auth';
 import { melhoresHorarios, proximasDatas, rankingConteudos, saudePorSegmento } from '../insights';
 import { listarNotificacoes } from '../notificacoes';
 import { run } from '../db';
 import { q } from '../db';
 import { allowedSegment, requireInternal, requireManager, requirePortal } from '../auth';
 import { fluxoPublico, FINAL_SOLICITACAO } from '../fluxo';
-import { getRow, listRows } from '../records';
+import { audit, getRow, listRows } from '../records';
 import { diasUteisEntre, HistRow, hojeLocal, periodosPorStatus, slaInfo } from '../sla';
 import { addDays, env, fail, fmtDate, Row } from '../util';
 import { json } from './handlers';
@@ -85,6 +87,18 @@ export async function operacaoRoute(c: Ctx) {
     else if (ids.length) await run(`UPDATE notifications SET lida=1 WHERE id IN (${ids.map(() => '?').join(',')}) AND (${dest})`, [...ids, String(u.nome)]);
     return json({ ok: true });
   }
+  if (path === '/ia/legenda' && c.method === 'POST') {
+    const u = await requireInternal(c);
+    const b = await c.body();
+    const mod = String(b.modulo ?? '');
+    if (!['conteudos', 'ideias', 'solicitacoes'].includes(mod)) fail(400, 'Módulo não permitido.');
+    const reg = (await getRow(mod, String(b.id ?? ''))) ?? fail(404, 'Registro não encontrado.');
+    await rateCheck('ia:' + u.codigo, 12); // no máximo 12 pedidos a cada 15 minutos por pessoa (custo e abuso)
+    await rateFail('ia:' + u.codigo);
+    const opcoes = await gerarLegendas(reg, String(b.instrucao ?? ''));
+    await audit(String(u.codigo), 'ia-legenda', mod, String(reg.id));
+    return json({ opcoes });
+  }
   if (path === '/insights') {
     await requireManager(c);
     return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(), ranking: await rankingConteudos() });
@@ -146,6 +160,9 @@ async function indicadores(c: Ctx): Promise<Row> {
   const notas = sols.filter((r) => Number(r.avaliacaoNota) > 0 && noPeriodo(ymd(r.avaliadoEm || r.atualizadoEm)));
   ind.push({ id: 'avaliacao', titulo: 'Avaliação média do solicitante', valor: notas.length ? media(notas.map((r) => Number(r.avaliacaoNota))) : null, unidade: 'de 5', ids: ids(notas), modulo: 'solicitacoes', definicao: 'Média das notas de 1 a 5 registradas no período.' });
 
+  const comNps = sols.filter((r) => String(r.npsNota ?? '') !== '' && noPeriodo(ymd(r.avaliadoEm || r.atualizadoEm)));
+  const npsDe = (xs: Row[]) => { const n = xs.length, pro = xs.filter((r) => Number(r.npsNota) >= 9).length, det = xs.filter((r) => Number(r.npsNota) <= 6).length; return n ? Math.round(((pro - det) / n) * 100) : null; };
+  ind.push({ id: 'nps', titulo: 'NPS do atendimento', valor: npsDe(comNps), unidade: 'pontos', ids: ids(comNps), modulo: 'solicitacoes', detalhe: comNps.length ? `${comNps.length} resposta(s)` : '', definicao: 'Pesquisa 0–10 (recomendaria o Marketing a um colega?): % de promotores (9–10) menos % de detratores (0–6), de -100 a 100. Sem respostas = sem dado.' });
   // tabelas
   const agrupa = (lista: Row[], chave: (r: Row) => string) => {
     const m = new Map<string, Row[]>();
@@ -175,6 +192,7 @@ async function indicadores(c: Ctx): Promise<Row> {
     regras: { diasUteis: 'segunda a sexta, exceto feriados informados em FERIADOS', pausa: 'AGUARDANDO SOLICITANTE', limiteSobrecarga: limite },
     indicadores: ind,
     tabelas: {
+      npsPorSegmento: [...new Set(comNps.map((r) => String(r.segmento)))].map((seg) => ({ segmento: seg, nps: npsDe(comNps.filter((r) => r.segmento === seg)), respostas: comNps.filter((r) => r.segmento === seg).length })),
       porSegmento: agrupa(recebidas, (r) => String(r.segmento)), porTipo: agrupa(recebidas, (r) => String(r.tipoSolicitacao)),
       porEtapa, cargaPorPessoa: carga, motivosBloqueio: motivos,
     },

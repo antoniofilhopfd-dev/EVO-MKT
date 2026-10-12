@@ -20,6 +20,7 @@ import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
 import { validarTransicaoSolicitacao } from '../fluxo';
 import { operacaoRoute } from './operacao';
+import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
 import { gConnected, gDriveSendEntregas } from '../integrations/google';
@@ -37,7 +38,9 @@ export async function route(c: Ctx): Promise<Out> {
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
 
   switch (true) {
-    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/datas':
+    case path === '/manager/approval-link' || path.startsWith('/public/approval'):
+      return aprovacaoPublicaRoute(c);
+    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/ia/legenda' || path === '/datas':
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);
@@ -583,6 +586,7 @@ function tabOf(tipo: string): 'users' | 'portal_users' {
 async function checkCsrfOrPortal(c: Ctx): Promise<void> {
   // Rotas públicas de login e chamadas do Portal (token em cabeçalho) não dependem de cookie.
   if (['/auth/login', '/portal/login', '/auth/forgot'].includes(c.path) || c.path.startsWith('/cron/')) return;
+  if (c.path === '/public/approval' && !c.header('cookie')) return; // resposta pelo link: sem cookie, o token é a credencial
   if (c.header('x-portal-token') && (await portalUser(c)) !== null && (await internalUser(c)) === null) return;
   checkCsrf(c);
 }
@@ -653,6 +657,12 @@ async function portalRestrictedUpdate(c: Ctx, u: Row, mod: string, id: string): 
     if (nota) {
       if (!cur.includes('CONCLUÍDA')) fail(409, 'A avaliação só pode ser enviada após a conclusão.');
       if (!/^\d+$/.test(nota) || +nota < 1 || +nota > 5) fail(400, 'Avaliação deve estar entre 1 e 5.');
+    }
+    const nps = strv(input.npsNota).trim();
+    if (nps) {
+      if (!cur.includes('CONCLUÍDA')) fail(409, 'A pesquisa só pode ser respondida após a conclusão.');
+      if (!/^\d+$/.test(nps) || +nps > 10) fail(400, 'A nota da pesquisa deve estar entre 0 e 10.');
+      if (cur0.npsNota !== undefined && String(cur0.npsNota) !== '') fail(409, 'A pesquisa já foi respondida.');
     }
     for (const k of UPDATE_FIELDS) if (k in input) row[k] = strv(input[k]);
     const ap = String(row.aprovacaoSolicitante ?? '').trim().toLocaleUpperCase('pt-BR');

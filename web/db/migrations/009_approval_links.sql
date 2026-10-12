@@ -1,0 +1,2 @@
+-- Links de aprovação sem login (token de uso único, com validade). O token em si nunca é guardado, só o hash.
+CREATE TABLE IF NOT EXISTS approval_links(token_hash VARCHAR(64) PRIMARY KEY,solicitacao VARCHAR(40) NOT NULL,criado_por VARCHAR(80) NOT NULL,criado_em VARCHAR(40) NOT NULL,expira_em VARCHAR(40) NOT NULL,usado_em VARCHAR(40) NOT NULL DEFAULT '',decisao VARCHAR(30) NOT NULL DEFAULT '',aprovador VARCHAR(120) NOT NULL DEFAULT '',KEY idx_approval_sol (solicitacao)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

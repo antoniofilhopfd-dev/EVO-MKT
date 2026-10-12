@@ -5,8 +5,9 @@ import { audit, listRows, MODULES } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
-import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded } from '../integrations/meta';
+import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
+import { iaConfigurada, IA_MODELO } from '../ia';
 import { json } from './handlers';
 
 const redirect = (to: string) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store' } });
@@ -49,6 +50,8 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           configurado: (await setting('meta_app_id')) !== '' && (await setting('meta_app_secret')) !== '',
           appId: await setting('meta_app_id'), conectado: await metaConnected(), usuario: await setting('ig_username'), pagina: await setting('meta_page_name'),
           expiraEm: exp ? now(new Date(exp * 1000)) : '', ultimaSync: await setting('ig_last_sync'),
+          contas: JSON.parse((await setting('meta_contas')) || '[]'), igUserId: await setting('ig_user_id'), tokenInvalido: (await setting('meta_token_invalido')) === '1',
+          permissoesFaltando: (await setting('meta_perm_faltando')).split(',').filter(Boolean),
         },
         google: {
           configurado: (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '',
@@ -57,6 +60,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
           planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
+        ia: { configurada: await iaConfigurada(), guiaVoz: await setting('ia_guia_voz'), modelo: IA_MODELO() },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
       });
@@ -77,6 +81,8 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const metaOn = await metaConnected();
       add('meta_conn', metaOn, 'erro', 'Meta: Instagram conectado', 'Clique em "Conectar com Facebook/Instagram" e aceite todas as permissões.');
       const exp = parseInt(await setting('meta_token_expira', '0'), 10) || 0;
+      add('meta_valido', (await setting('meta_token_invalido')) !== '1', 'erro', 'Meta: acesso válido (não expirou nem foi revogado)', 'Reconecte o Instagram: o acesso expirou, foi revogado ou a senha do Facebook mudou.');
+      add('meta_perm', !(await setting('meta_perm_faltando')), 'erro', 'Meta: todas as permissões foram aceitas', `Faltam: ${await setting('meta_perm_faltando')}. Reconecte e deixe todas marcadas.`);
       add('meta_token', !metaOn || (exp * 1000 - Date.now()) / 86400000 > 10, 'aviso', 'Meta: token com mais de 10 dias de validade', 'O cron renova sozinho; se faltar menos de 10 dias, o cron não está rodando — reconecte.');
       const gCred = (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '';
       add('g_cred', gCred, 'erro', 'Google: Client ID e Client Secret salvos', 'Cole as credenciais na caixa Google (veja GUIA_INTEGRACOES.md).');
@@ -94,6 +100,8 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const input = await c.body();
       await stepUp(u, input);
       for (const k of ['meta_app_id', 'meta_app_secret', 'g_client_id', 'g_client_secret']) if (input[k] !== undefined && strv(input[k]).trim() !== '') await setSetting(k, strv(input[k]).trim());
+      if (input.anthropic_key !== undefined && strv(input.anthropic_key).trim() !== '') await setSetting('anthropic_key', strv(input.anthropic_key).trim());
+      if (input.ia_guia_voz !== undefined) await setSetting('ia_guia_voz', strv(input.ia_guia_voz).slice(0, 4000));
       if (input.g_auto_drive_entregas !== undefined) await setSetting('g_auto_drive_entregas', input.g_auto_drive_entregas ? '1' : '0');
       if (input.g_sheet_modules !== undefined) await setSetting('g_sheet_modules', strv(input.g_sheet_modules).split(',').map((m) => m.trim()).filter((m) => m in MODULES).join(','));
       await audit(u.codigo, 'integracoes-config');
@@ -114,6 +122,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const tok = strv(input.token).trim();
       if (!tok) fail(400, 'Informe o token.');
       await setSetting('meta_token', tok);
+      await setSetting('meta_token_invalido', '');
       await setSetting('meta_token_expira', '0');
       try {
         if (strv(input.ig_user_id).trim()) await setSetting('ig_user_id', strv(input.ig_user_id).trim());
@@ -122,10 +131,19 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await audit(u.codigo, 'instagram-token-manual');
       return json({ ok: true });
     }
+    case path === '/integrations/meta/account' && method === 'POST': {
+      const u = await requireManager(c);
+      const input = await c.body();
+      const contas: MetaConta[] = JSON.parse((await setting('meta_contas')) || '[]');
+      const alvo = contas.find((x) => x.ig === strv(input.ig_user_id)) ?? fail(400, 'Conta não encontrada nas Páginas deste usuário.');
+      await metaUsarConta(alvo);
+      await audit(u.codigo, 'instagram-conta', alvo.usuario);
+      return json({ ok: true });
+    }
     case path === '/integrations/meta/disconnect' && method === 'POST': {
       const u = await requireManager(c);
       await stepUp(u, await c.body());
-      for (const k of ['meta_token', 'meta_token_expira', 'ig_user_id', 'ig_username', 'meta_page_name']) await setSetting(k, '');
+      for (const k of ['meta_token', 'meta_token_expira', 'ig_user_id', 'ig_username', 'meta_page_name', 'meta_contas', 'meta_perm_faltando', 'meta_token_invalido']) await setSetting(k, '');
       await audit(u.codigo, 'instagram-desconectado');
       return json({ ok: true });
     }

@@ -55,3 +55,19 @@ async function painelInstagramInsights(){
  <div class="card"><div class="card-title"><div><small>CURTIDAS + COMENTÁRIOS</small><h3>Ranking de conteúdos</h3></div></div>${d.ranking.map((r,i)=>`<div class="data-row"><b>${i+1}º</b><div><span>${esc(r.legenda||'Sem legenda')}</span><small>${esc(r.tipo)} · ${esc(String(r.quando).slice(0,10))} · ${r.interacoes} interações${r.link?` · <a href="${esc(r.link)}" target="_blank" rel="noopener">abrir</a>`:''}</small></div></div>`).join('')||'<div class="empty compact">Sincronize o Instagram para ver o ranking.</div>'}</div>`;
  host.appendChild(box);
 }
+
+// Link de aprovação sem login
+async function gerarLinkAprovacao(id){
+ let d;try{d=await api('/manager/approval-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,dias:7})})}catch(e){return toast(e.message,'warn')}
+ const o=adminOverlay(`<h3>Link de aprovação</h3><p>Envie este link a quem vai aprovar a entrega (não precisa de login). Vale até <b>${esc(fmtDate(d.expiraEm))}</b> e só pode ser usado <b>uma vez</b>. Um novo link cancela o anterior.</p><div class="uri-row"><code id="lnkAprov">${esc(d.url)}</code><button class="softbtn" id="lnkCopy">Copiar</button></div><div class="actions"><button class="btn soft" data-close>Fechar</button></div>`);
+ o.el.querySelector('#lnkCopy').onclick=()=>{navigator.clipboard?.writeText(d.url);toast('Link copiado')};
+}
+
+// Rascunho de legendas com IA (a equipe revisa; nada é publicado sozinho)
+async function sugerirLegendas(modulo,id){
+ const btn=$('#btnIA');if(btn){btn.disabled=true;btn.textContent='Gerando…'}
+ let d;try{d=await api('/ia/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo,id})})}catch(e){if(btn){btn.disabled=false;btn.textContent='✨ Sugerir legendas (IA)'}return toast(e.message,'warn')}
+ if(btn){btn.disabled=false;btn.textContent='✨ Sugerir legendas (IA)'}
+ const o=adminOverlay(`<h3>Rascunhos de legenda</h3><p class="kpi-note">Revise antes de usar. Trechos [COMPLETAR: …] mostram o que a IA não tinha como saber.</p><div class="origem-list">${d.opcoes.map((x,i)=>`<div class="notif"><div style="white-space:pre-wrap">${esc(x.legenda)}</div><small>${esc(x.hashtags.join(' '))}</small><div><button class="softbtn" data-usar="${i}">Usar esta</button></div></div>`).join('')}</div><div class="actions"><button class="btn soft" data-close>Fechar</button></div>`);
+ o.el.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{const x=d.opcoes[+b.dataset.usar];const txt=x.legenda+(x.hashtags.length?'\n\n'+x.hashtags.join(' '):'');const campo=document.querySelector('#formFields [name="legenda"]')||document.querySelector('#formFields [name="descricao"]');if(campo){campo.value=txt;campo.dispatchEvent(new Event('input',{bubbles:true}))}o.close();toast('Legenda colocada no formulário. Revise e salve.')});
+}

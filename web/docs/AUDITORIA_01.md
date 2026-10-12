@@ -150,3 +150,10 @@ Limitação conhecida: o backup guarda os dados **no mesmo banco**; ele protege 
 - Melhor dia/horário e ranking de conteúdos no Instagram, a partir de `ig_posts` (migração 008, preenchida pela sincronização). Sem amostra mínima (8 posts), não calcula.
 - Resumo diário da Gerência passou a incluir o bloco "Operação" (triagem, SLA, aprovações, falhas de integração).
 - Testes: `insights.test.js` (9) e uma verificação nova em `integrations` (54).
+
+## Sugestões restantes + endurecimento do Instagram
+- **Link de aprovação sem login** (`/aprovar.html?t=…`): token de 64 hex (só o hash no banco), uso único, validade de 7 dias (1–30), um link ativo por demanda, limite de tentativas por IP, resposta registrada no histórico (`link:Nome`) e avisada na central e por e-mail. Migração 009.
+- **NPS 0–10** no Portal após a avaliação; indicador "NPS do atendimento" e NPS por segmento.
+- **Legendas com IA** (SDK oficial `@anthropic-ai/sdk`, modelo `claude-opus-5-5`, esforço baixo; variável `IA_MODEL` troca o modelo): 3 rascunhos com o guia de voz do Colégio, nada é publicado sozinho; chave criptografada; limite de 12 pedidos/15 min por pessoa.
+- **Instagram**: leituras com nova tentativa (429/5xx), detecção de token expirado/revogado (erro 190) com alerta e item na Prontidão, conferência das permissões aceitas, escolha da conta quando há várias Páginas, métricas retiradas pela Meta não derrubam a sincronização, paginação das publicações (até 300), aviso quando a renovação do token falha perto do vencimento.
+- Testes: `extras` (32), `instagram` (9), `ui9` (8); suíte completa: 22 suítes, 0 falhas, `responsive` limpo.

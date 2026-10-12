@@ -4,7 +4,7 @@ import { q, q1, run } from './db';
 import { decryptSecret, encryptSecret } from './crypto';
 import { now } from './util';
 
-const SECRET_KEYS = ['meta_app_secret', 'meta_token', 'g_client_secret', 'g_refresh_token', 'g_access_token'];
+const SECRET_KEYS = ['meta_app_secret', 'meta_token', 'g_client_secret', 'g_refresh_token', 'g_access_token', 'anthropic_key'];
 
 export async function setting(k: string, def = ''): Promise<string> {
   const r = await q1<{ v: string }>('SELECT v FROM integration_settings WHERE k=?', [k]);

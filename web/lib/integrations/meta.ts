@@ -8,13 +8,27 @@ import { httpCall, httpOk, publicUrl, qsOf, signState, signedMediaUrl } from './
 const metaBase = () => env('META_GRAPH_BASE', 'https://graph.facebook.com/v21.0').replace(/\/+$/, '');
 const metaOauth = () => env('META_OAUTH_BASE', 'https://www.facebook.com/v21.0/dialog/oauth').replace(/\/+$/, '');
 
+/** Erro de autenticação da Meta (token expirado, revogado ou senha alterada): marca para reconectar e avisa a Gerência. */
+async function checarTokenInvalido(r: [number, any], ctx: string): Promise<void> {
+  const e = r[1]?.error;
+  if (r[0] >= 400 && e && (Number(e.code) === 190 || Number(e.code) === 102 || /access token|session has expired/i.test(String(e.message ?? '')))) {
+    if ((await setting('meta_token_invalido')) !== '1') {
+      await setSetting('meta_token_invalido', '1');
+      await intLog('instagram', 'erro', `${ctx}: o acesso à Meta expirou ou foi revogado. Reconecte o Instagram em Administração → Integrações.`);
+    }
+  }
+}
 export async function metaGet(path: string, params: Row = {}): Promise<Row> {
   params.access_token = await setting('meta_token');
-  return httpOk(await httpCall('GET', `${metaBase()}${path}?${qsOf(params)}`), `Meta GET ${path}`) as Row;
+  const r = await httpCall('GET', `${metaBase()}${path}?${qsOf(params)}`);
+  await checarTokenInvalido(r, `Meta GET ${path}`);
+  return httpOk(r, `Meta GET ${path}`) as Row;
 }
 export async function metaPost(path: string, params: Row = {}): Promise<Row> {
   params.access_token = await setting('meta_token');
-  return httpOk(await httpCall('POST', metaBase() + path, { 'Content-Type': 'application/x-www-form-urlencoded' }, qsOf(params)), `Meta POST ${path}`) as Row;
+  const r = await httpCall('POST', metaBase() + path, { 'Content-Type': 'application/x-www-form-urlencoded' }, qsOf(params));
+  await checarTokenInvalido(r, `Meta POST ${path}`);
+  return httpOk(r, `Meta POST ${path}`) as Row;
 }
 export async function metaConnected(): Promise<boolean> {
   return (await setting('meta_token')) !== '' && (await setting('ig_user_id')) !== '';
@@ -33,35 +47,79 @@ export async function metaFinishConnect(code: string): Promise<void> {
   const redirect = publicUrl() + '/api/integrations/meta/callback';
   const short = httpOk(await httpCall('GET', `${metaBase()}/oauth/access_token?${qsOf({ client_id: id, client_secret: secret, redirect_uri: redirect, code })}`), 'Meta token');
   const long = httpOk(await httpCall('GET', `${metaBase()}/oauth/access_token?${qsOf({ grant_type: 'fb_exchange_token', client_id: id, client_secret: secret, fb_exchange_token: short.access_token ?? '' })}`), 'Meta token longo');
+  await setSetting('meta_token_invalido', '');
   await setSetting('meta_token', String(long.access_token ?? ''));
   await setSetting('meta_token_expira', String(Math.floor(Date.now() / 1000) + Number(long.expires_in ?? 5184000)));
   await metaDiscoverAccount();
 }
+export const META_PERMISSOES = ['instagram_basic', 'instagram_manage_insights', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'business_management'];
+export interface MetaConta { ig: string; usuario: string; pagina: string }
+/** Lista as contas Instagram profissionais ligadas às Páginas do usuário. Se houver mais de uma, a Gerência escolhe qual usar. */
 export async function metaDiscoverAccount(): Promise<void> {
-  const r = await metaGet('/me/accounts', { fields: 'name,instagram_business_account{id,username}' });
-  for (const page of r.data ?? []) {
-    if (page.instagram_business_account?.id) {
-      await setSetting('ig_user_id', String(page.instagram_business_account.id));
-      await setSetting('ig_username', String(page.instagram_business_account.username ?? ''));
-      await setSetting('meta_page_name', String(page.name ?? ''));
-      await intLog('instagram', 'ok', 'Conectado como @' + (await setting('ig_username')));
-      return;
-    }
+  const r = await metaGet('/me/accounts', { fields: 'name,instagram_business_account{id,username}', limit: 100 });
+  const contas: MetaConta[] = [];
+  for (const page of r.data ?? []) if (page.instagram_business_account?.id) contas.push({ ig: String(page.instagram_business_account.id), usuario: String(page.instagram_business_account.username ?? ''), pagina: String(page.name ?? '') });
+  if (!contas.length) throw new Error('Nenhuma conta Instagram profissional encontrada nas Páginas deste usuário. Ligue o Instagram à Página do Facebook.');
+  await setSetting('meta_contas', JSON.stringify(contas));
+  const atual = await setting('ig_user_id');
+  await metaUsarConta(contas.find((c) => c.ig === atual) ?? contas[0]);
+  if (contas.length > 1) await intLog('instagram', 'aviso', `${contas.length} contas Instagram encontradas; em uso: @${await setting('ig_username')}. Confira se é a conta do Colégio.`);
+  await metaConferirPermissoes();
+}
+export async function metaUsarConta(c: MetaConta): Promise<void> {
+  await setSetting('ig_user_id', c.ig);
+  await setSetting('ig_username', c.usuario);
+  await setSetting('meta_page_name', c.pagina);
+  await intLog('instagram', 'ok', 'Conectado como @' + c.usuario);
+}
+/** Confere se a pessoa aceitou TODAS as permissões (desmarcar uma é a falha mais comum). */
+export async function metaConferirPermissoes(): Promise<string[]> {
+  try {
+    const r = await metaGet('/me/permissions');
+    const dadas = new Set((r.data ?? []).filter((p: Row) => p.status === 'granted').map((p: Row) => String(p.permission)));
+    if (!dadas.size) return [];
+    const faltam = META_PERMISSOES.filter((p) => !dadas.has(p));
+    await setSetting('meta_perm_faltando', faltam.join(','));
+    if (faltam.length) await intLog('instagram', 'aviso', 'Permissões não aceitas: ' + faltam.join(', ') + '. Reconecte e marque todas.');
+    return faltam;
+  } catch {
+    return [];
   }
-  throw new Error('Nenhuma conta Instagram profissional encontrada nas Páginas deste usuário. Ligue o Instagram à Página do Facebook.');
+}
+async function metaRefreshOnce(exp: number): Promise<void> {
+  const j = httpOk(await httpCall('GET', `${metaBase()}/oauth/access_token?${qsOf({ grant_type: 'fb_exchange_token', client_id: await setting('meta_app_id'), client_secret: await setting('meta_app_secret'), fb_exchange_token: await setting('meta_token') })}`), 'Meta renovar token');
+  await setSetting('meta_token', String(j.access_token));
+  await setSetting('meta_token_expira', String(Math.floor(Date.now() / 1000) + Number(j.expires_in ?? 5184000)));
+  await setSetting('meta_token_invalido', '');
+  await intLog('instagram', 'ok', 'Token renovado');
 }
 export async function metaRefreshIfNeeded(): Promise<void> {
   const exp = parseInt(await setting('meta_token_expira', '0'), 10) || 0;
   if (!(await metaConnected()) || exp === 0 || exp - Date.now() / 1000 > 10 * 86400) return;
-  const j = httpOk(await httpCall('GET', `${metaBase()}/oauth/access_token?${qsOf({ grant_type: 'fb_exchange_token', client_id: await setting('meta_app_id'), client_secret: await setting('meta_app_secret'), fb_exchange_token: await setting('meta_token') })}`), 'Meta renovar token');
-  await setSetting('meta_token', String(j.access_token));
-  await setSetting('meta_token_expira', String(Math.floor(Date.now() / 1000) + Number(j.expires_in ?? 5184000)));
-  await intLog('instagram', 'ok', 'Token renovado');
+  try {
+    await metaRefreshOnce(exp);
+  } catch (e: any) {
+    const dias = Math.max(0, Math.floor((exp - Date.now() / 1000) / 86400));
+    if (dias <= 5) await intLog('instagram', 'erro', `O token da Meta expira em ${dias} dia(s) e a renovação automática falhou (${String(e.message).slice(0, 150)}). Reconecte o Instagram.`);
+    throw e;
+  }
 }
 async function metaInsightTotal(ig: string, metrics: string[], since: number, until: number): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
-  const r = await metaGet(`/${ig}/insights`, { metric: metrics.join(','), metric_type: 'total_value', period: 'day', since, until });
-  for (const m of r.data ?? []) out[m.name] = Number(m.total_value?.value ?? 0);
+  const pede = async (ms: string[]) => {
+    const r = await metaGet(`/${ig}/insights`, { metric: ms.join(','), metric_type: 'total_value', period: 'day', since, until });
+    for (const m of r.data ?? []) out[m.name] = Number(m.total_value?.value ?? 0);
+  };
+  try {
+    await pede(metrics);
+  } catch (e: any) {
+    if ((await setting('meta_token_invalido')) === '1') throw e;
+    // A Meta renomeia/retira métricas: se o pedido em lote falhar, tenta uma a uma e segue com as que existem.
+    const falhas: string[] = [];
+    for (const m of metrics) { try { await pede([m]); } catch { falhas.push(m); } }
+    if (falhas.length === metrics.length) throw e;
+    await intLog('instagram', 'aviso', 'Métricas indisponíveis nesta conta/versão: ' + falhas.join(', '));
+  }
   return out;
 }
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -71,7 +129,14 @@ export async function igSync(months = 2): Promise<number> {
   if (!(await metaConnected())) throw new Error('Instagram não conectado.');
   const ig = await setting('ig_user_id');
   const profile = await metaGet(`/${ig}`, { fields: 'followers_count,follows_count,media_count,username' });
-  const media: Row[] = (await metaGet(`/${ig}/media`, { fields: 'id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink', limit: 100 })).data ?? [];
+  const media: Row[] = [];
+  let after = '';
+  for (let pg = 0; pg < 3; pg++) { // até 300 publicações mais recentes
+    const r = await metaGet(`/${ig}/media`, { fields: 'id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink', limit: 100, ...(after ? { after } : {}) });
+    media.push(...(r.data ?? []));
+    after = String(r.paging?.cursors?.after ?? '');
+    if (!r.paging?.next || !after) break;
+  }
   for (const md of media) {
     await run('INSERT INTO ig_posts(media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink,atualizado_em) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),legenda=VALUES(legenda),curtidas=VALUES(curtidas),comentarios=VALUES(comentarios),permalink=VALUES(permalink),atualizado_em=VALUES(atualizado_em)',
       [String(md.id), String(md.timestamp ?? ''), String(md.media_product_type ?? md.media_type ?? ''), String(md.caption ?? '').replace(/\s+/g, ' ').slice(0, 300), Number(md.like_count ?? 0), Number(md.comments_count ?? 0), String(md.permalink ?? '').slice(0, 300), now()]);

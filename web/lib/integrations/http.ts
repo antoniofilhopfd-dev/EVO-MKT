@@ -6,18 +6,28 @@ export type HttpResult = [number, any];
 
 /** Chamada HTTP com timeout. Devolve [status, json | texto]. */
 export async function httpCall(method: string, url: string, headers: Record<string, string> = {}, body?: BodyInit | null, timeoutS = 25): Promise<HttpResult> {
-  let res: Response;
-  try {
-    res = await fetch(url, { method, headers, body: body ?? undefined, redirect: 'manual', signal: AbortSignal.timeout(timeoutS * 1000) });
-  } catch (e: any) {
-    throw new Error('Falha de rede: ' + (e?.cause?.message || e?.message));
+  // Só leituras (GET) são repetidas: falha de rede, 429 e 5xx passageiros têm até 2 novas tentativas (1 s e 3 s).
+  const tentativas = method === 'GET' ? 3 : 1;
+  let ultimo: HttpResult | null = null;
+  let erroRede: Error | null = null;
+  for (let i = 0; i < tentativas; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, i === 1 ? 1000 : 3000));
+    let res: Response;
+    try {
+      res = await fetch(url, { method, headers, body: body ?? undefined, redirect: 'manual', signal: AbortSignal.timeout(timeoutS * 1000) });
+    } catch (e: any) {
+      erroRede = new Error('Falha de rede: ' + (e?.cause?.message || e?.message));
+      continue;
+    }
+    erroRede = null;
+    const txt = await res.text();
+    let out: HttpResult;
+    try { out = [res.status, JSON.parse(txt)]; } catch { out = [res.status, txt]; }
+    if ((res.status === 429 || res.status >= 500) && i < tentativas - 1) { ultimo = out; continue; }
+    return out;
   }
-  const txt = await res.text();
-  try {
-    return [res.status, JSON.parse(txt)];
-  } catch {
-    return [res.status, txt];
-  }
+  if (erroRede) throw erroRede;
+  return ultimo!;
 }
 export function httpOk(r: HttpResult, ctx: string): any {
   const [st, j] = r;
