@@ -4,6 +4,7 @@ import { run } from '../db';
 import { env, fail, fmtDate, addDays, parseLocal, Row, now } from '../util';
 import { listRows, emailForPerson } from '../records';
 import { notifyMail } from '../mail';
+import { resumoOperacional } from '../insights';
 import { intLog, setting } from '../settings';
 import { igPublishDue, igSync, metaConnected, metaRefreshIfNeeded } from '../integrations/meta';
 import { gCalendarSync, gConnected, gDriveSendEntregas, gSheetsExport } from '../integrations/google';
@@ -68,7 +69,11 @@ async function alertas(): Promise<Row> {
       itens.push({ mod, titulo: r.titulo ?? r.id, due, resp: String(r.responsavel ?? '').trim(), atraso: due < hoje });
     }
   }
-  if (!itens.length) return { enviados: 0, resumo: false, itens: 0 };
+  const op = await resumoOperacional();
+  if (!itens.length) {
+    if (op.length) await notifyMail('Resumo diário do EVO MKT', `Operação:\n${op.join('\n')}`);
+    return { enviados: 0, resumo: op.length > 0, itens: 0 };
+  }
   const br = (d: string) => parseLocal(d + 'T12:00:00').toLocaleDateString('pt-BR', { timeZone: env('TIMEZONE', 'America/Recife') });
   const linha = (i: Item) => `- [${i.mod}] ${i.titulo} — ${i.atraso ? 'ATRASADO desde ' : 'vence '}${br(i.due)}${i.resp ? ` (${i.resp})` : ''}`;
   const porPessoa: Record<string, Item[]> = {};
@@ -81,6 +86,6 @@ async function alertas(): Promise<Row> {
     enviados++;
   }
   itens.sort((a, b) => a.due.localeCompare(b.due));
-  await notifyMail(`Resumo de prazos (${itens.length} itens)`, itens.map(linha).join('\n'));
+  await notifyMail(`Resumo de prazos (${itens.length} itens)`, itens.map(linha).join('\n') + (op.length ? `\n\nOperação:\n${op.join('\n')}` : ''));
   return { enviados, resumo: true, itens: itens.length };
 }

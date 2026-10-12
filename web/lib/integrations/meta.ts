@@ -72,6 +72,10 @@ export async function igSync(months = 2): Promise<number> {
   const ig = await setting('ig_user_id');
   const profile = await metaGet(`/${ig}`, { fields: 'followers_count,follows_count,media_count,username' });
   const media: Row[] = (await metaGet(`/${ig}/media`, { fields: 'id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink', limit: 100 })).data ?? [];
+  for (const md of media) {
+    await run('INSERT INTO ig_posts(media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink,atualizado_em) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),legenda=VALUES(legenda),curtidas=VALUES(curtidas),comentarios=VALUES(comentarios),permalink=VALUES(permalink),atualizado_em=VALUES(atualizado_em)',
+      [String(md.id), String(md.timestamp ?? ''), String(md.media_product_type ?? md.media_type ?? ''), String(md.caption ?? '').replace(/\s+/g, ' ').slice(0, 300), Number(md.like_count ?? 0), Number(md.comments_count ?? 0), String(md.permalink ?? '').slice(0, 300), now()]);
+  }
   let n = 0;
   const lp = localParts(new Date());
   for (let i = 0; i < months; i++) {

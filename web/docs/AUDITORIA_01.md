@@ -144,3 +144,9 @@ Limitação conhecida: o backup guarda os dados **no mesmo banco**; ele protege 
 - A10: o cron diário apaga sessões expiradas e tentativas de login com mais de 24 h (além da limpeza já feita no login). CONCLUÍDO.
 - A11: uploads conferem a assinatura do arquivo (PDF, PNG, JPG, GIF, WEBP, ZIP/Office, MP4/MOV) e recusam SVG com script; teste em `integridade` (22). CONCLUÍDO. Limite de tamanho continua dependendo do `max_allowed_packet` do MySQL (DEP. EXTERNA).
 - A14: paginação no servidor segue não implementada (volume atual não exige; reavaliar acima de ~5 mil registros por módulo).
+
+## Melhorias inspiradas no Orkestrya
+- Saúde por segmento (0–100: SLA vencido, devoluções, reaberturas, avaliação) e "Datas para planejar" (calendário escolar/nacional com móveis calculadas e botão + Ideia) na Central Operacional.
+- Melhor dia/horário e ranking de conteúdos no Instagram, a partir de `ig_posts` (migração 008, preenchida pela sincronização). Sem amostra mínima (8 posts), não calcula.
+- Resumo diário da Gerência passou a incluir o bloco "Operação" (triagem, SLA, aprovações, falhas de integração).
+- Testes: `insights.test.js` (9) e uma verificação nova em `integrations` (54).

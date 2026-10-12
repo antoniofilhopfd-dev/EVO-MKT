@@ -1,0 +1,2 @@
+-- Métricas por publicação do Instagram (alimenta ranking de conteúdos e melhores horários).
+CREATE TABLE IF NOT EXISTS ig_posts(media_id VARCHAR(64) PRIMARY KEY,publicado_em VARCHAR(40) NOT NULL,tipo VARCHAR(20) NOT NULL DEFAULT '',legenda VARCHAR(300) NOT NULL DEFAULT '',curtidas INT NOT NULL DEFAULT 0,comentarios INT NOT NULL DEFAULT 0,permalink VARCHAR(300) NOT NULL DEFAULT '',atualizado_em VARCHAR(40) NOT NULL,KEY idx_igp_quando (publicado_em)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -103,6 +103,7 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/integrations/log',{ck:G});t('log das integrações registra as operações',r.s===200&&r.j.length>5&&r.j.some(l=>l.servico==='instagram')&&r.j.some(l=>l.servico==='google'));
  await call('/integrations/meta/disconnect',{m:'POST',ck:G,b:{}});r=await call('/integrations/instagram/sync',{m:'POST',ck:G,b:{}});t('desconectado: sincronizar avisa que não está conectado',r.s===502&&/não conectado/.test(r.j.error));
  await call('/integrations/google/disconnect',{m:'POST',ck:G,b:{}});r=await call('/integrations/status',{ck:G});t('desconectar Google',!r.j.google.conectado);
+ {const ins=await call('/insights',{ck:G});t('sincronizar Instagram grava as publicações (ranking de conteúdos)',ins.s===200&&ins.j.ranking.length===4&&ins.j.ranking[0].legenda.includes('Bastidores'),ins.j.ranking)}
  {const pr=await call('/integrations/prontidao',{ck:G});const it=id=>(pr.j.itens||[]).find(x=>x.id===id);
   t('prontidão: lista itens com como corrigir e as URLs para colar na Meta/Google',pr.s===200&&pr.j.itens.length>=10&&pr.j.urls.privacidade.endsWith('/privacidade.html')&&/\/api\/integrations\/google\/callback$/.test(pr.j.urls.googleRedirect)&&pr.j.itens.every(x=>x.titulo&&x.como),pr.j);
   t('prontidão: detecta PUBLIC_URL sem https e credenciais/conexão desligadas',it('public_url').ok===false&&it('meta_conn').ok===false&&it('g_conn').ok===false&&it('cron_secret').ok===true&&pr.j.pronto===false);

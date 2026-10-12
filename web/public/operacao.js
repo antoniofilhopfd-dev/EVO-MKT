@@ -32,3 +32,26 @@ async function abrirNotificacoes(){
  o.el.querySelector('#notifCentral').onclick=()=>{o.close();go(internalSession?.role==='manager'?'central':'minhaarea')};
 }
 setTimeout(()=>{if(typeof internalSession!=='undefined'&&internalSession)atualizarSinoNotificacoes()},2500);setInterval(()=>{if(typeof internalSession!=='undefined'&&internalSession)atualizarSinoNotificacoes()},90000);
+
+// Insights (saúde por segmento, datas comemorativas, melhores horários, ranking)
+const corSaude=n=>n>=75?'#187549':n>=40?'#9a5b00':'#aa2530';
+const fmtData=d=>d.slice(8,10)+'/'+d.slice(5,7);
+async function painelInsights(){
+ if(internalSession?.role!=='manager')return;const host=$('#content');if(!host)return;
+ let d;try{d=await api('/insights')}catch{return}
+ const box=document.createElement('div');box.className='dashboard-grid ins-grid';box.id='insPainel';
+ box.innerHTML=`<div class="card"><div class="card-title"><div><small>ÚLTIMOS 90 DIAS</small><h3>Saúde por segmento</h3></div></div>${d.saude.map(s=>`<button class="saude" data-seg="${esc(s.segmento)}"><span>${esc(s.segmento)}</span><div><i style="width:${s.score}%;background:${corSaude(s.score)}"></i></div><b style="color:${corSaude(s.score)}">${s.score}</b><small>${s.sinais.length?esc(s.sinais.join(' · ')):'Sem alertas'} · ${s.abertas} aberta(s)</small></button>`).join('')||'<div class="empty compact">Sem demandas para avaliar.</div>'}<p class="muted">Nota 0–100 calculada de SLA vencido, devoluções, reaberturas e avaliação.</p></div>
+ <div class="card"><div class="card-title"><div><small>PRÓXIMOS 90 DIAS</small><h3>Datas para planejar</h3></div></div>${d.datas.slice(0,8).map(x=>`<div class="data-row"><b>${fmtData(x.data)}</b><div><span>${esc(x.titulo)}</span><small>${esc(x.tema)} · faltam ${x.faltam} dia(s)${x.planejarAte<=today()?' · <b>planejar agora</b>':' · planejar até '+fmtData(x.planejarAte)}</small></div><button class="softbtn" data-ideia="${esc(x.titulo)}|${esc(x.data)}">+ Ideia</button></div>`).join('')||'<div class="empty compact">Sem datas nos próximos 90 dias.</div>'}</div>`;
+ host.prepend(box);
+ box.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{const s=d.saude.find(x=>x.segmento===b.dataset.seg);listaOrigem('Segmento '+s.segmento+' — SLA vencido',s.ids,'solicitacoes')});
+ box.querySelectorAll('[data-ideia]').forEach(b=>b.onclick=async()=>{const [t,dt]=b.dataset.ideia.split('|');try{await api('/data?module=ideias',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titulo:'Pauta: '+t,status:'IDEIA',sazonalidade:t,descricao:'Data: '+dt.split('-').reverse().join('/')})});invalidate('ideias');b.textContent='✔ criada';b.disabled=true}catch(e){toast(e.message,'warn')}});
+}
+async function painelInstagramInsights(){
+ if(internalSession?.role!=='manager')return;const host=$('#content');if(!host)return;
+ let d;try{d=await api('/insights')}catch{return}
+ const h=d.horarios,m=h.melhor;
+ const box=document.createElement('div');box.className='dashboard-grid ins-grid';
+ box.innerHTML=`<div class="card"><div class="card-title"><div><small>DADOS REAIS DO INSTAGRAM</small><h3>Melhor dia e horário</h3></div></div>${m?`<p><b>${esc(m.dia)}</b> (média ${m.mediaDia} interações) · por volta das <b>${String(m.hora).padStart(2,'0')}h</b> (média ${m.mediaHora})</p>${m.confianca==='baixa'?'<p class="muted">Confiança baixa: poucos posts em cada dia/horário. Use como pista, não como regra.</p>':''}<p class="muted">Calculado com ${h.amostra} publicações sincronizadas.</p>`:`<div class="empty compact">Ainda há ${h.amostra} publicação(ões) sincronizada(s); são necessárias ${h.minimo} para calcular.</div>`}</div>
+ <div class="card"><div class="card-title"><div><small>CURTIDAS + COMENTÁRIOS</small><h3>Ranking de conteúdos</h3></div></div>${d.ranking.map((r,i)=>`<div class="data-row"><b>${i+1}º</b><div><span>${esc(r.legenda||'Sem legenda')}</span><small>${esc(r.tipo)} · ${esc(String(r.quando).slice(0,10))} · ${r.interacoes} interações${r.link?` · <a href="${esc(r.link)}" target="_blank" rel="noopener">abrir</a>`:''}</small></div></div>`).join('')||'<div class="empty compact">Sincronize o Instagram para ver o ranking.</div>'}</div>`;
+ host.appendChild(box);
+}

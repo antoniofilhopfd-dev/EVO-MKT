@@ -1,4 +1,5 @@
 import { Ctx } from '../ctx';
+import { melhoresHorarios, proximasDatas, rankingConteudos, saudePorSegmento } from '../insights';
 import { listarNotificacoes } from '../notificacoes';
 import { run } from '../db';
 import { q } from '../db';
@@ -83,6 +84,14 @@ export async function operacaoRoute(c: Ctx) {
     if (b.todas) await run(`UPDATE notifications SET lida=1 WHERE ${dest}`, [String(u.nome)]);
     else if (ids.length) await run(`UPDATE notifications SET lida=1 WHERE id IN (${ids.map(() => '?').join(',')}) AND (${dest})`, [...ids, String(u.nome)]);
     return json({ ok: true });
+  }
+  if (path === '/insights') {
+    await requireManager(c);
+    return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(), ranking: await rankingConteudos() });
+  }
+  if (path === '/datas') {
+    await requireInternal(c);
+    return json({ rows: proximasDatas(Number(c.qs('dias')) || 90) });
   }
   if (path === '/indicadores') {
     await requireManager(c);

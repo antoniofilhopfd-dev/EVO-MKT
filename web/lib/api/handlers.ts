@@ -37,7 +37,7 @@ export async function route(c: Ctx): Promise<Out> {
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
 
   switch (true) {
-    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores':
+    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/datas':
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);
