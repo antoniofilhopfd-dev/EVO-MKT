@@ -4,6 +4,7 @@
 const {chromium}=require(process.env.PLAYWRIGHT||'/opt/node-tools/node_modules/playwright');const fs=require('fs');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const BASE=process.env.BASE||'http://127.0.0.1:8080';
 const tx=(n,txt,re)=>{const c=re.test(txt);t(n,c);if(!c)console.log('     texto visto:',JSON.stringify(txt.slice(0,260)))};
+const dia=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10); // datas relativas a hoje: o teste não envelhece
 let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
 (async()=>{
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
@@ -21,7 +22,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  await P.goto(BASE+'/solicitante.html');await P.fill('#code','FIN-2603');await P.fill('#pass',pw('FIN-2603'));await P.click('#login');await P.waitForSelector('.portal-shell',{timeout:6000});
  await P.click('[data-tab="new"]');await P.waitForSelector('#form');
  await P.fill('#form [name=solicitanteNome]','Coordenação Anos Finais');await P.fill('#form [name=titulo]','Banner Olimpíada de Matemática');
- await P.selectOption('#tipoSolicitacao','Post');await P.fill('#form [name=prazo]','2026-10-20');await P.fill('#form [name=objetivo]','Divulgar a olimpíada para as famílias');
+ await P.selectOption('#tipoSolicitacao','Post');await P.fill('#form [name=prazo]',dia(10));await P.fill('#form [name=objetivo]','Divulgar a olimpíada para as famílias');
  await P.setInputFiles('#form input[type=file]','/tmp/evo-brief.pdf');
  await P.click('#form button[type=submit]');await P.waitForTimeout(1200);
  let sol=(await rows(G,'solicitacoes')).find(r=>r.titulo==='Banner Olimpíada de Matemática');
@@ -94,9 +95,9 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  // ========== 9) EQUIPE, VISÕES E MODAIS ==========
  await G.evaluate(()=>go('equipe'));await G.waitForTimeout(700);const eq=await G.$eval('#content',e=>e.innerText);
  tx('Equipe mostra capacidade (sem “não definida”)',eq,/^(?![\s\S]*Capacidade não definida)[\s\S]*40/);
- await post(G,'eventos',{titulo:'Sarau literário',status:'PRÉ-EVENTO',dataInicio:'2026-10-12',responsavel:'Aluizo Junior',segmento:'Ensino Médio'});
+ await post(G,'eventos',{titulo:'Sarau literário',status:'PRÉ-EVENTO',dataInicio:dia(3),responsavel:'Aluizo Junior',segmento:'Ensino Médio'});
  await G.evaluate(()=>{setPref('view.eventos','timeline');go('eventos')});await G.waitForSelector('.tl-card');tx('Eventos: linha do tempo',await G.$eval('.tl-wrap',e=>e.innerText),/Sarau liter/);
- await post(G,'campanhas',{titulo:'Vestibular 2027',status:'ATIVA',dataInicio:'2026-09-20',prazo:'2026-11-20',objetivo:'Preparar alunos',orcamento:'3000'});
+ await post(G,'campanhas',{titulo:'Vestibular 2027',status:'ATIVA',dataInicio:dia(-10),prazo:dia(40),objetivo:'Preparar alunos',orcamento:'3000'});
  await G.evaluate(()=>{setPref('view.campanhas','cards');go('campanhas')});await G.waitForSelector('.camp-card');tx('Campanhas: cartões',await G.$eval('.camp-grid',e=>e.innerText),/Vestibular 2027/);
  await G.click('.camp-card .edit-row');await G.waitForSelector('#modal:not(.hidden)');
  const cut=await G.evaluate(()=>{const c=document.querySelector('.modalcard').getBoundingClientRect();return c.top<-1||c.bottom>innerHeight+1});t('Modal de edição cabe na janela',!cut);await G.click('#cancelModal');

@@ -22,3 +22,10 @@
 .forgot{text-align:center;margin:12px 0 0;font-size:13px}.forgot a{color:var(--blue);font-weight:700}.ok-msg{background:#eaf7ef;color:#1e7e4d;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:13px}
 .timeline-real{padding-left:18px;display:grid;gap:8px;font-size:13px}.timeline-real small{color:#8a8e9c}
 .nps-buttons{display:flex;flex-wrap:wrap;gap:6px}.nps-buttons button{min-width:38px}
+/* Portal: cores chapadas da marca/segmento (sem gradiente nem transparência decorativa) */
+.hero,.portal-shell .hero{background:var(--seg,var(--blue))!important;box-shadow:none!important}
+.hero .segment{background:rgba(0,0,0,.18)!important;border:1px solid rgba(255,255,255,.35)!important}
+:focus-visible{outline:3px solid #00A1F3;outline-offset:2px}
+/* contraste (AA, 4,5:1) do texto branco sobre a cor do segmento: tons escurecidos do azul claro e do laranja só no Portal */
+.portal-shell.segment-iniciais{--seg:#0077B3}
+.portal-shell.segment-finais{--seg:#B84F00}

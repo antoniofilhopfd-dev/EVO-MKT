@@ -111,3 +111,13 @@ label{font-weight:600;color:var(--ink-2)}
 #painelInt,#metaAdsBox,#filaUnica,#insPainel,#indPainel{min-width:0;max-width:100%}
 #painelInt .tablewrap,#metaAdsBox .tablewrap{max-width:100%}
 #painelInt h4{margin:var(--s4) 0 var(--s2)}
+.tb-item label{font-size:14px;font-weight:400;display:flex;gap:8px;align-items:center;flex:1}.tb-item label span{font-size:14px}.tb-item .softbtn{min-height:32px;padding:2px 10px}
+/* decoração sem função removida */
+.module-hero:after,.module-hero:before{content:none!important;display:none!important}
+.internal-login-wrap{background:var(--page)!important}
+.module-hero .module-metrics>*{box-shadow:none;border:1px solid var(--line)}
+/* laranja é realce, não cor de texto: rótulos e chips usam a cor de marca (contraste AA) */
+.module-intro>small,.card-title small,.dashboard-head small,.today-banner small,.int-card small[class],.hero small{color:var(--brand)}
+.today-banner small{color:#fff}
+.flowchips span{color:var(--brand);background:var(--brand-bg);border-color:transparent}
+.pipeline>div,.mini-kanban>div{box-shadow:none}

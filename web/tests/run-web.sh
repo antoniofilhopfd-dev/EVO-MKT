@@ -4,6 +4,7 @@
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd); WEB=$(cd "$HERE/.." && pwd); T="$HERE"
 D=${EVO_TEST_DIR:-/tmp/evo-web-test}; mkdir -p "$D"; PORT=${PORT:-8080}
+FALHOU=''
 SUITES=${*:-api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui ui2 ui3 ui4 ui5 ui6 ui7 ui8 ui9 ui10 contraste seguranca-estatica seguranca xss migracoes responsive}; rc=0
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 || { (mysqld_safe --user=mysql >/dev/null 2>&1 &); for i in $(seq 30); do mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 && break; sleep 1; done; }
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "CREATE USER IF NOT EXISTS 'evo'@'127.0.0.1' IDENTIFIED BY 'evopass'; GRANT ALL ON *.* TO 'evo'@'127.0.0.1';" 2>/dev/null
@@ -35,7 +36,7 @@ for suite in $SUITES; do
     INSERT INTO used_ids(id) VALUES('TAR-0007'); INSERT INTO id_counters(modulo,n) VALUES('tarefas',7);
     INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES('tarefas','TAR-0007','{\"id\":\"TAR-0007\",\"titulo\":\"Tarefa importada\",\"status\":\"NOVO\",\"prioridade\":\"ALTA\",\"responsavel\":\"Antônio Filho\",\"segmento\":\"Infantil\",\"descricao\":\"Descrição ç ã\",\"criadoEm\":\"2026-09-01T10:00:00-03:00\",\"atualizadoEm\":\"2026-09-01T10:00:00-03:00\"}','2026-09-01T10:00:00-03:00','2026-09-01T10:00:00-03:00');"
   echo "=== $suite ==="
-  BASE=http://127.0.0.1:$PORT EVO_DIR="$D" MAILLOG="$D/mail.log" node "$([ -f "$HERE/$suite.test.js" ] && echo "$HERE" || echo "$T")/$suite.test.js" "$D/install.out" || rc=1
+  BASE=http://127.0.0.1:$PORT EVO_DIR="$D" MAILLOG="$D/mail.log" node "$([ -f "$HERE/$suite.test.js" ] && echo "$HERE" || echo "$T")/$suite.test.js" "$D/install.out" || { rc=1; FALHOU="$FALHOU $suite"; }
   if [ "$suite" = "api" ]; then
     echo "=== cron ==="
     c401=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/cron/alertas"); c401b=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer errado" "http://127.0.0.1:$PORT/api/cron/alertas")
@@ -43,4 +44,6 @@ for suite in $SUITES; do
     if [ "$c401" = 401 ] && [ "$c401b" = 401 ] && [ "$c200" = 200 ] && grep -q "Resumo de prazos" "$D/mail.log" && grep -q "Seus prazos de hoje" "$D/mail.log"; then echo "OK   cron/alertas: 401 sem/errado, 200 com Bearer, envia resumo da Gerente e prazos por pessoa"; else echo "FAIL cron/alertas ($c401/$c401b/$c200) $(cat "$D/cron.out")"; rc=1; fi
   fi
 done
-stop; kill "$(cat /tmp/evo-mock.pid)" 2>/dev/null; exit $rc
+stop; kill "$(cat /tmp/evo-mock.pid)" 2>/dev/null
+if [ -n "$FALHOU" ]; then echo "SUÍTES COM FALHA:$FALHOU"; else echo "TODAS AS SUÍTES PASSARAM"; fi
+exit $rc

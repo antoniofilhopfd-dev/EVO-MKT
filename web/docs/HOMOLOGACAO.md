@@ -1,6 +1,6 @@
 # Homologação final — EVO MKT (Etapa 06)
 
-Estado verificado em 2026-10-10, suíte completa `tests/run-web.sh` (build de produção + MariaDB local): **18 suítes, 382 verificações, 0 falhas, e `responsive` sem estouro horizontal** (6 larguras × todas as telas).
+Estado verificado em 2026-10-13 (Prompt Mestre Definitivo): suíte completa `tests/run-web.sh`, **30 suítes, 618 verificações, 0 falhas**, mais `responsive` sem estouro horizontal (6 larguras × todas as telas). Detalhes por suíte em `ACOMPANHAMENTO_EXECUCAO.md`; segurança em `SEGURANCA_RELATORIO.md`; capturas reais em `screenshots/final/`.
 
 ## O que foi comprovado por teste
 | Área | Evidência |

@@ -10,6 +10,12 @@ Versão web do sistema de marketing do Colégio Evolução, pronta para a Hostin
 - **Anexos e backups** ficam no MySQL (o disco do app pode ser recriado a cada deploy).
 - **Cron** protegido por `CRON_SECRET`: `/api/cron/integracoes?tarefa=publicar|sincronizar|tudo`, `/api/cron/alertas`.
 
+## Áreas do sistema
+Menu com 8 áreas (seções em abas): **Visão geral** (Hoje, Minha Área, Central Operacional) · **Solicitações** (triagem, Fluxos) · **Planejamento** (Agenda, Calendário, Tarefas, Projetos, Eventos) · **Conteúdo** (Conteúdos, Ideias, Planejamento Editorial, Aprovações, Templates, Instagram) · **Tráfego** (Tráfego, Campanhas) · **Relatórios** (Relatórios, Fechamento Mensal) · **Arquivos e equipe** · **Administração** (Acessos, Integrações, Avisos, Auditoria, Backups, Configurações). Portal das coordenações em `/solicitante`.
+
+## Documentação
+`docs/OPERACAO.md` (instalação, variáveis, migrações, autenticação, permissões, backup, procedimentos) · `docs/DEPLOY_HOSTINGER.md` · `docs/GUIA_INTEGRACOES.md` · `docs/INDICADORES_E_SLA.md` · `docs/DESIGN_SYSTEM.md` · `docs/SEGURANCA_RELATORIO.md` · `docs/PLANO_FINALIZACAO.md` e `docs/ACOMPANHAMENTO_EXECUCAO.md` (diagnóstico e execução) · `docs/HOMOLOGACAO.md` · `docs/screenshots/final/` (capturas reais com índice).
+
 ## Rodar localmente
 ```bash
 cd web
