@@ -120,6 +120,8 @@ export async function route(c: Ctx): Promise<Out> {
       if (!verifyPassword(strv(input.atual), row.pass_hash)) fail(403, 'Senha atual incorreta.');
       strongPassword(strv(input.nova));
       await run('UPDATE users SET pass_hash=?,must_change=0 WHERE codigo=?', [hashPassword(strv(input.nova)), u.codigo]);
+      // quem trocou a senha continua logado neste aparelho; qualquer outra sessão (e aparelho lembrado) dessa pessoa é encerrada
+      await run('DELETE FROM sessions WHERE tipo=? AND codigo=? AND token_hash<>?', ['int', u.codigo, sha256(sessionTokenFromCookie(c) || '-')]);
       await audit(u.codigo, 'senha-alterada');
       return json({ ok: true });
     }
@@ -264,6 +266,8 @@ export async function route(c: Ctx): Promise<Out> {
       if (!verifyPassword(strv(input.atual), row.pass_hash)) fail(403, 'Senha atual incorreta.');
       strongPassword(strv(input.nova));
       await run('UPDATE portal_users SET pass_hash=?,must_change=0 WHERE codigo=?', [hashPassword(strv(input.nova)), u.codigo]);
+      await run('DELETE FROM sessions WHERE tipo=? AND codigo=? AND token_hash<>?', ['por', u.codigo, sha256(c.header('x-portal-token') || '-')]);
+      await audit(String(u.codigo), 'senha-alterada');
       return json({ ok: true });
     }
     case path === '/admin/users': {
@@ -491,9 +495,10 @@ export async function route(c: Ctx): Promise<Out> {
       if (strv(input.prioridade).toUpperCase() === 'URGENTE' && !strv(input.motivoUrgencia).trim()) fail(400, 'Motivo da urgência é obrigatório.');
       const row: Row = {
         titulo: strv(input.titulo), status: 'AGUARDANDO TRIAGEM', prioridade: strv(input.prioridade), segmento: seg, prazo: strv(input.prazo),
-        descricao: strv(input.objetivo), origem: 'PORTAL_SOLICITANTE', solicitante: u.nome, triagemStatus: 'AGUARDANDO TRIAGEM', gerenteTriagem: 'Gerente de Marketing',
+        descricao: strv(input.objetivo), origem: 'PORTAL_SOLICITANTE', solicitante: u.nome, coordenacao: u.nome, triagemStatus: 'AGUARDANDO TRIAGEM', gerenteTriagem: 'Gerente de Marketing',
       };
       for (const k of CREATE_FIELDS) if (k in input) row[k] = strv(input[k]);
+      if (row.dataPublicacao && !/^\d{4}-\d{2}-\d{2}$/.test(String(row.dataPublicacao))) fail(400, 'Data de publicação inválida.');
       if (String(row.solicitanteNome ?? '').trim()) row.solicitante = row.solicitanteNome;
       if (!row.aprovacaoSolicitante) row.aprovacaoSolicitante = 'PENDENTE';
       const novo = await insertRow('solicitacoes', row, 'portal:' + u.codigo);

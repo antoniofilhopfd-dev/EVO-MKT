@@ -13,6 +13,7 @@ export async function saveUploads(c: Ctx, id: string, sub: string): Promise<stri
   if (!ct.includes('multipart/form-data')) return [];
   const form = await c.req.formData();
   const files = form.getAll('files').filter((f): f is File => typeof f !== 'string');
+  if (files.length > 10) fail(400, 'Envie no máximo 10 arquivos por vez.');
   const max = envInt('MAX_UPLOAD_MB', 15) * 1048576;
   const rel = 'ANEXOS/SOLICITACOES/' + safePart(id) + (sub ? '/' + sub : '');
   const saved: string[] = [];
@@ -31,6 +32,8 @@ export async function saveUploads(c: Ctx, id: string, sub: string): Promise<stri
   return saved;
 }
 
+/** Só formatos que o navegador mostra sem executar nada abrem na própria página; SVG, Office, ZIP etc. sempre baixam. */
+const EXIBIR_NO_NAVEGADOR = /\.(pdf|png|jpe?g|gif|webp|mp4|mov|mp3|wav|txt|csv)$/i;
 export async function serveFile(rel: string, portal: Row | null): Promise<Response> {
   rel = rel.replace(/\\/g, '/').trim();
   if (!rel || rel.includes('..') || !rel.startsWith('ANEXOS/SOLICITACOES/')) fail(400, 'Arquivo inválido.');
@@ -46,7 +49,7 @@ export async function serveFile(rel: string, portal: Row | null): Promise<Respon
   if (!f) fail(404, 'Arquivo não encontrado.');
   const name = rel.split('/').pop()!.replace(/"/g, '');
   return new Response(new Uint8Array(f.conteudo as Buffer), {
-    headers: { 'Content-Type': f.mime, 'Content-Disposition': `inline; filename="${name}"`, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': 'sandbox', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': f.mime, 'Content-Disposition': `${EXIBIR_NO_NAVEGADOR.test(name) ? 'inline' : 'attachment'}; filename="${name}"`, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': 'sandbox', 'Cache-Control': 'no-store' },
   });
 }
 export { audit, q };

@@ -1,4 +1,5 @@
 // Etapa 03: linha do tempo de registros e painel de indicadores (dados vindos do servidor: /api/timeline e /api/indicadores).
+const urlSegura=u=>/^https?:\/\/[^\s"'<>]+$/i.test(String(u||''))?String(u):'';
 const fmtQuando=q=>String(q||'').replace('T',' ').slice(0,16);
 async function showTimeline(mod,id){
  let rows=[];try{rows=(await api(`/timeline?module=${encodeURIComponent(mod)}&id=${encodeURIComponent(id)}`)).rows}catch(e){return toast(e.message,'warn')}
@@ -52,7 +53,7 @@ async function painelInstagramInsights(){
  const h=d.horarios,m=h.melhor;
  const box=document.createElement('div');box.className='dashboard-grid ins-grid';
  box.innerHTML=`<div class="card"><div class="card-title"><div><small>DADOS REAIS DO INSTAGRAM</small><h3>Melhor dia e horário</h3></div></div>${m?`<p><b>${esc(m.dia)}</b> (média ${m.mediaDia} interações) · por volta das <b>${String(m.hora).padStart(2,'0')}h</b> (média ${m.mediaHora})</p>${m.confianca==='baixa'?'<p class="muted">Confiança baixa: poucos posts em cada dia/horário. Use como pista, não como regra.</p>':''}<p class="muted">Calculado com ${h.amostra} publicações sincronizadas.</p>`:`<div class="empty compact">Ainda há ${h.amostra} publicação(ões) sincronizada(s); são necessárias ${h.minimo} para calcular.</div>`}</div>
- <div class="card"><div class="card-title"><div><small>CURTIDAS + COMENTÁRIOS</small><h3>Ranking de conteúdos</h3></div></div>${d.ranking.map((r,i)=>`<div class="data-row"><b>${i+1}º</b><div><span>${esc(r.legenda||'Sem legenda')}</span><small>${esc(r.tipo)} · ${esc(String(r.quando).slice(0,10))} · ${r.interacoes} interações${r.link?` · <a href="${esc(r.link)}" target="_blank" rel="noopener">abrir</a>`:''}</small></div></div>`).join('')||'<div class="empty compact">Sincronize o Instagram para ver o ranking.</div>'}</div>`;
+ <div class="card"><div class="card-title"><div><small>CURTIDAS + COMENTÁRIOS</small><h3>Ranking de conteúdos</h3></div></div>${d.ranking.map((r,i)=>`<div class="data-row"><b>${i+1}º</b><div><span>${esc(r.legenda||'Sem legenda')}</span><small>${esc(r.tipo)} · ${esc(String(r.quando).slice(0,10))} · ${r.interacoes} interações${urlSegura(r.link)?` · <a href="${esc(urlSegura(r.link))}" target="_blank" rel="noopener">abrir</a>`:''}</small></div></div>`).join('')||'<div class="empty compact">Sincronize o Instagram para ver o ranking.</div>'}</div>`;
  host.appendChild(box);
 }
 
@@ -90,7 +91,7 @@ async function montarExtrasModal(mod,row){
  const gerente=internalSession?.role==='manager';
  const podeDecidir=mod==='conteudos'&&row.status==='REVISÃO'&&(gerente||String(row.revisor||'').trim().toLowerCase()===String(internalSession?.name||'').trim().toLowerCase());
  let h='';
- if(est)h+=`<div><h4>Publicação</h4>${badgeEstado(est.estado)} <small>canal: ${esc(est.canal)}</small>${est.erro?`<p class="estado-erro">Falha informada pela plataforma: ${esc(est.erro)}</p>`:''}${row.linkPublicacao?`<p><a href="${esc(row.linkPublicacao)}" target="_blank" rel="noopener">Ver publicação</a> <small>confirmada por ${esc(row.publicadoConfirmadoPor||'—')}</small></p>`:''}
+ if(est)h+=`<div><h4>Publicação</h4>${badgeEstado(est.estado)} <small>canal: ${esc(est.canal)}</small>${est.erro?`<p class="estado-erro">Falha informada pela plataforma: ${esc(est.erro)}</p>`:''}${urlSegura(row.linkPublicacao)?`<p><a href="${esc(urlSegura(row.linkPublicacao))}" target="_blank" rel="noopener">Ver publicação</a> <small>confirmada por ${esc(row.publicadoConfirmadoPor||'—')}</small></p>`:''}
   <div class="tb-add">${podeDecidir?`<button type="button" class="btn soft" id="cDecidir">Decidir revisão…</button>`:''}${['APROVADO','PROGRAMADO'].includes(row.status)?`<button type="button" class="btn soft" id="cConfirmar">Confirmar publicação manual…</button>`:''}</div>
   ${row.aprovadoPor?`<small>Última decisão: ${esc(row.aprovacaoDecisao||'')} por ${esc(row.aprovadoPor)} em ${esc(fmtDateTime(row.aprovadoEm))}${row.versaoAprovada?` · versão ${esc(row.versaoAprovada)}`:''}</small>`:''}</div>`;
  if(mod==='tarefas'){

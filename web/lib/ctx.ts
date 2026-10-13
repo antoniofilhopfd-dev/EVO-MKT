@@ -32,8 +32,12 @@ function parseCookies(h: string): Record<string, string> {
 
 export function makeCtx(req: Request, path: string): Ctx {
   const url = new URL(req.url);
-  const xff = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim();
-  const ip = xff || req.headers.get('x-real-ip') || '-';
+  // IP do cliente: a hospedagem acrescenta o IP real ao FIM de X-Forwarded-For; o começo da lista é escrito pelo próprio cliente
+  // e pode ser forjado para escapar do limite de tentativas. TRUSTED_PROXY_HOPS = quantos proxies confiáveis há na frente (padrão 1).
+  const hops = Math.max(1, Math.min(5, Number(env('TRUSTED_PROXY_HOPS', '1')) || 1));
+  const cadeia = (req.headers.get('x-forwarded-for') || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const xff = cadeia.length ? cadeia[Math.max(0, cadeia.length - hops)] : '';
+  const ip = (xff || req.headers.get('x-real-ip') || '-').slice(0, 64);
   const secure = req.headers.get('x-forwarded-proto') === 'https' || env('PUBLIC_URL').startsWith('https://') || url.protocol === 'https:';
   let cached: Row | null = null;
   return {
@@ -50,6 +54,7 @@ export function makeCtx(req: Request, path: string): Ctx {
     header: (k) => req.headers.get(k) || '',
     async body() {
       if (cached) return cached;
+      if (Number(req.headers.get('content-length') || 0) > 2_000_000) fail(413, 'Requisição muito grande.');
       const raw = await req.text();
       if (!raw) return (cached = {});
       if (raw.length > 2_000_000) fail(413, 'Requisição muito grande.');

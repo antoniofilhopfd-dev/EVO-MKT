@@ -28,15 +28,15 @@ export const FINAL_SOLICITACAO = ['CONCLUÍDA', 'CANCELADA'];
 /** Etapas em que o relógio do SLA fica parado (esperando o solicitante). */
 export const PAUSA_SLA = ['AGUARDANDO SOLICITANTE'];
 
-/** de → [para...]. Marcadas com "retorno" exigem justificativa (motivo). */
+/** de → [para...]. Marcadas com "retorno" exigem justificativa (motivo): retornos de etapa, reabertura e TODA recusa/cancelamento. */
 const T: Record<string, { to: string; retorno?: boolean }[]> = {
-  'NOVA': [{ to: 'AGUARDANDO TRIAGEM' }, { to: 'CANCELADA' }],
-  'AGUARDANDO TRIAGEM': [{ to: 'EM ANÁLISE' }, { to: 'DISTRIBUÍDA' }, { to: 'EM EXECUÇÃO' }, { to: 'AGUARDANDO SOLICITANTE' }, { to: 'CANCELADA' }],
-  'EM ANÁLISE': [{ to: 'DISTRIBUÍDA' }, { to: 'EM EXECUÇÃO' }, { to: 'AGUARDANDO SOLICITANTE' }, { to: 'CANCELADA' }, { to: 'AGUARDANDO TRIAGEM', retorno: true }],
-  'DISTRIBUÍDA': [{ to: 'EM EXECUÇÃO' }, { to: 'AGUARDANDO SOLICITANTE' }, { to: 'CANCELADA' }, { to: 'EM ANÁLISE', retorno: true }],
-  'EM EXECUÇÃO': [{ to: 'AGUARDANDO SOLICITANTE' }, { to: 'AGUARDANDO APROVAÇÃO DO SOLICITANTE' }, { to: 'CONCLUÍDA' }, { to: 'CANCELADA' }, { to: 'EM ANÁLISE', retorno: true }],
-  'AGUARDANDO SOLICITANTE': [{ to: 'EM ANÁLISE' }, { to: 'EM EXECUÇÃO' }, { to: 'CANCELADA' }],
-  'AGUARDANDO APROVAÇÃO DO SOLICITANTE': [{ to: 'CONCLUÍDA' }, { to: 'EM EXECUÇÃO', retorno: true }, { to: 'CANCELADA' }],
+  'NOVA': [{ to: 'AGUARDANDO TRIAGEM' }, { to: 'CANCELADA', retorno: true }],
+  'AGUARDANDO TRIAGEM': [{ to: 'EM ANÁLISE' }, { to: 'DISTRIBUÍDA' }, { to: 'EM EXECUÇÃO' }, { to: 'AGUARDANDO SOLICITANTE' }, { to: 'CANCELADA', retorno: true }],
+  'EM ANÁLISE': [{ to: 'DISTRIBUÍDA' }, { to: 'EM EXECUÇÃO' }, { to: 'AGUARDANDO SOLICITANTE' }, { to: 'CANCELADA', retorno: true }, { to: 'AGUARDANDO TRIAGEM', retorno: true }],
+  'DISTRIBUÍDA': [{ to: 'EM EXECUÇÃO' }, { to: 'AGUARDANDO SOLICITANTE' }, { to: 'CANCELADA', retorno: true }, { to: 'EM ANÁLISE', retorno: true }],
+  'EM EXECUÇÃO': [{ to: 'AGUARDANDO SOLICITANTE' }, { to: 'AGUARDANDO APROVAÇÃO DO SOLICITANTE' }, { to: 'CONCLUÍDA' }, { to: 'CANCELADA', retorno: true }, { to: 'EM ANÁLISE', retorno: true }],
+  'AGUARDANDO SOLICITANTE': [{ to: 'EM ANÁLISE' }, { to: 'EM EXECUÇÃO' }, { to: 'CANCELADA', retorno: true }],
+  'AGUARDANDO APROVAÇÃO DO SOLICITANTE': [{ to: 'CONCLUÍDA' }, { to: 'EM EXECUÇÃO', retorno: true }, { to: 'CANCELADA', retorno: true }],
   'CONCLUÍDA': [{ to: 'EM EXECUÇÃO', retorno: true }],
   'CANCELADA': [{ to: 'AGUARDANDO TRIAGEM', retorno: true }],
 };
@@ -60,7 +60,7 @@ export function validarTransicaoSolicitacao(de: string, para: string, motivoInfo
   }
   const motivo = motivoInformado.trim();
   if (regra.retorno && !auto && motivo.length < 3) {
-    throw new HttpError(409, `Informe o motivo para voltar ${atual} → ${novo}.`, { motivo: true });
+    throw new HttpError(409, novo === 'CANCELADA' ? 'Informe o motivo da recusa ou do cancelamento.' : `Informe o motivo para voltar ${atual} → ${novo}.`, { motivo: true });
   }
   return { motivo };
 }

@@ -88,6 +88,13 @@ const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
  [,r]=await call('GET','/indicadores?de=2026-01-01&ate=2099-12-31');
  t('tabelas: por etapa e carga por pessoa existem; Natália aparece na redistribuição',Array.isArray(r.tabelas.porEtapa)&&Array.isArray(r.tabelas.cargaPorPessoa)&&r.indicadores.find(x=>x.id==='redistribuidas').ids.includes(s1.id),r.tabelas);
 
+ // ---- recusa/cancelamento sempre com motivo; coordenação e data de publicação no pedido ----
+ {const x=await mk('Post');
+  [s,r]=await put(x,{status:'CANCELADA'});t('recusar/cancelar sem motivo é recusado (409 com {motivo:true})',s===409&&r.motivo===true&&/motivo da recusa/.test(r.error),r);
+  [s]=await put(x,{status:'CANCELADA',motivoTransicao:'Fora do escopo do Marketing'});t('recusar com motivo funciona e o motivo fica no histórico',s===200&&hist(x).some(h=>/>CANCELADA\|Fora do escopo/.test(h)));
+  const novo=await (await fetch(B+'/portal/requests',{method:'POST',headers:{...P1,'Content-Type':'application/json'},body:JSON.stringify({titulo:'Com data',objetivo:'x',segmento:'Infantil',prioridade:'MÉDIA',dataPublicacao:'2026-12-01',prazo:'2026-11-20'})})).json();
+  t('o pedido guarda a coordenação (usuário do Portal) e a data de publicação',novo.coordenacao&&novo.dataPublicacao==='2026-12-01',novo);
+  const ruim=await fetch(B+'/portal/requests',{method:'POST',headers:{...P1,'Content-Type':'application/json'},body:JSON.stringify({titulo:'Data ruim',objetivo:'x',segmento:'Infantil',dataPublicacao:'amanhã'})});t('data de publicação inválida: 400',ruim.status===400)}
  // ---- ciclo completo ----
  const cic=(await (await fetch(B+'/portal/requests',{method:'POST',headers:{...P1,'Content-Type':'application/json'},body:JSON.stringify({titulo:'Ciclo completo',objetivo:'x',segmento:'Infantil',prioridade:'ALTA',tipoSolicitacao:'Reels'})})).json()).id;
  const cnt=async()=>({s:(await call('GET','/data?module=solicitacoes'))[1].rows.length,t:(await call('GET','/data?module=tarefas'))[1].rows.length});

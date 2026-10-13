@@ -24,9 +24,18 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'same-origin' },
           { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
+          { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
         ],
       },
+      // arquivos enviados pelos usuários: CSP própria (sem scripts); a regra vem depois da global e a substitui
+      ...['/api/file', '/api/portal/file', '/api/public/approval/file'].map((source) => ({
+        source,
+        headers: [{ key: 'Content-Security-Policy', value: "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; frame-ancestors 'none'; sandbox allow-same-origin" }],
+      })),
       { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
     ];
   },

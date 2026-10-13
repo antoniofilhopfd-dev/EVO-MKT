@@ -77,6 +77,8 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       add('public_url', /^https:\/\//.test(pub) && pub.replace(/\/+$/, '') === c.url.origin, 'erro', 'PUBLIC_URL é o endereço https do sistema', `Defina PUBLIC_URL=${c.url.origin} nas variáveis da Hostinger (precisa ser https e igual ao endereço de acesso).`);
       add('app_key', env('APP_KEY').length >= 32, 'erro', 'APP_KEY com 32+ caracteres (criptografa os tokens)', 'Gere com "npm run gerar:segredos" e não troque depois de conectar.');
       add('cron_secret', env('CRON_SECRET').length >= 16, 'erro', 'CRON_SECRET definido (protege o cron)', 'Defina CRON_SECRET (16+ caracteres) e use-o no cron da Hostinger.');
+      add('setup_key', env('SETUP_KEY') === '', 'aviso', 'SETUP_KEY removida depois da instalação', 'Remova SETUP_KEY das variáveis da Hostinger depois de instalar: ela libera rotas de diagnóstico e instalação.');
+      add('recovery_key', env('RECOVERY_KEY') === '', 'aviso', 'RECOVERY_KEY removida', 'Remova RECOVERY_KEY das variáveis depois de recuperar o acesso: ela permite gerar um novo código para a Gerência.');
       add('smtp', env('SMTP_HOST') !== '' && env('NOTIFY_TO') !== '', 'aviso', 'E-mail configurado (SMTP_* e NOTIFY_TO) para avisos de falha', 'Sem isso as falhas só aparecem na central de notificações.');
       const metaCred = (await setting('meta_app_id')) !== '' && (await setting('meta_app_secret')) !== '';
       add('meta_cred', metaCred, 'erro', 'Meta: App ID e App Secret salvos', 'Cole as credenciais na caixa Instagram (veja GUIA_INTEGRACOES.md).');

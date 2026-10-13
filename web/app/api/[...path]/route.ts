@@ -25,6 +25,12 @@ async function handle(req: Request, ctx: { params: Promise<{ path?: string[] }> 
         res = json({ error: 'Erro interno do servidor.' }, 500);
       }
     }
+    if (!res.headers.has('Cache-Control')) {
+      // dados autenticados nunca devem ficar em cache de navegador ou proxy
+      const h = new Headers(res.headers);
+      h.set('Cache-Control', 'no-store');
+      res = new Response(res.body, { status: res.status, headers: h });
+    }
     if (c.setCookies.length) {
       const h = new Headers(res.headers);
       for (const sc of c.setCookies) h.append('Set-Cookie', sc);
