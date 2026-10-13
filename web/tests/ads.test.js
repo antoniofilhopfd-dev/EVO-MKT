@@ -18,28 +18,46 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await call('POST','/integrations/meta/token',{token:'NOADS_TOKEN'});[s,r]=await call('POST','/integrations/ads/sync',{});
  t('sem a permissão ads_read: recusa e explica',s===502&&/ads_read/.test(r.error),r);
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});
- [s,r]=await call('POST','/integrations/ads/sync',{});t('sincroniza campanhas e gasto (3 meses × 2 campanhas)',s===200&&r.linhas===6,r);
+ [s,r]=await call('POST','/integrations/ads/sync',{});t('sincroniza campanhas e gasto (3 meses × 4 campanhas)',s===200&&r.linhas===12,r);
  [s,r]=await call('GET','/traffic/snapshots');const c1=r.rows.find(x=>x.campanha_id==='c1');
  t('snapshots guardam gasto, moeda, status, objetivo e orçamento diário convertido de centavos',c1&&Number(c1.gasto)===1234.56&&c1.moeda==='BRL'&&c1.status==='PAUSED'&&c1.objetivo==='OUTCOME_LEADS'&&Number(c1.orcamento_diario)===50&&Number(c1.resultados)===55,c1);
- await call('POST','/integrations/ads/sync',{});[,r]=await call('GET','/traffic/snapshots');t('sincronizar de novo não duplica linhas (upsert)',r.rows.length===6,r.rows.length);
+ await call('POST','/integrations/ads/sync',{});[,r]=await call('GET','/traffic/snapshots');t('sincronizar de novo não duplica linhas (upsert)',r.rows.length===12,r.rows.length);
  const ms=await mock('/__state');
  const mutacoes=ms.calls.filter(x=>/^(POST|DELETE|PUT) \/graph\/(act_|[0-9]+\/(campaigns|adsets|ads))/.test(x));
  t('somente leitura: nenhuma chamada de criação/alteração a campanhas, conjuntos ou anúncios',mutacoes.length===0,mutacoes);
  // painel integrado de relatórios
  const mes=new Date().toISOString().slice(0,7);
  [s,r]=await call('GET',`/reports/overview?de=${mes}&ate=${mes}`);
- t('painel integrado: tráfego com fonte, período e atualização; moeda separada',s===200&&r.trafego.meta.moedas.length===1&&r.trafego.meta.moedas[0].moeda==='BRL'&&Math.abs(r.trafego.meta.moedas[0].gasto-1534.56)<0.01&&r.trafego.meta.atualizadoEm&&r.trafego.fonte.includes('Meta Ads'),r.trafego.meta.moedas);
+ t('painel integrado: tráfego com fonte, período e atualização; moeda separada',s===200&&r.trafego.meta.moedas.length===1&&r.trafego.meta.moedas[0].moeda==='BRL'&&Math.abs(r.trafego.meta.moedas[0].gasto-2084.56)<0.01&&r.trafego.meta.atualizadoEm&&r.trafego.fonte.includes('Meta Ads'),r.trafego.meta.moedas);
  t('institucionais: declara que não há fonte (não estima)',r.institucionais.disponivel===false);
  const camp=(await call('POST','/data?module=campanhas',{titulo:'Matrículas 2027',status:'PLANEJAMENTO',orcamento:'2000',metaAdsId:'c1'}))[1];
  [,r]=await call('GET',`/reports/overview?de=${mes}&ate=${mes}`);const pv=r.trafego.planejadoVsReal.find(x=>x.id===camp.id);
  t('planejado x real: orçamento planejado da campanha ao lado do gasto real vindo da Meta',pv.orcamentoPlanejado===2000&&Math.abs(pv.gastoReal-1234.56)<0.01&&pv.fonteGasto==='Meta Ads',pv);
  await call('POST','/data?module=trafego',{titulo:'Registro manual',periodo:mes,investimento:'500',impressoes:'1000'});
- [,r]=await call('GET',`/reports/overview?de=${mes}&ate=${mes}`);t('registro manual NÃO é somado ao dado da Meta, e há aviso de possível dupla contagem',Math.abs(r.trafego.meta.moedas[0].gasto-1534.56)<0.01&&r.trafego.registrosManuais.linhas.length===1&&/NÃO são somados/.test(r.trafego.aviso),r.trafego.aviso);
+ [,r]=await call('GET',`/reports/overview?de=${mes}&ate=${mes}`);t('registro manual NÃO é somado ao dado da Meta, e há aviso de possível dupla contagem',Math.abs(r.trafego.meta.moedas[0].gasto-2084.56)<0.01&&r.trafego.registrosManuais.linhas.length===1&&/NÃO são somados/.test(r.trafego.aviso),r.trafego.aviso);
  [s]=await call('GET','/reports/overview?de=2026-12&ate=2026-01');t('período invertido: 400',s===400);
  [s,r]=await call('POST','/reports/save',{de:mes,ate:mes});const rels=(await call('GET','/data?module=relatorios'))[1].rows;
  t('salvar relatório guarda cópia fiel no histórico (módulo Relatórios)',s===200&&rels.some(x=>x.id===r.id&&x.tipoRelatorio==='Painel integrado'&&JSON.parse(x.snapshot).trafego.meta.moedas[0].moeda==='BRL'));
  t('salvar relatório é só da Gerência (403 Equipe)',(await call('POST','/reports/save',{},E))[0]===403);
  t('relatórios exigem sessão',[401,403].includes((await call('GET','/reports/overview',null,{}))[0]));
+
+ // ---- alertas objetivos (limites visíveis, só com dados suficientes) e mudança de status ----
+ [,r]=await call('GET','/traffic/snapshots');const al=r.alertas;const reg=(id,rg)=>al.find(a=>a.campanha_id===id&&a.regra===rg);
+ t('alerta de CTR baixo cita o número e o limite (campanha c3: 0,40% com 5.000 impressões)',reg('c3','CTR baixo')&&/0\.40%/.test(reg('c3','CTR baixo').mensagem)&&/limite: 0\.9%/.test(reg('c3','CTR baixo').mensagem),al);
+ t('alerta de frequência alta (c3) e de CPC acima do normal (c3)',!!reg('c3','Frequência alta')&&!!reg('c3','CPC acima do normal'));
+ t('alerta crítico de gasto sem resultado só em campanha de leads/conversas (c4), não em engajamento (c2)',reg('c4','Gasto sem resultado')?.severidade==='critico'&&!reg('c2','Gasto sem resultado'));
+ t('campanhas saudáveis (c1, c2) não geram alerta de CTR/frequência',!reg('c1','CTR baixo')&&!reg('c2','CTR baixo')&&!reg('c1','Frequência alta')&&!reg('c2','Frequência alta'));
+ t('limites padrão expostos (0,9% · 3,5 · 100 · 1.000)',r.limites.ctrMin===0.9&&r.limites.frequenciaMax===3.5&&r.limites.gastoSemResultado===100&&r.limites.impressoesMin===1000,r.limites);
+ const nts=(await call('GET','/notificacoes'))[1].rows.filter(n=>n.tipo==='ads_alerta');
+ t('a Gerência é avisada na central, uma vez por campanha, regra e mês (sem repetir a cada sincronização)',nts.length===al.length&&nts.length>=4,[nts.length,al.length]);
+ [s]=await call('POST','/integrations/ads/config',{ctrMin:-1});t('limite inválido é recusado (400)',s===400);
+ [s]=await call('POST','/integrations/ads/config',{ctrMin:3});[,r]=await call('GET','/traffic/snapshots');
+ t('a Gerência ajusta o limite e as regras passam a usá-lo (CTR de 2,3% de c1 agora alerta)',s===200&&r.limites.ctrMin===3&&!!r.alertas.find(a=>a.campanha_id==='c1'&&a.regra==='CTR baixo'));
+ await call('POST','/integrations/ads/config',{ctrMin:0.9});
+ await call('POST','/integrations/meta/token',{token:'STATUS_TOKEN'});await call('POST','/integrations/ads/sync',{});
+ const st2=(await call('GET','/notificacoes'))[1].rows.filter(n=>n.tipo==='ads_status');
+ t('mudança de status na Meta (PAUSED → WITH_ISSUES) vira notificação de problema e alerta crítico',st2.some(n=>/c1|Matrículas 2027/.test(n.titulo+n.texto+n.registro)&&/problema/i.test(n.titulo))&&(await call('GET','/traffic/snapshots'))[1].alertas.some(a=>a.campanha_id==='c1'&&a.regra==='Problema de aprovação'),st2);
+ await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});
  // ligar leitura de anúncios muda o escopo do OAuth
  await call('POST','/integrations/settings',{meta_app_id:'APPID',meta_app_secret:'META_SECRET'});await call('POST','/integrations/ads/config',{ativar:true});
  const x=await fetch(B+'/integrations/meta/connect',{headers:G,redirect:'manual'});t('ativar a leitura de anúncios acrescenta ads_read ao consentimento',/ads_read/.test(decodeURIComponent(x.headers.get('location')||'')));

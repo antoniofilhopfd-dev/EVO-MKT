@@ -1,6 +1,6 @@
 # Capturas reais finais
 
-Geradas em 13/10/2026, 19:21:53 pelo próprio aplicativo (build de produção) com `tests/capturas.test.js`, contra um banco de testes. Todos os registros de demonstração têm o prefixo **[DEMO]**; não há dados pessoais, senhas, códigos de acesso nem tokens nas imagens. Tráfego e Instagram usam o **servidor simulado** da Meta usado nos testes — os números **não** são do Colégio.
+Geradas em 13/10/2026, 19:33:46 pelo próprio aplicativo (build de produção) com `tests/capturas.test.js`, contra um banco de testes. Todos os registros de demonstração têm o prefixo **[DEMO]**; não há dados pessoais, senhas, códigos de acesso nem tokens nas imagens. Tráfego e Instagram usam o **servidor simulado** da Meta usado nos testes — os números **não** são do Colégio.
 
 | Arquivo | Tela | O que demonstra |
 |---|---|---|

@@ -8,7 +8,7 @@ import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
-import { adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync } from '../integrations/metaads';
+import { adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta } from '../integrations/metaads';
 import { json } from './handlers';
 
 const redirect = (to: string) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store' } });
@@ -61,7 +61,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
           planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
-        ads: { ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
+        ads: { limites: await limitesAlerta(), ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
         ia: { configurada: await iaConfigurada(), guiaVoz: await setting('ia_guia_voz'), modelo: IA_MODELO() },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
@@ -139,6 +139,9 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const u = await requireManager(c);
       const b = await c.body();
       if ('ativar' in b) await setSetting('meta_ads_ativar', b.ativar ? '1' : '0');
+      for (const [k, cfg] of [['ctrMin', 'ads_ctr_min'], ['frequenciaMax', 'ads_freq_max'], ['gastoSemResultado', 'ads_gasto_sem_resultado'], ['impressoesMin', 'ads_impr_min']] as const) {
+        if (k in b) { const v = Number(b[k]); if (!Number.isFinite(v) || v <= 0 || v > 1_000_000) fail(400, `Valor inválido para ${k}.`); await setSetting(cfg, String(v)); }
+      }
       await audit(u.codigo, 'ads-config', '', b.ativar ? 'ativado' : 'desativado');
       return json({ ok: true });
     }
@@ -161,7 +164,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     }
     case path === '/traffic/snapshots': {
       await requireInternal(c);
-      return json({ rows: await adsSnapshots(c.qs('periodo') || undefined), ultimaSync: await setting('meta_ads_ultima_sync'), conta: await setting('meta_ads_conta'), fonte: 'Meta Ads (leitura)' });
+      return json({ alertas: await alertasTrafego(), limites: await limitesAlerta(), rows: await adsSnapshots(c.qs('periodo') || undefined), ultimaSync: await setting('meta_ads_ultima_sync'), conta: await setting('meta_ads_conta'), fonte: 'Meta Ads (leitura)' });
     }
     case path === '/integrations/meta/account' && method === 'POST': {
       const u = await requireManager(c);

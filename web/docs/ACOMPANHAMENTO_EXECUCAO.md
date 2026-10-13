@@ -4,7 +4,7 @@ Registro objetivo, atualizado ao final de cada bloco de trabalho. Datas: 13/10/2
 
 ## Estado final
 **Concluído com ressalvas documentadas** (seção "Pendências e dependências externas").
-Suíte completa (`tests/run-web.sh`): **30 suítes de verificação, 618 verificações, 0 falhas**, mais a suíte `responsive` (6 larguras × todas as telas): sem estouro horizontal. `npm audit --omit=dev`: 0 vulnerabilidades. Build de produção (`next build --webpack`) executado em cada rodada de testes.
+Suíte completa (`tests/run-web.sh`): **30 suítes de verificação, 627 verificações, 0 falhas**, mais a suíte `responsive` (6 larguras × todas as telas): sem estouro horizontal. `npm audit --omit=dev`: 0 vulnerabilidades. Build de produção (`next build --webpack`) executado em cada rodada de testes.
 
 | Suíte | Verificações | | Suíte | Verificações |
 |---|---|---|---|---|
@@ -12,7 +12,7 @@ Suíte completa (`tests/run-web.sh`): **30 suítes de verificação, 618 verific
 | acesso | 36 | | ui2 (fluxo completo) | 27 |
 | integrations | 54 | | ui3 | 19 |
 | instagram | 9 | | ui4 | 9 |
-| ads (Meta Ads leitura + relatório) | 20 | | ui5 | 8 |
+| ads (Meta Ads leitura, alertas e relatório) | 29 | | ui5 | 8 |
 | importar | 9 | | ui6 | 13 |
 | recover | 8 | | ui7 | 16 |
 | codigo | 13 | | ui8 | 7 |
@@ -33,7 +33,7 @@ Suíte completa (`tests/run-web.sh`): **30 suítes de verificação, 618 verific
 **05 Autenticação, permissões e Portal.** Concluída: sessões encerradas na troca de senha, IP real, recusa/cancelamento sempre com motivo, coordenação e data de publicação no pedido, comentários e histórico visíveis ao solicitante, matriz de permissões documentada e testada. Limite: papéis Administrador/Gerente continuam um só (`manager`); modo de login ativo não foi alterado.
 **06 Gestão do trabalho.** Concluída: subtarefas e dependências por ID (sem ciclos, bloqueia concluir), checklist, comentários, histórico de prazo/responsável, tarefas recorrentes, tarefa criada automaticamente ao distribuir uma demanda (uma vez, com chave de idempotência), automações com liga/desliga. Não implementado: Gantt.
 **07 Conteúdo e redes.** Concluída: canal (Instagram/TikTok/YouTube), hashtags, versão, estado de publicação separado do status (agendado internamente ≠ publicação confirmada), decisão de revisão com motivo e versão (só Gerência ou revisor), confirmação manual com link https, filtros por canal/estado/responsável. Sem API de TikTok/YouTube.
-**08 Tráfego e integrações.** Concluída no código, **não validada com contas reais**: Meta Ads **somente leitura** (contas, campanhas, gasto, resultados; upsert; moeda separada; planejado × real), painel integrado de relatórios (fonte, período, atualização, sem estimativas, sem misturar API e manual), conferência de permissões/token/contas do Instagram, Google (Agenda/Drive/Planilhas) e IA (legendas) já existentes. AdFlow: ZIP **não foi recebido** (pendência). MCP e WhatsApp: não implementados (não justificados).
+**08 Tráfego e integrações.** Concluída no código, **não validada com contas reais**: Meta Ads **somente leitura** (contas, campanhas, gasto, resultados; upsert; moeda separada; planejado × real), painel integrado de relatórios (fonte, período, atualização, sem estimativas, sem misturar API e manual), conferência de permissões/token/contas do Instagram, Google (Agenda/Drive/Planilhas) e IA (legendas) já existentes. AdFlow: ZIP recebido depois da entrega e **inspecionado** (`COMPARATIVO_REFERENCIAS.md`): incorporados alertas objetivos com limites ajustáveis (CTR, frequência, gasto sem resultado, CPC relativo, problema de aprovação), notificação de mudança de status e as lições sobre período até hoje e totais acumulados; criação/ativação de campanhas, públicos, WhatsApp e MCP **não** foram importados. MCP e WhatsApp: não implementados (não justificados).
 **09 Testes, documentação e capturas.** Concluída: 30 suítes, documentação (`OPERACAO.md`, `DESIGN_SYSTEM.md`, `SEGURANCA_RELATORIO.md`, README, `.env.example`), 21 capturas reais com índice em `docs/screenshots/final/`. Orkestrya: ZIP inspecionado (conceitos de aprovação por link, saúde por segmento, ranking, horários, datas, NPS já incorporados; nada de CRM/clientes/propostas).
 **10 Segurança.** Concluída: `SEGURANCA_RELATORIO.md` (10 achados, todos corrigidos/mitigados e revalidados; riscos residuais e itens não verificáveis listados).
 
@@ -49,7 +49,7 @@ Testes: 12 suítes novas (`trabalho conteudo ads seguranca seguranca-estatica xs
 ## Pendências e dependências externas
 1. **Reimplantar** na Hostinger (não houve implantação em produção nesta execução) e conferir a tela Prontidão.
 2. **Credenciais**: Meta (app e `ads_read` se quiser anúncios), Google, chave da Anthropic. Sem elas, tudo foi validado só com servidores simulados.
-3. **AdFlow**: reenviar o ZIP (não chegou nesta sessão) para uma comparação de conceitos.
+3. Os limites dos alertas de tráfego (CTR 0,9%, frequência 3,5, gasto sem resultado 100, mínimo de 1.000 impressões) são referências de mercado do AdFlow: confirme ou ajuste em Administração → Integrações.
 4. Remover `SETUP_KEY` e `RECOVERY_KEY` do painel; trocar segredos que passaram pelo chat.
 5. Decisão de produto: modo de login (código × senha) e se Administrador e Gerente devem ser papéis distintos.
 6. Teste com leitor de tela real; varredura dinâmica externa de segurança; LGPD (exportar/excluir dados de titular).
