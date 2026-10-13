@@ -2,6 +2,7 @@ import { registrarNotificacao } from './notificacoes';
 import { q, q1, run, withTx } from './db';
 import { cleanInput, currentIp, fail, lower, now, Row, strv } from './util';
 import { validarTransicaoSolicitacao } from './fluxo';
+import { automacaoAtiva, checarDependenciaAoConcluir, dadosTarefaDaSolicitacao, proximaOcorrencia, validarVinculosTarefa } from './trabalho';
 import { notifyMail } from './mail';
 import { env, envInt } from './util';
 
@@ -73,6 +74,7 @@ export async function getRow(mod: string, id: string): Promise<Row | null> {
 export async function insertRow(mod: string, input: Row, ator: string): Promise<Row> {
   const clean = cleanInput(input);
   delete clean.id;
+  if (mod === 'tarefas') await validarVinculosTarefa('', clean);
   const id = await newId(mod);
   const t = now();
   const row: Row = { id, ...clean, criadoEm: t, atualizadoEm: t, criadoPor: ator };
@@ -124,11 +126,50 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
     }
     if (patch.responsavel !== undefined && String(patch.responsavel).trim() !== String(cur.responsavel ?? '').trim() && String(cur.responsavel ?? '').trim() !== '')
       await logStatus(c, mod, id, String(cur.responsavel ?? ''), String(patch.responsavel), ator, motivoInformado.trim(), 'responsavel');
-    return { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
+    for (const campo of ['prazo', 'publicacaoEm']) {
+      if (patch[campo] !== undefined && strv(patch[campo]) !== strv(cur[campo]) && strv(cur[campo]) !== '') await logStatus(c, mod, id, strv(cur[campo]), strv(patch[campo]), ator, motivoInformado.trim(), campo);
+    }
+    const merged: Row = { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
+    if (mod === 'tarefas') {
+      if ('tarefaPaiId' in patch || 'dependeDe' in patch) await validarVinculosTarefa(id, merged);
+      const concluindo = /CONCLU/i.test(strv(merged.status)) && !/CONCLU/i.test(strv(cur.status));
+      if (concluindo) {
+        await checarDependenciaAoConcluir(merged);
+        const prox = (await automacaoAtiva('auto_recorrencia')) ? proximaOcorrencia(merged) : null;
+        if (prox) {
+          const nid = await newId('tarefas');
+          const t = now();
+          const row: Row = { id: nid, ...prox, criadoEm: t, atualizadoEm: t, criadoPor: 'automacao' };
+          await c.query('INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES(?,?,?,?,?)', ['tarefas', nid, JSON.stringify(row), t, t]);
+          await logStatus(c, 'tarefas', nid, '', 'NOVO', 'automacao', `Recorrência (${merged.recorrencia}) da tarefa ${id}`);
+          merged.proximaCriadaId = nid;
+        }
+      }
+    }
+    return merged;
   });
   await audit(ator, 'editar', mod, id);
-  if (mod === 'solicitacoes') await avisosDaSolicitacao(prev, nw, ator);
+  if (mod === 'solicitacoes') {
+    await avisosDaSolicitacao(prev, nw, ator);
+    return (await tarefaDaDemanda(nw, ator)) ?? nw;
+  }
   return nw;
+}
+/** Ao distribuir uma demanda com responsável, cria UMA tarefa vinculada (a demanda guarda o vínculo, então repetir/devolver/reabrir não duplica). */
+async function tarefaDaDemanda(sol: Row, ator: string): Promise<Row | null> {
+  const st = strv(sol.status).toUpperCase();
+  if (!['DISTRIBUÍDA', 'EM EXECUÇÃO'].includes(st) || !strv(sol.responsavel).trim() || sol.tarefaAutoId) return null;
+  if (!(await automacaoAtiva('auto_tarefa_solicitacao'))) return null;
+  let reivindicou = false;
+  const marcada = await modifyRow('solicitacoes', String(sol.id), (cur) => {
+    if (cur.tarefaAutoId) return cur;
+    reivindicou = true;
+    return { ...cur, tarefaAutoId: 'PENDENTE' };
+  });
+  if (!reivindicou) return marcada;
+  const existente = (await listRows('tarefas')).find((t) => String(t.solicitacaoId ?? '') === String(sol.id));
+  const tarefa = existente ?? (await insertRow('tarefas', await dadosTarefaDaSolicitacao(sol), 'automacao'));
+  return modifyRow('solicitacoes', String(sol.id), (cur) => ({ ...cur, tarefaAutoId: String(tarefa.id) }));
 }
 async function avisosDaSolicitacao(antes: Row, depois: Row, ator: string): Promise<void> {
   const id = String(depois.id), titulo = String(depois.titulo ?? id), portal = `portal:${depois.segmento ?? ''}`;
@@ -146,6 +187,7 @@ export async function trashRow(mod: string, id: string, ator: string): Promise<v
   const cur = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
   if (mod === 'lixeira') {
     await run('DELETE FROM records WHERE modulo=? AND id=?', ['lixeira', id]);
+    if (cur.origem && cur.idOriginal) for (const t of ['status_history', 'record_comments', 'record_checklist']) await run(`DELETE FROM ${t} WHERE modulo=? AND registro=?`, [String(cur.origem), String(cur.idOriginal)]);
     await audit(ator, 'excluir-permanente', 'lixeira', id);
     return;
   }

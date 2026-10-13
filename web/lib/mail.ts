@@ -1,8 +1,8 @@
 import { appendFile } from 'node:fs/promises';
-import nodemailer from 'nodemailer';
+import { createTransport, type Transporter } from 'nodemailer';
 import { env, envInt } from './util';
 
-let transport: nodemailer.Transporter | null = null;
+let transport: Transporter | null = null;
 
 /** Envio melhor-esforço. Sem SMTP configurado só registra no console (ou em MAIL_LOG nos testes). */
 export async function notifyMail(assunto: string, texto: string, to?: string): Promise<void> {
@@ -18,7 +18,7 @@ export async function notifyMail(assunto: string, texto: string, to?: string): P
       console.log(`[mail] (sem SMTP) para ${dest}: ${assunto}`);
       return;
     }
-    transport ??= nodemailer.createTransport({
+    transport ??= createTransport({
       host: env('SMTP_HOST'),
       port: envInt('SMTP_PORT', 465),
       secure: envInt('SMTP_PORT', 465) === 465,

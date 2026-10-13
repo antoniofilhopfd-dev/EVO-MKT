@@ -8,6 +8,7 @@ import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
+import { adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync } from '../integrations/metaads';
 import { json } from './handlers';
 
 const redirect = (to: string) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store' } });
@@ -60,6 +61,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
           planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
+        ads: { ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
         ia: { configurada: await iaConfigurada(), guiaVoz: await setting('ia_guia_voz'), modelo: IA_MODELO() },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
@@ -131,6 +133,34 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await audit(u.codigo, 'instagram-token-manual');
       return json({ ok: true });
     }
+    case path === '/integrations/ads/config' && method === 'POST': {
+      const u = await requireManager(c);
+      const b = await c.body();
+      if ('ativar' in b) await setSetting('meta_ads_ativar', b.ativar ? '1' : '0');
+      await audit(u.codigo, 'ads-config', '', b.ativar ? 'ativado' : 'desativado');
+      return json({ ok: true });
+    }
+    case path === '/integrations/ads/accounts': {
+      await requireManager(c);
+      try { return json({ contas: await listarContasAds() }); } catch (e: any) { return fail(502, e.message); }
+    }
+    case path === '/integrations/ads/account' && method === 'POST': {
+      const u = await requireManager(c);
+      const b = await c.body();
+      const contas: ContaAds[] = JSON.parse((await setting('meta_ads_contas')) || '[]');
+      const alvo = contas.find((x) => x.id === strv(b.conta)) ?? fail(400, 'Conta de anúncios não encontrada. Atualize a lista.');
+      await setSetting('meta_ads_conta', alvo.id);
+      await audit(u.codigo, 'ads-conta', '', alvo.id);
+      return json({ ok: true });
+    }
+    case path === '/integrations/ads/sync' && method === 'POST': {
+      await requireManager(c);
+      try { return json({ linhas: await adsSync() }); } catch (e: any) { await intLog('instagram', 'erro', 'Meta Ads: ' + e.message); return fail(502, e.message); }
+    }
+    case path === '/traffic/snapshots': {
+      await requireInternal(c);
+      return json({ rows: await adsSnapshots(c.qs('periodo') || undefined), ultimaSync: await setting('meta_ads_ultima_sync'), conta: await setting('meta_ads_conta'), fonte: 'Meta Ads (leitura)' });
+    }
     case path === '/integrations/meta/account' && method === 'POST': {
       const u = await requireManager(c);
       const input = await c.body();
@@ -143,7 +173,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/meta/disconnect' && method === 'POST': {
       const u = await requireManager(c);
       await stepUp(u, await c.body());
-      for (const k of ['meta_token', 'meta_token_expira', 'ig_user_id', 'ig_username', 'meta_page_name', 'meta_contas', 'meta_perm_faltando', 'meta_token_invalido']) await setSetting(k, '');
+      for (const k of ['meta_token', 'meta_token_expira', 'ig_user_id', 'ig_username', 'meta_page_name', 'meta_contas', 'meta_perm_faltando', 'meta_token_invalido', 'meta_ads_conta', 'meta_ads_contas', 'meta_ads_ultima_sync']) await setSetting(k, '');
       await audit(u.codigo, 'instagram-desconectado');
       return json({ ok: true });
     }

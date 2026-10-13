@@ -98,7 +98,7 @@ const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
  await put(cic,{status:'EM EXECUÇÃO',motivoTransicao:'Ajuste pedido pelo solicitante'});await put(cic,{status:'AGUARDANDO APROVAÇÃO DO SOLICITANTE'});await put(cic,{status:'CONCLUÍDA'});
  const c1=await cnt();
  t('ciclo completo: histórico cobre todas as etapas na ordem',hist(cic).map(x=>x.split('|')[0]).join(' ').includes('>AGUARDANDO SOLICITANTE')&&hist(cic).slice(-1)[0].includes('>CONCLUÍDA'),hist(cic));
- t('ciclo completo: devolver, distribuir e reabrir não criam registros novos',c1.s===c0.s&&c1.t===c0.t,[c0,c1]);
+ t('ciclo completo: devolver, distribuir e reabrir não duplicam demandas; a automação cria no máximo UMA tarefa vinculada',c1.s===c0.s&&c1.t===c0.t+1,[c0,c1]);
  t('ciclo completo: demanda final em CONCLUÍDA e visível ao solicitante',(await (await fetch(B+'/portal/requests',{headers:P1})).json()).rows.find(x=>x.id===cic).status==='CONCLUÍDA');
  console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

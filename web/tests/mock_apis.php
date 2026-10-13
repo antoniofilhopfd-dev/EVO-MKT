@@ -39,7 +39,16 @@ if (str_starts_with($p, '/graph')) {
     }
     if ($tok === '') j(['error' => ['message' => 'Missing access token']], 401);
     if ($tok === 'EXPIRED_TOKEN') j(['error' => ['message' => 'Error validating access token: Session has expired', 'type' => 'OAuthException', 'code' => 190]], 400);
-    if ($g === '/me/permissions') { $all = ['instagram_basic', 'instagram_manage_insights', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'business_management']; $d = []; foreach ($all as $x) { $d[] = ['permission' => $x, 'status' => ($tok === 'LIMITED_TOKEN' && $x === 'instagram_content_publish') ? 'declined' : 'granted']; } j(['data' => $d]); }
+    if ($g === '/me/permissions') { $all = ['instagram_basic', 'instagram_manage_insights', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'business_management', 'ads_read']; $d = []; foreach ($all as $x) { $d[] = ['permission' => $x, 'status' => (($tok === 'LIMITED_TOKEN' && $x === 'instagram_content_publish') || ($tok === 'NOADS_TOKEN' && $x === 'ads_read')) ? 'declined' : 'granted']; } j(['data' => $d]); }
+    if ($g === '/me/adaccounts') j(['data' => [['account_id' => '111222333', 'name' => 'Conta Colégio', 'currency' => 'BRL', 'account_status' => 1], ['account_id' => '999', 'name' => 'Outra conta', 'currency' => 'USD', 'account_status' => 1]]]);
+    if ($g === '/act_111222333/campaigns') j(['data' => [['id' => 'c1', 'name' => 'Matrículas 2027', 'status' => 'PAUSED', 'effective_status' => 'PAUSED', 'objective' => 'OUTCOME_LEADS', 'daily_budget' => '5000'], ['id' => 'c2', 'name' => 'Open day', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'objective' => 'OUTCOME_ENGAGEMENT', 'daily_budget' => '2000']]]);
+    if ($g === '/act_111222333/insights') {
+        $since = json_decode($_GET['time_range'] ?? '{}', true)['since'] ?? '';
+        j(['data' => [
+            ['campaign_id' => 'c1', 'campaign_name' => 'Matrículas 2027', 'spend' => '1234.56', 'impressions' => '90000', 'reach' => '41000', 'clicks' => '2100', 'account_currency' => 'BRL', 'actions' => [['action_type' => 'lead', 'value' => '35'], ['action_type' => 'onsite_conversion.messaging_conversation_started_7d', 'value' => '20'], ['action_type' => 'link_click', 'value' => '2000']]],
+            ['campaign_id' => 'c2', 'campaign_name' => 'Open day', 'spend' => '300.00', 'impressions' => '20000', 'reach' => '15000', 'clicks' => '500', 'account_currency' => 'BRL'],
+        ], 'since' => $since]);
+    }
     if ($g === '/me/accounts') { $d = [['name' => 'Colégio Evolução', 'id' => 'p1', 'instagram_business_account' => ['id' => $IG, 'username' => 'evolucaopb']]]; if ($tok === 'MULTI_TOKEN') $d[] = ['name' => 'Outra Página', 'id' => 'p2', 'instagram_business_account' => ['id' => '17841499999999999', 'username' => 'outraconta']]; j(['data' => $d]); }
     if ($g === "/$IG") j(['followers_count' => 4600, 'follows_count' => 120, 'media_count' => 310, 'username' => 'evolucaopb']);
     if ($g === "/$IG/insights") {

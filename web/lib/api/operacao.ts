@@ -1,4 +1,5 @@
 import { Ctx } from '../ctx';
+import { verificarIntegridade } from '../integridade';
 import { gerarLegendas } from '../ia';
 import { rateCheck, rateFail } from '../auth';
 import { melhoresHorarios, proximasDatas, rankingConteudos, saudePorSegmento } from '../insights';
@@ -31,9 +32,9 @@ async function timeline(mod: string, id: string, portal: boolean): Promise<Row[]
   for (const h of await q('SELECT campo,de,para,quando,ator,motivo FROM status_history WHERE modulo=? AND registro=? ORDER BY id', [mod, id])) {
     const interno = !String(h.ator).startsWith('portal:');
     out.push({
-      quando: h.quando, tipo: h.campo === 'responsavel' ? 'responsavel' : 'status',
+      quando: h.quando, tipo: h.campo === 'status' ? 'status' : h.campo === 'responsavel' ? 'responsavel' : 'prazo',
       ator: portal && interno ? 'Marketing' : h.ator,
-      texto: h.campo === 'responsavel' ? `Responsável: ${h.de} → ${h.para}` : h.de ? `Status: ${h.de} → ${h.para}` : `Registrada com status ${h.para}`,
+      texto: h.campo === 'responsavel' ? `Responsável: ${h.de} → ${h.para}` : h.campo === 'prazo' ? `Prazo: ${h.de} → ${h.para}` : h.campo === 'publicacaoEm' ? `Publicação: ${h.de} → ${h.para}` : h.de ? `Status: ${h.de} → ${h.para}` : `Registrada com status ${h.para}`,
       motivo: h.motivo,
     });
   }
@@ -98,6 +99,10 @@ export async function operacaoRoute(c: Ctx) {
     const opcoes = await gerarLegendas(reg, String(b.instrucao ?? ''));
     await audit(String(u.codigo), 'ia-legenda', mod, String(reg.id));
     return json({ opcoes });
+  }
+  if (path === '/admin/integridade') {
+    await requireManager(c);
+    return json(await verificarIntegridade());
   }
   if (path === '/insights') {
     await requireManager(c);

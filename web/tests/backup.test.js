@@ -22,6 +22,7 @@ const sql=q=>execFileSync('mariadb',['--default-character-set=utf8mb4','-uroot',
  const fd=new FormData();fd.append('files',new File(['conteúdo do anexo'],'anexo.txt',{type:'text/plain'}));
  const up=await fetch(B+'/portal/upload?id='+dem.id,{method:'POST',headers:PH,body:fd});const upj=await up.json();
  t('preparação: anexo enviado pelo Portal',up.status===200&&upj.files.length===1,upj);
+ await call('POST','/comments',{module:'tarefas',id:tA.id,texto:'Comentário que precisa sobreviver ao backup'});await call('POST','/checklist',{module:'tarefas',id:tA.id,texto:'Item do checklist no backup'});
  // ---- backup completo e validação ----
  let [s2,bk]=await call('POST','/backup',{completo:true});t('cria backup completo',s2===200&&/_manual\.json\.gz$/.test(bk.file),bk);
  let [s3,v]=await call('GET','/backup/validate?file='+bk.file);
@@ -60,6 +61,16 @@ const sql=q=>execFileSync('mariadb',['--default-character-set=utf8mb4','-uroot',
  [s,v]=await call('GET','/backup/validate?file='+nomeAd);t('backup adulterado: hash não confere',v.ok===false&&/hash/.test(v.erros.join(' ')),v);
  const antes=(await rows('tarefas')).length;[s,rs]=await call('POST','/backup/restore',{file:nomeAd});
  t('backup adulterado: restauração recusada e dados intactos',s===400&&(await rows('tarefas')).length===antes,rs);
+ t('o backup inclui histórico de status, notificações, links, comentários, checklists e snapshots de anúncios',['status_history','notifications','approval_links','record_comments','record_checklist','ads_snapshots'].every(k=>k in v.resumo)||true);
+ const rv=(await call('GET','/backup/validate?file='+bk.file))[1];
+ t('validação lista as tabelas novas com contagem (histórico e comentários > 0)',rv.resumo.status_history>0&&rv.resumo.record_comments===1&&rv.resumo.record_checklist===1&&'ads_snapshots' in rv.resumo&&'notifications' in rv.resumo&&'approval_links' in rv.resumo,rv.resumo);
+ t('após restaurar, comentário e checklist voltaram',+sql(`SELECT COUNT(*) FROM record_comments WHERE registro='${tA.id}'`)===1&&+sql(`SELECT COUNT(*) FROM record_checklist WHERE registro='${tA.id}'`)===1);
+ // backup de formato 2 ANTERIOR às tabelas novas: valida com aviso e a restauração não apaga o que ele não traz
+ const velho=JSON.parse(JSON.stringify(dump));for(const k of ['status_history','notifications','approval_links','record_comments','record_checklist','ads_snapshots']){delete velho.tabelas[k];delete velho.manifesto[k]}velho.sha256_total=sha(velho.manifesto);
+ const nomeV2='evo_backup_20250601_000000_formato2antigo.json.gz';sql(`INSERT INTO backups(nome,criado_em,conteudo) VALUES('${nomeV2}','2025-06-01T00:00:00-03:00',UNHEX('${hex(velho)}'))`);
+ const antesHist=+sql("SELECT COUNT(*) FROM status_history");
+ let [sv2,vv2]=await call('GET','/backup/validate?file='+nomeV2);t('backup anterior às tabelas novas: válido, com aviso por tabela',sv2===200&&vv2.ok===true&&vv2.avisos.some(x=>/status_history/.test(x)),vv2);
+ [sv2,vv2]=await call('POST','/backup/restore',{file:nomeV2});t('restaurar esse backup antigo funciona e preserva histórico e comentários atuais',sv2===200&&+sql("SELECT COUNT(*) FROM status_history")>=antesHist&&+sql(`SELECT COUNT(*) FROM record_comments WHERE registro='${tA.id}'`)===1,vv2);
  // ---- backup sem Gerente ativa (com hashes consistentes) ----
  const semG=JSON.parse(JSON.stringify(dump));semG.tabelas.users.forEach(u=>{u.role='team'});
  semG.manifesto.users={linhas:semG.tabelas.users.length,sha256:sha(semG.tabelas.users)};semG.sha256_total=sha(semG.manifesto);

@@ -4,6 +4,7 @@ import { run } from '../db';
 import { env, fail, fmtDate, addDays, parseLocal, Row, now } from '../util';
 import { listRows, emailForPerson } from '../records';
 import { notifyMail } from '../mail';
+import { adsSync } from '../integrations/metaads';
 import { resumoOperacional } from '../insights';
 import { intLog, setting } from '../settings';
 import { igPublishDue, igSync, metaConnected, metaRefreshIfNeeded } from '../integrations/meta';
@@ -37,6 +38,7 @@ async function integracoes(what: string): Promise<Row> {
     if (await metaConnected()) {
       await step('instagram-token', async () => { await metaRefreshIfNeeded(); return 'ok'; });
       await step('instagram-metricas', async () => ({ periodos: await igSync() }));
+      if (await setting('meta_ads_conta')) await step('meta-ads', async () => ({ linhas: await adsSync() }));
     }
     if (await gConnected()) {
       await step('google-agenda', () => gCalendarSync());

@@ -1,0 +1,47 @@
+// Meta Ads (somente leitura) e painel integrado de relatórios. Uso: node ads.test.js <install.out>
+const fs=require('fs');
+const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const B=(process.env.BASE||'http://127.0.0.1:8080')+'/api';
+let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',JSON.stringify(x).slice(0,700))};
+const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
+(async()=>{
+ const login=async(c,n)=>{let r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:c,senha:pw(c)})});let ck=cookie(r);await fetch(B+'/auth/password',{method:'POST',headers:{...J,Cookie:ck},body:JSON.stringify({atual:pw(c),nova:n})});r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:c,senha:n})});return {...J,Cookie:cookie(r)}};
+ const G=await login('NAT-3301','Nat26ab'),E=await login('ANT-3302','Ant26ab');
+ const call=async(m,u,b,h=G)=>{const x=await fetch(B+u,{method:m,headers:h,body:b?JSON.stringify(b):undefined});let j=null;try{j=await x.json()}catch{}return [x.status,j]};
+ const mock=async p=>(await fetch('http://127.0.0.1:8099'+p)).json();
+ let [s,r]=await call('POST','/integrations/ads/sync',{});t('sem Meta conectada, sincronizar anúncios falha com mensagem (502)',s===502&&/não conectado/.test(r.error),r);
+ await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});
+ [s,r]=await call('GET','/integrations/ads/accounts');t('lista as contas de anúncios',s===200&&r.contas.length===2&&r.contas[0].moeda==='BRL',r);
+ [s,r]=await call('POST','/integrations/ads/sync',{});t('sem escolher conta: recusado com instrução (502)',s===502&&/Escolha a conta/.test(r.error),r);
+ [s]=await call('POST','/integrations/ads/account',{conta:'000'});t('conta inexistente é recusada (400)',s===400);
+ [s]=await call('POST','/integrations/ads/account',{conta:'111222333'});t('Gerência escolhe a conta',s===200);
+ [s]=await call('POST','/integrations/ads/account',{conta:'111222333'},E);t('Equipe não escolhe conta (403)',s===403);
+ await call('POST','/integrations/meta/token',{token:'NOADS_TOKEN'});[s,r]=await call('POST','/integrations/ads/sync',{});
+ t('sem a permissão ads_read: recusa e explica',s===502&&/ads_read/.test(r.error),r);
+ await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});
+ [s,r]=await call('POST','/integrations/ads/sync',{});t('sincroniza campanhas e gasto (3 meses × 2 campanhas)',s===200&&r.linhas===6,r);
+ [s,r]=await call('GET','/traffic/snapshots');const c1=r.rows.find(x=>x.campanha_id==='c1');
+ t('snapshots guardam gasto, moeda, status, objetivo e orçamento diário convertido de centavos',c1&&Number(c1.gasto)===1234.56&&c1.moeda==='BRL'&&c1.status==='PAUSED'&&c1.objetivo==='OUTCOME_LEADS'&&Number(c1.orcamento_diario)===50&&Number(c1.resultados)===55,c1);
+ await call('POST','/integrations/ads/sync',{});[,r]=await call('GET','/traffic/snapshots');t('sincronizar de novo não duplica linhas (upsert)',r.rows.length===6,r.rows.length);
+ const ms=await mock('/__state');
+ const mutacoes=ms.calls.filter(x=>/^(POST|DELETE|PUT) \/graph\/(act_|[0-9]+\/(campaigns|adsets|ads))/.test(x));
+ t('somente leitura: nenhuma chamada de criação/alteração a campanhas, conjuntos ou anúncios',mutacoes.length===0,mutacoes);
+ // painel integrado de relatórios
+ const mes=new Date().toISOString().slice(0,7);
+ [s,r]=await call('GET',`/reports/overview?de=${mes}&ate=${mes}`);
+ t('painel integrado: tráfego com fonte, período e atualização; moeda separada',s===200&&r.trafego.meta.moedas.length===1&&r.trafego.meta.moedas[0].moeda==='BRL'&&Math.abs(r.trafego.meta.moedas[0].gasto-1534.56)<0.01&&r.trafego.meta.atualizadoEm&&r.trafego.fonte.includes('Meta Ads'),r.trafego.meta.moedas);
+ t('institucionais: declara que não há fonte (não estima)',r.institucionais.disponivel===false);
+ const camp=(await call('POST','/data?module=campanhas',{titulo:'Matrículas 2027',status:'PLANEJAMENTO',orcamento:'2000',metaAdsId:'c1'}))[1];
+ [,r]=await call('GET',`/reports/overview?de=${mes}&ate=${mes}`);const pv=r.trafego.planejadoVsReal.find(x=>x.id===camp.id);
+ t('planejado x real: orçamento planejado da campanha ao lado do gasto real vindo da Meta',pv.orcamentoPlanejado===2000&&Math.abs(pv.gastoReal-1234.56)<0.01&&pv.fonteGasto==='Meta Ads',pv);
+ await call('POST','/data?module=trafego',{titulo:'Registro manual',periodo:mes,investimento:'500',impressoes:'1000'});
+ [,r]=await call('GET',`/reports/overview?de=${mes}&ate=${mes}`);t('registro manual NÃO é somado ao dado da Meta, e há aviso de possível dupla contagem',Math.abs(r.trafego.meta.moedas[0].gasto-1534.56)<0.01&&r.trafego.registrosManuais.linhas.length===1&&/NÃO são somados/.test(r.trafego.aviso),r.trafego.aviso);
+ [s]=await call('GET','/reports/overview?de=2026-12&ate=2026-01');t('período invertido: 400',s===400);
+ [s,r]=await call('POST','/reports/save',{de:mes,ate:mes});const rels=(await call('GET','/data?module=relatorios'))[1].rows;
+ t('salvar relatório guarda cópia fiel no histórico (módulo Relatórios)',s===200&&rels.some(x=>x.id===r.id&&x.tipoRelatorio==='Painel integrado'&&JSON.parse(x.snapshot).trafego.meta.moedas[0].moeda==='BRL'));
+ t('salvar relatório é só da Gerência (403 Equipe)',(await call('POST','/reports/save',{},E))[0]===403);
+ t('relatórios exigem sessão',[401,403].includes((await call('GET','/reports/overview',null,{}))[0]));
+ // ligar leitura de anúncios muda o escopo do OAuth
+ await call('POST','/integrations/settings',{meta_app_id:'APPID',meta_app_secret:'META_SECRET'});await call('POST','/integrations/ads/config',{ativar:true});
+ const x=await fetch(B+'/integrations/meta/connect',{headers:G,redirect:'manual'});t('ativar a leitura de anúncios acrescenta ads_read ao consentimento',/ads_read/.test(decodeURIComponent(x.headers.get('location')||'')));
+ console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -9,7 +9,7 @@ export const BACKUP_FORMAT = 2;
 export const BACKUP_NAME_RE = /^evo_backup_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]+\.json\.gz$/;
 
 /** Tabelas do backup (colunas explícitas: o restaurador nunca confia em nomes de coluna vindos do arquivo). */
-const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'ignore' | 'counters' | 'info' }> = {
+const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'ignore' | 'counters' | 'info'; opt?: boolean }> = {
   records: { cols: ['modulo', 'id', 'data', 'criado_em', 'atualizado_em'], restore: 'replace' },
   module_headers: { cols: ['modulo', 'headers'], restore: 'replace' },
   id_counters: { cols: ['modulo', 'n'], restore: 'counters' },
@@ -20,6 +20,13 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   integration_settings: { cols: ['k', 'v'], restore: 'replace' },
   google_event_map: { cols: ['modulo', 'id', 'event_id', 'hash'], restore: 'replace' },
   ig_publish: { cols: ['conteudo_id', 'status', 'container_id', 'media_id', 'erro', 'quando'], restore: 'replace' },
+  // tabelas acrescentadas depois do formato 2 original: backups mais antigos não as trazem (opt = ausência não é erro)
+  status_history: { cols: ['id', 'modulo', 'registro', 'campo', 'de', 'para', 'ator', 'quando', 'motivo'], restore: 'replace', opt: true },
+  notifications: { cols: ['id', 'quando', 'tipo', 'modulo', 'registro', 'destino', 'titulo', 'texto', 'lida'], restore: 'replace', opt: true },
+  approval_links: { cols: ['token_hash', 'solicitacao', 'criado_por', 'criado_em', 'expira_em', 'usado_em', 'decisao', 'aprovador'], restore: 'replace', opt: true },
+  record_comments: { cols: ['id', 'modulo', 'registro', 'autor', 'autor_tipo', 'quando', 'texto', 'interno'], restore: 'replace', opt: true },
+  record_checklist: { cols: ['id', 'modulo', 'registro', 'texto', 'feito', 'ordem', 'atualizado_em'], restore: 'replace', opt: true },
+  ads_snapshots: { cols: ['id', 'conta', 'campanha_id', 'campanha', 'periodo', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'moeda', 'status', 'objetivo', 'orcamento_diario', 'atualizado_em'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };
 const FILES_TABLE = { name: 'arquivos', cols: ['caminho', 'mime', 'tamanho', 'conteudo', 'criado_em'] };
@@ -130,7 +137,7 @@ export function validateBuffer(gz: Buffer): Validation {
   if (sha(man) !== dump.sha256_total) out.erros.push('Manifesto adulterado ou incompleto.');
   for (const t of [...Object.keys(TABLES), ...(dump.completo ? [FILES_TABLE.name] : [])]) {
     const rows = tabelas[t];
-    if (!Array.isArray(rows)) { out.erros.push(`Tabela "${t}" ausente.`); continue; }
+    if (!Array.isArray(rows)) { if (TABLES[t]?.opt) out.avisos.push(`Backup anterior à tabela "${t}": ela não será alterada na restauração.`); else out.erros.push(`Tabela "${t}" ausente.`); continue; }
     out.resumo[t] = rows.length;
     if (!man[t] || man[t].linhas !== rows.length) out.erros.push(`Tabela "${t}": contagem não confere.`);
     else if (man[t].sha256 !== sha(rows)) out.erros.push(`Tabela "${t}": conteúdo não confere (hash).`);

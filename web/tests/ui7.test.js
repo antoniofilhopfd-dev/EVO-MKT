@@ -14,7 +14,9 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await post('conteudos',{titulo:'Post da feira',publicacaoEm:ds+'T10:00',status:'PROGRAMADO'});
  await post('campanhas',{titulo:'Matrículas 2027',dataInicio:ds,status:'PLANEJAMENTO'});
  const nav=await p.$$eval('#nav .navitem',e=>e.map(x=>x.innerText.replace(/\s+/g,' ').trim()));
- t('menu tem só um "Calendário" (sem "Calendário de Eventos")',nav.filter(x=>/Calendário/.test(x)).length===1&&!nav.some(x=>/Calendário de Eventos/.test(x)),nav.join('|'));
+ t('menu lateral tem as 8 áreas',nav.length===8&&['Visão geral','Solicitações','Planejamento','Conteúdo','Tráfego','Relatórios','Arquivos e equipe','Administração'].every((x,i)=>nav[i].includes(x)),nav.join('|'));
+ await p.evaluate(()=>go('agenda'));await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText));
+ t('Planejamento tem um só "Calendário" nas seções (sem "Calendário de Eventos")',sub.filter(x=>/Calendário/.test(x)).length===1&&!sub.some(x=>/Calendário de Eventos/.test(x))&&sub.includes('Tarefas')&&sub.includes('Projetos'),sub.join('|'));
  // geral com filtros
  await p.evaluate(()=>go('calendario'));await p.waitForSelector('.upcoming-panel');
  let up=await p.$eval('.upcoming-panel',e=>e.innerText);

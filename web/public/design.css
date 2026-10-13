@@ -1,0 +1,113 @@
+/* ==========================================================================
+   EVO MKT — Design System (camada final, carregada depois de style.css)
+   Regras documentadas em docs/DESIGN_SYSTEM.md
+   ========================================================================== */
+:root{
+  /* marca (papéis fixos) */
+  --brand:#063996;--brand-dark:#00275F;--accent:#FF7800;--info:#00A1F3;--warn:#FAB900;--infantil:#793A8C;
+  /* neutros e estados */
+  --ink:#1D2433;--ink-2:#4A5163;--ink-3:#5E6678;--line:#DDE1EA;--line-2:#EEF0F5;--page:#F5F6FA;--card:#fff;
+  --ok:#1E7E4D;--ok-bg:#E8F5EE;--bad:#B3261E;--bad-bg:#FBEAE8;--alert:#8A5A00;--alert-bg:#FFF4D6;--info-bg:#E6F4FD;--brand-bg:#EAF0FB;
+  /* forma */
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--sh-1:0 1px 2px rgba(16,24,40,.06);--sh-2:0 4px 14px rgba(16,24,40,.08);
+  /* espaços (4 px) */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;
+  /* compat com o CSS anterior */
+  --blue:var(--brand);--blue2:var(--brand-dark);--orange:var(--accent);--bg:var(--page);--surface:var(--card);--border:var(--line);--text:var(--ink);--muted:var(--ink-3);--success:var(--ok);--danger:var(--bad);--warning:var(--alert);--shadow:var(--sh-2);
+}
+body{background:var(--page);color:var(--ink);line-height:1.5}
+
+/* ---- sem decoração sem função: gradientes viram cores chapadas ---- */
+.module-hero,.today-banner,.social-cockpit .social-hero,.traffic-cockpit .traffic-hero,[class*="cockpit"] header,.request-flow>div,.card,.panel{background-image:none!important}
+.module-hero{background:var(--card)!important;box-shadow:var(--sh-1)!important;border:1px solid var(--line)!important;border-radius:var(--r-lg)!important}
+.today-banner{background:var(--brand)!important;box-shadow:none!important}
+.module-hero *,.card *{text-shadow:none}
+.card,.modalcard,.kpi,.report-card,.file-card,.ind{box-shadow:var(--sh-1)}
+[style*="gradient"]{background-image:none!important}
+header{box-shadow:none}
+
+/* ---- tipografia ---- */
+h1{font-size:24px;line-height:1.25;font-weight:700}h2{font-size:20px;font-weight:700}h3{font-size:16px;font-weight:700}
+small,.muted,.kpi-note{color:var(--ink-3)}
+
+/* ---- botões (3 variações) ---- */
+.btn,.softbtn,button.btn{border-radius:var(--r-sm);font-weight:600;min-height:40px;cursor:pointer;transition:background-color .12s,border-color .12s}
+.btn{background:var(--brand);color:#fff;border:1px solid var(--brand)}
+.btn:hover{background:var(--brand-dark);border-color:var(--brand-dark)}
+.btn.secondary,.btn.soft{background:#fff;color:var(--brand);border:1px solid var(--line)}
+.btn.secondary:hover,.btn.soft:hover{background:var(--brand-bg);border-color:var(--brand)}
+.softbtn{background:#fff;color:var(--brand);border:1px solid var(--line);padding:8px 12px}
+.softbtn:hover{background:var(--brand-bg)}
+button:disabled{opacity:.55;cursor:not-allowed}
+.btn.danger,.softbtn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+
+/* ---- foco visível e áreas de toque (acessibilidade) ---- */
+:focus-visible{outline:3px solid var(--info);outline-offset:2px;border-radius:4px}
+#sidebar :focus-visible{outline-color:#fff}
+@media(pointer:coarse){.btn,.softbtn,.subtab,.navitem,.iconbtn,select,input{min-height:44px}}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---- formulários ---- */
+input,select,textarea,.control{border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;color:var(--ink);padding:9px 11px;font:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--brand);outline:3px solid rgba(0,161,243,.25);outline-offset:0}
+label{font-weight:600;color:var(--ink-2)}
+.field label small{font-weight:400}
+
+/* ---- badges de status (um só padrão) ---- */
+.badge{border-radius:999px;font-weight:700;font-size:11px;padding:3px 9px;background:var(--brand-bg);color:var(--brand)}
+.badge.ok,.badge.green{background:var(--ok-bg);color:var(--ok)}.badge.warn,.badge.orange{background:var(--alert-bg);color:var(--alert)}.badge.bad,.badge.red{background:var(--bad-bg);color:var(--bad)}.badge.blue{background:var(--brand-bg);color:var(--brand)}.badge.info{background:var(--info-bg);color:#05608F}
+.alert-row,.int-warn{border-radius:var(--r-md)}
+
+/* ---- tabelas ---- */
+.datatable{border-collapse:collapse;width:100%}
+.datatable th{background:#F8F9FC;color:var(--ink-2);font-size:12px;text-transform:none;letter-spacing:0;font-weight:700;border-bottom:1px solid var(--line);padding:10px 12px;text-align:left}
+.datatable td{border-bottom:1px solid var(--line-2);padding:10px 12px}
+.datatable tbody tr:hover{background:#FAFBFE}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md);background:#fff}
+
+/* ---- modais ---- */
+.modal,.admin-overlay{background:rgba(16,24,40,.45);backdrop-filter:none}
+.modalcard,.admin-box{border-radius:var(--r-lg);box-shadow:var(--sh-2)}
+.modalhead{background:#fff}
+
+/* ---- navegação por áreas ---- */
+#sidebar{background:var(--brand-dark)}
+.navitem{border-radius:var(--r-sm)}
+.navitem.active{background:rgba(255,255,255,.14);box-shadow:inset 3px 0 0 var(--accent)}
+.subtabs{display:flex;gap:var(--s1);flex-wrap:wrap;padding:var(--s2) var(--s5) 0;background:var(--page);border-bottom:1px solid var(--line);position:sticky;top:76px;z-index:15}
+.subtabs[hidden]{display:none}
+.subtab{background:none;border:0;border-bottom:3px solid transparent;color:var(--ink-2);padding:10px 14px;font-weight:600;cursor:pointer;border-radius:var(--r-sm) var(--r-sm) 0 0}
+.subtab:hover{background:var(--brand-bg);color:var(--brand)}
+.subtab.active{color:var(--brand);border-bottom-color:var(--accent)}
+@media(max-width:760px){.subtabs{padding:var(--s2) var(--s3) 0;top:auto;position:static;flex-wrap:nowrap;overflow-x:auto}.subtab{white-space:nowrap}}
+
+/* ---- estados vazios, carregando e erro ---- */
+.empty{color:var(--ink-3);text-align:center;padding:var(--s5)}
+.loading{display:flex;gap:var(--s3);align-items:center;color:var(--ink-3);padding:var(--s5)}
+.loading span{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:evo-spin .8s linear infinite}
+@keyframes evo-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.estado-erro{background:var(--bad-bg);color:var(--bad);border-radius:var(--r-md);padding:var(--s4)}
+
+/* ---- segmentos (cores institucionais; roxo só na Educação Infantil) ---- */
+.seg-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.seg-chip::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--ink-3)}
+.seg-infantil::before{background:var(--infantil)}.seg-iniciais::before{background:var(--info)}.seg-finais::before{background:var(--accent)}.seg-medio::before{background:var(--brand)}
+
+/* ---- painéis do trabalho (comentários, checklist, subtarefas) ---- */
+.trabalho-box{border-top:1px solid var(--line);margin-top:var(--s4);padding-top:var(--s4);display:grid;gap:var(--s4)}
+.trabalho-box h4{margin:0 0 var(--s2);font-size:14px}
+.tb-item{display:flex;gap:var(--s2);align-items:center;padding:6px 0;border-bottom:1px solid var(--line-2)}
+.tb-item.feito span{text-decoration:line-through;color:var(--ink-3)}
+.tb-comment{background:#F8F9FC;border-radius:var(--r-md);padding:var(--s2) var(--s3);margin-bottom:var(--s2)}
+.tb-comment small{display:block}
+.tb-add{display:flex;gap:var(--s2);margin-top:var(--s2)}.tb-add input,.tb-add textarea{flex:1}
+.estado-pub{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;display:inline-block;background:var(--brand-bg);color:var(--brand)}
+.estado-pub.ok{background:var(--ok-bg);color:var(--ok)}.estado-pub.bad{background:var(--bad-bg);color:var(--bad)}.estado-pub.warn{background:var(--alert-bg);color:var(--alert)}
+.fila-aprov{display:grid;gap:var(--s2)}
+.fonte-tag{font-size:11px;color:var(--ink-3)}
+/* painéis novos nunca podem estourar a largura */
+.tb-add{flex-wrap:wrap}.tb-add label{flex:1 1 140px}.tb-item{flex-wrap:wrap}.tb-item span,.tb-comment,.fonte-tag,.int-warn{overflow-wrap:anywhere}
+#painelInt,#metaAdsBox,#filaUnica,#insPainel,#indPainel{min-width:0;max-width:100%}
+#painelInt .tablewrap,#metaAdsBox .tablewrap{max-width:100%}
+#painelInt h4{margin:var(--s4) 0 var(--s2)}

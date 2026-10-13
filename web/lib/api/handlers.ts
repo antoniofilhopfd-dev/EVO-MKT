@@ -20,6 +20,9 @@ import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
 import { validarTransicaoSolicitacao } from '../fluxo';
 import { operacaoRoute } from './operacao';
+import { trabalhoRoute } from './trabalho';
+import { conteudoRoute } from './conteudo';
+import { relatoriosRoute } from './relatorios';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
@@ -40,7 +43,13 @@ export async function route(c: Ctx): Promise<Out> {
   switch (true) {
     case path === '/manager/approval-link' || path.startsWith('/public/approval'):
       return aprovacaoPublicaRoute(c);
-    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/ia/legenda' || path === '/datas':
+    case path.startsWith('/reports/'):
+      return relatoriosRoute(c);
+    case path.startsWith('/content/'):
+      return conteudoRoute(c);
+    case path === '/comments' || path === '/portal/comments' || path === '/checklist' || path === '/admin/automacoes':
+      return trabalhoRoute(c);
+    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/admin/integridade' || path === '/ia/legenda' || path === '/datas':
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);
@@ -143,6 +152,7 @@ export async function route(c: Ctx): Promise<Out> {
       const res: Row[] = [];
       outer: for (const m of Object.keys(MODULES)) {
         if (m === 'configuracoes' && u.role !== 'manager') continue;
+        if (m === 'lixeira') continue; // itens excluídos não aparecem na busca global
         for (const r of await listRows(m)) {
           if (lower(Object.values(r).join(' ')).includes(term)) {
             res.push({ ...r, module: m });
@@ -216,7 +226,7 @@ export async function route(c: Ctx): Promise<Out> {
     }
 
     // ---------- Integrações (Instagram / Google) ----------
-    case path.startsWith('/integrations/') || path === '/public/media':
+    case path.startsWith('/integrations/') || path === '/public/media' || path === '/traffic/snapshots':
       return integrationsRoute(c);
 
     // ---------- Portal do Solicitante ----------

@@ -5,7 +5,7 @@ const out=fs.readFileSync(process.argv[2],'utf8');const pw=out.match(/NAT-3301[^
  for(const [w,h] of [[1280,720],[1024,700],[800,600],[412,915],[390,844],[360,740]]){
   const p=await (await b.newContext({viewport:{width:w,height:h}})).newPage();p.on('dialog',d=>d.accept('Senha26x'));
   await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',PW);await p.click('#internalLoginBtn');if(!(await p.waitForSelector('#nav .navitem',{timeout:6000,state:'attached'}).catch(()=>null))){await p.fill('#internalPass','Senha26x');await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem',{state:'attached'})}PW='Senha26x';
-  const pages=await p.$$eval('#nav .navitem',e=>e.map(x=>x.dataset.page));
+  const pages=await p.evaluate(()=>Object.keys(MODULES).filter(k=>canAccess(k)));
   for(const pg of pages){await p.evaluate(x=>go(x),pg);await p.waitForTimeout(250);
    const o=await p.evaluate(()=>{const c=document.getElementById('content');const bw=document.documentElement.scrollWidth-document.documentElement.clientWidth;const cw=c.scrollWidth-c.clientWidth;const modalCut=0;return {bw,cw}});
    if(o.bw>2||o.cw>2){bad++;console.log(`ESTOURO ${w}x${h} ${pg}`,o);await p.screenshot({path:`/tmp/resp_${w}_${pg}.png`})}}
