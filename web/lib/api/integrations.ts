@@ -6,7 +6,7 @@ import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
-import { gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
+import { gCalendarChoose, gCalendarList, gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
 import { adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta } from '../integrations/metaads';
 import { json } from './handlers';
@@ -58,6 +58,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           configurado: (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '',
           clientId: await setting('g_client_id'), conectado: await gConnected(), email: await setting('g_email'),
           ultimaAgenda: await setting('g_last_cal_sync'), planilhaUrl: await setting('g_sheet_url'), ultimaPlanilha: await setting('g_last_sheet_export'),
+          calendarioId: await setting('g_calendar_id'),
           driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
           planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
@@ -227,6 +228,18 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         await igMarkError(id, e.message);
         return bad('instagram', e);
       }
+    }
+    case path === '/integrations/google/calendars' && method === 'GET': {
+      await requireManager(c);
+      try { return json({ rows: await gCalendarList() }); } catch (e: any) { return bad('google', e); }
+    }
+    case path === '/integrations/google/calendar/choose' && method === 'POST': {
+      const u = await requireManager(c);
+      const input = await c.body();
+      await stepUp(u, input);
+      try { await gCalendarChoose(strv(input.id)); } catch (e: any) { return bad('google', e); }
+      await audit(u.codigo, 'agenda-google-escolhida');
+      return json({ ok: true });
     }
     case path === '/integrations/google/calendar/sync' && method === 'POST': {
       await requireManager(c);

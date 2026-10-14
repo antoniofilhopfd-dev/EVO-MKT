@@ -66,6 +66,9 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  await call('/data?module=tarefas',{m:'POST',ck:G,b:{titulo:'Entregar banner',status:'NOVO',prazo:fut1}});
  await call('/data?module=eventos',{m:'POST',ck:G,b:{titulo:'Feira de Ciências',status:'PRÉ-EVENTO',dataInicio:fut1}});
  await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Reel da feira',status:'PRODUÇÃO',publicacaoEm:fut1+'T18:00'}});
+ r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: sem agenda escolhida, não cria nenhuma',r.s>=400&&!/cal1/.test(JSON.stringify(await mock('/__state'))),r);
+ r=await call('/integrations/google/calendars',{ck:G});t('lista as agendas da conta',r.s===200&&r.j.rows.some(a=>a.id==='cal1'),r);
+ r=await call('/integrations/google/calendar/choose',{m:'POST',ck:G,b:{id:'cal1'}});t('escolhe uma agenda existente',r.s===200,r);
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: envia itens do EVO ao Google',r.s===200&&r.j.para_google>=4,r);
  let s2=await mock('/__state');const evs=Object.values(s2.events);
  t('eventos criados com módulo/ID de origem e horário',evs.some(e=>e.summary==='Reunião de pauta'&&e.extendedProperties.private.evoModule==='calendario'&&e.start.dateTime)&&evs.some(e=>e.summary==='[Tarefa] Entregar banner'&&e.start.date===fut1)&&evs.some(e=>e.summary==='[Evento] Feira de Ciências'));

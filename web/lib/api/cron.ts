@@ -41,7 +41,7 @@ async function integracoes(what: string): Promise<Row> {
       if (await setting('meta_ads_conta')) await step('meta-ads', async () => ({ linhas: await adsSync() }));
     }
     if (await gConnected()) {
-      await step('google-agenda', () => gCalendarSync());
+      if (await setting('g_calendar_id')) await step('google-agenda', () => gCalendarSync());
       await step('google-planilhas', () => gSheetsExport());
       if ((await setting('g_auto_drive_entregas')) === '1') {
         await step('google-drive', async () => {

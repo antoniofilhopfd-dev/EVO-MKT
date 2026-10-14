@@ -100,6 +100,8 @@ if (str_starts_with($p, '/google')) {
     $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     if (!str_starts_with($auth, 'Bearer AT')) j(['error' => ['message' => 'unauthorized']], 401);
     $now = gmdate('Y-m-d\TH:i:s.000\Z');
+    if ($g === '/calendar/v3/users/me/calendarList' && $m === 'GET') j(['items' => [['id' => 'cal1', 'summary' => 'Marketing', 'accessRole' => 'owner']]]);
+    if ($g === '/calendar/v3/calendars/cal1' && $m === 'GET') j(['id' => 'cal1', 'summary' => 'Marketing']);
     if ($g === '/calendar/v3/calendars' && $m === 'POST') j(['id' => 'cal1', 'summary' => $in['summary'] ?? '']);
     if ($g === '/calendar/v3/calendars/cal1/events' && $m === 'GET') j(['items' => array_values($S['events'])]);
     if ($g === '/calendar/v3/calendars/cal1/events' && $m === 'POST') { $id = nid('ev'); $in['id'] = $id; $in['updated'] = $now; $in['status'] = 'confirmed'; $S['events'][$id] = $in; j($in); }

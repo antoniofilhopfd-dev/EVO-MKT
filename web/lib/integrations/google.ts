@@ -67,10 +67,22 @@ async function gApi(method: string, path: string, body: any = null, svc: 'api' |
 export const GCAL_MODULES = ['agenda', 'calendario', 'eventos', 'conteudos', 'tarefas', 'campanhas'];
 async function gCalendarId(): Promise<string> {
   const id = await setting('g_calendar_id');
-  if (id) return id;
-  const r = await gApi('POST', '/calendar/v3/calendars', { summary: 'EVO MKT', timeZone: tz(), description: 'Calendário sincronizado com o EVO MKT' });
-  await setSetting('g_calendar_id', String(r.id));
-  return String(r.id);
+  if (!id) throw new Error('Escolha a agenda do Google em Administração → Integrações (o sistema não cria agenda sozinho).');
+  return id;
+}
+/** Agendas da conta conectada em que o sistema pode gravar (para escolher uma já existente). */
+export async function gCalendarList(): Promise<Row[]> {
+  const r = await gApi('GET', '/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250');
+  const atual = await setting('g_calendar_id');
+  return (r.items ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.summaryOverride || i.summary || i.id), principal: !!i.primary, atual: String(i.id) === atual }));
+}
+/** Passa a usar uma agenda existente. Vazio = desliga a sincronização da Agenda. */
+export async function gCalendarChoose(id: string): Promise<void> {
+  const novo = id.trim();
+  if (novo) await gApi('GET', `/calendar/v3/calendars/${encodeURIComponent(novo)}`); // falha se não existir ou sem acesso
+  if (novo === (await setting('g_calendar_id'))) return;
+  await setSetting('g_calendar_id', novo);
+  await run('DELETE FROM google_event_map'); // os vínculos eram da agenda anterior; os eventos lá ficam como estão
 }
 function gEventFromRow(mod: string, r: Row): Row | null {
   const label: Record<string, string> = { agenda: '', calendario: '', eventos: '[Evento] ', conteudos: '[Conteúdo] ', tarefas: '[Tarefa] ', campanhas: '[Campanha] ' };
