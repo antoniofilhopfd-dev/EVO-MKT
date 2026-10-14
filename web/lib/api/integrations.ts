@@ -6,7 +6,7 @@ import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
-import { gCalendarChoose, gCalendarList, gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
+import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
 import { adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta } from '../integrations/metaads';
 import { json } from './handlers';
@@ -58,7 +58,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           configurado: (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '',
           clientId: await setting('g_client_id'), conectado: await gConnected(), email: await setting('g_email'),
           ultimaAgenda: await setting('g_last_cal_sync'), planilhaUrl: await setting('g_sheet_url'), ultimaPlanilha: await setting('g_last_sheet_export'),
-          calendarioId: await setting('g_calendar_id'),
+          calendarioId: await setting('g_calendar_id'), importar: (await setting('g_importar')) !== '0',
           driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
           planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
@@ -110,6 +110,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       for (const k of ['meta_app_id', 'meta_app_secret', 'g_client_id', 'g_client_secret']) if (input[k] !== undefined && strv(input[k]).trim() !== '') await setSetting(k, strv(input[k]).trim());
       if (input.anthropic_key !== undefined && strv(input.anthropic_key).trim() !== '') await setSetting('anthropic_key', strv(input.anthropic_key).trim());
       if (input.ia_guia_voz !== undefined) await setSetting('ia_guia_voz', strv(input.ia_guia_voz).slice(0, 4000));
+      if (input.g_importar !== undefined) await setSetting('g_importar', input.g_importar ? '1' : '0');
       if (input.g_auto_drive_entregas !== undefined) await setSetting('g_auto_drive_entregas', input.g_auto_drive_entregas ? '1' : '0');
       if (input.g_sheet_modules !== undefined) await setSetting('g_sheet_modules', strv(input.g_sheet_modules).split(',').map((m) => m.trim()).filter((m) => m in MODULES).join(','));
       await audit(u.codigo, 'integracoes-config');
@@ -240,6 +241,12 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       try { await gCalendarChoose(strv(input.id)); } catch (e: any) { return bad('google', e); }
       await audit(u.codigo, 'agenda-google-escolhida');
       return json({ ok: true });
+    }
+    case path === '/integrations/google/calendar/limpar-importados' && method === 'POST': {
+      const u = await requireManager(c);
+      const n = await gLimparImportados();
+      await audit(u.codigo, 'agenda-google-limpar-importados');
+      return json({ ok: true, removidos: n });
     }
     case path === '/integrations/google/calendar/sync' && method === 'POST': {
       await requireManager(c);

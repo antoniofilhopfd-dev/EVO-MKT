@@ -122,6 +122,8 @@ const closed = /CONCLU|CANCEL|ARQUIV/i;
 
 export async function gCalendarSync(): Promise<Row> {
   const cal = encodeURIComponent(await gCalendarId());
+  // Eventos criados direto no Google entram no Calendário (ligado por padrão; dá para desligar em Integrações).
+  const importar = (await setting('g_importar')) !== '0';
   const stat = { do_google: 0, para_google: 0, criados: 0, removidos: 0 };
   const map: Record<string, Row> = {};
   for (const m of await q('SELECT * FROM google_event_map')) map[`${m.modulo}|${m.id}`] = m;
@@ -168,7 +170,7 @@ export async function gCalendarSync(): Promise<Row> {
         map[`${mod}|${id}`].hash = nh;
         stat.do_google++;
       }
-    } else if (!known && ev.start) {
+    } else if (!known && ev.start && importar) {
       const patch = gApplyEventToRow('calendario', {}, ev);
       const nw = await insertRow('calendario', { ...patch, status: 'NOVO', origem: 'GOOGLE_AGENDA', idExterno: evId, descricao: String(ev.description ?? '') }, 'integracao:google');
       const h = md5(gEventFromRow('calendario', nw) ?? []);
@@ -289,4 +291,11 @@ export async function gSheetsExport(): Promise<Row> {
   await setSetting('g_last_sheet_export', now());
   await intLog('google', 'ok', 'Planilha atualizada: ' + JSON.stringify(out));
   return out;
+}
+
+/** Remove do sistema os eventos que vieram do Google. NÃO apaga nada no Google (os vínculos saem antes das linhas). */
+export async function gLimparImportados(): Promise<number> {
+  const like = '%"origem":"GOOGLE_AGENDA"%';
+  await run("DELETE m FROM google_event_map m JOIN records r ON r.modulo=m.modulo AND r.id=m.id WHERE m.modulo='calendario' AND r.data LIKE ?", [like]);
+  return run("DELETE FROM records WHERE modulo='calendario' AND data LIKE ?", [like]);
 }
