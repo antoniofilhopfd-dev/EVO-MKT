@@ -197,3 +197,32 @@ function desenharIgPosts(){
   $$('[data-igf]').forEach(s=>s.onchange=()=>{igFiltro[s.dataset.igf]=s.value;desenharIgPosts()});
   const b=$('#igAtualiza');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Atualizando…';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});toast('Publicações atualizadas');await renderIgPosts()}catch(e){toast(e.message,'bad');b.disabled=false;b.textContent='Atualizar agora'}};
 }
+
+// ---------- Fechamento mensal: blocos para a direção (Instagram, atendimento, tráfego), saem no mesmo PDF ----------
+const _renderFechamentoBase=renderMonthlyClosing;
+renderMonthlyClosing=async function(){
+  await _renderFechamentoBase();
+  const grid=document.querySelector('.closing-grid'),month=document.getElementById('closingMonth')?.value;
+  if(!grid||!month)return;
+  const dtMes=new Date(month+'-01T12:00:00'),ate=stIso(new Date(dtMes.getFullYear(),dtMes.getMonth()+1,0,12));
+  const mesAnt=stIso(new Date(dtMes.getFullYear(),dtMes.getMonth()-1,1,12)).slice(0,7);
+  const brl=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const [ig,tr,posts,ind]=await Promise.all([getRows('instagram').catch(()=>({rows:[]})),getRows('trafego').catch(()=>({rows:[]})),api('/instagram/posts').catch(()=>({rows:[]})),api(`/indicadores?de=${month}-01&ate=${ate}`).catch(()=>null)]);
+  if(document.getElementById('closingMonth')?.value!==month)return; // trocou de mês enquanto carregava
+  const linha=(rows,p)=>(rows.rows||[]).find(r=>String(r.periodo||'').slice(0,7)===p&&r.origem==='INSTAGRAM_API');
+  const a=linha(ig,month),b=linha(ig,mesAnt),num2=k=>Number(a?.[k]||0),numB=k=>Number(b?.[k]||0);
+  const eng=r=>r&&Number(r.alcance)?Math.round(Number(r.interacoes||0)/Number(r.alcance)*1000)/10:null;
+  const dosMes=(posts.rows||[]).filter(r=>String(r.quando).slice(0,7)===month).sort((x,y)=>y.interacoes-x.interacoes);
+  const fmtT={FEED:'Feed',REELS:'Reels',STORY:'Stories',CAROUSEL_ALBUM:'Carrossel',IMAGE:'Feed',VIDEO:'Vídeo'};
+  const cont=t=>dosMes.filter(r=>(fmtT[r.tipo]||r.tipo)===t).length;
+  const kp=(l,v,ant)=>`<div class="closing-stat"><span>${esc(l)}</span><b>${igNum(v)} ${typeof trendBadge==='function'&&b?trendBadge(v,ant):''}</b></div>`;
+  const cardIg=`<section class="card span2 fech-extra"><div class="card-title"><div><small>INSTAGRAM</small><h3>Resultado no mês</h3></div></div>${a?`<div class="closing-stat"><span>Seguidores (fim do mês)</span><b>${igNum(num2('seguidores'))} ${b?trendBadge(num2('seguidores'),numB('seguidores')):''}</b></div>${kp('Novos seguidores',num2('novosSeguidores'),numB('novosSeguidores'))}${kp('Alcance',num2('alcance'),numB('alcance'))}${kp('Interações',num2('interacoes'),numB('interacoes'))}${kp('Visitas ao perfil',num2('visitasPerfil'),numB('visitasPerfil'))}<div class="closing-stat"><span>Engajamento (interações ÷ alcance)</span><b>${eng(a)===null?'—':String(eng(a)).replace('.',',')+'%'}</b></div>`:'<div class="empty compact">Sem dados do Instagram neste mês. Conecte e sincronize em Administração → Integrações.</div>'}
+    <div class="closing-stat"><span>Publicações no mês</span><b>${dosMes.length} (${cont('Feed')} feed · ${cont('Reels')} reels · ${cont('Carrossel')} carrossel)</b></div>
+    ${dosMes.length?`<h4 class="fech-sub">Publicações com mais interações</h4>${dosMes.slice(0,3).map(r=>`<div class="goal-line"><span>${esc(String(r.legenda||'(sem legenda)').slice(0,80))}</span><b>${igNum(r.interacoes)} int.${r.alcance===null?'':' · '+igNum(r.alcance)+' alc.'}</b></div>`).join('')}`:''}</section>`;
+  const lista=(ind?.indicadores||[]).filter(i=>/recebidas|Concluídas no período|SLA vencido|Cumprimento|Tempo médio|Avaliação|NPS/i.test(i.titulo)); // só o que a direção precisa; o painel completo fica na Central
+  const cardAt=`<section class="card fech-extra"><div class="card-title"><div><small>ATENDIMENTO</small><h3>Solicitações no mês</h3></div></div>${lista.map(i=>`<div class="closing-stat"><span>${esc(i.titulo)}</span><b>${i.valor===null?'—':esc(String(i.valor))+(i.unidade?(i.unidade==='%'?'%':' '+esc(i.unidade)):'')}</b></div>`).join('')||'<div class="empty compact">Sem indicadores no período.</div>'}</section>`;
+  const trm=(tr.rows||[]).filter(r=>String(r.periodo||'').slice(0,7)===month),soma=k=>trm.reduce((s,r)=>s+Number(r[k]||0),0);
+  const inv=soma('investimento'),leads=soma('leads'),conv=soma('conversas');
+  const cardTr=`<section class="card fech-extra"><div class="card-title"><div><small>TRÁFEGO PAGO</small><h3>Investimento e retorno</h3></div></div>${trm.length?`<div class="closing-stat"><span>Investimento</span><b>${brl(inv)}</b></div><div class="closing-stat"><span>Impressões</span><b>${igNum(soma('impressoes'))}</b></div><div class="closing-stat"><span>Cliques</span><b>${igNum(soma('cliques'))}</b></div><div class="closing-stat"><span>Conversas iniciadas</span><b>${igNum(conv)}${conv?' · '+brl(inv/conv)+' cada':''}</b></div><div class="closing-stat"><span>Leads</span><b>${igNum(leads)}${leads?' · '+brl(inv/leads)+' cada':''}</b></div>`:'<div class="empty compact">Sem dados de tráfego neste mês.</div>'}</section>`;
+  grid.insertAdjacentHTML('beforeend',`<div id="closingExtras" class="span2" style="display:contents">${cardIg}${cardAt}${cardTr}</div>`);
+};

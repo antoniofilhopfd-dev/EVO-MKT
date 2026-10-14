@@ -125,6 +125,13 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('a direção aprova pelo link e o post vira APROVADO',/Post aprovado/.test(await anon.$eval('#box',e=>e.innerText))&&(await api('GET','/data?module=conteudos&id='+aprId)).status==='APROVADO');
  await anon.reload();await anon.waitForSelector('.msg.err');t('o link usado não abre mais',/não é mais válido/.test(await anon.$eval('#box',e=>e.innerText)));
  t('sem erros de JS na página pública',e3.length===0,e3.join('|'));
+ // ---- fechamento mensal com Instagram, atendimento e tráfego
+ await p.evaluate(()=>go('fechamento'));await p.waitForSelector('#closingExtras',{state:'attached',timeout:20000});
+ const fx=await p.$eval('.closing-grid',e=>e.innerText);
+ t('Fechamento Mensal traz o resultado do Instagram do mês (alcance, melhor post)',/Resultado no mês/.test(fx)&&/18\.000/.test(fx)&&/Bastidores da feira/.test(fx),fx.slice(0,400));
+ t('Fechamento Mensal traz atendimento e tráfego no mesmo relatório',/Solicitações no mês/.test(fx)&&/Investimento e retorno/.test(fx)&&!!(await p.$('#closingPrint')));
+ t('bloco de atendimento mostra só os indicadores principais',(fx.match(/closing-stat/g)||[]).length>=0&&!/Urgentes sem responsável/.test(fx)&&/NPS do atendimento/.test(fx)&&/Cumprimento do SLA/.test(fx),fx.slice(-500));
+ await p.screenshot({path:PR+'/27_fechamento_direcao.png',fullPage:true});
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
  await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('studio')});await m.waitForSelector('.st-week');
