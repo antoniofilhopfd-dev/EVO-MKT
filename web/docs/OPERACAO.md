@@ -55,3 +55,10 @@ A interface esconde o que o perfil não usa, mas **não é a barreira**: `tests/
 
 ## 9. Limitações conhecidas
 Sem paginação no servidor (volume atual não exige; reavaliar acima de ~5 mil registros por módulo). Sem Gantt. Sem API do TikTok/YouTube (planejamento e confirmação manual). Sem indicadores institucionais (não há fonte autorizada). Integrações reais Meta/Google/Anthropic não validadas (dependem de credenciais; testadas só com servidores simulados). Sem teste com leitor de tela real. Demandas anteriores à migração 006 não têm histórico.
+
+
+## Estúdio de publicações (v5.3.0)
+Conteúdo → **Estúdio de publicações**: semana editorial com arrastar-e-soltar (reagenda mantendo a hora), coluna "Sem data", filtros por perfil/etapa/formato, datas comemorativas no dia e dica de melhor horário (calculada dos posts reais; abaixo de 8 posts não sugere nada).
+- **Novo post:** título, perfil, formato, legenda (contador de 2.200), hashtags (contador de 30), CTA, data/hora, revisor, mídia e prévia aproximada do Instagram. Três botões: *Salvar rascunho* (PRODUÇÃO), *Enviar para aprovação* (REVISÃO) e *Agendar* (PROGRAMADO, exige data).
+- **Grupos de hashtags:** salvos no servidor (`/api/studio/hashtags`), até 30 grupos de 30 tags.
+- Nada é publicado sozinho: a publicação automática segue exigindo a opção marcada, status Aprovado/Agendado e mídia anexada.

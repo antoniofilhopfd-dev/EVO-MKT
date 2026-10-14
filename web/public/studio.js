@@ -1,0 +1,190 @@
+// Estúdio de publicações: semana editorial com arrastar-e-soltar, compositor com prévia do Instagram,
+// grupos de hashtags e melhor horário calculado dos posts reais. Usa o módulo "conteudos" (nada novo no banco).
+const ST_ETAPAS={RASCUNHO:'PRODUÇÃO',APROVACAO:'REVISÃO',AGENDADO:'PROGRAMADO'};
+const ST_CLASSE={IDEIA:'draft',BRIEFING:'draft','PRODUÇÃO':'draft','REVISÃO':'review',APROVADO:'ok',PROGRAMADO:'sched',PUBLICADO:'done',ARQUIVADO:'off'};
+const ST_ROTULO={IDEIA:'Ideia',BRIEFING:'Briefing','PRODUÇÃO':'Rascunho','REVISÃO':'Em aprovação',APROVADO:'Aprovado',PROGRAMADO:'Agendado',PUBLICADO:'Publicado',ARQUIVADO:'Arquivado'};
+const ST_ICONE={Feed:'▦',Stories:'◔',Reels:'▶',Carrossel:'❏','Vídeo':'▶',Foto:'▣',Outro:'◇'};
+const ST_DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+let studioSemana=null,studioFiltro={perfil:'',status:'',formato:''},studioCache={rows:[],estados:new Map(),datas:[],horarios:null};
+
+function stSegunda(d){const x=new Date(d);x.setHours(12,0,0,0);const w=(x.getDay()+6)%7;x.setDate(x.getDate()-w);return x}
+function stIso(d){return isoDate(d)}
+function stAddDias(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function stQuando(r){return String(r.publicacaoEm||r.publicadoEm||'')}
+function stHora(r){return stQuando(r).slice(11,16)}
+function stDia(r){return stQuando(r).slice(0,10)}
+function stAgoraLocal(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}
+function stAtivo(r){return !/PUBLICADO|ARQUIVADO/i.test(String(r.status||''))}
+function stFiltrar(rows){return rows.filter(r=>(!studioFiltro.perfil||r.perfil===studioFiltro.perfil)&&(!studioFiltro.status||String(r.status||'').toUpperCase()===studioFiltro.status)&&(!studioFiltro.formato||r.formato===studioFiltro.formato))}
+function stContaTags(txt){return (String(txt||'').match(/#[\p{L}\p{N}_]+/gu)||[]).length}
+
+function stCard(r){
+  const st=String(r.status||'').toUpperCase(),est=studioCache.estados.get(r.id)||'';
+  const falha=/FALHA/.test(est),mov=stAtivo(r);
+  return `<button class="st-card st-${ST_CLASSE[st]||'draft'}${falha?' st-falha':''}" ${mov?'draggable="true"':''} data-id="${attr(r.id)}" title="${attr(r.titulo||'')}">
+    <span class="st-top"><b>${ST_ICONE[r.formato]||'◇'} ${esc(stHora(r)||'sem hora')}</b><em>${esc(ST_ROTULO[st]||st||'—')}</em></span>
+    <strong>${esc(r.titulo||'(sem título)')}</strong>
+    <small>${esc(r.perfil||'')}${r.formato?' · '+esc(r.formato):''}${falha?' · falha ao publicar':''}</small>
+  </button>`;
+}
+
+async function renderStudio(){
+  const [d,est,datas,ins]=await Promise.all([getRows('conteudos',true),api('/content/states').catch(()=>({rows:[]})),api('/datas?dias=60').catch(()=>({rows:[]})),api('/insights').catch(()=>null)]);
+  studioCache={rows:d.rows||[],estados:new Map((est.rows||[]).map(x=>[x.id,x.estado])),datas:datas.rows||[],horarios:ins?.horarios||null};
+  desenharStudio();
+}
+
+function desenharStudio(){
+  if(!studioSemana)studioSemana=stSegunda(new Date());
+  const rows=studioCache.rows,vis=stFiltrar(rows),hoje=today(),ini=studioSemana,fim=stAddDias(ini,6);
+  const cont=s=>rows.filter(r=>String(r.status||'').toUpperCase()===s).length;
+  const prox14=rows.filter(r=>stAtivo(r)&&stDia(r)>=hoje&&stDia(r)<=stIso(stAddDias(new Date(),14))&&/PROGRAMADO|APROVADO/i.test(r.status||'')).length;
+  const mes=hoje.slice(0,7),pubMes=rows.filter(r=>/PUBLICADO/i.test(r.status||'')&&stDia(r).slice(0,7)===mes).length;
+  const dias=[...Array(7)].map((_,i)=>stAddDias(ini,i));
+  const datasPor=new Map();studioCache.datas.forEach(x=>{(datasPor.get(x.data)||datasPor.set(x.data,[]).get(x.data)).push(x)});
+  const semData=vis.filter(r=>stAtivo(r)&&!stDia(r));
+  const sel=(k,lista,cur)=>`<select data-stf="${k}"><option value="">${k==='perfil'?'Todos os perfis':k==='status'?'Todas as etapas':'Todos os formatos'}</option>${lista.map(v=>`<option value="${attr(v)}" ${cur===v?'selected':''}>${esc(ST_ROTULO[v]||v)}</option>`).join('')}</select>`;
+  const h=studioCache.horarios;
+  const dica=h?.melhor?`<b>${esc(h.melhor.dia)}</b> às <b>${h.melhor.hora}h</b> tem a melhor média de interações (confiança ${esc(h.melhor.confianca)}, ${h.amostra} posts analisados).`:(h?`Ainda há poucos posts sincronizados para sugerir horário (${h.amostra} de ${h.minimo}).`:'Conecte o Instagram para ver o melhor horário.');
+  const fmtSem=`${fmtDate(stIso(ini))} a ${fmtDate(stIso(fim))}`;
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>ESTÚDIO DE PUBLICAÇÕES</small><h1>Quem publica o quê, e quando</h1><p>Arraste os posts entre os dias para reagendar. Nada é publicado sozinho sem você marcar e aprovar.</p></div><button class="btn" id="stNovo">+ Novo post</button></div>
+  <div class="kpis st-kpis"><div class="kpi"><small>Rascunhos</small><strong>${cont('PRODUÇÃO')+cont('BRIEFING')+cont('IDEIA')}</strong></div><div class="kpi orange"><small>Em aprovação</small><strong>${cont('REVISÃO')}</strong></div><div class="kpi"><small>Aprovados</small><strong>${cont('APROVADO')}</strong></div><div class="kpi green"><small>Agendados (14 dias)</small><strong>${prox14}</strong></div><div class="kpi"><small>Publicados no mês</small><strong>${pubMes}</strong></div></div>
+  <div class="card st-tip"><span>◷</span><div>${dica}</div></div>
+  <div class="st-toolbar"><div class="st-nav"><button class="softbtn" id="stPrev" aria-label="Semana anterior">‹</button><b>${fmtSem}</b><button class="softbtn" id="stNext" aria-label="Próxima semana">›</button><button class="softbtn" id="stHoje">Hoje</button></div><div class="st-filtros">${sel('perfil',[...new Set([...(SELECTS.perfil||[]),...rows.map(r=>r.perfil).filter(Boolean)])],studioFiltro.perfil)}${sel('status',Object.keys(ST_ROTULO),studioFiltro.status)}${sel('formato',SELECTS.formato||[],studioFiltro.formato)}</div></div>
+  <div class="st-layout"><aside class="st-backlog" data-date=""><h3>Sem data <span>${semData.length}</span></h3><p class="kpi-note">Arraste para um dia da semana para agendar.</p><div class="st-lista">${semData.map(stCard).join('')||'<div class="empty compact">Tudo com data.</div>'}</div></aside>
+  <div class="st-week">${dias.map(dt=>{const iso=stIso(dt),ps=vis.filter(r=>stDia(r)===iso).sort((a,b)=>stHora(a).localeCompare(stHora(b)));const ds=datasPor.get(iso)||[];return `<section class="st-day ${iso===hoje?'today':''} ${iso<hoje?'past':''}" data-date="${iso}"><header><b>${ST_DIAS[dt.getDay()].slice(0,3)}</b><span>${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}</span><button class="st-add" data-add="${iso}" aria-label="Novo post em ${iso}">+</button></header>${ds.map(x=>`<div class="st-data" title="${attr(x.tema)}">★ ${esc(x.titulo)}</div>`).join('')}${ps.map(stCard).join('')}</section>`}).join('')}</div></div>`;
+  $('#stNovo').onclick=()=>studioCompositor(null);
+  $('#stPrev').onclick=()=>{studioSemana=stAddDias(studioSemana,-7);desenharStudio()};
+  $('#stNext').onclick=()=>{studioSemana=stAddDias(studioSemana,7);desenharStudio()};
+  $('#stHoje').onclick=()=>{studioSemana=stSegunda(new Date());desenharStudio()};
+  $$('[data-stf]').forEach(s=>s.onchange=()=>{studioFiltro[s.dataset.stf]=s.value;desenharStudio()});
+  $$('.st-add').forEach(b=>b.onclick=()=>studioCompositor(null,b.dataset.add));
+  $$('.st-card').forEach(c=>c.onclick=()=>studioCompositor(studioCache.rows.find(r=>r.id===c.dataset.id)));
+  let arrastando='';
+  $$('.st-card[draggable]').forEach(c=>{c.ondragstart=e=>{arrastando=c.dataset.id;c.classList.add('dragging');e.dataTransfer?.setData('text/plain',arrastando)};c.ondragend=()=>c.classList.remove('dragging')});
+  $$('.st-day,.st-backlog').forEach(z=>{z.ondragover=e=>{e.preventDefault();z.classList.add('over')};z.ondragleave=()=>z.classList.remove('over');z.ondrop=async e=>{e.preventDefault();z.classList.remove('over');const id=arrastando||e.dataTransfer?.getData('text/plain');arrastando='';if(!id)return;await studioMover(id,z.dataset.date)}});
+}
+
+async function studioMover(id,data){
+  const r=studioCache.rows.find(x=>x.id===id);if(!r)return;
+  if(data&&data<today()&&!confirm('Esse dia já passou. Agendar mesmo assim?'))return;
+  const hora=stHora(r)||'09:00',novo=data?`${data}T${hora}`:'';
+  if(stDia(r)===data)return;
+  try{await api(`/data?module=conteudos&id=${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({publicacaoEm:novo})});invalidate('conteudos');toast(data?`Reagendado para ${fmtDate(data)} às ${hora}`:'Post voltou para "Sem data"');await renderStudio()}catch(e){toast(e.message,'bad')}
+}
+
+// ---------- compositor ----------
+function stProximaData(diaNome,hora){
+  const alvo=ST_DIAS.indexOf(diaNome);if(alvo<0)return '';
+  const d=new Date();d.setHours(12,0,0,0);for(let i=1;i<=7;i++){const x=stAddDias(d,i);if(x.getDay()===alvo)return `${stIso(x)}T${String(hora).padStart(2,'0')}:00`}return '';
+}
+async function studioCompositor(row,dataIni=''){
+  const edit=!!row,r=row||{},jaPublicado=!!r.instagramMediaId||/PUBLICADO/i.test(r.status||'');
+  const perfis=[...new Set([...(SELECTS.perfil||[]),r.perfil].filter(Boolean))],formatos=SELECTS.formato||[];
+  let grupos=[];try{grupos=(await api('/studio/hashtags')).grupos||[]}catch{}
+  const h=studioCache.horarios?.melhor,sug=h?stProximaData(h.dia,h.hora):'';
+  const o=adminOverlay(`<div class="st-comp"><form id="stForm" class="st-form"><h3>${edit?'Editar post':'Novo post'}</h3>
+   <label>Título interno<input id="sfTitulo" maxlength="140" value="${attr(r.titulo||'')}" placeholder="Ex.: Aula aberta — Ensino Médio"></label>
+   <div class="st-row"><label>Perfil<select id="sfPerfil">${perfis.map(p=>`<option ${r.perfil===p?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Formato<select id="sfFormato">${formatos.map(f=>`<option ${(r.formato||'Feed')===f?'selected':''}>${esc(f)}</option>`).join('')}</select></label></div>
+   <label>Legenda <span class="st-cont" id="sfCLeg"></span><textarea id="sfLegenda" rows="6" placeholder="Escreva a legenda…">${esc(r.legenda||'')}</textarea></label>
+   <div class="st-ia"><button type="button" class="softbtn" id="sfIA">✦ Sugerir legendas com IA</button><small class="kpi-note">As 125 primeiras letras aparecem antes do "mais".</small></div>
+   <label>Hashtags <span class="st-cont" id="sfCTag"></span><textarea id="sfTags" rows="2" placeholder="#evolução #colégio">${esc(r.hashtags||'')}</textarea></label>
+   <div class="st-grupos" id="sfGrupos"></div>
+   <label>Chamada para ação (CTA)<input id="sfCta" maxlength="160" value="${attr(r.cta||'')}" placeholder="Ex.: Link na bio para se inscrever"></label>
+   <div class="st-row"><label>Data e hora<input id="sfQuando" type="datetime-local" value="${attr(r.publicacaoEm||(dataIni?dataIni+'T09:00':''))}"></label><label>Revisor<input id="sfRevisor" value="${attr(r.revisor||'')}" placeholder="Quem aprova"></label></div>
+   ${sug?`<div class="st-sug"><span>Melhor momento nos seus dados: <b>${esc(h.dia)} às ${h.hora}h</b></span><button type="button" class="softbtn" id="sfSug">Usar</button></div>`:''}
+   <label>Mídia (JPEG ou vídeo MP4/MOV) <input id="sfArq" type="file" accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
+   <label class="check-row"><input type="checkbox" id="sfIG" ${/SIM/i.test(r.publicarInstagram||'')?'checked':''}> Publicar no Instagram automaticamente (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
+   <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="softbtn" type="button" data-s="RASCUNHO">Salvar rascunho</button><button class="softbtn" type="button" data-s="APROVACAO">Enviar para aprovação</button><button class="btn" type="button" data-s="AGENDADO">Agendar</button>${edit?'<button class="softbtn" type="button" data-s="MANTER">Salvar sem mudar a etapa</button>':''}${jaPublicado?'':'<button class="btn accent" type="button" data-s="PUBLICAR">Publicar agora no Instagram</button>'}</div>
+   ${jaPublicado?`<p class="kpi-note">Já publicado${urlSegura(r.instagramLink)?` — <a href="${attr(urlSegura(r.instagramLink))}" target="_blank" rel="noopener">ver no Instagram</a>`:''}.</p>`:''}
+   ${edit?`<p class="kpi-note">Etapa atual: <b>${esc(ST_ROTULO[String(r.status||'').toUpperCase()]||r.status||'—')}</b></p>`:''}</form>
+   <div class="st-prev"><div class="st-fone" id="sfFone"><div class="st-fh"><i></i><b id="pvPerfil"></b></div><div class="st-midia" id="pvMidia"></div><div class="st-fa">♡ ◌ ➤</div><div class="st-fc" id="pvLegenda"></div><small id="pvQuando"></small></div><p class="kpi-note">Prévia aproximada. O Instagram pode cortar a imagem e a legenda de outro jeito.</p></div></div>`);
+  o.el.querySelector('.admin-box').classList.add('st-box');
+  const g=id=>o.el.querySelector('#'+id);let arquivoUrl=r.midiaPrevia||'';
+  const pv=()=>{
+    const leg=g('sfLegenda').value,tags=g('sfTags').value,cta=g('sfCta').value,perfil=g('sfPerfil').value,fm=g('sfFormato').value;
+    g('sfCLeg').textContent=`${leg.length}/2200`;g('sfCLeg').classList.toggle('bad',leg.length>2200);
+    const nt=stContaTags(tags)+stContaTags(leg);g('sfCTag').textContent=`${nt}/30`;g('sfCTag').classList.toggle('bad',nt>30);
+    g('pvPerfil').textContent=perfil||'perfil';
+    const m=g('pvMidia');m.className='st-midia fm-'+(['Reels','Stories','Vídeo'].includes(fm)?'vert':'feed');
+    m.innerHTML=arquivoUrl?(/video/.test(g('sfArq').files?.[0]?.type||'')?`<video src="${attr(arquivoUrl)}" muted></video>`:`<img alt="" src="${attr(arquivoUrl)}">`):`<span>${ST_ICONE[fm]||'◇'}<br>${esc(fm)}</span>`;
+    const txt=leg+(cta?'\n'+cta:''),corte=txt.length>125?txt.slice(0,125)+'… mais':txt;
+    g('pvLegenda').innerHTML=`<b>${esc(perfil)}</b> ${esc(corte).replace(/\n/g,'<br>')}${tags?`<div class="st-tags">${esc(tags)}</div>`:''}`;
+    const q=g('sfQuando').value;g('pvQuando').textContent=q?`${fmtDate(q.slice(0,10))} às ${q.slice(11,16)}`:'Sem data';
+  };
+  const desenhaGrupos=()=>{g('sfGrupos').innerHTML=`<small>Grupos de hashtags:</small> ${grupos.map((x,i)=>`<span class="st-chip"><button type="button" data-gu="${i}" title="Adicionar ${attr(x.tags.join(' '))}">${esc(x.nome)} (${x.tags.length})</button><button type="button" class="x" data-gx="${i}" aria-label="Apagar grupo ${attr(x.nome)}">×</button></span>`).join('')||'<small>nenhum ainda</small>'} <button type="button" class="softbtn" id="sfGSalvar">Salvar estas como grupo</button>`;
+    g('sfGrupos').querySelectorAll('[data-gu]').forEach(b=>b.onclick=()=>{const cur=g('sfTags').value.split(/\s+/).filter(Boolean),novo=grupos[+b.dataset.gu].tags.filter(t=>!cur.includes(t));g('sfTags').value=[...cur,...novo].join(' ');pv()});
+    g('sfGrupos').querySelectorAll('[data-gx]').forEach(b=>b.onclick=async()=>{const x=grupos[+b.dataset.gx];if(!confirm(`Apagar o grupo "${x.nome}"?`))return;grupos=grupos.filter((_,i)=>i!==+b.dataset.gx);await stSalvaGrupos(grupos);desenhaGrupos()});
+    g('sfGSalvar').onclick=async()=>{const tags=(g('sfTags').value.match(/#[\p{L}\p{N}_]+/gu)||[]);if(!tags.length)return toast('Escreva as hashtags primeiro','warn');const nome=(prompt('Nome do grupo (ex.: Matrículas)')||'').trim();if(!nome)return;grupos=[...grupos.filter(x=>x.nome.toLowerCase()!==nome.toLowerCase()),{nome,tags}];await stSalvaGrupos(grupos);desenhaGrupos();toast('Grupo salvo')};
+  };
+  ['sfLegenda','sfTags','sfCta','sfPerfil','sfFormato','sfQuando'].forEach(i=>{g(i).oninput=pv;g(i).onchange=pv});
+  g('sfArq').onchange=()=>{const f=g('sfArq').files[0];arquivoUrl=f?URL.createObjectURL(f):'';pv()};
+  if(g('sfSug'))g('sfSug').onclick=()=>{g('sfQuando').value=sug;pv()};
+  g('sfIA').onclick=async()=>{
+    if(!edit)return toast('Salve o rascunho primeiro; a IA usa os dados do post salvo.','warn');
+    try{const d=await api('/ia/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'conteudos',id:r.id})});
+      const ov=adminOverlay(`<h3>Rascunhos de legenda</h3><p class="kpi-note">Revise antes de usar.</p><div class="origem-list">${d.opcoes.map((x,i)=>`<div class="notif"><div style="white-space:pre-wrap">${esc(x.legenda)}</div><small>${esc(x.hashtags.join(' '))}</small><div><button class="softbtn" data-usar="${i}">Usar esta</button></div></div>`).join('')}</div><div class="actions"><button class="btn soft" data-close>Fechar</button></div>`);
+      ov.el.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{const x=d.opcoes[+b.dataset.usar];g('sfLegenda').value=x.legenda;if(x.hashtags.length)g('sfTags').value=x.hashtags.join(' ');pv();ov.close()})}catch(e){toast(e.message,'warn')}
+  };
+  const salvar=async tipo=>{
+    const titulo=g('sfTitulo').value.trim(),leg=g('sfLegenda').value,quando=g('sfQuando').value;
+    if(!titulo)return toast('Dê um título interno ao post','warn');
+    if(leg.length>2200)return toast('A legenda passou de 2.200 caracteres','warn');
+    if(stContaTags(g('sfTags').value)+stContaTags(leg)>30)return toast('O Instagram aceita no máximo 30 hashtags','warn');
+    if(tipo==='AGENDADO'&&!quando)return toast('Escolha a data e a hora para agendar','warn');
+    const gerente=internalSession?.role==='manager',liberado=/^(APROVADO|PROGRAMADO)$/i.test(r.status||'');
+    if(tipo==='PUBLICAR'){
+      if(!g('sfArq').files[0]&&!r.midiaInstagram)return toast('Anexe a mídia (JPEG ou vídeo) antes de publicar','warn');
+      if(g('sfFormato').value==='Carrossel')return toast('Carrossel ainda não publica automaticamente: publique manualmente.','warn');
+      if(!gerente&&!liberado)return toast('Só publica depois de aprovado. Use "Enviar para aprovação".','warn');
+      if(!confirm(gerente&&!liberado?'Isto APROVA e PUBLICA agora no Instagram do colégio. Não dá para desfazer pelo sistema. Continuar?':'Publicar agora no Instagram do colégio? Não dá para desfazer pelo sistema.'))return;
+    }
+    const body={titulo,perfil:g('sfPerfil').value,formato:g('sfFormato').value,canal:'Instagram',legenda:leg,hashtags:g('sfTags').value,cta:g('sfCta').value,publicacaoEm:quando,revisor:g('sfRevisor').value,publicarInstagram:g('sfIG').checked?'SIM':'NÃO'};
+    if(tipo==='PUBLICAR'){if(!liberado)body.status='APROVADO';if(!body.publicacaoEm)body.publicacaoEm=stAgoraLocal()}else if(tipo!=='MANTER')body.status=ST_ETAPAS[tipo];else if(!edit)body.status='PRODUÇÃO';
+    try{
+      const salvo=await api(edit?`/data?module=conteudos&id=${encodeURIComponent(r.id)}`:'/data?module=conteudos',{method:edit?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const id=salvo?.id||r.id,f=g('sfArq').files[0];
+      if(f&&id){const fd=new FormData();fd.append('files',f);const rs=await fetch(API+'/integrations/instagram/media?id='+encodeURIComponent(id),{method:'POST',credentials:'same-origin',headers:{'X-EVO':'1'},body:fd});if(!rs.ok){const j=await rs.json().catch(()=>({}));toast('Post salvo, mas a mídia não subiu: '+(j.error||rs.status),'warn')}}
+      if(tipo==='PUBLICAR'){
+        o.el.querySelectorAll('button').forEach(b=>b.disabled=true);toast('Publicando… pode levar até 1 minuto');
+        try{const pr=await api('/integrations/instagram/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});invalidate('conteudos');o.close();toast(pr.status==='PUBLICADO'?'Publicado no Instagram!':'O Instagram está processando o vídeo; o sistema conclui sozinho');await renderStudio();return}
+        catch(e){invalidate('conteudos');o.close();toast('Salvo, mas não publicou: '+e.message,'bad');await renderStudio();return}
+      }
+      invalidate('conteudos');o.close();toast(tipo==='APROVACAO'?'Enviado para aprovação':tipo==='AGENDADO'?'Post agendado':'Post salvo');await renderStudio();
+    }catch(e){toast(e.message,'bad')}
+  };
+  o.el.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>salvar(b.dataset.s));
+  desenhaGrupos();pv();
+}
+async function stSalvaGrupos(grupos){try{await api('/studio/hashtags',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({grupos})})}catch(e){toast(e.message,'bad')}}
+
+// ---------- Desempenho por publicação (Instagram) ----------
+let igFiltro={periodo:'90',tipo:'',ordem:'recentes'},igDados=null;
+const IG_TIPO={FEED:'Feed',REELS:'Reels',STORY:'Stories',CAROUSEL_ALBUM:'Carrossel',IMAGE:'Feed',VIDEO:'Vídeo'};
+const IG_ORDEM={recentes:['Mais recentes',(a,b)=>String(b.quando).localeCompare(String(a.quando))],interacoes:['Mais interações',(a,b)=>b.interacoes-a.interacoes],alcance:['Maior alcance',(a,b)=>(b.alcance??-1)-(a.alcance??-1)],engajamento:['Maior engajamento',(a,b)=>(b.engajamento??-1)-(a.engajamento??-1)]};
+const igNum=n=>Number(n||0).toLocaleString('pt-BR');
+async function renderIgPosts(){
+  igDados=await api('/instagram/posts');
+  desenharIgPosts();
+}
+function desenharIgPosts(){
+  const todos=igDados.rows||[],corte=igFiltro.periodo==='tudo'?null:new Date(Date.now()-Number(igFiltro.periodo)*86400000);
+  const tipoDe=r=>IG_TIPO[r.tipo]||r.tipo||'Outro';
+  let rows=todos.filter(r=>(!corte||new Date(String(r.quando).replace(/([+-]\d\d)(\d\d)$/,'$1:$2'))>=corte)&&(!igFiltro.tipo||tipoDe(r)===igFiltro.tipo));
+  rows=[...rows].sort(IG_ORDEM[igFiltro.ordem][1]);
+  const tipos=[...new Set(todos.map(tipoDe))];
+  const porTipo=tipos.map(t=>{const rs=rows.filter(r=>tipoDe(r)===t);if(!rs.length)return null;const com=rs.filter(r=>r.alcance!==null),m=(a,k)=>a.length?Math.round(a.reduce((s,r)=>s+(r[k]||0),0)/a.length):null;return {t,n:rs.length,inter:m(rs,'interacoes'),alc:m(com,'alcance'),eng:com.length?Math.round(com.reduce((s,r)=>s+(r.engajamento||0),0)/com.length*10)/10:null}}).filter(Boolean);
+  const melhor=[...rows].sort(IG_ORDEM.interacoes[1])[0];
+  const sel=(k,opts,cur)=>`<select data-igf="${k}">${opts.map(([v,l])=>`<option value="${attr(v)}" ${String(cur)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${ST_ICONE[tipoDe(r)]||'◇'}<br>${esc(tipoDe(r))}</span>`};
+  const card=r=>{const l=urlSegura(r.link),dt=String(r.quando).slice(0,10);return `<article class="ig-card"><${l?`a href="${attr(l)}" target="_blank" rel="noopener"`:'div'} class="ig-thumb" title="Abrir no Instagram">${mini(r)}</${l?'a':'div'}><div class="ig-body"><div class="ig-meta"><b>${esc(tipoDe(r))}</b><span>${dt?fmtDate(dt):''}</span></div><p>${esc(r.legenda||'(sem legenda)')}</p><dl><div><dt>Curtidas</dt><dd>${igNum(r.curtidas)}</dd></div><div><dt>Comentários</dt><dd>${igNum(r.comentarios)}</dd></div><div><dt>Salvos</dt><dd>${igNum(r.salvos)}</dd></div><div><dt>Compart.</dt><dd>${igNum(r.compartilhamentos)}</dd></div><div><dt>Alcance</dt><dd>${r.alcance===null?'—':igNum(r.alcance)}</dd></div><div><dt>Engajamento</dt><dd>${r.engajamento===null?'—':String(r.engajamento).replace('.',',')+'%'}</dd></div></dl></div></article>`};
+  const vazio=!todos.length;
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · DESEMPENHO</small><h1>O que funcionou em cada publicação</h1><p>${igDados.ultimaSync?`Última leitura da Meta: ${fmtDateTime(igDados.ultimaSync)}.`:'Ainda não houve leitura da Meta.'} Alcance, salvamentos e compartilhamentos vêm das 30 publicações mais recentes.</p></div>${internalSession?.role==='manager'?'<button class="btn" id="igAtualiza">Atualizar agora</button>':''}</div>
+  ${vazio?`<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram em Administração → Integrações e clique em “Atualizar agora”.</span></div>`:`
+  <div class="st-toolbar"><div class="st-filtros">${sel('periodo',[['30','Últimos 30 dias'],['90','Últimos 90 dias'],['365','Último ano'],['tudo','Tudo']],igFiltro.periodo)}${sel('tipo',[['','Todos os formatos'],...tipos.map(t=>[t,t])],igFiltro.tipo)}${sel('ordem',Object.entries(IG_ORDEM).map(([k,v])=>[k,v[0]]),igFiltro.ordem)}</div><span class="kpi-note">${rows.length} publicação(ões)</span></div>
+  <div class="ig-resumo">${porTipo.map(x=>`<div class="card ig-tipo"><small>${esc(x.t.toUpperCase())} · ${x.n} POST(S)</small><div class="ig-nums"><div><strong>${x.inter===null?'—':igNum(x.inter)}</strong><span>interações em média</span></div><div><strong>${x.alc===null?'—':igNum(x.alc)}</strong><span>alcance médio</span></div><div><strong>${x.eng===null?'—':String(x.eng).replace('.',',')+'%'}</strong><span>engajamento médio</span></div></div></div>`).join('')||''}</div>
+  ${melhor?`<div class="card st-tip"><span>★</span><div>Melhor publicação do período: <b>${esc((melhor.legenda||'sem legenda').slice(0,90))}</b> — ${igNum(melhor.interacoes)} interações.</div></div>`:''}
+  <div class="ig-grid">${rows.map(card).join('')||'<div class="empty compact">Nada neste filtro.</div>'}</div>`}`;
+  $$('[data-igf]').forEach(s=>s.onchange=()=>{igFiltro[s.dataset.igf]=s.value;desenharIgPosts()});
+  const b=$('#igAtualiza');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Atualizando…';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});toast('Publicações atualizadas');await renderIgPosts()}catch(e){toast(e.message,'bad');b.disabled=false;b.textContent='Atualizar agora'}};
+}

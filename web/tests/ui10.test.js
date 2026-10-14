@@ -1,4 +1,4 @@
-// Interface: 8 áreas, seções, ficha com comentários/checklist/subtarefas, decisão de conteúdo, diálogos acessíveis, relatórios, tráfego, administração. Uso: node ui10.test.js <install.out>
+// Interface: 9 áreas, seções, ficha com comentários/checklist/subtarefas, decisão de conteúdo, diálogos acessíveis, relatórios, tráfego, administração. Uso: node ui10.test.js <install.out>
 const {chromium}=require(process.env.PLAYWRIGHT||'/opt/node-tools/node_modules/playwright');const fs=require('fs');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const BASE=process.env.BASE||'http://127.0.0.1:8080';
 let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(x).slice(0,400))};
@@ -8,9 +8,9 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');ans='Subtarefa criada pela tela';
  const api=(m,u,body)=>p.evaluate(async([m,u,body])=>api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}),[m,u,body]);
  const nav=await p.$$eval('#nav .navitem .navlabel',e=>e.map(x=>x.innerText.trim()));
- t('menu lateral: exatamente as 8 áreas, sem itens decorativos',nav.length===8&&nav[0]==='Visão geral'&&nav[7]==='Administração',nav.join('|'));
- const areas={planejamento:['Agenda','Calendário','Tarefas','Projetos','Eventos'],conteudo:['Conteúdos','Ideias','Planejamento Editorial','Aprovações','Templates','Instagram'],trafego:['Tráfego','Campanhas'],relatorios:['Relatórios','Fechamento Mensal']};
- const pag={planejamento:'agenda',conteudo:'conteudos',trafego:'trafego',relatorios:'relatorios'};
+ t('menu lateral: exatamente as 9 áreas (com Instagram), sem itens decorativos',nav.length===9&&nav[0]==='Visão geral'&&nav[4]==='Instagram'&&nav[8]==='Administração',nav.join('|'));
+ const areas={planejamento:['Agenda','Calendário','Tarefas','Projetos','Eventos'],conteudo:['Conteúdos','Ideias','Planejamento Editorial','Aprovações','Templates'],instagramarea:['Estúdio','Métricas','Desempenho'],trafego:['Tráfego','Campanhas'],relatorios:['Relatórios','Fechamento Mensal']};
+ const pag={planejamento:'agenda',instagramarea:'studio',conteudo:'conteudos',trafego:'trafego',relatorios:'relatorios'};
  for(const [k,esperado] of Object.entries(areas)){await p.evaluate(x=>go(x),pag[k]);await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText.trim()));t(`seções de ${k}: ${esperado.join(', ')}`,esperado.every(x=>sub.includes(x)),sub.join('|'))}
  await p.click('#subtabs .subtab:nth-child(2)');await p.waitForTimeout(600);t('clicar numa seção troca de tela e marca a seção ativa',await p.$eval('#subtabs .subtab.active',e=>e.innerText)==='Fechamento Mensal');
  // ficha da tarefa

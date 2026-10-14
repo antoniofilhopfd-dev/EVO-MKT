@@ -1,0 +1,116 @@
+// Estúdio de publicações: semana editorial, arrastar-e-soltar, compositor com prévia, grupos de hashtags. Uso: node studio.test.js <install.out>
+const {chromium}=require(process.env.PLAYWRIGHT||'/opt/node-tools/node_modules/playwright');const fs=require('fs');
+const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const BASE=process.env.BASE||'http://127.0.0.1:8080';const PR=process.env.PRINTS||'/tmp/evo-prints';
+fs.mkdirSync(PR,{recursive:true});
+let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(x).slice(0,300))};
+const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
+(async()=>{
+ const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+ const ctx=await b.newContext({viewport:{width:1366,height:1000}});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+ let logado=false;p.on('dialog',d=>d.accept(d.type()==='prompt'?(logado?'Matrículas':'Senha26x'):undefined));
+ await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');logado=true;
+ const api=(m,u,body)=>p.evaluate(async([m,u,body])=>{try{return await api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})}catch(e){return {erro:e.message}}},[m,u,body]);
+ // ---- API de hashtags
+ let r=await api('GET','/studio/hashtags');t('grupos de hashtags começam vazios',Array.isArray(r.grupos)&&r.grupos.length===0,r);
+ r=await api('POST','/studio/hashtags',{grupos:[{nome:'Infantil',tags:['#evolucao','sem-cerquilha','#ok_1','#evolucao']}]});t('salva grupo, tira tag inválida e repetida',r.ok&&r.grupos[0].tags.join()==='#evolucao,#ok_1',r);
+ r=await api('POST','/studio/hashtags',{grupos:[{nome:'',tags:['#a']}]});t('grupo sem nome é recusado',!!r.erro,r);
+ r=await api('POST','/studio/hashtags',{grupos:Array.from({length:31},(_,i)=>({nome:'g'+i,tags:[]}))});t('mais de 30 grupos é recusado',!!r.erro,r);
+ await api('POST','/studio/hashtags',{grupos:[]});
+ // ---- semana
+ await p.evaluate(()=>go('studio'));await p.waitForSelector('.st-week');
+ t('mostra a semana com 7 dias',(await p.$$('.st-day')).length===7);
+ t('mostra indicadores, dica de horário e a coluna "Sem data"',(await p.$$('.st-kpis .kpi')).length===5&&!!(await p.$('.st-tip'))&&!!(await p.$('.st-backlog')));
+ const dia=await p.evaluate(()=>stIso(stAddDias(studioSemana,3))),dia2=await p.evaluate(()=>stIso(stAddDias(studioSemana,5)));
+ const c1=(await api('POST','/data?module=conteudos',{titulo:'Aula aberta do Médio',perfil:'@evolucaopb',formato:'Reels',status:'PROGRAMADO',publicacaoEm:dia+'T10:30',legenda:'Venha conhecer'})).id;
+ const c2=(await api('POST','/data?module=conteudos',{titulo:'Pauta sem data',perfil:'@evolucaopb',formato:'Feed',status:'PRODUÇÃO'})).id;
+ await p.evaluate(()=>renderStudio());await p.waitForSelector('.st-card');
+ t('post datado aparece no dia certo',!!(await p.$(`.st-day[data-date="${dia}"] .st-card[data-id="${c1}"]`)));
+ t('post sem data aparece em "Sem data"',!!(await p.$(`.st-backlog .st-card[data-id="${c2}"]`)));
+ await p.screenshot({path:PR+'/22_estudio_semana.png'});
+ // ---- arrastar e soltar
+ await p.dragAndDrop(`.st-card[data-id="${c1}"]`,`.st-day[data-date="${dia2}"]`);await p.waitForTimeout(1200);
+ let x=await api('GET','/data?module=conteudos&id='+c1);t('arrastar para outro dia reagenda e mantém a hora',x.publicacaoEm===dia2+'T10:30',x.publicacaoEm);
+ await p.dragAndDrop(`.st-backlog .st-card[data-id="${c2}"]`,`.st-day[data-date="${dia}"]`);await p.waitForTimeout(1200);
+ x=await api('GET','/data?module=conteudos&id='+c2);t('arrastar de "Sem data" agenda no dia (hora padrão 09:00)',x.publicacaoEm===dia+'T09:00',x.publicacaoEm);
+ // ---- filtro
+ await p.selectOption('[data-stf="formato"]','Reels');await p.waitForTimeout(200);
+ t('filtro por formato esconde os outros posts',!!(await p.$(`.st-card[data-id="${c1}"]`))&&!(await p.$(`.st-card[data-id="${c2}"]`)));
+ await p.selectOption('[data-stf="formato"]','');
+ // ---- compositor
+ await p.click('#stNovo');await p.waitForSelector('.st-form');
+ await p.fill('#sfTitulo','Matrículas abertas 2027');
+ await p.fill('#sfLegenda','Venha conhecer o Colégio Evolução e garanta a vaga do seu filho para 2027 com condições especiais de matrícula e bolsa.');
+ await p.fill('#sfTags','#matriculas #evolucao');
+ await p.fill('#sfCta','Link na bio');
+ t('prévia mostra legenda cortada em 125 letras com "mais"',/… mais/.test(await p.$eval('#pvLegenda',e=>e.innerText))&&/#matriculas/.test(await p.$eval('#pvLegenda',e=>e.innerText)));
+ t('contadores de legenda e de hashtags',/\/2200/.test(await p.$eval('#sfCLeg',e=>e.textContent))&&(await p.$eval('#sfCTag',e=>e.textContent))==='2/30');
+ await p.setInputFiles('#sfArq',{name:'a.png',mimeType:'image/png',buffer:PNG});await p.waitForSelector('#pvMidia img');
+ t('prévia mostra a mídia escolhida',!!(await p.$('#pvMidia img')));
+ await p.selectOption('#sfFormato','Reels');t('formato Reels muda a prévia para vertical',/fm-vert/.test(await p.$eval('#pvMidia',e=>e.className)));
+ await p.screenshot({path:PR+'/23_estudio_compositor.png'});
+ // grupos
+ await p.click('#sfGSalvar');await p.waitForSelector('[data-gu]');
+ t('"Salvar como grupo" cria o grupo com as hashtags',(await api('GET','/studio/hashtags')).grupos.some(g=>g.nome==='Matrículas'&&g.tags.join()==='#matriculas,#evolucao'));
+ await p.fill('#sfTags','');await p.click('[data-gu="0"]');
+ t('clicar no grupo coloca as hashtags no campo',(await p.$eval('#sfTags',e=>e.value))==='#matriculas #evolucao');
+ // validações
+ await p.fill('#sfLegenda','a'.repeat(2201));await p.click('[data-s="RASCUNHO"]');await p.waitForTimeout(400);
+ t('legenda acima de 2.200 caracteres não salva',!(await api('GET','/data?module=conteudos')).rows.some(r=>r.titulo==='Matrículas abertas 2027'));
+ await p.fill('#sfLegenda','Texto curto');await p.fill('#sfTags',Array.from({length:31},(_,i)=>'#t'+i).join(' '));await p.click('[data-s="RASCUNHO"]');await p.waitForTimeout(400);
+ t('mais de 30 hashtags não salva',!(await api('GET','/data?module=conteudos')).rows.some(r=>r.titulo==='Matrículas abertas 2027'));
+ await p.fill('#sfTags','#a #b');await p.click('[data-s="AGENDADO"]');await p.waitForTimeout(400);
+ t('agendar sem data não salva',!(await api('GET','/data?module=conteudos')).rows.some(r=>r.titulo==='Matrículas abertas 2027'));
+ // salvar rascunho / aprovação / agendar
+ await p.click('[data-s="RASCUNHO"]');await p.waitForSelector('.st-form',{state:'detached'});
+ let novo=(await api('GET','/data?module=conteudos')).rows.find(r=>r.titulo==='Matrículas abertas 2027');
+ t('salvar rascunho cria o post na etapa PRODUÇÃO',novo&&novo.status==='PRODUÇÃO'&&novo.formato==='Reels'&&novo.cta==='Link na bio'&&novo.canal==='Instagram',novo);
+ await p.waitForSelector(`.st-card[data-id="${novo.id}"]`);await p.click(`.st-card[data-id="${novo.id}"]`);await p.waitForSelector('.st-form');
+ t('abrir o card edita o mesmo post',(await p.$eval('#sfTitulo',e=>e.value))==='Matrículas abertas 2027');
+ await p.fill('#sfRevisor','Antônio Filho');await p.click('[data-s="APROVACAO"]');await p.waitForSelector('.st-form',{state:'detached'});
+ novo=await api('GET','/data?module=conteudos&id='+novo.id);t('"Enviar para aprovação" muda para REVISÃO',novo.status==='REVISÃO'&&novo.revisor==='Antônio Filho',novo);
+ await p.click(`.st-card[data-id="${novo.id}"]`);await p.waitForSelector('.st-form');await p.fill('#sfQuando',dia2+'T12:00');await p.click('[data-s="AGENDADO"]');await p.waitForSelector('.st-form',{state:'detached'});
+ novo=await api('GET','/data?module=conteudos&id='+novo.id);t('"Agendar" muda para PROGRAMADO com data e hora',novo.status==='PROGRAMADO'&&novo.publicacaoEm===dia2+'T12:00',novo);
+ await p.click(`.st-card[data-id="${novo.id}"]`);await p.waitForSelector('.st-form');await p.fill('#sfCta','Novo CTA');await p.click('[data-s="MANTER"]');await p.waitForSelector('.st-form',{state:'detached'});
+ novo=await api('GET','/data?module=conteudos&id='+novo.id);t('"Salvar sem mudar a etapa" preserva o status',novo.status==='PROGRAMADO'&&novo.cta==='Novo CTA',novo);
+ // ---- área Instagram no menu + desempenho por publicação
+ t('menu tem a área Instagram com Estúdio, Métricas e Desempenho',await p.evaluate(()=>{go('studio');const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&subs.join()==='Estúdio,Métricas,Desempenho'}));
+ t('a área Conteúdo não tem mais Instagram nem Estúdio',await p.evaluate(()=>{const a=AREAS.find(x=>x.k==='conteudo');return !a.pages.includes('instagram')&&!a.pages.includes('studio')}));
+ await p.evaluate(()=>go('igposts'));await p.waitForSelector('.dashboard-head');
+ t('sem Instagram sincronizado mostra aviso claro',/Nenhuma publicação lida ainda/.test(await p.$eval('#content',e=>e.innerText)));
+ await api('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});let sy=await api('POST','/integrations/instagram/sync',{});
+ let ps=await api('GET','/instagram/posts');const m2=(ps.rows||[]).find(x=>x.id==='m2');
+ t('sincronização grava alcance, salvos e compartilhamentos por publicação',m2&&m2.alcance===20000&&m2.salvos===80&&m2.compartilhamentos===40&&m2.interacoes===900+55+80+40,[sy,m2]);
+ t('engajamento = interações ÷ alcance',m2&&m2.engajamento===Math.round((m2.interacoes/20000)*1000)/10,m2);
+ t('só endereços https viram miniatura',(ps.rows||[]).every(x=>!x.miniatura||/^https:\/\//.test(x.miniatura))&&(ps.rows||[]).find(x=>x.id==='m1').miniatura.includes('cdninstagram'));
+ await p.evaluate(()=>go('igposts'));await p.waitForSelector('.ig-card');
+ t('tela Desempenho mostra um card por publicação do período',(await p.$$('.ig-card')).length>=3);
+ await p.selectOption('[data-igf="tipo"]','Reels');t('filtro por formato mostra só Reels',(await p.$$('.ig-card')).length===1);
+ await p.selectOption('[data-igf="tipo"]','');await p.selectOption('[data-igf="ordem"]','interacoes');
+ t('ordenar por interações põe a melhor primeiro',/Bastidores da feira/.test(await p.$eval('.ig-card p',e=>e.textContent)));
+ t('resumo compara formatos (Reels × Feed)',/REELS/.test(await p.$eval('.ig-resumo',e=>e.innerText))&&/FEED/.test(await p.$eval('.ig-resumo',e=>e.innerText)));
+ await p.screenshot({path:PR+'/25_instagram_desempenho.png'});
+ // ---- publicar pelo Estúdio
+ const JPG=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
+ const cr=(await api('POST','/data?module=conteudos',{titulo:'Rascunho que não pode publicar',status:'PRODUÇÃO',formato:'Feed'})).id;
+ r=await api('POST','/integrations/instagram/publish',{id:cr});t('o servidor recusa publicar conteúdo que não está aprovado',!!r.erro&&/APROVADOS/.test(r.erro),r);
+ await p.evaluate(()=>go('studio'));await p.waitForSelector('#stNovo');await p.click('#stNovo');await p.waitForSelector('.st-form');
+ await p.fill('#sfTitulo','Publicado pelo Estúdio');await p.fill('#sfLegenda','Hoje tem aula aberta!');
+ await p.click('[data-s="PUBLICAR"]');await p.waitForTimeout(500);
+ t('publicar sem mídia não publica nem cria o post',!(await api('GET','/data?module=conteudos')).rows.some(x=>x.titulo==='Publicado pelo Estúdio'));
+ await p.setInputFiles('#sfArq',{name:'arte.jpg',mimeType:'image/jpeg',buffer:JPG});await p.click('[data-s="PUBLICAR"]');
+ await p.waitForSelector('.st-form',{state:'detached',timeout:20000});
+ const pub=(await api('GET','/data?module=conteudos')).rows.find(x=>x.titulo==='Publicado pelo Estúdio');
+ t('"Publicar agora" aprova, publica no Instagram e grava o link',pub&&pub.status==='PUBLICADO'&&/MEDIA_/.test(pub.instagramMediaId||'')&&/instagram\.com/.test(pub.instagramLink||''),pub);
+ await p.evaluate(()=>renderStudio());await p.waitForSelector(`.st-card[data-id="${pub.id}"]`);await p.click(`.st-card[data-id="${pub.id}"]`);await p.waitForSelector('.st-form');
+ t('post já publicado não oferece publicar de novo e mostra o link',!(await p.$('[data-s="PUBLICAR"]'))&&/ver no Instagram/.test(await p.$eval('.st-form',e=>e.innerText)));
+ await p.click('.st-form [data-close]');
+ // celular
+ const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
+ await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('studio')});await m.waitForSelector('.st-week');
+ t('no celular a página não rola para o lado',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+ await m.screenshot({path:PR+'/24_estudio_celular.png'});
+ await m.click('#stNovo');await m.waitForSelector('.st-form');
+ t('no celular o compositor cabe na tela',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1&&document.querySelector('.st-box').scrollWidth<=window.innerWidth));
+ t('sem erros de JS',errs.length===0&&e2.length===0,errs.concat(e2).join('|'));
+ console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
+})();

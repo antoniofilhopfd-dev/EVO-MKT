@@ -9,6 +9,7 @@ import { q } from '../db';
 import { allowedSegment, requireInternal, requireManager, requirePortal } from '../auth';
 import { fluxoPublico, FINAL_SOLICITACAO } from '../fluxo';
 import { audit, getRow, listRows } from '../records';
+import { setSetting, setting } from '../settings';
 import { diasUteisEntre, HistRow, hojeLocal, periodosPorStatus, slaInfo } from '../sla';
 import { addDays, env, fail, fmtDate, Row } from '../util';
 import { json } from './handlers';
@@ -107,6 +108,40 @@ export async function operacaoRoute(c: Ctx) {
   if (path === '/insights') {
     await requireManager(c);
     return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(), ranking: await rankingConteudos() });
+  }
+  if (path === '/instagram/posts') {
+    await requireInternal(c);
+    const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts ORDER BY publicado_em DESC LIMIT 300')).map((p) => {
+      const interacoes = Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos);
+      const alcance = p.alcance === null || p.alcance === undefined ? null : Number(p.alcance);
+      return {
+        id: p.media_id, quando: p.publicado_em, tipo: p.tipo, legenda: p.legenda, curtidas: Number(p.curtidas), comentarios: Number(p.comentarios),
+        salvos: Number(p.salvos), compartilhamentos: Number(p.compartilhamentos), alcance, interacoes,
+        engajamento: alcance ? Math.round((interacoes / alcance) * 1000) / 10 : null, miniatura: p.miniatura, link: p.permalink,
+      };
+    });
+    return json({ rows, ultimaSync: await setting('ig_last_sync') });
+  }
+  if (path === '/studio/hashtags') {
+    const u = await requireInternal(c);
+    if (c.method === 'GET') {
+      let grupos: unknown = [];
+      try { grupos = JSON.parse((await setting('studio_hashtags')) || '[]'); } catch { /* guardado inválido: lista vazia */ }
+      return json({ grupos });
+    }
+    if (c.method !== 'POST') return fail(405, 'Método não permitido.');
+    const b = await c.body();
+    const lista = Array.isArray(b.grupos) ? b.grupos : fail(400, 'Envie a lista de grupos.');
+    if (lista.length > 30) fail(400, 'No máximo 30 grupos de hashtags.');
+    const limpos = lista.map((g: any) => {
+      const nome = String(g?.nome ?? '').trim().slice(0, 40);
+      const tags = (Array.isArray(g?.tags) ? g.tags : []).map((t: any) => String(t).trim()).filter((t: string) => /^#[\p{L}\p{N}_]{1,60}$/u.test(t)).slice(0, 30);
+      if (!nome) fail(400, 'Todo grupo precisa de um nome.');
+      return { nome, tags: [...new Set(tags)] };
+    });
+    await setSetting('studio_hashtags', JSON.stringify(limpos));
+    await audit(String(u.codigo), 'studio-hashtags');
+    return json({ ok: true, grupos: limpos });
   }
   if (path === '/datas') {
     await requireInternal(c);

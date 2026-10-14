@@ -1,5 +1,5 @@
 const API='/api';
-const VERSION='5.2.0';
+const VERSION='5.3.0';
 const DATA_MODULES=['agenda','aprovacoes','arquivos','calendario','campanhas','configuracoes','conteudos','equipe','eventos','ideias','instagram','integracoes','lixeira','projetos','relatorios','solicitacoes','tarefas','templates','trafego'];
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -21,7 +21,7 @@ const INTERNAL_USERS=[
  {code:'ALU-3304',name:'Aluizo Junior',role:'team',label:'Equipe de Marketing'},
  {code:'EDU-3305',name:'Maria Eduarda',role:'team',label:'Equipe de Marketing'}
 ];
-const TEAM_ALLOWED=['minhaarea','agenda','calendario','tarefas','projetos','eventos','conteudos','ideias','campanhas','aprovacoes','instagram','trafego','templates','arquivos'];
+const TEAM_ALLOWED=['minhaarea','studio','igposts','agenda','calendario','tarefas','projetos','eventos','conteudos','ideias','campanhas','aprovacoes','instagram','trafego','templates','arquivos'];
 let internalSession=null;
 function loadInternalSession(){try{const x=JSON.parse(sessionStorage.getItem('evo.internal.session')||'null');if(x&&INTERNAL_USERS.some(u=>u.code===x.code&&u.name===x.name))return x}catch{}return null}
 function canAccess(page){if(!internalSession)return false;return internalSession.role==='manager'||TEAM_ALLOWED.includes(page)}
@@ -61,6 +61,8 @@ const MODULES={
  relatorios:{label:'Relatórios',icon:'▥',group:'Gestão',tone:'blue',desc:'Relatórios executivos e comparativos por período.'},
  arquivos:{label:'Arquivos',icon:'▱',group:'Gestão',tone:'slate',desc:'Biblioteca de caminhos, materiais e vínculos.'},
  equipe:{label:'Equipe',icon:'♙',group:'Gestão',tone:'green',desc:'Pessoas, funções, capacidade e carga de trabalho.'},
+ igposts:{label:'Desempenho das publicações',icon:'▥',group:'Marketing',tone:'orange',desc:'Alcance, interações e engajamento de cada post, com miniatura e comparação por formato.'},
+ studio:{label:'Estúdio de publicações',icon:'✎',group:'Marketing',tone:'orange',desc:'Semana editorial, novo post com prévia, hashtags e melhor horário.'},
  editorial:{label:'Planejamento Editorial',icon:'▧',group:'Gestão',tone:'orange',desc:'Cobertura editorial, campanhas, formatos, perfis e próximos conteúdos.'},
  fechamento:{label:'Fechamento Mensal',icon:'◫',group:'Gestão',tone:'green',desc:'Resumo executivo do mês, realizado, pendências e próximos focos.'},
  fluxos:{label:'Fluxos',icon:'⇢',group:'Gestão',tone:'purple',desc:'Automação de etapas, SLAs internos, responsáveis e gargalos.'},
@@ -152,7 +154,8 @@ const AREAS=[
  {k:'visao',label:'Visão geral',icon:'◉',pages:['hoje','minhaarea','central']},
  {k:'solicitacoes',label:'Solicitações',icon:'☷',pages:['solicitacoes','fluxos']},
  {k:'planejamento',label:'Planejamento',icon:'◷',pages:['agenda','calendario','tarefas','projetos','eventos']},
- {k:'conteudo',label:'Conteúdo',icon:'✎',pages:['conteudos','ideias','editorial','aprovacoes','templates','instagram']},
+ {k:'conteudo',label:'Conteúdo',icon:'✎',pages:['conteudos','ideias','editorial','aprovacoes','templates']},
+ {k:'instagramarea',label:'Instagram',icon:'◎',pages:['studio','instagram','igposts']},
  {k:'trafego',label:'Tráfego',icon:'↗',pages:['trafego','campanhas']},
  {k:'relatorios',label:'Relatórios',icon:'▥',pages:['relatorios','fechamento']},
  {k:'arquivoseequipe',label:'Arquivos e equipe',icon:'▱',pages:['arquivos','equipe']},
@@ -167,11 +170,12 @@ function renderNav(){
  $$('.navitem',nav).forEach(b=>b.onclick=()=>go(b.dataset.page));
  $('#version').textContent=`v${VERSION}`;
 }
+const SUBLABEL={studio:'Estúdio',instagram:'Métricas',igposts:'Desempenho'};
 function montarSubtabs(){
  const box=$('#subtabs');if(!box)return;const a=areaOf(state.page);const ok=a?a.pages.filter(canAccess):[];
  if(!a||ok.length<2){box.innerHTML='';box.hidden=true;return}
  box.hidden=false;box.setAttribute('aria-label','Seções de '+a.label);
- box.innerHTML=ok.map(p=>`<button class="subtab ${p===state.page?'active':''}" data-sub="${p}" ${p===state.page?'aria-current="page"':''}>${esc(MODULES[p].label)}</button>`).join('');
+ box.innerHTML=ok.map(p=>`<button class="subtab ${p===state.page?'active':''}" data-sub="${p}" ${p===state.page?'aria-current="page"':''}>${esc(SUBLABEL[p]||MODULES[p].label)}</button>`).join('');
  $$('.subtab',box).forEach(b=>b.onclick=()=>go(b.dataset.sub));
  setPref('areaLast.'+a.k,state.page);
 }
@@ -186,7 +190,7 @@ async function go(page){
  if(!canAccess(page))page=internalSession?.role==='manager'?'hoje':'minhaarea';state.page=page;state.module=DATA_MODULES.includes(page)?page:null;state.query='';state.status='';state.priority='';state.segment='';state.respF='';state.canalF='';state.estadoF='';state.pageNum=1;state.selected.clear();state.view=pref(`view.${page}`,VIEW_DEFAULT[page]||'table');
  recordRecent(page);history.replaceState(null,'',`?page=${encodeURIComponent(page)}`);renderNav();updateHeader();$('#content').innerHTML='<div class="loading"><span></span><b>Carregando…</b></div>';
  try{
-  if(page==='hoje')return renderToday(); if(page==='minhaarea')return renderMyArea(); if(page==='equipe')return renderTeamManagement(); if(page==='editorial')return renderEditorialPlanning(); if(page==='fechamento')return renderMonthlyClosing(); if(page==='fluxos')return renderWorkflowManagement(); if(page==='aprovacoes')return renderApprovalCenter(); if(page==='solicitacoes')return renderRequests(); if(page==='central')return renderCentral(); if(page==='calendario')return renderCalendar(); if(page==='instagram')return renderInstagramWorkspace(); if(page==='trafego')return renderTrafficWorkspace(); if(page==='relatorios')return renderReports(); if(page==='arquivos')return renderFiles(); if(page==='configuracoes')return renderSettings(); if(page==='administracao')return renderAdministration();
+  if(page==='hoje')return renderToday(); if(page==='studio')return renderStudio(); if(page==='igposts')return renderIgPosts(); if(page==='minhaarea')return renderMyArea(); if(page==='equipe')return renderTeamManagement(); if(page==='editorial')return renderEditorialPlanning(); if(page==='fechamento')return renderMonthlyClosing(); if(page==='fluxos')return renderWorkflowManagement(); if(page==='aprovacoes')return renderApprovalCenter(); if(page==='solicitacoes')return renderRequests(); if(page==='central')return renderCentral(); if(page==='calendario')return renderCalendar(); if(page==='instagram')return renderInstagramWorkspace(); if(page==='trafego')return renderTrafficWorkspace(); if(page==='relatorios')return renderReports(); if(page==='arquivos')return renderFiles(); if(page==='configuracoes')return renderSettings(); if(page==='administracao')return renderAdministration();
   return loadModule(page);
  }catch(e){$('#content').innerHTML=`<div class="error-state"><div>!</div><h2>Não foi possível carregar</h2><p>${esc(e.message)}</p><button class="btn" id="retryBtn">Tentar novamente</button></div>`;$('#retryBtn').onclick=()=>go(page)}
 }
@@ -248,7 +252,7 @@ function saveCurrentFilter(){const name=prompt('Nome para este filtro:');if(!nam
 async function bulkApply(){const patch={};const s=$('#bulkStatus')?.value,p=$('#bulkPriority')?.value,r=$('#bulkResponsible')?.value.trim();if(s)patch.status=s;if(p)patch.prioridade=p;if(r)patch.responsavel=r;if(!Object.keys(patch).length)return toast('Escolha uma alteração','warn');for(const id of state.selected)await api(`/data?module=${state.module}&id=${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});state.selected.clear();invalidate(state.module);toast('Alterações em massa aplicadas');await refreshCurrentPage()}
 function bindKanban(){let dragId='';$$('.kanban-card').forEach(c=>{c.ondragstart=()=>{dragId=c.dataset.id;c.classList.add('dragging')};c.ondragend=()=>c.classList.remove('dragging')});$$('.kanban-drop').forEach(l=>{l.ondragover=e=>{e.preventDefault();l.classList.add('over')};l.ondragleave=()=>l.classList.remove('over');l.ondrop=async e=>{e.preventDefault();l.classList.remove('over');if(!dragId)return;await api(`/data?module=${state.module}&id=${encodeURIComponent(dragId)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:l.dataset.status})});invalidate(state.module);toast('Status atualizado');await loadModule(state.module,true)}})}
 
-function isCustomPage(p){return ['calendario','instagram','trafego','relatorios','arquivos','integracoes','configuracoes','editorial','fechamento'].includes(p)}
+function isCustomPage(p){return ['studio','igposts','calendario','instagram','trafego','relatorios','arquivos','integracoes','configuracoes','editorial','fechamento'].includes(p)}
 async function refreshCurrentPage(){if(isCustomPage(state.page))return go(state.page);return loadModule(state.module,true)}
 function fieldOptions(k,m){if(k==='status')return moduleStatuses(m);return SELECTS[k]||[]}
 function openModal(row=null,prefill=null){if(pref('safeMode',false))return toast('Modo Seguro ativo: edição bloqueada.','warn');if(!state.module)return;state.editing=row||null;const draft=!row?pref(`draft.${state.module}`,null):null;const src=row||prefill||draft||state.prefill||{};$('#modalTitle').textContent=row?'Editar registro':newLabel(state.module).replace(/^\+\s*/,'');$('#modalHint').textContent=`${MODULES[state.module]?.label||state.module} · salvamento automático no banco`;const fields=fieldsFor(state.module);$('#formFields').innerHTML=fields.map(f=>{const [k,l,t='text',req,wide]=f;const val=(k==='status'&&!row&&!(src?.[k]))?(moduleStatuses(state.module)[0]||'NOVO'):(src?.[k]??'');const opts=fieldOptions(k,state.module);if(t==='select')return `<div class="field ${wide?'wide':''}"><label>${esc(l)}${req?' *':''}</label><select name="${k}" ${req?'required':''}><option value=""></option>${opts.map(o=>`<option value="${attr(o)}" ${String(val)===String(o)?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;if(t==='textarea')return `<div class="field ${wide?'wide':''}"><label>${esc(l)}${req?' *':''}</label><textarea name="${k}" ${req?'required':''}>${esc(val)}</textarea></div>`;return `<div class="field ${wide?'wide':''}"><label>${esc(l)}${req?' *':''}</label><input type="${t}" name="${k}" value="${attr(val)}" ${req?'required':''}></div>`}).join('');if(row&&row.id)$('#formFields').insertAdjacentHTML('beforeend',`<div class="field wide"><button type="button" class="btn soft" id="btnTimeline">Linha do tempo deste registro</button></div>`);$('#modal').classList.remove('hidden');const form=$('#recordForm');if(row&&row.id){const bt=$('#btnTimeline');if(bt)bt.onclick=()=>showTimeline(state.module,row.id);if(['conteudos','ideias'].includes(state.module)){$('#formFields').insertAdjacentHTML('beforeend','<div class="field wide"><button type="button" class="btn soft" id="btnIA">✨ Sugerir legendas (IA)</button></div>');$('#btnIA').onclick=()=>sugerirLegendas(state.module,row.id)}if(state.module==='solicitacoes'&&/AGUARDANDO APROVAÇÃO/i.test(row.status||'')&&internalSession?.role==='manager'){$('#formFields').insertAdjacentHTML('beforeend','<div class="field wide"><button type="button" class="btn soft" id="btnAprovLink">Gerar link de aprovação (sem login)</button></div>');$('#btnAprovLink').onclick=()=>gerarLinkAprovacao(row.id)}}form.oninput=debounce(()=>{if(!state.editing)setPref(`draft.${state.module}`,Object.fromEntries(new FormData(form).entries()))},350);state.prefill=null;if(row&&row.id&&typeof montarExtrasModal==='function')montarExtrasModal(state.module,row)}

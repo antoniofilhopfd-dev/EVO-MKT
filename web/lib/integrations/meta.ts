@@ -132,14 +132,26 @@ export async function igSync(months = 2): Promise<number> {
   const media: Row[] = [];
   let after = '';
   for (let pg = 0; pg < 3; pg++) { // até 300 publicações mais recentes
-    const r = await metaGet(`/${ig}/media`, { fields: 'id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink', limit: 100, ...(after ? { after } : {}) });
+    const r = await metaGet(`/${ig}/media`, { fields: 'id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink,media_url,thumbnail_url', limit: 100, ...(after ? { after } : {}) });
     media.push(...(r.data ?? []));
     after = String(r.paging?.cursors?.after ?? '');
     if (!r.paging?.next || !after) break;
   }
   for (const md of media) {
-    await run('INSERT INTO ig_posts(media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink,atualizado_em) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),legenda=VALUES(legenda),curtidas=VALUES(curtidas),comentarios=VALUES(comentarios),permalink=VALUES(permalink),atualizado_em=VALUES(atualizado_em)',
-      [String(md.id), String(md.timestamp ?? ''), String(md.media_product_type ?? md.media_type ?? ''), String(md.caption ?? '').replace(/\s+/g, ' ').slice(0, 300), Number(md.like_count ?? 0), Number(md.comments_count ?? 0), String(md.permalink ?? '').slice(0, 300), now()]);
+    const mini = String(md.thumbnail_url || (md.media_type === 'IMAGE' || md.media_type === 'CAROUSEL_ALBUM' ? md.media_url : '') || '');
+    await run('INSERT INTO ig_posts(media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink,miniatura,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),legenda=VALUES(legenda),curtidas=VALUES(curtidas),comentarios=VALUES(comentarios),permalink=VALUES(permalink),miniatura=VALUES(miniatura),atualizado_em=VALUES(atualizado_em)',
+      [String(md.id), String(md.timestamp ?? ''), String(md.media_product_type ?? md.media_type ?? ''), String(md.caption ?? '').replace(/\s+/g, ' ').slice(0, 300), Number(md.like_count ?? 0), Number(md.comments_count ?? 0), String(md.permalink ?? '').slice(0, 300), /^https:\/\//.test(mini) ? mini.slice(0, 1000) : '', now()]);
+  }
+  // Alcance, salvamentos e compartilhamentos das 30 publicações mais recentes (a Meta não traz isso na lista). Falha numa publicação não derruba a sincronização.
+  for (const md of media.slice(0, 30)) {
+    try {
+      const r = await metaGet(`/${md.id}/insights`, { metric: 'reach,saved,shares' });
+      const v: Record<string, number> = {};
+      for (const m of r.data ?? []) v[m.name] = Number(m.values?.[0]?.value ?? m.total_value?.value ?? 0);
+      await run('UPDATE ig_posts SET alcance=?,salvos=?,compartilhamentos=? WHERE media_id=?', ['reach' in v ? v.reach : null, v.saved ?? 0, v.shares ?? 0, String(md.id)]);
+    } catch (e: any) {
+      if ((await setting('meta_token_invalido')) === '1') throw e;
+    }
   }
   let n = 0;
   const lp = localParts(new Date());

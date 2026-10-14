@@ -1,7 +1,7 @@
 import { Ctx } from '../ctx';
 import { q, q1 } from '../db';
 import { requireInternal, requireManager, stepUp } from '../auth';
-import { audit, listRows, MODULES } from '../records';
+import { audit, getRow, listRows, MODULES } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
@@ -221,6 +221,8 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/instagram/publish' && method === 'POST': {
       const u = await requireInternal(c);
       const id = strv((await c.body()).id);
+      const alvo = await getRow('conteudos', id);
+      if (alvo && !/^(APROVADO|PROGRAMADO|PUBLICADO)$/i.test(strv(alvo.status))) fail(409, 'Só conteúdos APROVADOS ou PROGRAMADOS podem ser publicados no Instagram.');
       try {
         const r = await igPublish(id, u.codigo);
         await audit(u.codigo, 'instagram-publicado', 'conteudos', id);

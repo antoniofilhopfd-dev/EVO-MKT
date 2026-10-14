@@ -60,10 +60,11 @@ if (str_starts_with($p, '/graph')) {
         $d = []; foreach (explode(',', $_GET['metric'] ?? '') as $k) { $d[] = ['name' => $k, 'period' => 'day', 'total_value' => ['value' => $vals[$k] ?? 0]]; }
         j(['data' => $d]);
     }
+    if (preg_match('#^/(m[0-9])/insights$#', $g, $mm)) { $b = ['m1' => [4000, 30, 12], 'm2' => [20000, 80, 40], 'm3' => [1500, 5, 2], 'm0' => [900, 3, 1]][$mm[1]] ?? [0, 0, 0]; j(['data' => [['name' => 'reach', 'values' => [['value' => $b[0]]]], ['name' => 'saved', 'values' => [['value' => $b[1]]]], ['name' => 'shares', 'values' => [['value' => $b[2]]]]]]); }
     if ($g === "/$IG/media" && $m === 'GET') {
         $cur = date('Y-m'); $prev = date('Y-m', strtotime('first day of last month'));
         j(['data' => [
-            ['id' => 'm1', 'caption' => 'Aprovados no vestibular! 🎉', 'media_type' => 'IMAGE', 'media_product_type' => 'FEED', 'timestamp' => "$cur-01T10:00:00+0000", 'like_count' => 300, 'comments_count' => 20, 'permalink' => 'https://instagram.com/p/m1'],
+            ['id' => 'm1', 'caption' => 'Aprovados no vestibular! 🎉', 'media_type' => 'IMAGE', 'media_product_type' => 'FEED', 'timestamp' => "$cur-01T10:00:00+0000", 'like_count' => 300, 'comments_count' => 20, 'permalink' => 'https://instagram.com/p/m1', 'media_url' => 'https://scontent.cdninstagram.com/m1.jpg'],
             ['id' => 'm2', 'caption' => 'Bastidores da feira', 'media_type' => 'VIDEO', 'media_product_type' => 'REELS', 'timestamp' => "$cur-01T12:00:00+0000", 'like_count' => 900, 'comments_count' => 55, 'permalink' => 'https://instagram.com/reel/m2'],
             ['id' => 'm3', 'caption' => 'Matrículas abertas', 'media_type' => 'IMAGE', 'media_product_type' => 'FEED', 'timestamp' => "$cur-01T15:00:00+0000", 'like_count' => 100, 'comments_count' => 5, 'permalink' => 'https://instagram.com/p/m3'],
             ['id' => 'm0', 'caption' => 'Mês passado', 'media_type' => 'IMAGE', 'media_product_type' => 'FEED', 'timestamp' => "$prev-10T10:00:00+0000", 'like_count' => 50, 'comments_count' => 2, 'permalink' => 'https://instagram.com/p/m0'],

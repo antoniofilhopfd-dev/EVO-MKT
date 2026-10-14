@@ -41,6 +41,8 @@ const tx=(n,txt,re)=>{const c=re.test(txt);t(n,c);if(!c)console.log('     texto 
  t('publicar agora: conteúdo fica Publicado com link',await p.$eval('#adminBody a[href*="instagram.com"]',a=>!!a.href));
  // Google
  await p.waitForSelector('#gCal');
+ await p.waitForSelector('#gCalSel option[value="cal1"]',{state:'attached'});tx('lista as agendas da conta e deixa escolher uma',await p.$eval('#gCalSel',e=>e.innerText),/Marketing/);
+ await p.selectOption('#gCalSel','cal1');await p.click('#gCalSalvar');await p.waitForTimeout(1200);
  await p.click('#gCal');await p.waitForTimeout(1500);tx('sincronizar Agenda mostra resultado',await p.$eval('#toast',e=>e.innerText),/Agenda:/);
  await p.click('#gSheet');await p.waitForTimeout(2000);tx('exportar para Planilhas gera link da planilha',await p.$eval('#adminBody',e=>e.innerHTML),/docs\.google\.com\/spreadsheets/);
  await p.check('#gAuto');await p.waitForTimeout(500);t('ligar envio automático ao Drive',(await A('/integrations/status')).google.driveAuto===true);
