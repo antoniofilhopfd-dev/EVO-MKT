@@ -35,7 +35,7 @@ const valorMenor = (v: unknown, moeda: string) => (v === undefined || v === null
 /** Resultados = leads + conversas iniciadas, exatamente como a Meta as relata em "actions". Outras ações (cliques no link etc.) não entram. */
 const RESULTADO = ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.messaging_conversation_started_7d'];
 
-async function paginar(path: string, params: Row, max = 5): Promise<Row[]> {
+export async function paginar(path: string, params: Row, max = 5): Promise<Row[]> {
   const out: Row[] = [];
   let after = '';
   for (let i = 0; i < max; i++) {

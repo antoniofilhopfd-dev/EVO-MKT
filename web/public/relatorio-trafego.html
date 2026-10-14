@@ -1,0 +1,15 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Dashboard de Tráfego — Meta Ads</title><link rel="icon" type="image/png" href="/icons/favicon-64.png"><link rel="stylesheet" href="relatorio-trafego.css"></head><body>
+<div class="barra no-print">
+  <div class="campos">
+    <label>De <input type="date" id="de"></label>
+    <label>Até <input type="date" id="ate"></label>
+    <label class="larga">Subtítulo <input id="sub" maxlength="120"></label>
+    <button id="atualiza" class="bt">Atualizar</button>
+    <button id="imprime" class="bt pri">Imprimir / salvar PDF</button>
+  </div>
+  <label class="obs">Observações (saem no fim do relatório; pode editar)<textarea id="obs" rows="3" maxlength="1200"></textarea></label>
+  <p class="dica">No diálogo de impressão escolha <b>Salvar como PDF</b>, papel <b>A4</b> e marque <b>Gráficos de segundo plano</b> para manter as cores. Os números vêm direto da Meta, só leitura.</p>
+</div>
+<main id="rel"><div class="msg">Carregando…</div></main>
+<footer class="rodape"><img src="/img/logo-colegio.png" alt="Colégio Evolução"></footer>
+<script src="relatorio-trafego.js"></script></body></html>

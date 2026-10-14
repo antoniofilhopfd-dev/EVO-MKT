@@ -262,7 +262,7 @@ async function painelTrafegoExtra(){
   const semRes=ads.filter(x=>x.resultados===0&&x.gasto>0).sort((x,y)=>y.gasto-x.gasto).slice(0,5);
   const probl=ads.filter(x=>/DISAPPROVED|WITH_ISSUES/i.test(x.status||''));
   const box=document.createElement('section');box.className='card';box.id='trafegoExtra';
-  box.innerHTML=`<div class="card-title"><div><small>META ADS · SOMENTE LEITURA</small><h3>Visão do mês</h3></div><div>${saude}</div></div>
+  box.innerHTML=`<div class="card-title"><div><small>META ADS · SOMENTE LEITURA</small><h3>Visão do mês</h3></div><div>${saude}${gerente?' <a class="btn" id="tgRelatorio" href="/relatorio-trafego.html" target="_blank" rel="noopener">Relatório semanal (PDF)</a>':''}</div></div>
   <div class="kpis tg-kpis">${kp('Gasto no mês',esc(brl(m.gasto)),delta(m.gasto,a.gasto,true))}${kp('Resultados (leads + conversas)',n0(m.resultados),delta(m.resultados,a.resultados))}${kp('Custo por resultado',cpr(m)===null?'—':esc(brl(cpr(m))),delta(cpr(m)||0,cpr(a)||0,true))}${kp('CTR',ctr(m)===null?'—':ctr(m).toFixed(2).replace('.',',')+'%',delta(ctr(m)||0,ctr(a)||0))}${kp('Alcance',n0(m.alcance),delta(m.alcance,a.alcance))}</div>
   <p class="kpi-note">O mês atual está em andamento; o anterior está completo. Resultado = leads e conversas iniciadas informados pela Meta.</p>
   <div class="tg-secao"><h4>Orçamento do mês</h4>${pacing}${gerente?`<div class="st-linkbox"><div id="sfLinkBox"><input id="tgOrc" type="number" min="0" step="50" placeholder="Orçamento do mês (R$)" value="${d.orcamentoMensal||''}"><button class="softbtn" id="tgOrcSalva">Salvar orçamento</button></div><small class="kpi-note">É só um número de acompanhamento: o sistema não altera nada na Meta. Zero remove.</small></div>`:''}</div>

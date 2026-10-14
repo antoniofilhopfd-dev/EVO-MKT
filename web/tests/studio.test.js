@@ -99,8 +99,8 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.click('[data-s="PUBLICAR"]');await p.waitForTimeout(500);
  t('publicar sem mídia não publica nem cria o post',!(await api('GET','/data?module=conteudos')).rows.some(x=>x.titulo==='Publicado pelo Estúdio'));
  await p.setInputFiles('#sfArq',{name:'arte.jpg',mimeType:'image/jpeg',buffer:JPG});await p.click('[data-s="PUBLICAR"]');
+ let pub;for(let i=0;i<40;i++){pub=(await api('GET','/data?module=conteudos')).rows.find(x=>x.titulo==='Publicado pelo Estúdio');if(pub&&pub.status==='PUBLICADO')break;await p.waitForTimeout(500)}
  await p.waitForSelector('.st-form',{state:'detached',timeout:20000});
- const pub=(await api('GET','/data?module=conteudos')).rows.find(x=>x.titulo==='Publicado pelo Estúdio');
  t('"Publicar agora" aprova, publica no Instagram e grava o link',pub&&pub.status==='PUBLICADO'&&/MEDIA_/.test(pub.instagramMediaId||'')&&/instagram\.com/.test(pub.instagramLink||''),pub);
  await p.evaluate(()=>renderStudio());await p.waitForSelector(`.st-card[data-id="${pub.id}"]`);await p.click(`.st-card[data-id="${pub.id}"]`);await p.waitForSelector('.st-form');
  t('post já publicado não oferece publicar de novo e mostra o link',!(await p.$('[data-s="PUBLICAR"]'))&&/ver no Instagram/.test(await p.$eval('.st-form',e=>e.innerText)));
@@ -161,9 +161,28 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('gráfico de gasto por dia com 10 barras',(await p.$$('#trafegoExtra .tg-dias span')).length===10);
  t('ranking de anúncios: melhor custo por resultado, gasto sem resultado e anúncio com problema',/Vídeo depoimento/i.test(tg)&&/Cartaz antigo/i.test(tg)&&/acima do permitido/i.test(tg)&&/Melhor custo por resultado/i.test(tg),tg.slice(-500));
  await p.fill('#tgOrc','1000');await p.click('#tgOrcSalva');await p.waitForFunction(()=>/Gasto até hoje/.test(document.querySelector('#trafegoExtra')?.innerText||''),null,{timeout:20000});
+ t('a Gerência tem o botão do relatório semanal em PDF no Tráfego',(await p.$eval('#tgRelatorio',e=>e.getAttribute('href')))==='/relatorio-trafego.html');
  t('definir o orçamento mostra o ritmo e a projeção do mês',/No ritmo atual o mês fecha em/.test(await p.$eval('#trafegoExtra',e=>e.innerText)));
  await p.screenshot({path:PR+'/29_trafego_visao_mes.png',fullPage:true});
  await api('POST','/integrations/ads/orcamento',{valor:0});
+ // ---- Dashboard de Tráfego (relatório semanal em PDF)
+ const rp=await ctx.newPage();const e5=[];rp.on('pageerror',e=>e5.push(e.message));
+ await rp.goto(BASE+'/relatorio-trafego.html');await rp.waitForSelector('.pg',{timeout:20000});
+ const rtx=await rp.$eval('#rel',e=>e.innerText);
+ t('relatório: título, indicadores do mês e da semana no modelo do PDF',/Dashboard de Tráfego — Meta Ads/.test(rtx)&&/Indicadores do período/.test(rtx)&&/Indicadores da semana/.test(rtx)&&/MENSAL •/.test(rtx)&&/SEMANAL •/.test(rtx)&&/R\$ 2\.084,56/.test(rtx),rtx.slice(0,300));
+ t('relatório: 2 páginas, gráfico com uma linha por campanha + total, resumo e detalhamento',(await rp.$$('.pg')).length===2&&(await rp.$$('svg polyline')).length===4&&/Resumo por campanha/.test(rtx)&&/Detalhamento por anúncio/.test(rtx)&&/01 - EI/.test(rtx));
+ t('relatório: anúncios com status em português e uma foto (só https)',/Vídeo depoimento/.test(rtx)&&/Reprovado/.test(rtx)&&(await rp.$$('td img')).length===1);
+ await rp.fill('#sub','Colégio Evolução | Teste de subtítulo');await rp.fill('#obs','Observação da semana para a direção.');
+ t('editar subtítulo e observações atualiza o relatório na hora',/Teste de subtítulo/.test(await rp.$eval('.cab .sub',e=>e.textContent))&&/Observação da semana/.test(await rp.$eval('.nota',e=>e.textContent)));
+ await rp.fill('#de','2026-10-01');await rp.fill('#ate','2026-12-31');await rp.click('#atualiza');await rp.waitForFunction(()=>/até 31 dias/.test(document.querySelector('#rel')?.innerText||''));
+ t('período acima de 31 dias mostra a mensagem do servidor',true);
+ await rp.fill('#de','2026-10-04');await rp.fill('#ate','2026-10-10');await rp.click('#atualiza');await rp.waitForSelector('.pg');
+ t('tags mostram o período escolhido (04/10 a 10/10/2026)',/SEMANAL • 04\/10 a 10\/10\/2026/.test(await rp.$eval('#rel',e=>e.innerText)));
+ await rp.screenshot({path:PR+'/30_dashboard_trafego_tela.png',fullPage:true});
+ await rp.emulateMedia({media:'print'});const pdf=await rp.pdf({format:'A4',printBackground:true});fs.writeFileSync(PR+'/relatorio_trafego_exemplo.pdf',pdf);
+ const nPag=(pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g)||[]).length;
+ t('o PDF sai em A4 com 2 a 3 páginas e sem a barra de controles',pdf.length>15000&&nPag>=2&&nPag<=3,[pdf.length,nPag]);
+ t('sem erros de JS no relatório',e5.length===0,e5.join('|'));await rp.close();
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
  await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('trafego')});await m.waitForSelector('#trafegoExtra',{state:'attached',timeout:20000});

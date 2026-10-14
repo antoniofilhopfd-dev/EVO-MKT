@@ -83,6 +83,21 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const ms2=await mock('/__state');const mut2=ms2.calls.filter(x=>/^(POST|DELETE|PUT) \/graph\/(act_|[0-9]+\/(campaigns|adsets|ads))/.test(x));
  t('continua somente leitura depois dos extras (nenhuma escrita na Meta)',mut2.length===0,mut2);
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await call('POST','/integrations/ads/sync',{});
+ // ---- relatório semanal (Dashboard de Tráfego): lê a Meta na hora, só leitura ----
+ const hj=new Date(),f=d=>d.toISOString().slice(0,10),ini=new Date(hj.getTime()-6*86400000);
+ [s,r]=await call('GET',`/traffic/semanal?de=${f(ini)}&ate=${f(hj)}`);
+ t('relatório semanal: 4 campanhas, totais somados e nomes curtos (01 - EI)',s===200&&r.campanhas.length===4&&r.campanhas[0].curto==='01 - EI'&&Math.abs(r.semanal.investimento-2084.56)<0.01&&r.semanal.cliques===2920,r.campanhas&&r.campanhas.map(c=>c.curto));
+ t('KPIs: CTR = cliques ÷ impressões e CPC = gasto ÷ cliques; conversas só as iniciadas por mensagem',Math.abs(r.semanal.ctr-(2920/127000*100))<0.01&&Math.abs(r.semanal.cpc-2084.56/2920)<0.001&&r.semanal.conversas===20&&Math.abs(r.semanal.custoConversa-2084.56/20)<0.01,r.semanal);
+ t('mensal vai do dia 1 até hoje (parcial) ou o mês inteiro',r.mensal.de.endsWith('-01')&&r.mensal.ate<=f(new Date(Date.now()+86400000)),r.mensal);
+ t('série diária: uma linha por campanha, todas as datas do período e total = soma',r.diario.datas.length===7&&r.diario.series.length===3&&r.diario.total.every((v,i)=>Math.abs(v-r.diario.series.reduce((a,x)=>a+x.valores[i],0))<0.011),r.diario);
+ const ra1=r.anuncios.find(x=>x.nome==='Vídeo depoimento'),ra2=r.anuncios.find(x=>x.nome==='Carrossel valores'),ra3=r.anuncios.find(x=>x.nome==='Cartaz antigo');
+ t('anúncios ordenados por gasto, com status em português e foto só se for https',r.anuncios[0].nome==='Carrossel valores'&&ra1.status==='Ativo'&&ra1.foto==='https://scontent.fbcdn.net/a1.jpg'&&ra2.foto===''&&ra3.status==='Reprovado',r.anuncios.map(a=>[a.nome,a.status,a.foto]));
+ t('total dos anúncios soma as linhas',Math.abs(r.totalAnuncios.investimento-1384.56)<0.01,r.totalAnuncios);
+ [s]=await call('GET',`/traffic/semanal?de=${f(ini)}&ate=${f(hj)}`,null,E);t('relatório semanal é só da Gerência (403 Equipe)',s===403);
+ [s]=await call('GET','/traffic/semanal?de=2026-10-10&ate=2026-10-01');t('período invertido é recusado (400)',s===400);
+ [s]=await call('GET','/traffic/semanal?de=2026-01-01&ate=2026-06-30');t('período maior que 31 dias é recusado (400)',s===400);
+ [s]=await call('GET','/traffic/semanal?de=abc&ate=2026-10-01');t('data inválida é recusada (400)',s===400);
+ const ms3=await mock('/__state');t('relatório semanal só lê: nenhuma escrita na Meta',ms3.calls.filter(x=>/^(POST|DELETE|PUT) \/graph\/(act_|[0-9]+\/(campaigns|adsets|ads))/.test(x)).length===0);
  // ligar leitura de anúncios muda o escopo do OAuth
  await call('POST','/integrations/settings',{meta_app_id:'APPID',meta_app_secret:'META_SECRET'});await call('POST','/integrations/ads/config',{ativar:true});
  const x=await fetch(B+'/integrations/meta/connect',{headers:G,redirect:'manual'});t('ativar a leitura de anúncios acrescenta ads_read ao consentimento',/ads_read/.test(decodeURIComponent(x.headers.get('location')||'')));

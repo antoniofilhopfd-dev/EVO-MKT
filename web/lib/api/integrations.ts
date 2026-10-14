@@ -8,6 +8,7 @@ import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
+import { relatorioTrafego } from '../integrations/metarelatorio';
 import { adsAnuncios, adsDiario, adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta, pacingMes, saudeConta } from '../integrations/metaads';
 import { json } from './handlers';
 
@@ -174,6 +175,15 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await setSetting('ads_orcamento_mensal', v > 0 ? String(v) : '');
       await audit(u.codigo, 'ads-orcamento', '', v > 0 ? String(v) : 'removido');
       return json({ ok: true });
+    }
+    case path === '/traffic/semanal': {
+      await requireManager(c);
+      const ymd = (v: string) => (/^\d{4}-\d\d-\d\d$/.test(v) && !isNaN(new Date(v + 'T12:00:00').getTime()) ? v : '');
+      const de = ymd(c.qs('de')), ate = ymd(c.qs('ate'));
+      if (!de || !ate) fail(400, 'Informe as datas (de e ate) no formato AAAA-MM-DD.');
+      if (de > ate) fail(400, 'A data inicial é depois da final.');
+      if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 31) fail(400, 'O período do relatório vai até 31 dias.');
+      try { return json(await relatorioTrafego(de, ate)); } catch (e: any) { await intLog('instagram', 'erro', 'Relatório de tráfego: ' + e.message); return fail(502, e.message); }
     }
     case path === '/traffic/painel': {
       await requireInternal(c);
