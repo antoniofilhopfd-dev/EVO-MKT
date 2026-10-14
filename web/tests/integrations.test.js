@@ -81,10 +81,11 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});const cal2=(await rows('calendario')).find(c=>c.id===cal.id);
  t('alteração feita no Google volta para o EVO (título e horário)',r.j.do_google===1&&cal2.titulo==='Reunião de pauta — editada no Google'&&cal2.inicioEm===fut1+'T16:00',cal2);
  await mock('/__google_create',{summary:'Visita da inspetora',start:{dateTime:fut1+'T10:00:00-03:00'},end:{dateTime:fut1+'T11:00:00-03:00'},description:'criado direto no Google'});
+ await mock('/__google_create',{summary:'Visita da inspetora',start:{dateTime:fut1+'T10:00:00-03:00'},end:{dateTime:fut1+'T11:00:00-03:00'},description:'cópia duplicada no Google'});
  r=await call('/integrations/settings',{m:'POST',ck:G,b:{g_importar:false}});r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('importação desligada: evento do Google não entra no Calendário',r.j.criados===0);
  r=await call('/integrations/settings',{m:'POST',ck:G,b:{g_importar:true}});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});const nat=(await rows('calendario')).find(c=>c.titulo==='Visita da inspetora');
- t('evento criado direto no Google vira item do Calendário',r.j.criados===1&&nat&&nat.origem==='GOOGLE_AGENDA'&&nat.inicioEm===fut1+'T10:00');
+ t('evento criado direto no Google vira item do Calendário (cópia duplicada é ignorada)',r.j.criados===1&&(await rows('calendario')).filter(c=>c.titulo==='Visita da inspetora').length===1&&nat&&nat.origem==='GOOGLE_AGENDA'&&nat.inicioEm===fut1+'T10:00');
  r=await call('/integrations/google/calendar/limpar-importados',{m:'POST',ck:G,b:{}});s2=await mock('/__state');t('limpar importados remove do sistema sem apagar no Google',r.s===200&&r.j.removidos>=1&&!(await rows('calendario')).some(c=>c.origem==='GOOGLE_AGENDA')&&Object.values(s2.events).some(e=>e.summary==='Visita da inspetora'),r);
  const tar=(await rows('tarefas')).find(c=>c.titulo==='Entregar banner');await call('/data?module=tarefas&id='+tar.id,{m:'DELETE',ck:G});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});s2=await mock('/__state');

@@ -124,6 +124,9 @@ export async function gCalendarSync(): Promise<Row> {
   const cal = encodeURIComponent(await gCalendarId());
   // Eventos criados direto no Google entram no Calendário (ligado por padrão; dá para desligar em Integrações).
   const importar = (await setting('g_importar')) !== '0';
+  const chaveEv = (r: Row) => `${String(r.titulo ?? '').trim().toLowerCase()}|${String(r.inicioEm || r.dataInicio || '').slice(0, 16)}`;
+  const jaImportados = new Set<string>();
+  if (importar) for (const r of await listRows('calendario')) if (r.origem === 'GOOGLE_AGENDA') jaImportados.add(chaveEv(r));
   const stat = { do_google: 0, para_google: 0, criados: 0, removidos: 0 };
   const map: Record<string, Row> = {};
   for (const m of await q('SELECT * FROM google_event_map')) map[`${m.modulo}|${m.id}`] = m;
@@ -172,6 +175,8 @@ export async function gCalendarSync(): Promise<Row> {
       }
     } else if (!known && ev.start && importar) {
       const patch = gApplyEventToRow('calendario', {}, ev);
+      if (jaImportados.has(chaveEv(patch))) continue; // mesma data e título já importados: cópia duplicada na agenda do Google
+      jaImportados.add(chaveEv(patch));
       const nw = await insertRow('calendario', { ...patch, status: 'NOVO', origem: 'GOOGLE_AGENDA', idExterno: evId, descricao: String(ev.description ?? '') }, 'integracao:google');
       const h = md5(gEventFromRow('calendario', nw) ?? []);
       await run('INSERT INTO google_event_map(modulo,id,event_id,hash) VALUES(?,?,?,?)', ['calendario', nw.id, evId, h]);
