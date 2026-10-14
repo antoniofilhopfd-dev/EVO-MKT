@@ -231,7 +231,7 @@ export async function route(c: Ctx): Promise<Out> {
     }
 
     // ---------- Integrações (Instagram / Google) ----------
-    case path.startsWith('/integrations/') || path === '/public/media' || path === '/traffic/snapshots':
+    case path.startsWith('/integrations/') || path === '/public/media' || path === '/traffic/snapshots' || path === '/traffic/painel':
       return integrationsRoute(c);
 
     // ---------- Portal do Solicitante ----------

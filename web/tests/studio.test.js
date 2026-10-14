@@ -153,9 +153,22 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.evaluate(()=>go('studio'));await p.waitForSelector('#stCompartilha');await p.click('#stCompartilha');await p.waitForSelector('#cmpOff');await p.click('#cmpOff');await p.waitForTimeout(800);
  const depois=await p.evaluate(async t=>(await fetch('/api/public/calendario?t='+t,{credentials:'omit'})).status,tok);t('desativar o link o invalida na hora',depois===404);
  t('sem erros de JS na página pública do calendário',e4.length===0,e4.join('|'));
+ // ---- Tráfego: visão do mês, orçamento, gasto por dia e anúncios
+ await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});const sa=await api('POST','/integrations/ads/sync',{});
+ await p.evaluate(()=>go('trafego'));await p.waitForSelector('#trafegoExtra',{state:'attached',timeout:20000});
+ const tg=await p.$eval('#trafegoExtra',e=>e.innerText);
+ t('Tráfego mostra a saúde da conta e os indicadores do mês com comparação',/Ativa/.test(tg)&&/Gasto no mês/.test(tg)&&/Custo por resultado/.test(tg)&&/vs mês anterior|= mês anterior/i.test(tg),JSON.stringify([sa,tg]).slice(0,900));
+ t('gráfico de gasto por dia com 10 barras',(await p.$$('#trafegoExtra .tg-dias span')).length===10);
+ t('ranking de anúncios: melhor custo por resultado, gasto sem resultado e anúncio com problema',/Vídeo depoimento/.test(tg)&&/Cartaz antigo/.test(tg)&&/acima do permitido/.test(tg)&&/Melhor custo por resultado/.test(tg),tg.slice(-500));
+ await p.fill('#tgOrc','1000');await p.click('#tgOrcSalva');await p.waitForFunction(()=>/Gasto até hoje/.test(document.querySelector('#trafegoExtra')?.innerText||''),null,{timeout:20000});
+ t('definir o orçamento mostra o ritmo e a projeção do mês',/No ritmo atual o mês fecha em/.test(await p.$eval('#trafegoExtra',e=>e.innerText)));
+ await p.screenshot({path:PR+'/29_trafego_visao_mes.png',fullPage:true});
+ await api('POST','/integrations/ads/orcamento',{valor:0});
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
- await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('studio')});await m.waitForSelector('.st-week');
+ await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('trafego')});await m.waitForSelector('#trafegoExtra',{state:'attached',timeout:20000});
+ t('no celular a tela de Tráfego não rola para o lado',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+ await m.evaluate(()=>go('studio'));await m.waitForSelector('.st-week');
  t('no celular a página não rola para o lado',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await m.screenshot({path:PR+'/24_estudio_celular.png'});
  await m.click('#stNovo');await m.waitForSelector('.st-form');

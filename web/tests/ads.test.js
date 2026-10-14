@@ -58,6 +58,31 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const st2=(await call('GET','/notificacoes'))[1].rows.filter(n=>n.tipo==='ads_status');
  t('mudança de status na Meta (PAUSED → WITH_ISSUES) vira notificação de problema e alerta crítico',st2.some(n=>/c1|Matrículas 2027/.test(n.titulo+n.texto+n.registro)&&/problema/i.test(n.titulo))&&(await call('GET','/traffic/snapshots'))[1].alertas.some(a=>a.campanha_id==='c1'&&a.regra==='Problema de aprovação'),st2);
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});
+ // ---- extras do Tráfego: saúde da conta, orçamento, gasto por dia e anúncios ----
+ await call('POST','/integrations/ads/sync',{});
+ [s,r]=await call('GET','/traffic/painel');
+ t('painel do tráfego: conta ativa, forma de pagamento e teto de gasto lidos da Meta',s===200&&r.saude&&r.saude.ok===true&&r.saude.rotulo==='Ativa'&&r.saude.forma==='Visa 4242'&&r.saude.tetoGasto===10000&&r.saude.gastoTotal===9500,r.saude);
+ t('painel do tráfego: mês atual somado e comparado ao anterior',Math.abs(r.mes.gasto-2084.56)<0.01&&r.mes.resultados===55&&Math.abs(r.mesAnterior.gasto-2084.56)<0.01,[r.mes,r.mesAnterior]);
+ t('gasto por dia dos últimos 30 dias gravado (10 dias no teste)',r.diario.length===10&&r.diario.every(d=>d.gasto>0),r.diario.length);
+ const a3=r.anuncios.find(x=>x.anuncio_id==='a3'),a1=r.anuncios.find(x=>x.anuncio_id==='a1');
+ t('anúncios do mês com gasto, resultados e status; o reprovado traz o motivo da Meta',r.anuncios.length===3&&a1&&a1.resultados===30&&a1.gasto===600&&a3&&/DISAPPROVED/.test(a3.status)&&/acima do permitido/.test(a3.problema),r.anuncios);
+ [,r]=await call('GET','/traffic/snapshots');
+ t('alertas: anúncio com problema (crítico, com o motivo) e teto de gasto da conta a 95%',!!r.alertas.find(a=>a.regra==='Anúncio com problema'&&a.severidade==='critico'&&/acima do permitido/.test(a.mensagem))&&!!r.alertas.find(a=>a.regra==='Teto de gasto da conta perto do fim'&&/95%/.test(a.mensagem)),r.alertas.map(a=>a.regra));
+ [s]=await call('POST','/integrations/ads/orcamento',{valor:1000},E);t('Equipe não define orçamento (403)',s===403);
+ [s]=await call('POST','/integrations/ads/orcamento',{valor:-5});t('orçamento negativo é recusado (400)',s===400);
+ [,r]=await call('GET','/traffic/painel');t('sem orçamento definido não há projeção',r.pacing===null&&r.orcamentoMensal===0);
+ [s]=await call('POST','/integrations/ads/orcamento',{valor:1000});[,r]=await call('GET','/traffic/painel');
+ t('orçamento menor que o gasto: alerta crítico de orçamento estourado',s===200&&r.pacing.orcamento===1000&&(await call('GET','/traffic/snapshots'))[1].alertas.some(a=>a.regra==='Orçamento do mês estourado'&&a.severidade==='critico'));
+ await call('POST','/integrations/ads/orcamento',{valor:100000});
+ t('com folga no orçamento não há alerta de orçamento',!(await call('GET','/traffic/snapshots'))[1].alertas.some(a=>/Orçamento|Ritmo de gasto/.test(a.regra)));
+ await call('POST','/integrations/ads/orcamento',{valor:0});[,r]=await call('GET','/traffic/painel');t('zero remove o orçamento',r.pacing===null);
+ await call('POST','/integrations/meta/token',{token:'BADACCT_TOKEN'});await call('POST','/integrations/ads/sync',{});[,r]=await call('GET','/traffic/painel');
+ t('conta com pagamento pendente: painel mostra o estado e há alerta crítico',r.saude.ok===false&&r.saude.rotulo==='Pagamento pendente'&&(await call('GET','/traffic/snapshots'))[1].alertas.some(a=>a.regra==='Conta de anúncios com problema'&&a.severidade==='critico'));
+ await call('POST','/integrations/meta/token',{token:'STOPPED_TOKEN'});await call('POST','/integrations/ads/sync',{});
+ t('3 dias fechados sem gasto com campanha ativa e semana anterior com gasto: alerta "Entrega parou"',(await call('GET','/traffic/snapshots'))[1].alertas.some(a=>a.regra==='Entrega parou'&&a.severidade==='critico'));
+ const ms2=await mock('/__state');const mut2=ms2.calls.filter(x=>/^(POST|DELETE|PUT) \/graph\/(act_|[0-9]+\/(campaigns|adsets|ads))/.test(x));
+ t('continua somente leitura depois dos extras (nenhuma escrita na Meta)',mut2.length===0,mut2);
+ await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await call('POST','/integrations/ads/sync',{});
  // ligar leitura de anúncios muda o escopo do OAuth
  await call('POST','/integrations/settings',{meta_app_id:'APPID',meta_app_secret:'META_SECRET'});await call('POST','/integrations/ads/config',{ativar:true});
  const x=await fetch(B+'/integrations/meta/connect',{headers:G,redirect:'manual'});t('ativar a leitura de anúncios acrescenta ads_read ao consentimento',/ads_read/.test(decodeURIComponent(x.headers.get('location')||'')));

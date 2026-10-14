@@ -236,3 +236,39 @@ async function studioCompartilhar(){
   o.el.querySelector('#cmpCriar').onclick=async()=>{try{const d=await post('criar');o.el.querySelector('#cmpBox').innerHTML=`<p>Link criado, válido por ${d.dias} dias:</p><div class="st-linkbox"><div id="sfLinkBox"><input readonly id="cmpUrl" value="${attr(d.url)}"><button type="button" class="softbtn" id="cmpCopia">Copiar</button></div></div>`;o.el.querySelector('#cmpCopia').onclick=()=>{navigator.clipboard?.writeText(d.url);toast('Link copiado')};o.el.querySelector('#cmpUrl').onfocus=e=>e.target.select()}catch(e){toast(e.message,'bad')}};
   const off=o.el.querySelector('#cmpOff');if(off)off.onclick=async()=>{if(!confirm('Desativar o link? Quem o tem deixa de ver o calendário.'))return;try{await post('desativar');toast('Link desativado');o.close()}catch(e){toast(e.message,'bad')}};
 }
+
+// ---------- Tráfego: saúde da conta, mês × mês anterior, orçamento, gasto por dia e ranking de anúncios (somente leitura) ----------
+async function painelTrafegoExtra(){
+  const host=$('#content');if(!host)return;
+  let d;try{d=await api('/traffic/painel')}catch{return}
+  if(state.page!=='trafego')return;
+  const brl=(v,m)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:m||d.mes.moeda||'BRL'});
+  const n0=v=>Number(v||0).toLocaleString('pt-BR');
+  const delta=(a,b,inverso=false)=>{if(!b)return '';const p=Math.round((a-b)/b*100);if(!p)return '<small class="delta">= mês anterior</small>';const bom=inverso?p<0:p>0;return `<small class="delta ${bom?'up':'down'}">${p>0?'+':''}${p}% vs mês anterior</small>`};
+  const m=d.mes,a=d.mesAnterior,gerente=internalSession?.role==='manager';
+  const cpr=x=>x.resultados?x.gasto/x.resultados:null,ctr=x=>x.impressoes?x.cliques/x.impressoes*100:null;
+  const kp=(l,v,dl)=>`<div class="kpi"><small>${esc(l)}</small><strong>${v}</strong>${dl}</div>`;
+  const sa=d.saude;
+  const saude=sa?`<span class="badge ${sa.ok?'ok':'bad'}">${esc(sa.rotulo)}</span>${sa.forma?` <small>${esc(sa.forma)}</small>`:''}`:'<small>Atualize para ler o estado da conta.</small>';
+  const pc=d.pacing;
+  const pacing=pc?`<div class="tg-pacing"><div class="tg-barra" role="img" aria-label="Gasto ${Math.round(pc.gasto/pc.orcamento*100)}% do orçamento"><i style="width:${Math.min(100,pc.gasto/pc.orcamento*100)}%"></i><b style="left:${Math.min(100,pc.projecao/pc.orcamento*100)}%" title="Projeção até o fim do mês"></b></div><p>Gasto até hoje <b>${brl(pc.gasto)}</b> de <b>${brl(pc.orcamento)}</b>. No ritmo atual o mês fecha em <b class="${pc.projecao>pc.orcamento*1.05?'tg-ruim':''}">${brl(pc.projecao)}</b> (${Math.round(pc.projecao/pc.orcamento*100)}% do orçamento).</p></div>`:'<p class="kpi-note">Defina o orçamento do mês para acompanhar o ritmo de gasto e receber aviso antes de estourar.</p>';
+  const dias=d.diario,max=Math.max(1,...dias.map(x=>x.gasto));
+  const soma=(arr,k)=>arr.reduce((s,x)=>s+x[k],0),u7=dias.slice(-7),a7=dias.slice(-14,-7);
+  const grafico=dias.length?`<div class="tg-dias" role="img" aria-label="Gasto por dia nos últimos 30 dias">${dias.map(x=>`<span title="${attr(fmtDate(x.dia)+': '+brl(x.gasto)+' · '+x.resultados+' resultado(s)')}" class="${x.gasto===0?'zero':''}"><i style="height:${Math.max(2,Math.round(x.gasto/max*100))}%"></i></span>`).join('')}</div><p class="kpi-note">Últimos 7 dias: <b>${brl(soma(u7,'gasto'))}</b> e ${n0(soma(u7,'resultados'))} resultado(s)${a7.length?` · 7 dias antes: ${brl(soma(a7,'gasto'))} e ${n0(soma(a7,'resultados'))}`:''}. Barra baixa e vermelha = dia sem gasto.</p>`:'<div class="empty compact">Sem leitura diária ainda. A Gerência clica em “Atualizar agora”.</div>';
+  const ads=d.anuncios,cr=x=>x.resultados?x.gasto/x.resultados:null,ctrA=x=>x.impressoes?x.cliques/x.impressoes*100:null;
+  const linha=x=>`<tr><td>${esc(x.anuncio)}<br><small>${esc(x.campanha||'')}</small></td><td>${esc(brl(x.gasto,x.moeda))}</td><td>${n0(x.resultados)}</td><td>${cr(x)===null?'—':esc(brl(cr(x),x.moeda))}</td><td>${ctrA(x)===null?'—':ctrA(x).toFixed(2).replace('.',',')+'%'}</td></tr>`;
+  const tabela=(t,l)=>`<div><h4>${t}</h4>${l.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>Anúncio</th><th>Gasto</th><th>Resultados</th><th>Custo/resultado</th><th>CTR</th></tr></thead><tbody>${l.map(linha).join('')}</tbody></table></div>`:'<div class="empty compact">Nenhum.</div>'}</div>`;
+  const melhores=ads.filter(x=>x.resultados>0&&x.gasto>0).sort((x,y)=>cr(x)-cr(y)).slice(0,5);
+  const semRes=ads.filter(x=>x.resultados===0&&x.gasto>0).sort((x,y)=>y.gasto-x.gasto).slice(0,5);
+  const probl=ads.filter(x=>/DISAPPROVED|WITH_ISSUES/i.test(x.status||''));
+  const box=document.createElement('section');box.className='card';box.id='trafegoExtra';
+  box.innerHTML=`<div class="card-title"><div><small>META ADS · SOMENTE LEITURA</small><h3>Visão do mês</h3></div><div>${saude}</div></div>
+  <div class="kpis tg-kpis">${kp('Gasto no mês',esc(brl(m.gasto)),delta(m.gasto,a.gasto,true))}${kp('Resultados (leads + conversas)',n0(m.resultados),delta(m.resultados,a.resultados))}${kp('Custo por resultado',cpr(m)===null?'—':esc(brl(cpr(m))),delta(cpr(m)||0,cpr(a)||0,true))}${kp('CTR',ctr(m)===null?'—':ctr(m).toFixed(2).replace('.',',')+'%',delta(ctr(m)||0,ctr(a)||0))}${kp('Alcance',n0(m.alcance),delta(m.alcance,a.alcance))}</div>
+  <p class="kpi-note">O mês atual está em andamento; o anterior está completo. Resultado = leads e conversas iniciadas informados pela Meta.</p>
+  <div class="tg-secao"><h4>Orçamento do mês</h4>${pacing}${gerente?`<div class="st-linkbox"><div id="sfLinkBox"><input id="tgOrc" type="number" min="0" step="50" placeholder="Orçamento do mês (R$)" value="${d.orcamentoMensal||''}"><button class="softbtn" id="tgOrcSalva">Salvar orçamento</button></div><small class="kpi-note">É só um número de acompanhamento: o sistema não altera nada na Meta. Zero remove.</small></div>`:''}</div>
+  <div class="tg-secao"><h4>Gasto por dia (30 dias)</h4>${grafico}</div>
+  <div class="tg-secao"><h4>Anúncios do mês</h4>${ads.length?`<div class="tg-listas">${tabela('Melhor custo por resultado',melhores)}${tabela('Gasto sem resultado',semRes)}</div>${probl.length?`<h4>Com problema de aprovação</h4>${probl.map(x=>`<div class="tb-item"><span class="badge bad">${esc(x.status)}</span> <span><b>${esc(x.anuncio)}</b>${x.campanha?' · '+esc(x.campanha):''}<br><small>${esc(x.problema||'Veja o motivo no Gerenciador de Anúncios.')}</small></span></div>`).join('')}`:''}<p class="kpi-note">Ranking por custo por resultado (sem ROAS: o Colégio não vende online). Só entram anúncios com gasto no mês.</p>`:'<div class="empty compact">Sem leitura de anúncios ainda.</div>'}</div>`;
+  const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
+  const bt=$('#tgOrcSalva');if(bt)bt.onclick=async()=>{try{await api('/integrations/ads/orcamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valor:Number($('#tgOrc').value||0)})});toast('Orçamento salvo');go('trafego')}catch(e){toast(e.message,'warn')}};
+}
+{const o2=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o2.apply(this,arguments);await painelTrafegoExtra()}}

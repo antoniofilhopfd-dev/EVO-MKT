@@ -27,6 +27,8 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   record_comments: { cols: ['id', 'modulo', 'registro', 'autor', 'autor_tipo', 'quando', 'texto', 'interno'], restore: 'replace', opt: true },
   record_checklist: { cols: ['id', 'modulo', 'registro', 'texto', 'feito', 'ordem', 'atualizado_em'], restore: 'replace', opt: true },
   ads_snapshots: { cols: ['id', 'conta', 'campanha_id', 'campanha', 'periodo', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'moeda', 'status', 'objetivo', 'orcamento_diario', 'atualizado_em'], restore: 'replace', opt: true },
+  ads_diario: { cols: ['conta', 'dia', 'gasto', 'impressoes', 'cliques', 'resultados', 'moeda', 'atualizado_em'], restore: 'replace', opt: true },
+  ads_anuncios: { cols: ['conta', 'anuncio_id', 'periodo', 'anuncio', 'campanha', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'moeda', 'status', 'problema', 'atualizado_em'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };
 const FILES_TABLE = { name: 'arquivos', cols: ['caminho', 'mime', 'tamanho', 'conteudo', 'criado_em'] };

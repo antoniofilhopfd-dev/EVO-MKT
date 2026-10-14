@@ -84,6 +84,13 @@ export async function adsSync(meses = 3): Promise<number> {
       n++;
     }
   }
+  // Extras (saúde da conta, gasto por dia, anúncios): falhar aqui não pode derrubar a leitura principal.
+  for (const [nome, fn] of [['saúde da conta', () => adsSaudeConta(conta, moeda)], ['gasto por dia', () => adsSyncDiario(conta, moeda)], ['anúncios', () => adsSyncAnuncios(conta, moeda)]] as const) {
+    try { await fn(); } catch (e: any) {
+      if ((await setting('meta_token_invalido')) === '1') throw e;
+      await intLog('instagram', 'aviso', `Meta Ads (${nome}): ${String(e.message).slice(0, 160)}`);
+    }
+  }
   await setSetting('meta_ads_ultima_sync', now());
   await notificarAlertasTrafego();
   await intLog('instagram', 'ok', `Meta Ads: ${n} linha(s) de campanha/mês atualizadas (somente leitura).`);
@@ -126,7 +133,7 @@ export async function alertasTrafego(): Promise<AlertaTrafego[]> {
     }
     if (/DISAPPROVED|WITH_ISSUES/i.test(String(r.status))) add('Problema de aprovação', 'critico', `A Meta informa o status ${r.status}. Veja o motivo no Gerenciador de Anúncios.`);
   }
-  return out;
+  return [...out, ...(await alertasExtras())];
 }
 
 /** Avisa a Gerência (uma vez por campanha, regra e mês) sobre alertas novos. */
@@ -138,4 +145,105 @@ export async function notificarAlertasTrafego(): Promise<number> {
     n++;
   }
   return n;
+}
+
+// ---------- extras (somente leitura) ----------
+const STATUS_CONTA: Record<number, string> = { 1: 'Ativa', 2: 'Desativada', 3: 'Pagamento pendente', 7: 'Em análise de risco', 8: 'Aguardando liquidação', 9: 'Período de carência', 100: 'Encerramento pendente', 101: 'Encerrada' };
+export interface SaudeConta { status: number; rotulo: string; ok: boolean; gastoTotal: number; tetoGasto: number; moeda: string; forma: string; lidoEm: string }
+
+async function adsSaudeConta(conta: string, moeda: string): Promise<void> {
+  const r = await metaGet(`/act_${conta}`, { fields: 'account_status,disable_reason,spend_cap,amount_spent,currency,funding_source_details' });
+  const status = Number(r.account_status ?? 0), mo = String(r.currency ?? moeda);
+  const s: SaudeConta = {
+    status, rotulo: STATUS_CONTA[status] ?? `Status ${status}`, ok: status === 1, gastoTotal: valorMenor(r.amount_spent, mo), tetoGasto: valorMenor(r.spend_cap, mo), moeda: mo,
+    forma: String(r.funding_source_details?.display_string ?? '').slice(0, 80), lidoEm: now(),
+  };
+  await setSetting('ads_conta_saude', JSON.stringify(s));
+}
+export async function saudeConta(): Promise<SaudeConta | null> {
+  try { return JSON.parse((await setting('ads_conta_saude')) || 'null'); } catch { return null; }
+}
+
+/** Gasto e resultados por dia da conta (últimos 30 dias, inclusive hoje). */
+async function adsSyncDiario(conta: string, moeda: string): Promise<void> {
+  const ate = fmtDate(new Date()), de = fmtDate(new Date(Date.now() - 29 * 86400000));
+  const linhas = await paginar(`/act_${conta}/insights`, { level: 'account', fields: 'spend,impressions,clicks,actions,account_currency,date_start', time_increment: 1, time_range: JSON.stringify({ since: de, until: ate }), limit: 60 });
+  for (const l of linhas) {
+    const dia = String(l.date_start ?? '').slice(0, 10);
+    if (!/^\d{4}-\d\d-\d\d$/.test(dia)) continue;
+    const resultados = (Array.isArray(l.actions) ? l.actions : []).filter((a: Row) => RESULTADO.includes(String(a.action_type))).reduce((x: number, a: Row) => x + num(a.value), 0);
+    await run('INSERT INTO ads_diario(conta,dia,gasto,impressoes,cliques,resultados,moeda,atualizado_em) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE gasto=VALUES(gasto),impressoes=VALUES(impressoes),cliques=VALUES(cliques),resultados=VALUES(resultados),moeda=VALUES(moeda),atualizado_em=VALUES(atualizado_em)',
+      [conta, dia, num(l.spend), num(l.impressions), num(l.clicks), resultados, String(l.account_currency ?? moeda), now()]);
+  }
+}
+
+/** Desempenho por anúncio no mês atual + anúncios com problema de aprovação (motivo informado pela Meta). */
+async function adsSyncAnuncios(conta: string, moeda: string): Promise<void> {
+  const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
+  const estado = new Map<string, Row>();
+  for (const a of await paginar(`/act_${conta}/ads`, { fields: 'id,effective_status,issues_info', limit: 200 }, 6)) estado.set(String(a.id), a);
+  const linhas = await paginar(`/act_${conta}/insights`, { level: 'ad', fields: 'ad_id,ad_name,campaign_name,spend,impressions,reach,clicks,actions,account_currency', time_range: JSON.stringify({ since: `${per}-01`, until: fmtDate(new Date()) }), limit: 200 }, 6);
+  const vistos = new Set<string>();
+  for (const l of linhas) {
+    const id = String(l.ad_id ?? '');
+    if (!id) continue;
+    vistos.add(id);
+    const st = estado.get(id) ?? {};
+    const problema = (Array.isArray(st.issues_info) ? st.issues_info : []).map((i: Row) => String(i.error_summary ?? i.error_message ?? '')).filter(Boolean).join('; ').slice(0, 500);
+    const resultados = (Array.isArray(l.actions) ? l.actions : []).filter((a: Row) => RESULTADO.includes(String(a.action_type))).reduce((x: number, a: Row) => x + num(a.value), 0);
+    await run(`INSERT INTO ads_anuncios(conta,anuncio_id,periodo,anuncio,campanha,gasto,impressoes,alcance,cliques,resultados,moeda,status,problema,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE anuncio=VALUES(anuncio),campanha=VALUES(campanha),gasto=VALUES(gasto),impressoes=VALUES(impressoes),alcance=VALUES(alcance),cliques=VALUES(cliques),resultados=VALUES(resultados),moeda=VALUES(moeda),status=VALUES(status),problema=VALUES(problema),atualizado_em=VALUES(atualizado_em)`,
+      [conta, id, per, String(l.ad_name ?? '').slice(0, 250), String(l.campaign_name ?? '').slice(0, 200), num(l.spend), num(l.impressions), num(l.reach), num(l.clicks), resultados, String(l.account_currency ?? moeda), String(st.effective_status ?? '').slice(0, 40), problema, now()]);
+  }
+  // anúncio com problema que ainda não gastou no mês também precisa aparecer
+  for (const [id, st] of estado) {
+    if (vistos.has(id) || !/DISAPPROVED|WITH_ISSUES/i.test(String(st.effective_status ?? ''))) continue;
+    const problema = (Array.isArray(st.issues_info) ? st.issues_info : []).map((i: Row) => String(i.error_summary ?? '')).filter(Boolean).join('; ').slice(0, 500);
+    await run("INSERT INTO ads_anuncios(conta,anuncio_id,periodo,anuncio,campanha,moeda,status,problema,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status),problema=VALUES(problema),atualizado_em=VALUES(atualizado_em)",
+      [conta, id, per, `Anúncio ${id}`, '', moeda, String(st.effective_status).slice(0, 40), problema, now()]);
+  }
+}
+
+export async function adsDiario(dias = 30): Promise<Row[]> {
+  return q('SELECT dia,gasto,impressoes,cliques,resultados,moeda FROM ads_diario WHERE dia>=? ORDER BY dia', [fmtDate(new Date(Date.now() - (dias - 1) * 86400000))]);
+}
+export async function adsAnuncios(periodo: string): Promise<Row[]> {
+  return q('SELECT anuncio_id,anuncio,campanha,gasto,impressoes,alcance,cliques,resultados,moeda,status,problema FROM ads_anuncios WHERE periodo=? ORDER BY gasto DESC LIMIT 200', [periodo]);
+}
+
+/** Orçamento do mês (informado pela Gerência) × gasto acumulado, com projeção linear até o fim do mês. */
+export async function pacingMes(): Promise<{ orcamento: number; gasto: number; projecao: number; diasPassados: number; diasMes: number; moeda: string } | null> {
+  const orc = Number(await setting('ads_orcamento_mensal'));
+  if (!Number.isFinite(orc) || orc <= 0) return null;
+  const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
+  const r = await q1('SELECT COALESCE(SUM(gasto),0) g, MAX(moeda) m FROM ads_snapshots WHERE periodo=?', [per]);
+  const gasto = Number(r?.g ?? 0), diasMes = new Date(lp.y, lp.m, 0).getDate(), diasPassados = Math.max(1, lp.d);
+  return { orcamento: orc, gasto, projecao: Math.round((gasto / diasPassados) * diasMes * 100) / 100, diasPassados, diasMes, moeda: String(r?.m ?? '') };
+}
+
+/** Alertas de conta, orçamento, entrega e anúncios (regras objetivas; cada mensagem cita o número que a gerou). */
+export async function alertasExtras(): Promise<AlertaTrafego[]> {
+  const out: AlertaTrafego[] = [];
+  const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
+  const add = (chave: string, regra: string, severidade: 'atencao' | 'critico', mensagem: string, campanha = 'Conta de anúncios') => out.push({ chave: `${chave}|${per}`, campanha_id: '', campanha, periodo: per, regra, severidade, mensagem });
+  const saude = await saudeConta();
+  if (saude && !saude.ok) add('conta-status', 'Conta de anúncios com problema', 'critico', `A Meta informa a conta como "${saude.rotulo}". Os anúncios podem parar de rodar: confira no Gerenciador de Anúncios.`);
+  if (saude && saude.tetoGasto > 0 && saude.gastoTotal / saude.tetoGasto >= 0.9) add('conta-teto', 'Teto de gasto da conta perto do fim', 'atencao', `A conta já usou ${Math.round((saude.gastoTotal / saude.tetoGasto) * 100)}% do limite de gasto definido na Meta.`);
+  const pc = await pacingMes();
+  if (pc) {
+    if (pc.gasto >= pc.orcamento) add('orc-estourou', 'Orçamento do mês estourado', 'critico', `Gasto de ${pc.gasto.toFixed(2)} já passou do orçamento do mês (${pc.orcamento.toFixed(2)}).`);
+    else if (pc.diasPassados >= 5 && pc.projecao > pc.orcamento * 1.05) add('orc-projecao', 'Ritmo de gasto acima do orçamento', 'atencao', `No ritmo atual, o mês fecha em ${pc.projecao.toFixed(2)}, acima do orçamento de ${pc.orcamento.toFixed(2)} (gasto até hoje: ${pc.gasto.toFixed(2)}).`);
+  }
+  // entrega parada: os 3 últimos dias fechados sem gasto, mas a semana anterior teve gasto e há campanha ativa
+  const dias = await adsDiario(14), hoje = fmtDate(new Date());
+  const fechados = dias.filter((d) => String(d.dia) < hoje).slice(-10);
+  if (fechados.length >= 6) {
+    const ult3 = fechados.slice(-3), ant = fechados.slice(0, -3);
+    const ativa = await q1("SELECT 1 FROM ads_snapshots WHERE periodo=(SELECT MAX(periodo) FROM ads_snapshots) AND status='ACTIVE' LIMIT 1");
+    if (ativa && ult3.every((d) => Number(d.gasto) === 0) && ant.reduce((s, d) => s + Number(d.gasto), 0) > 0) add('entrega-parou', 'Entrega parou', 'critico', 'Os 3 últimos dias fechados não tiveram gasto, mas há campanha ativa e a semana anterior gastou. Verifique pagamento, aprovação e orçamento.');
+  }
+  for (const a of await adsAnuncios(per)) {
+    if (/DISAPPROVED|WITH_ISSUES/i.test(String(a.status))) add(`anuncio-${a.anuncio_id}`, 'Anúncio com problema', 'critico', `${a.problema ? a.problema : 'A Meta informa ' + a.status + '.'}`, String(a.anuncio));
+  }
+  return out;
 }

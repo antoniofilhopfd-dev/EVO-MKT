@@ -8,7 +8,7 @@ import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
-import { adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta } from '../integrations/metaads';
+import { adsAnuncios, adsDiario, adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta, pacingMes, saudeConta } from '../integrations/metaads';
 import { json } from './handlers';
 
 const redirect = (to: string) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store' } });
@@ -166,6 +166,27 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/ads/sync' && method === 'POST': {
       await requireManager(c);
       try { return json({ linhas: await adsSync() }); } catch (e: any) { await intLog('instagram', 'erro', 'Meta Ads: ' + e.message); return fail(502, e.message); }
+    }
+    case path === '/integrations/ads/orcamento' && method === 'POST': {
+      const u = await requireManager(c);
+      const v = Number((await c.body()).valor);
+      if (!Number.isFinite(v) || v < 0 || v > 100_000_000) fail(400, 'Informe um valor válido (0 remove o orçamento).');
+      await setSetting('ads_orcamento_mensal', v > 0 ? String(v) : '');
+      await audit(u.codigo, 'ads-orcamento', '', v > 0 ? String(v) : 'removido');
+      return json({ ok: true });
+    }
+    case path === '/traffic/painel': {
+      await requireInternal(c);
+      const lp = new Date(), per = `${lp.getFullYear()}-${String(lp.getMonth() + 1).padStart(2, '0')}`;
+      const ant = new Date(lp.getFullYear(), lp.getMonth() - 1, 1), perAnt = `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`;
+      const soma = async (p: string) => (await q1('SELECT COALESCE(SUM(gasto),0) gasto,COALESCE(SUM(impressoes),0) impressoes,COALESCE(SUM(alcance),0) alcance,COALESCE(SUM(cliques),0) cliques,COALESCE(SUM(resultados),0) resultados,COUNT(*) n,MAX(moeda) moeda FROM ads_snapshots WHERE periodo=?', [p])) ?? {};
+      const num = (r: Row) => ({ gasto: Number(r.gasto ?? 0), impressoes: Number(r.impressoes ?? 0), alcance: Number(r.alcance ?? 0), cliques: Number(r.cliques ?? 0), resultados: Number(r.resultados ?? 0), n: Number(r.n ?? 0), moeda: String(r.moeda ?? '') });
+      return json({
+        periodo: per, anterior: perAnt, mes: num(await soma(per)), mesAnterior: num(await soma(perAnt)), saude: await saudeConta(), pacing: await pacingMes(),
+        diario: (await adsDiario(30)).map((d) => ({ dia: d.dia, gasto: Number(d.gasto), resultados: Number(d.resultados), cliques: Number(d.cliques), impressoes: Number(d.impressoes) })),
+        anuncios: (await adsAnuncios(per)).map((a) => ({ ...a, gasto: Number(a.gasto), impressoes: Number(a.impressoes), alcance: Number(a.alcance), cliques: Number(a.cliques), resultados: Number(a.resultados) })),
+        orcamentoMensal: Number(await setting('ads_orcamento_mensal')) || 0, ultimaSync: await setting('meta_ads_ultima_sync'),
+      });
     }
     case path === '/traffic/snapshots': {
       await requireInternal(c);
