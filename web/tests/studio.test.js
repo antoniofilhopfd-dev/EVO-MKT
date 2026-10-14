@@ -132,6 +132,27 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('Fechamento Mensal traz atendimento e tráfego no mesmo relatório',/Solicitações no mês/.test(fx)&&/Investimento e retorno/.test(fx)&&!!(await p.$('#closingPrint')));
  t('bloco de atendimento mostra só os indicadores principais',(fx.match(/closing-stat/g)||[]).length>=0&&!/Urgentes sem responsável/.test(fx)&&/NPS do atendimento/.test(fx)&&/Cumprimento do SLA/.test(fx),fx.slice(-500));
  await p.screenshot({path:PR+'/27_fechamento_direcao.png',fullPage:true});
+ // ---- calendário compartilhável (somente leitura)
+ const hojeIso=await p.evaluate(()=>stIso(new Date()));
+ await api('POST','/data?module=conteudos',{titulo:'Post agendado visível',perfil:'@evolucaopb',formato:'Feed',status:'PROGRAMADO',publicacaoEm:hojeIso+'T15:00'});
+ await api('POST','/data?module=conteudos',{titulo:'Rascunho secreto',perfil:'@evolucaopb',formato:'Feed',status:'PRODUÇÃO',publicacaoEm:hojeIso+'T16:00'});
+ r=await api('GET','/manager/calendario-link');t('sem link criado, o estado é inativo',r.ativo===false,r);
+ await p.evaluate(()=>go('studio'));await p.waitForSelector('#stCompartilha');await p.click('#stCompartilha');await p.waitForSelector('#cmpCriar');await p.click('#cmpCriar');await p.waitForSelector('#cmpUrl');
+ const calUrl=await p.$eval('#cmpUrl',e=>e.value);t('a Gerência cria o link do calendário',/\/calendario\.html\?t=[0-9a-f]{64}/.test(calUrl),calUrl);
+ await p.click('.admin-overlay [data-close]');
+ const tok=new URL(calUrl).searchParams.get('t');
+ const pubApi=await p.evaluate(async t=>{const r=await fetch('/api/public/calendario?t='+t,{credentials:'omit'});return {s:r.status,j:await r.json()}},tok);
+ t('o link mostra posts agendados e esconde rascunhos',pubApi.s===200&&pubApi.j.rows.some(x=>x.titulo==='Post agendado visível')&&!pubApi.j.rows.some(x=>x.titulo==='Rascunho secreto'),JSON.stringify(pubApi.j).slice(0,200));
+ t('o link só entrega título, perfil, formato, horário e etapa',pubApi.j.rows.every(x=>Object.keys(x).sort().join()==='formato,perfil,quando,status,titulo'));
+ const ruim=await p.evaluate(async()=>{const r=await fetch('/api/public/calendario?t='+'a'.repeat(64),{credentials:'omit'});return r.status});t('token errado é recusado (404)',ruim===404);
+ const anonC=await (await b.newContext({viewport:{width:390,height:844}})).newPage();const e4=[];anonC.on('pageerror',e=>e4.push(e.message));
+ await anonC.goto(BASE+'/calendario.html?t='+tok);await anonC.waitForSelector('.dia');
+ t('a página pública mostra o post e não mostra o rascunho',/Post agendado visível/.test(await anonC.$eval('#box',e=>e.innerText))&&!/Rascunho secreto/.test(await anonC.$eval('#box',e=>e.innerText)));
+ t('a página pública no celular não rola para o lado',await anonC.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+ await anonC.screenshot({path:PR+'/28_calendario_compartilhado.png'});
+ await p.evaluate(()=>go('studio'));await p.waitForSelector('#stCompartilha');await p.click('#stCompartilha');await p.waitForSelector('#cmpOff');await p.click('#cmpOff');await p.waitForTimeout(800);
+ const depois=await p.evaluate(async t=>(await fetch('/api/public/calendario?t='+t,{credentials:'omit'})).status,tok);t('desativar o link o invalida na hora',depois===404);
+ t('sem erros de JS na página pública do calendário',e4.length===0,e4.join('|'));
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
  await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('studio')});await m.waitForSelector('.st-week');

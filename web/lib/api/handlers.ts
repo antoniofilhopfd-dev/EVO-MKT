@@ -23,6 +23,7 @@ import { operacaoRoute } from './operacao';
 import { trabalhoRoute } from './trabalho';
 import { conteudoRoute } from './conteudo';
 import { relatoriosRoute } from './relatorios';
+import { calendarioPublicoRoute } from './calendarioPublico';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
@@ -43,6 +44,8 @@ export async function route(c: Ctx): Promise<Out> {
   switch (true) {
     case path === '/manager/approval-link' || path.startsWith('/public/approval'):
       return aprovacaoPublicaRoute(c);
+    case path === '/manager/calendario-link' || path === '/public/calendario':
+      return calendarioPublicoRoute(c);
     case path.startsWith('/reports/'):
       return relatoriosRoute(c);
     case path.startsWith('/content/'):
