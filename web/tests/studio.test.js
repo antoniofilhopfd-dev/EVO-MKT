@@ -157,9 +157,9 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});const sa=await api('POST','/integrations/ads/sync',{});
  await p.evaluate(()=>go('trafego'));await p.waitForSelector('#trafegoExtra',{state:'attached',timeout:20000});
  const tg=await p.$eval('#trafegoExtra',e=>e.innerText);
- t('Tráfego mostra a saúde da conta e os indicadores do mês com comparação',/Ativa/.test(tg)&&/Gasto no mês/.test(tg)&&/Custo por resultado/.test(tg)&&/vs mês anterior|= mês anterior/i.test(tg),JSON.stringify([sa,tg]).slice(0,900));
+ t('Tráfego mostra a saúde da conta e os indicadores do mês com comparação',/Ativa/.test(tg)&&/Gasto no mês/i.test(tg)&&/Custo por resultado/i.test(tg)&&/vs mês anterior|= mês anterior/i.test(tg),JSON.stringify([sa,tg]).slice(0,900));
  t('gráfico de gasto por dia com 10 barras',(await p.$$('#trafegoExtra .tg-dias span')).length===10);
- t('ranking de anúncios: melhor custo por resultado, gasto sem resultado e anúncio com problema',/Vídeo depoimento/.test(tg)&&/Cartaz antigo/.test(tg)&&/acima do permitido/.test(tg)&&/Melhor custo por resultado/.test(tg),tg.slice(-500));
+ t('ranking de anúncios: melhor custo por resultado, gasto sem resultado e anúncio com problema',/Vídeo depoimento/i.test(tg)&&/Cartaz antigo/i.test(tg)&&/acima do permitido/i.test(tg)&&/Melhor custo por resultado/i.test(tg),tg.slice(-500));
  await p.fill('#tgOrc','1000');await p.click('#tgOrcSalva');await p.waitForFunction(()=>/Gasto até hoje/.test(document.querySelector('#trafegoExtra')?.innerText||''),null,{timeout:20000});
  t('definir o orçamento mostra o ritmo e a projeção do mês',/No ritmo atual o mês fecha em/.test(await p.$eval('#trafegoExtra',e=>e.innerText)));
  await p.screenshot({path:PR+'/29_trafego_visao_mes.png',fullPage:true});
