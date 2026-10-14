@@ -74,7 +74,10 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const it: Item[] = [];
       const add = (id: string, ok: boolean, nivel: 'erro' | 'aviso', titulo: string, como: string) => it.push({ id, ok, nivel, titulo, como });
       const pub = env('PUBLIC_URL');
-      add('public_url', /^https:\/\//.test(pub) && pub.replace(/\/+$/, '') === c.url.origin, 'erro', 'PUBLIC_URL é o endereço https do sistema', `Defina PUBLIC_URL=${c.url.origin} nas variáveis da Hostinger (precisa ser https e igual ao endereço de acesso).`);
+      // Atrás do proxy c.url.origin é o endereço interno (0.0.0.0:3000): usa o host encaminhado.
+      const fwdHost = (c.req.headers.get('x-forwarded-host') || c.req.headers.get('host') || '').split(',').pop()!.trim();
+      const hostOk = !fwdHost || /^(0\.0\.0\.0|127\.|localhost)/.test(fwdHost) || pub.replace(/\/+$/, '').toLowerCase().endsWith('//' + fwdHost.toLowerCase());
+      add('public_url', /^https:\/\//.test(pub) && hostOk, 'erro', 'PUBLIC_URL é o endereço https do sistema', `Defina PUBLIC_URL=https://${fwdHost && !/^(0\.0\.0\.0|127\.|localhost)/.test(fwdHost) ? fwdHost : 'seu-dominio'} nas variáveis da Hostinger (precisa ser https e igual ao endereço de acesso).`);
       add('app_key', env('APP_KEY').length >= 32, 'erro', 'APP_KEY com 32+ caracteres (criptografa os tokens)', 'Gere com "npm run gerar:segredos" e não troque depois de conectar.');
       add('cron_secret', env('CRON_SECRET').length >= 16, 'erro', 'CRON_SECRET definido (protege o cron)', 'Defina CRON_SECRET (16+ caracteres) e use-o no cron da Hostinger.');
       add('setup_key', env('SETUP_KEY') === '', 'aviso', 'SETUP_KEY removida depois da instalação', 'Remova SETUP_KEY das variáveis da Hostinger depois de instalar: ela libera rotas de diagnóstico e instalação.');
