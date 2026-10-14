@@ -62,3 +62,6 @@ Conteúdo → **Estúdio de publicações**: semana editorial com arrastar-e-sol
 - **Novo post:** título, perfil, formato, legenda (contador de 2.200), hashtags (contador de 30), CTA, data/hora, revisor, mídia e prévia aproximada do Instagram. Três botões: *Salvar rascunho* (PRODUÇÃO), *Enviar para aprovação* (REVISÃO) e *Agendar* (PROGRAMADO, exige data).
 - **Grupos de hashtags:** salvos no servidor (`/api/studio/hashtags`), até 30 grupos de 30 tags.
 - Nada é publicado sozinho: a publicação automática segue exigindo a opção marcada, status Aprovado/Agendado e mídia anexada.
+- **Link de aprovação do post (direção, sem login):** com o post em REVISÃO, o compositor tem "Gerar link para a direção aprovar". A pessoa vê a mídia, a legenda e as hashtags, e aprova ou pede ajustes (comentário obrigatório). Link de uso único, 7 dias; a resposta muda a etapa para APROVADO ou PRODUÇÃO, grava no histórico e avisa a Gerência e o responsável.
+- **Publicar agora:** só publica conteúdo APROVADO ou PROGRAMADO (o servidor recusa o resto). A Gerência pode aprovar e publicar numa só ação, com confirmação. Carrossel segue manual.
+- **Desempenho (área Instagram):** alcance, salvamentos e compartilhamentos são lidos das 30 publicações mais recentes a cada sincronização; as demais mostram "—".

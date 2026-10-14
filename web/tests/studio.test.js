@@ -73,9 +73,10 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.click(`.st-card[data-id="${novo.id}"]`);await p.waitForSelector('.st-form');await p.fill('#sfCta','Novo CTA');await p.click('[data-s="MANTER"]');await p.waitForSelector('.st-form',{state:'detached'});
  novo=await api('GET','/data?module=conteudos&id='+novo.id);t('"Salvar sem mudar a etapa" preserva o status',novo.status==='PROGRAMADO'&&novo.cta==='Novo CTA',novo);
  // ---- área Instagram no menu + desempenho por publicação
- t('menu tem a área Instagram com Estúdio, Métricas e Desempenho',await p.evaluate(()=>{go('studio');const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&subs.join()==='Estúdio,Métricas,Desempenho'}));
+ await p.evaluate(()=>go('studio'));await p.waitForSelector('.st-week');
+ t('menu tem a área Instagram com Estúdio, Métricas e Desempenho',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&subs.join()==='Estúdio,Métricas,Desempenho'}));
  t('a área Conteúdo não tem mais Instagram nem Estúdio',await p.evaluate(()=>{const a=AREAS.find(x=>x.k==='conteudo');return !a.pages.includes('instagram')&&!a.pages.includes('studio')}));
- await p.evaluate(()=>go('igposts'));await p.waitForSelector('.dashboard-head');
+ await p.evaluate(()=>go('igposts'));await p.waitForFunction(()=>/DESEMPENHO/.test(document.querySelector('.dashboard-head')?.innerText||''));
  t('sem Instagram sincronizado mostra aviso claro',/Nenhuma publicação lida ainda/.test(await p.$eval('#content',e=>e.innerText)));
  await api('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});let sy=await api('POST','/integrations/instagram/sync',{});
  let ps=await api('GET','/instagram/posts');const m2=(ps.rows||[]).find(x=>x.id==='m2');
@@ -104,6 +105,26 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.evaluate(()=>renderStudio());await p.waitForSelector(`.st-card[data-id="${pub.id}"]`);await p.click(`.st-card[data-id="${pub.id}"]`);await p.waitForSelector('.st-form');
  t('post já publicado não oferece publicar de novo e mostra o link',!(await p.$('[data-s="PUBLICAR"]'))&&/ver no Instagram/.test(await p.$eval('.st-form',e=>e.innerText)));
  await p.click('.st-form [data-close]');
+ // ---- link de aprovação do post (direção, sem login)
+ const aprId=(await api('POST','/data?module=conteudos',{titulo:'Post para a direção',perfil:'@evolucaopb',formato:'Feed',legenda:'Matrículas abertas!',hashtags:'#evolucao',status:'REVISÃO',publicacaoEm:dia2+'T11:00'})).id;
+ await p.evaluate(async i=>{const f=new FormData();f.append('files',new File([Uint8Array.from(atob('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=='),c=>c.charCodeAt(0))],'arte.jpg',{type:'image/jpeg'}));await fetch('/api/integrations/instagram/media?id='+i,{method:'POST',credentials:'same-origin',headers:{'X-EVO':'1'},body:f})},aprId);
+ const rascunhoLink=await api('POST','/manager/approval-link',{id:cr});t('link de post só existe quando o post está em aprovação',!!rascunhoLink.erro&&/REVISÃO/.test(rascunhoLink.erro),rascunhoLink);
+ await p.evaluate(()=>renderStudio());await p.waitForSelector(`.st-card[data-id="${aprId}"]`);await p.click(`.st-card[data-id="${aprId}"]`);await p.waitForSelector('#sfLink');await p.click('#sfLink');await p.waitForSelector('#sfLinkUrl');
+ const urlAp=await p.$eval('#sfLinkUrl',e=>e.value);t('o compositor gera o link de aprovação do post',/\/aprovar\.html\?t=/.test(urlAp),urlAp);
+ await p.click('.st-form [data-close]');
+ const anon=await (await b.newContext({viewport:{width:390,height:844}})).newPage();const e3=[];anon.on('pageerror',e=>e3.push(e.message));
+ await anon.goto(urlAp.replace(/^https?:\/\/[^/]+/,BASE));await anon.waitForSelector('#nome');
+ const tx=await anon.$eval('#box',e=>e.innerText);
+ t('a direção vê título, legenda e hashtags sem login',/Post para a direção/.test(tx)&&/Matrículas abertas/.test(tx)&&/#evolucao/.test(tx)&&/Aprovar post/.test(tx),tx);
+ const mr=await anon.evaluate(async()=>{const u=document.querySelector('.post img')?.src;if(!u)return null;const r=await fetch(u);return {s:r.status,t:r.headers.get('content-type'),n:(await r.arrayBuffer()).byteLength}});
+ t('a mídia do post é entregue pelo link, sem login (imagem JPEG)',mr&&mr.s===200&&/image\/jpeg/.test(mr.t)&&mr.n>50,JSON.stringify(mr));
+ await anon.screenshot({path:PR+'/26_aprovacao_post_celular.png'});
+ await anon.fill('#nome','Diretora Maria');await anon.click('#aj');await anon.waitForTimeout(600);
+ t('pedir ajustes sem comentário é recusado e o link continua valendo',!!(await anon.$('#nome')));
+ await anon.fill('#com','Trocar a foto por uma da fachada');await anon.click('#ok');await anon.waitForSelector('.msg');
+ t('a direção aprova pelo link e o post vira APROVADO',/Post aprovado/.test(await anon.$eval('#box',e=>e.innerText))&&(await api('GET','/data?module=conteudos&id='+aprId)).status==='APROVADO');
+ await anon.reload();await anon.waitForSelector('.msg.err');t('o link usado não abre mais',/não é mais válido/.test(await anon.$eval('#box',e=>e.innerText)));
+ t('sem erros de JS na página pública',e3.length===0,e3.join('|'));
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
  await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('studio')});await m.waitForSelector('.st-week');

@@ -30,6 +30,7 @@ function stCard(r){
 
 async function renderStudio(){
   const [d,est,datas,ins]=await Promise.all([getRows('conteudos',true),api('/content/states').catch(()=>({rows:[]})),api('/datas?dias=60').catch(()=>({rows:[]})),api('/insights').catch(()=>null)]);
+  if(state.page!=='studio')return; // o usuário já foi para outra aba: descarta este carregamento atrasado
   studioCache={rows:d.rows||[],estados:new Map((est.rows||[]).map(x=>[x.id,x.estado])),datas:datas.rows||[],horarios:ins?.horarios||null};
   desenharStudio();
 }
@@ -96,6 +97,7 @@ async function studioCompositor(row,dataIni=''){
    <label>Mídia (JPEG ou vídeo MP4/MOV) <input id="sfArq" type="file" accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
    <label class="check-row"><input type="checkbox" id="sfIG" ${/SIM/i.test(r.publicarInstagram||'')?'checked':''}> Publicar no Instagram automaticamente (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
    <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="softbtn" type="button" data-s="RASCUNHO">Salvar rascunho</button><button class="softbtn" type="button" data-s="APROVACAO">Enviar para aprovação</button><button class="btn" type="button" data-s="AGENDADO">Agendar</button>${edit?'<button class="softbtn" type="button" data-s="MANTER">Salvar sem mudar a etapa</button>':''}${jaPublicado?'':'<button class="btn accent" type="button" data-s="PUBLICAR">Publicar agora no Instagram</button>'}</div>
+   ${edit&&/REVIS/i.test(r.status||'')?'<div class="st-linkbox"><button class="softbtn" type="button" id="sfLink">Gerar link para a direção aprovar</button><small class="kpi-note">Salve as alterações antes. A pessoa abre o link sem login, vê o post e aprova ou pede ajustes.</small><div id="sfLinkBox"></div></div>':''}
    ${jaPublicado?`<p class="kpi-note">Já publicado${urlSegura(r.instagramLink)?` — <a href="${attr(urlSegura(r.instagramLink))}" target="_blank" rel="noopener">ver no Instagram</a>`:''}.</p>`:''}
    ${edit?`<p class="kpi-note">Etapa atual: <b>${esc(ST_ROTULO[String(r.status||'').toUpperCase()]||r.status||'—')}</b></p>`:''}</form>
    <div class="st-prev"><div class="st-fone" id="sfFone"><div class="st-fh"><i></i><b id="pvPerfil"></b></div><div class="st-midia" id="pvMidia"></div><div class="st-fa">♡ ◌ ➤</div><div class="st-fc" id="pvLegenda"></div><small id="pvQuando"></small></div><p class="kpi-note">Prévia aproximada. O Instagram pode cortar a imagem e a legenda de outro jeito.</p></div></div>`);
@@ -125,6 +127,11 @@ async function studioCompositor(row,dataIni=''){
     try{const d=await api('/ia/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'conteudos',id:r.id})});
       const ov=adminOverlay(`<h3>Rascunhos de legenda</h3><p class="kpi-note">Revise antes de usar.</p><div class="origem-list">${d.opcoes.map((x,i)=>`<div class="notif"><div style="white-space:pre-wrap">${esc(x.legenda)}</div><small>${esc(x.hashtags.join(' '))}</small><div><button class="softbtn" data-usar="${i}">Usar esta</button></div></div>`).join('')}</div><div class="actions"><button class="btn soft" data-close>Fechar</button></div>`);
       ov.el.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{const x=d.opcoes[+b.dataset.usar];g('sfLegenda').value=x.legenda;if(x.hashtags.length)g('sfTags').value=x.hashtags.join(' ');pv();ov.close()})}catch(e){toast(e.message,'warn')}
+  };
+  if(g('sfLink'))g('sfLink').onclick=async()=>{
+    try{const d=await api('/manager/approval-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:r.id,dias:7})});
+      g('sfLinkBox').innerHTML=`<input readonly id="sfLinkUrl" value="${attr(d.url)}"><button type="button" class="softbtn" id="sfLinkCopia">Copiar</button><small class="kpi-note">Vale ${d.dias} dias e só pode ser usado uma vez.</small>`;
+      g('sfLinkCopia').onclick=()=>{navigator.clipboard?.writeText(d.url);toast('Link copiado')};g('sfLinkUrl').onfocus=e=>e.target.select()}catch(e){toast(e.message,'warn')}
   };
   const salvar=async tipo=>{
     const titulo=g('sfTitulo').value.trim(),leg=g('sfLegenda').value,quando=g('sfQuando').value;
@@ -164,7 +171,9 @@ const IG_TIPO={FEED:'Feed',REELS:'Reels',STORY:'Stories',CAROUSEL_ALBUM:'Carross
 const IG_ORDEM={recentes:['Mais recentes',(a,b)=>String(b.quando).localeCompare(String(a.quando))],interacoes:['Mais interações',(a,b)=>b.interacoes-a.interacoes],alcance:['Maior alcance',(a,b)=>(b.alcance??-1)-(a.alcance??-1)],engajamento:['Maior engajamento',(a,b)=>(b.engajamento??-1)-(a.engajamento??-1)]};
 const igNum=n=>Number(n||0).toLocaleString('pt-BR');
 async function renderIgPosts(){
-  igDados=await api('/instagram/posts');
+  const d=await api('/instagram/posts');
+  if(state.page!=='igposts')return;
+  igDados=d;
   desenharIgPosts();
 }
 function desenharIgPosts(){

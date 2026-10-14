@@ -34,9 +34,9 @@ export async function saveUploads(c: Ctx, id: string, sub: string): Promise<stri
 
 /** Só formatos que o navegador mostra sem executar nada abrem na própria página; SVG, Office, ZIP etc. sempre baixam. */
 const EXIBIR_NO_NAVEGADOR = /\.(pdf|png|jpe?g|gif|webp|mp4|mov|mp3|wav|txt|csv)$/i;
-export async function serveFile(rel: string, portal: Row | null): Promise<Response> {
+export async function serveFile(rel: string, portal: Row | null, prefixos: string[] = ['ANEXOS/SOLICITACOES/']): Promise<Response> {
   rel = rel.replace(/\\/g, '/').trim();
-  if (!rel || rel.includes('..') || !rel.startsWith('ANEXOS/SOLICITACOES/')) fail(400, 'Arquivo inválido.');
+  if (!rel || rel.includes('..') || !prefixos.some((p) => rel.startsWith(p))) fail(400, 'Arquivo inválido.');
   if (portal) {
     let ok = false;
     for (const r of await listRows('solicitacoes')) {
