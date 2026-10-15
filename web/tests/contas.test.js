@@ -32,6 +32,10 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('relatório mensal da segunda conta traz o nome e só os posts dela',r.conta==='outraconta'&&r.posts.length===2,[r.conta,r.posts.length]);
  [,r]=await call('GET','/data?module=instagram');const meses=r.rows.filter(x=>x.origem==='INSTAGRAM_API'&&x.periodo===mes);
  t('métricas mensais existem para cada conta, com o @ no título',meses.length===2&&meses.some(x=>x.idExterno===IG2&&/@outraconta/.test(x.titulo))&&meses.some(x=>x.idExterno===IG1&&/@evolucaopb/.test(x.titulo)),meses.map(x=>[x.idExterno,x.titulo]));
+ [s]=await call('POST','/integrations/meta/account',{ocultar:[IG2,IG1]});st=(await call('GET','/integrations/status'))[1].instagram;
+ t('conta oculta some das acompanhadas; a conta em uso nunca pode ser ocultada',s===200&&st.ocultas.join()===IG2&&!st.monitoradas.includes(IG2)&&st.monitoradas.includes(IG1),st);
+ [,r]=await call('GET','/instagram/contas');t('seletor lista só as contas não ocultas',r.contas.length===1&&r.contas[0].ig===IG1,r);
+ await call('POST','/integrations/meta/account',{ocultar:[],monitorar:[IG1,IG2]});
  // publicar pela conta escolhida + colab
  const jpg=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
  const up=async id=>{const fd=new FormData();fd.append('files',new Blob([jpg]),'a.jpg');const rr=await fetch(B+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G.Cookie,'X-EVO':'1'},body:fd});return rr.status};

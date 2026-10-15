@@ -126,12 +126,16 @@ async function metaInsightTotal(ig: string, metrics: string[], since: number, un
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
 /** Contas Instagram acompanhadas pelo sistema (a em uso sempre entra). */
+export async function contasOcultas(): Promise<string[]> {
+  try { const l = JSON.parse((await setting('ig_contas_ocultas')) || '[]'); return Array.isArray(l) ? l.map(String) : []; } catch { return []; }
+}
 export async function contasMonitoradas(): Promise<MetaConta[]> {
   let todas: MetaConta[] = [], ids: string[] = [];
   try { todas = JSON.parse((await setting('meta_contas')) || '[]'); } catch { /* vazio */ }
   try { ids = JSON.parse((await setting('ig_contas_monitoradas')) || '[]'); } catch { /* vazio */ }
   const principal = await setting('ig_user_id');
-  const sel = todas.filter((c) => c.ig === principal || ids.includes(c.ig));
+  const ocultas = await contasOcultas();
+  const sel = todas.filter((c) => c.ig === principal || (ids.includes(c.ig) && !ocultas.includes(c.ig)));
   return sel.length ? sel : principal ? [{ ig: principal, usuario: await setting('ig_username'), pagina: await setting('meta_page_name') }] : [];
 }
 export async function igContaValida(conta: string): Promise<string> {
