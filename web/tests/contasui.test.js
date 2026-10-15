@@ -48,7 +48,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.mouse.click(mb.x+mb.width*0.15,mb.y+mb.height*0.5);t('tocar na metade esquerda volta (2/3)',(await p.$eval('.st-cnt',e=>e.textContent))==='2/3');
  t('as ações da prévia são ícones (sem o quadrado azul de emoji)',(await p.$$('.st-fa svg')).length>=4);
  await p.selectOption('#sfColabSel','__outro');t('"Outro perfil…" mostra o campo de texto',!(await p.$eval('#sfColabOutroL',e=>e.hidden)));
- await p.evaluate(()=>go('instagram'));await p.waitForSelector('#igPerBox [data-igper]',{timeout:20000});await p.waitForFunction(()=>!/Carregando/.test(document.querySelector('#igPerKpis')?.textContent||''),null,{timeout:20000});
+ await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove());go('instagram')});await p.waitForSelector('#igPerBox [data-igper]',{timeout:20000});await p.waitForFunction(()=>!/Carregando/.test(document.querySelector('#igPerKpis')?.textContent||''),null,{timeout:20000});
  t('Métricas do Instagram mostram os 5 filtros de período e o seletor de conta',(await p.$$eval('[data-igper]',e=>e.map(x=>x.textContent))).join()==='7 dias,30 dias,90 dias,Ano,Todo'&&!!(await p.$('[data-igconta]')));
  t('a nota diz a que período e conta os números se referem',/30 dias/.test(await p.textContent('#igPerNota'))&&/@/.test(await p.textContent('#igPerNota')));
  await p.click('[data-igper="90"]');await p.waitForFunction(()=>/90 dias/.test(document.querySelector('#igPerNota')?.textContent||''),null,{timeout:20000});
