@@ -1,5 +1,5 @@
 const API='/api';
-const VERSION='5.6.0';
+const VERSION='5.6.1';
 const DATA_MODULES=['agenda','aprovacoes','arquivos','calendario','campanhas','configuracoes','conteudos','equipe','eventos','ideias','instagram','integracoes','lixeira','projetos','relatorios','solicitacoes','tarefas','templates','trafego'];
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -186,7 +186,7 @@ function updateHeader(){montarSubtabs();const m=MODULES[state.page]||{label:'EVO
 
 // telas removidas: links antigos caem na tela equivalente
 const MOVED={calev:'eventos',dashboard:'hoje',governanca:'hoje',estrategia:'hoje',centraldados:'administracao',backup:'administracao',integracoes:'administracao',saude:'administracao',manutencao:'administracao',lixeira:'hoje'};
-async function go(page){
+async function go(page){setTimeout(()=>{if(typeof igTopo==='function')igTopo()},0);
  if(MOVED[page]){if(page==='calev')setPref('view.eventos','calendar');if(page==='backup')adminTab='backups';else if(page==='integracoes')adminTab='integracoes';page=MOVED[page]}
  if(!MODULES[page])page=internalSession?.role==='manager'?'hoje':'minhaarea';
  if(!canAccess(page))page=internalSession?.role==='manager'?'hoje':'minhaarea';state.page=page;state.module=DATA_MODULES.includes(page)?page:null;state.query='';state.status='';state.priority='';state.segment='';state.respF='';state.canalF='';state.estadoF='';state.pageNum=1;state.selected.clear();state.view=pref(`view.${page}`,VIEW_DEFAULT[page]||'table');
