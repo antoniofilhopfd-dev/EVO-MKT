@@ -39,8 +39,8 @@ const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sáb
 const MIN_AMOSTRA = 8, MIN_BUCKET = 3;
 
 /** Melhor dia e horário a partir dos posts reais já sincronizados (nunca uma tabela genérica de mercado). */
-export async function melhoresHorarios(): Promise<Row> {
-  const posts = await q('SELECT publicado_em,curtidas,comentarios,tipo FROM ig_posts');
+export async function melhoresHorarios(conta = ''): Promise<Row> {
+  const posts = await q('SELECT publicado_em,curtidas,comentarios,tipo FROM ig_posts' + (conta ? ' WHERE conta=?' : ''), conta ? [conta] : []);
   if (posts.length < MIN_AMOSTRA) return { amostra: posts.length, minimo: MIN_AMOSTRA, melhor: null };
   const tz = env('TIMEZONE', 'America/Recife');
   const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', hourCycle: 'h23' });
@@ -75,8 +75,8 @@ export async function melhoresHorarios(): Promise<Row> {
   return { amostra: posts.length, minimo: MIN_AMOSTRA, porFormato, melhor: { dia: DIAS[d.k], mediaDia: d.media, hora: h.k, mediaHora: h.media, confianca: d.n >= MIN_BUCKET && h.n >= MIN_BUCKET ? 'alta' : 'baixa' } };
 }
 
-export async function rankingConteudos(limite = 8): Promise<Row[]> {
-  return (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink FROM ig_posts ORDER BY (curtidas+comentarios) DESC, publicado_em DESC LIMIT ' + Math.min(30, limite)))
+export async function rankingConteudos(limite = 8, conta = ''): Promise<Row[]> {
+  return (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink FROM ig_posts' + (conta ? ' WHERE conta=?' : '') + ' ORDER BY (curtidas+comentarios) DESC, publicado_em DESC LIMIT ' + Math.min(30, limite), conta ? [conta] : []))
     .map((p) => ({ id: p.media_id, quando: p.publicado_em, tipo: p.tipo, legenda: p.legenda, interacoes: Number(p.curtidas) + Number(p.comentarios), curtidas: p.curtidas, comentarios: p.comentarios, link: p.permalink }));
 }
 

@@ -32,7 +32,8 @@ if ($p === '/anthropic/v1/messages') {
 if (str_starts_with($p, '/graph')) {
     $g = substr($p, 6);
     $tok = $_GET['access_token'] ?? ($in['access_token'] ?? '');
-    $IG = '17841400000000000';
+    $IG = '17841400000000000'; $IG2 = '17841499999999999'; $is2 = false;
+    if (str_starts_with($g, "/$IG2")) { $g = "/$IG" . substr($g, strlen("/$IG2")); $is2 = true; }
     if ($g === '/oauth/access_token') {
         if (($_GET['grant_type'] ?? '') === 'fb_exchange_token') { if (($_GET['client_secret'] ?? '') !== 'META_SECRET') j(['error' => ['message' => 'bad secret']], 400); j(['access_token' => 'LONG_TOKEN', 'expires_in' => 5184000]); }
         if (($_GET['code'] ?? '') !== 'GOODCODE') j(['error' => ['message' => 'Invalid verification code']], 400);
@@ -89,8 +90,8 @@ if (str_starts_with($p, '/graph')) {
             ['campaign_id' => 'c4', 'campaign_name' => 'Captação de leads', 'spend' => '400.00', 'impressions' => '12000', 'reach' => '9000', 'clicks' => '300', 'account_currency' => 'BRL'],
         ], 'since' => $since]);
     }
-    if ($g === '/me/accounts') { $d = [['name' => 'Colégio Evolução', 'id' => 'p1', 'instagram_business_account' => ['id' => $IG, 'username' => 'evolucaopb']]]; if ($tok === 'MULTI_TOKEN') $d[] = ['name' => 'Outra Página', 'id' => 'p2', 'instagram_business_account' => ['id' => '17841499999999999', 'username' => 'outraconta']]; j(['data' => $d]); }
-    if ($g === "/$IG") j(['followers_count' => 4600, 'follows_count' => 120, 'media_count' => 310, 'username' => 'evolucaopb']);
+    if ($g === '/me/accounts') { $d = [['name' => 'Colégio Evolução', 'id' => 'p1', 'instagram_business_account' => ['id' => $IG, 'username' => 'evolucaopb']]]; if ($tok === 'MULTI_TOKEN' || $tok === 'DUAL_TOKEN') $d[] = ['name' => 'Outra Página', 'id' => 'p2', 'instagram_business_account' => ['id' => '17841499999999999', 'username' => 'outraconta']]; j(['data' => $d]); }
+    if ($g === "/$IG") j($is2 ? ['followers_count' => 1300, 'follows_count' => 50, 'media_count' => 40, 'username' => 'outraconta'] : ['followers_count' => 4600, 'follows_count' => 120, 'media_count' => 310, 'username' => 'evolucaopb']);
     if ($g === "/$IG/insights") {
         if ($tok === 'NOVIEWS_TOKEN' && str_contains($_GET['metric'] ?? '', ',') ) j(['error' => ['message' => 'metric views is deprecated']], 400);
         if ($tok === 'NOVIEWS_TOKEN' && ($_GET['metric'] ?? '') === 'views') j(['error' => ['message' => 'metric views is deprecated']], 400);
@@ -98,7 +99,14 @@ if (str_starts_with($p, '/graph')) {
         $d = []; foreach (explode(',', $_GET['metric'] ?? '') as $k) { $d[] = ['name' => $k, 'period' => 'day', 'total_value' => ['value' => $vals[$k] ?? 0]]; }
         j(['data' => $d]);
     }
-    if (preg_match('#^/(m[0-9])/insights$#', $g, $mm)) { $b = ['m1' => [4000, 30, 12], 'm2' => [20000, 80, 40], 'm3' => [1500, 5, 2], 'm0' => [900, 3, 1]][$mm[1]] ?? [0, 0, 0]; j(['data' => [['name' => 'reach', 'values' => [['value' => $b[0]]]], ['name' => 'saved', 'values' => [['value' => $b[1]]]], ['name' => 'shares', 'values' => [['value' => $b[2]]]]]]); }
+    if (preg_match('#^/(m[0-9]|n[0-9])/insights$#', $g, $mm)) { $b = ['n1' => [700, 9, 3], 'n2' => [300, 2, 1], 'm1' => [4000, 30, 12], 'm2' => [20000, 80, 40], 'm3' => [1500, 5, 2], 'm0' => [900, 3, 1]][$mm[1]] ?? [0, 0, 0]; j(['data' => [['name' => 'reach', 'values' => [['value' => $b[0]]]], ['name' => 'saved', 'values' => [['value' => $b[1]]]], ['name' => 'shares', 'values' => [['value' => $b[2]]]]]]); }
+    if ($g === "/$IG/media" && $m === 'GET' && $is2) {
+        $cur = date('Y-m');
+        j(['data' => [
+            ['id' => 'n1', 'caption' => 'Geração Evolução: ensaio', 'media_type' => 'IMAGE', 'media_product_type' => 'FEED', 'timestamp' => "$cur-02T10:00:00+0000", 'like_count' => 60, 'comments_count' => 4, 'permalink' => 'https://instagram.com/p/n1'],
+            ['id' => 'n2', 'caption' => 'Bastidores do coral', 'media_type' => 'VIDEO', 'media_product_type' => 'REELS', 'timestamp' => "$cur-03T12:00:00+0000", 'like_count' => 20, 'comments_count' => 1, 'permalink' => 'https://instagram.com/reel/n2'],
+        ]]);
+    }
     if ($g === "/$IG/media" && $m === 'GET') {
         $cur = date('Y-m'); $prev = date('Y-m', strtotime('first day of last month'));
         j(['data' => [
@@ -118,7 +126,7 @@ if (str_starts_with($p, '/graph')) {
         if ($url === '') j(['error' => ['message' => 'media url required']], 400);
         $ch = curl_init($url); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10]); $body = curl_exec($ch); $st = curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $ct = curl_getinfo($ch, CURLINFO_CONTENT_TYPE); curl_close($ch);
         if ($st !== 200) j(['error' => ['message' => "Meta não conseguiu baixar a mídia (HTTP $st)"]], 400);
-        $id = nid('CONT_'); $S['containers'][$id] = ['params' => $in, 'bytes' => strlen((string)$body), 'type' => $ct, 'status' => 'FINISHED'];
+        $id = nid('CONT_'); $S['containers'][$id] = ['params' => $in, 'conta' => $is2 ? 'ig2' : 'ig1', 'bytes' => strlen((string)$body), 'type' => $ct, 'status' => 'FINISHED'];
         j(['id' => $id]);
     }
     if ($g === "/$IG/media_publish") {

@@ -55,14 +55,20 @@ export async function contaAds(): Promise<{ id: string; moeda: string }> {
   const info = (JSON.parse((await setting('meta_ads_contas')) || '[]') as ContaAds[]).find((c) => c.id === id);
   return { id, moeda: info?.moeda || 'BRL' };
 }
-export async function paginaDoInstagram(): Promise<string> {
-  const salvo = await setting('meta_page_id');
+/** Conta Instagram dona da publicação (a em uso se a publicação não for conhecida). */
+export async function igDoPost(media?: string): Promise<string> {
+  const c = media ? (await q1('SELECT conta FROM ig_posts WHERE media_id=?', [String(media)]))?.conta : '';
+  return String(c || (await setting('ig_user_id')));
+}
+export async function paginaDoInstagram(igAlvo?: string): Promise<string> {
+  const principal = await setting('ig_user_id');
+  const ig = igAlvo || principal;
+  const salvo = ig === principal ? await setting('meta_page_id') : '';
   if (salvo) return salvo;
-  const ig = await setting('ig_user_id');
   const r = await metaGet('/me/accounts', { fields: 'id,name,instagram_business_account{id}', limit: 100 });
   const p = (r.data ?? []).find((x: Row) => String(x.instagram_business_account?.id ?? '') === ig);
   if (!p?.id) throw new Error('Não achei a Página do Facebook ligada ao Instagram conectado.');
-  await setSetting('meta_page_id', String(p.id));
+  if (ig === principal) await setSetting('meta_page_id', String(p.id));
   return String(p.id);
 }
 
@@ -151,7 +157,7 @@ export async function lancarImpulso(p: PedidoImpulso, quem: string): Promise<Row
   const id = Number(row.id);
   let campanhaId = '';
   try {
-    const pay = montarPayloads(p, { whatsapp: cfg.whatsapp, moeda, pagina: await paginaDoInstagram(), ig: await setting('ig_user_id'), cidade: cfg.publico.cidade!, pub: cfg.publico, titulo, fim });
+    const pay = montarPayloads(p, { whatsapp: cfg.whatsapp, moeda, pagina: await paginaDoInstagram(await igDoPost(p.midia)), ig: await igDoPost(p.midia), cidade: cfg.publico.cidade!, pub: cfg.publico, titulo, fim });
     campanhaId = String((await metaPost(`/act_${conta}/campaigns`, pay.campanha)).id);
     await marcar(id, 'CRIANDO', { campanha_id: campanhaId });
     const conjuntoId = String((await metaPost(`/act_${conta}/adsets`, { ...pay.conjunto, campaign_id: campanhaId })).id);

@@ -12,6 +12,7 @@ import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
 import { diasUteisEntre, HistRow, hojeLocal, periodosPorStatus, slaInfo } from '../sla';
 import { addDays, env, fail, fmtDate, localParts, now, Row } from '../util';
+import { contasMonitoradas, igContaValida } from '../integrations/meta';
 import { json } from './handlers';
 
 const ymd = (s: unknown) => String(s ?? '').slice(0, 10);
@@ -107,7 +108,7 @@ export async function operacaoRoute(c: Ctx) {
   }
   if (path === '/insights') {
     await requireManager(c);
-    return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(), ranking: await rankingConteudos() });
+    return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(await igContaValida(c.qs('conta'))), ranking: await rankingConteudos(8, await igContaValida(c.qs('conta'))) });
   }
   if (path === '/studio/modelos') {
     await requireInternal(c);
@@ -131,7 +132,7 @@ export async function operacaoRoute(c: Ctx) {
   if (path === '/instagram/seguidores/manual' && c.method === 'POST') {
     const u = await requireManager(c);
     const b = await c.body();
-    const mes = String(b.mes ?? '').trim(), n = Math.floor(Number(b.seguidores));
+    const conta = await igContaValida(String(b.conta ?? '')), mes = String(b.mes ?? '').trim(), n = Math.floor(Number(b.seguidores));
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) fail(400, 'Informe o mês no formato AAAA-MM.');
     if (!Number.isFinite(n) || n < 0 || n > 100000000) fail(400, 'Número de seguidores inválido.');
     const [y, m] = mes.split('-').map(Number);
@@ -139,8 +140,8 @@ export async function operacaoRoute(c: Ctx) {
     const hoje = fmtDate(new Date());
     const dia = `${mes}-${String(ultimo).padStart(2, '0')}`;
     const alvo = dia > hoje ? hoje : dia;
-    if (await q1('SELECT 1 FROM ig_seguidores WHERE dia LIKE ? AND atualizado_em NOT LIKE ?', [mes + '%', 'manual%'])) fail(409, 'Esse mês já tem registro automático do sistema; o número manual só vale para meses sem registro.');
-    await run('INSERT INTO ig_seguidores(dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,0,0,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),atualizado_em=VALUES(atualizado_em)', [alvo, n, 'manual ' + now()]);
+    if (await q1('SELECT 1 FROM ig_seguidores WHERE conta=? AND dia LIKE ? AND atualizado_em NOT LIKE ?', [conta, mes + '%', 'manual%'])) fail(409, 'Esse mês já tem registro automático do sistema; o número manual só vale para meses sem registro.');
+    await run('INSERT INTO ig_seguidores(conta,dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,?,0,0,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),atualizado_em=VALUES(atualizado_em)', [conta, alvo, n, 'manual ' + now()]);
     await audit(String(u.codigo), 'ig-seguidores-manual', 'instagram', mes);
     return json({ ok: true });
   }
@@ -150,15 +151,21 @@ export async function operacaoRoute(c: Ctx) {
     const mes = /^\d{4}-\d{2}$/.test(c.qs('mes')) ? c.qs('mes') : `${lp.y}-${String(lp.m).padStart(2, '0')}`;
     const [y, m] = mes.split('-').map(Number);
     const ant = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
-    const linhas = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API');
+    const conta = await igContaValida(c.qs('conta'));
+    const linhas = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? conta) === conta);
     const pega = (per: string) => linhas.find((r) => r.periodo === per) ?? null;
-    const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts WHERE publicado_em LIKE ? ORDER BY publicado_em DESC', [mes + '%'])).map((p) => ({ ...p, interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos) }));
-    const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE dia LIKE ? ORDER BY dia DESC LIMIT 1', [per + '%']))?.seguidores ?? null;
-    return json({ mes, anterior: ant, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: await setting('ig_username') });
+    const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts WHERE conta=? AND publicado_em LIKE ? ORDER BY publicado_em DESC', [conta, mes + '%'])).map((p) => ({ ...p, interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos) }));
+    const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [conta, per + '%']))?.seguidores ?? null;
+    return json({ mes, anterior: ant, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' });
+  }
+  if (path === '/instagram/contas') {
+    await requireInternal(c);
+    return json({ contas: await contasMonitoradas(), principal: await setting('ig_user_id') });
   }
   if (path === '/instagram/seguidores') {
     await requireInternal(c);
-    const snaps = await q('SELECT dia,seguidores FROM ig_seguidores ORDER BY dia');
+    const conta = await igContaValida(c.qs('conta'));
+    const snaps = await q('SELECT dia,seguidores FROM ig_seguidores WHERE conta=? ORDER BY dia', [conta]);
     const ult = (chave: (d: string) => string) => {
       const m = new Map<string, number>();
       for (const s of snaps) m.set(chave(String(s.dia)), Number(s.seguidores)); // ordenado: o último do período vence
@@ -169,7 +176,8 @@ export async function operacaoRoute(c: Ctx) {
   }
   if (path === '/instagram/posts') {
     await requireInternal(c);
-    const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts ORDER BY publicado_em DESC LIMIT 1000')).map((p) => {
+    const conta = await igContaValida(c.qs('conta'));
+    const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts WHERE conta=? ORDER BY publicado_em DESC LIMIT 1000', [conta])).map((p) => {
       const interacoes = Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos);
       const alcance = p.alcance === null || p.alcance === undefined ? null : Number(p.alcance);
       return {
@@ -178,7 +186,7 @@ export async function operacaoRoute(c: Ctx) {
         engajamento: alcance ? Math.round((interacoes / alcance) * 1000) / 10 : null, miniatura: p.miniatura, link: p.permalink,
       };
     });
-    return json({ rows, ultimaSync: await setting('ig_last_sync') });
+    return json({ rows, conta, contas: await contasMonitoradas(), ultimaSync: await setting('ig_last_sync') });
   }
   if (path === '/studio/hashtags') {
     const u = await requireInternal(c);

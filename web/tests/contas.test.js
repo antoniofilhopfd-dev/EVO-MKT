@@ -1,0 +1,46 @@
+// Duas contas de Instagram: acompanhar as duas, métricas/posts/seguidores separados, publicar pela conta escolhida e colab. Uso: node contas.test.js <install.out>
+const fs=require('fs');const path=require('path');
+const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const B=(process.env.BASE||'http://127.0.0.1:8080')+'/api';
+let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',JSON.stringify(x).slice(0,700))};
+const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
+(async()=>{
+ const login=async(c,n)=>{let r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:c,senha:pw(c)})});let ck=cookie(r);await fetch(B+'/auth/password',{method:'POST',headers:{...J,Cookie:ck},body:JSON.stringify({atual:pw(c),nova:n})});r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:c,senha:n})});return {...J,Cookie:cookie(r)}};
+ const G=await login('NAT-3301','Nat26ab'),E=await login('ANT-3302','Ant26ab');
+ const call=async(m,u,b,h=G)=>{const x=await fetch(B+u,{method:m,headers:h,body:b?JSON.stringify(b):undefined});let j=null;try{j=await x.json()}catch{}return [x.status,j]};
+ const mock=async p=>(await fetch('http://127.0.0.1:8099'+p)).json();
+ const novos=async()=>Object.entries((await mock('/__state')).ads_novos||{});
+ let s,r;
+ const IG2='17841499999999999';
+ await call('POST','/integrations/meta/token',{token:'DUAL_TOKEN'});
+ let st=(await call('GET','/integrations/status'))[1].instagram;const IG1=st.igUserId;
+ t('duas contas nas Páginas, só a em uso é acompanhada por padrão',st.contas.length===2&&st.monitoradas.length===1&&st.monitoradas[0]===IG1,st);
+ [s,r]=await call('GET','/instagram/contas',null,E);t('Equipe vê a lista de contas acompanhadas',s===200&&r.contas.length===1&&r.principal===IG1,r);
+ await call('POST','/integrations/instagram/sync',{});
+ [,r]=await call('GET','/instagram/posts');t('com uma conta só, os posts são dela',r.rows.length===4&&r.rows.every(x=>/^m/.test(x.id)),r.rows.map(x=>x.id));
+ [s]=await call('POST','/integrations/meta/account',{monitorar:[IG1,IG2]},E);t('Equipe não muda as contas acompanhadas (403)',s===403);
+ [s]=await call('POST','/integrations/meta/account',{monitorar:[IG1,IG2,'123']});t('Gerência acompanha as duas (ids que não existem são ignorados)',s===200);
+ [,r]=await call('GET','/instagram/contas');t('as duas contas passam a ser acompanhadas',r.contas.length===2,r);
+ await call('POST','/integrations/instagram/sync',{});
+ [,r]=await call('GET','/instagram/posts?conta='+IG2);t('posts da segunda conta ficam separados',r.rows.length===2&&r.rows.every(x=>/^n/.test(x.id))&&r.conta===IG2,r.rows.map(x=>x.id));
+ [,r]=await call('GET','/instagram/posts?conta='+IG1);t('posts da primeira conta continuam só dela',r.rows.length===4&&r.rows.every(x=>/^m/.test(x.id)));
+ [,r]=await call('GET','/instagram/posts?conta=999');t('conta desconhecida cai na conta em uso (nunca mistura)',r.conta===IG1&&r.rows.every(x=>/^m/.test(x.id)));
+ [,r]=await call('GET','/instagram/seguidores?conta='+IG2);const a2=r.atual;[,r]=await call('GET','/instagram/seguidores?conta='+IG1);
+ t('seguidores separados por conta (1.300 × 4.600)',a2===1300&&r.atual===4600,[a2,r.atual]);
+ [s]=await call('POST','/instagram/seguidores/manual',{conta:IG2,mes:'2025-01',seguidores:700});[,r]=await call('GET','/instagram/seguidores?conta='+IG2);const m2=r.mensal.some(x=>x.periodo==='2025-01'&&x.seguidores===700);[,r]=await call('GET','/instagram/seguidores?conta='+IG1);
+ t('seguidores informados à mão valem só para a conta escolhida',s===200&&m2&&!r.mensal.some(x=>x.periodo==='2025-01'),r.mensal);
+ const mes=new Date().toISOString().slice(0,7);[,r]=await call('GET','/instagram/relatorio?mes='+mes+'&conta='+IG2);
+ t('relatório mensal da segunda conta traz o nome e só os posts dela',r.conta==='outraconta'&&r.posts.length===2,[r.conta,r.posts.length]);
+ [,r]=await call('GET','/data?module=instagram');const meses=r.rows.filter(x=>x.origem==='INSTAGRAM_API'&&x.periodo===mes);
+ t('métricas mensais existem para cada conta, com o @ no título',meses.length===2&&meses.some(x=>x.idExterno===IG2&&/@outraconta/.test(x.titulo))&&meses.some(x=>x.idExterno===IG1&&/@evolucaopb/.test(x.titulo)),meses.map(x=>[x.idExterno,x.titulo]));
+ // publicar pela conta escolhida + colab
+ const jpg=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
+ const up=async id=>{const fd=new FormData();fd.append('files',new Blob([jpg]),'a.jpg');const rr=await fetch(B+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G.Cookie,'X-EVO':'1'},body:fd});return rr.status};
+ const mk=async b=>(await call('POST','/data?module=conteudos',{titulo:b.titulo,legenda:b.titulo,status:'APROVADO',formato:'Feed',publicarInstagram:'NÃO',publicacaoEm:'2020-01-01T10:00',...b}))[1].id;
+ const c2=await mk({titulo:'Post da segunda conta',contaInstagram:IG2,colaboradores:'@evolucaopb, @amiga.escola'});await up(c2);
+ [s,r]=await call('POST','/integrations/instagram/publish',{id:c2});t('publica pela segunda conta',s===200&&r.status==='PUBLICADO',r);
+ const c1=await mk({titulo:'Post da conta padrão'});await up(c1);await call('POST','/integrations/instagram/publish',{id:c1});
+ const cont=Object.values((await mock('/__state')).containers);const k2=cont.find(c=>/segunda conta/.test(c.params.caption||'')),k1=cont.find(c=>/conta padrão/.test(c.params.caption||''));
+ t('o container saiu da conta escolhida, não da padrão',k2&&k2.conta==='ig2'&&k1&&k1.conta==='ig1',[k1&&k1.conta,k2&&k2.conta]);
+ t('colab: convida os perfis informados (até 3) no pedido à Meta',k2&&JSON.parse(k2.params.collaborators).join()==='evolucaopb,amiga.escola'&&!k1.params.collaborators,[k2&&k2.params.collaborators,k1&&k1.params.collaborators]);
+ console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
+})().catch(e=>{console.error(e);process.exit(1)});

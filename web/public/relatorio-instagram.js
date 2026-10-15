@@ -24,7 +24,7 @@ function obsPadrao(d){const p=[];if(!d.atual)p.push('As métricas deste mês ain
 async function carregar(){
   $('#rel').innerHTML='<div class="msg">Carregando…</div>';
   try{
-    const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value),{credentials:'same-origin',headers:{'X-EVO':'1'}});let d={};try{d=await r.json()}catch{}
+    const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+(new URLSearchParams(location.search).get('conta')?'&conta='+encodeURIComponent(new URLSearchParams(location.search).get('conta')):''),{credentials:'same-origin',headers:{'X-EVO':'1'}});let d={};try{d=await r.json()}catch{}
     if(r.status===401||r.status===403){$('#rel').innerHTML='<div class="msg">Entre no EVO MKT como Gerência e abra este relatório de novo.</div>';return}
     if(!r.ok)throw new Error(d.error||'Não foi possível montar o relatório.');
     ultimo=d;$('#obs').value=obsPadrao(d);desenhar();

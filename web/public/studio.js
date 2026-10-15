@@ -5,6 +5,13 @@ const ST_CLASSE={IDEIA:'draft',BRIEFING:'draft','PRODUÇÃO':'draft','REVISÃO':
 const ST_ROTULO={IDEIA:'Ideia',BRIEFING:'Briefing','PRODUÇÃO':'Rascunho','REVISÃO':'Em aprovação',APROVADO:'Aprovado',PROGRAMADO:'Agendado',PUBLICADO:'Publicado',ARQUIVADO:'Arquivado'};
 const ST_ICONE={Feed:'▦',Stories:'◔',Reels:'▶',Carrossel:'❏','Vídeo':'▶',Foto:'▣',Outro:'◇'};
 const ST_DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+// ---------- várias contas de Instagram ----------
+let igConta=(()=>{try{return localStorage.getItem('evo.igConta')||''}catch{return ''}})(),igContas=[],igPrincipal='';
+const igQ=(pre='?')=>igConta?`${pre}conta=${encodeURIComponent(igConta)}`:'';
+async function igCarregaContas(){try{const d=await api('/instagram/contas');igContas=d.contas||[];igPrincipal=d.principal||'';if(!igConta||!igContas.some(c=>c.ig===igConta))igConta=igPrincipal||(igContas[0]&&igContas[0].ig)||''}catch{igContas=[]}}
+const igSeletor=()=>igContas.length>1?`<select data-igconta aria-label="Conta do Instagram" class="ig-conta-sel">${igContas.map(c=>`<option value="${attr(c.ig)}" ${c.ig===igConta?'selected':''}>@${esc(c.usuario)}</option>`).join('')}</select>`:'';
+function igLigaSeletor(refaz){$$('[data-igconta]').forEach(sel=>sel.onchange=()=>{igConta=sel.value;try{localStorage.setItem('evo.igConta',igConta)}catch{};refaz()})}
+const igContaDoPost=r=>String(r.contaInstagram||igPrincipal||'');
 let studioSemana=null,studioFiltro={perfil:'',status:'',formato:''},studioCache={rows:[],estados:new Map(),datas:[],horarios:null};
 
 function stSegunda(d){const x=new Date(d);x.setHours(12,0,0,0);const w=(x.getDay()+6)%7;x.setDate(x.getDate()-w);return x}
@@ -29,9 +36,10 @@ function stCard(r){
 }
 
 async function renderStudio(){
-  const [d,est,datas,ins]=await Promise.all([getRows('conteudos',true),api('/content/states').catch(()=>({rows:[]})),api('/datas?dias=60').catch(()=>({rows:[]})),api('/insights').catch(()=>null)]);
+  await igCarregaContas();
+  const [d,est,datas,ins]=await Promise.all([getRows('conteudos',true),api('/content/states').catch(()=>({rows:[]})),api('/datas?dias=60').catch(()=>({rows:[]})),api('/insights'+igQ()).catch(()=>null)]);
   if(state.page!=='studio')return; // o usuário já foi para outra aba: descarta este carregamento atrasado
-  studioCache={rows:d.rows||[],estados:new Map((est.rows||[]).map(x=>[x.id,x.estado])),datas:datas.rows||[],horarios:ins?.horarios||null};
+  studioCache={rows:(d.rows||[]).filter(r=>igContas.length<2||igContaDoPost(r)===igConta),estados:new Map((est.rows||[]).map(x=>[x.id,x.estado])),datas:datas.rows||[],horarios:ins?.horarios||null};
   desenharStudio();
 }
 
@@ -48,7 +56,7 @@ function desenharStudio(){
   const h=studioCache.horarios;
   const dica=h?.melhor?`<b>${esc(h.melhor.dia)}</b> às <b>${h.melhor.hora}h</b> tem a melhor média de interações (confiança ${esc(h.melhor.confianca)}, ${h.amostra} posts analisados).${h.porFormato&&Object.keys(h.porFormato).length?`<br><small>Por formato: ${Object.entries(h.porFormato).map(([k,v])=>`${esc(IG_TIPO[k]||k)}: ${esc(v.dia)} ${v.hora}h`).join(' · ')}</small>`:''}`:(h?`Ainda há poucos posts sincronizados para sugerir horário (${h.amostra} de ${h.minimo}).`:'Conecte o Instagram para ver o melhor horário.');
   const fmtSem=`${fmtDate(stIso(ini))} a ${fmtDate(stIso(fim))}`;
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>ESTÚDIO DE PUBLICAÇÕES</small><h1>Quem publica o quê, e quando</h1><p>Arraste os posts entre os dias para reagendar. Nada é publicado sozinho sem você marcar e aprovar.</p></div><div class="st-head-btns">${internalSession?.role==='manager'?'<button class="softbtn" id="stCompartilha">Compartilhar calendário</button>':''}<button class="btn" id="stNovo">+ Novo post</button></div></div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>ESTÚDIO DE PUBLICAÇÕES</small><h1>Quem publica o quê, e quando</h1><p>Arraste os posts entre os dias para reagendar. Nada é publicado sozinho sem você marcar e aprovar.</p></div><div class="st-head-btns">${igSeletor()}${internalSession?.role==='manager'?'<button class="softbtn" id="stCompartilha">Compartilhar calendário</button>':''}<button class="btn" id="stNovo">+ Novo post</button></div></div>
   <div class="kpis st-kpis"><div class="kpi"><small>Rascunhos</small><strong>${cont('PRODUÇÃO')+cont('BRIEFING')+cont('IDEIA')}</strong></div><div class="kpi orange"><small>Em aprovação</small><strong>${cont('REVISÃO')}</strong></div><div class="kpi"><small>Aprovados</small><strong>${cont('APROVADO')}</strong></div><div class="kpi green"><small>Agendados (14 dias)</small><strong>${prox14}</strong></div><div class="kpi"><small>Publicados no mês</small><strong>${pubMes}</strong></div></div>
   <div class="card st-tip"><span>◷</span><div>${dica}</div></div>
   <div class="st-toolbar"><div class="st-nav"><button class="softbtn" id="stPrev" aria-label="Semana anterior">‹</button><b>${fmtSem}</b><button class="softbtn" id="stNext" aria-label="Próxima semana">›</button><button class="softbtn" id="stHoje">Hoje</button></div><div class="st-filtros">${sel('perfil',[...new Set([...(SELECTS.perfil||[]),...rows.map(r=>r.perfil).filter(Boolean)])],studioFiltro.perfil)}${sel('status',Object.keys(ST_ROTULO),studioFiltro.status)}${sel('formato',SELECTS.formato||[],studioFiltro.formato)}</div></div>
@@ -59,6 +67,7 @@ function desenharStudio(){
   $('#stPrev').onclick=()=>{studioSemana=stAddDias(studioSemana,-7);desenharStudio()};
   $('#stNext').onclick=()=>{studioSemana=stAddDias(studioSemana,7);desenharStudio()};
   $('#stHoje').onclick=()=>{studioSemana=stSegunda(new Date());desenharStudio()};
+  igLigaSeletor(renderStudio);
   $$('[data-stf]').forEach(s=>s.onchange=()=>{studioFiltro[s.dataset.stf]=s.value;desenharStudio()});
   $$('.st-add').forEach(b=>b.onclick=()=>studioCompositor(null,b.dataset.add));
   $$('.st-card').forEach(c=>c.onclick=()=>studioCompositor(studioCache.rows.find(r=>r.id===c.dataset.id)));
@@ -89,6 +98,7 @@ async function studioCompositor(row,dataIni=''){
   const o=adminOverlay(`<div class="st-comp"><form id="stForm" class="st-form"><h3>${edit?'Editar post':'Novo post'}</h3>
    ${falha?`<div class="st-sug" id="sfFalha"><span class="tg-ruim">A publicação automática falhou: ${esc(falha)}</span><button type="button" class="softbtn" id="sfRetry">Tentar de novo</button></div>`:''}
    <label>Título interno<input id="sfTitulo" maxlength="140" value="${attr(r.titulo||'')}" placeholder="Ex.: Aula aberta — Ensino Médio"></label>
+   ${igContas.length>1?`<label>Conta do Instagram<select id="sfConta">${igContas.map(c=>`<option value="${attr(c.ig)}" ${(r.contaInstagram||igConta)===c.ig?'selected':''}>@${esc(c.usuario)}</option>`).join('')}</select></label>`:''}
    <div class="st-row"><label>Perfil<select id="sfPerfil">${perfis.map(p=>`<option ${r.perfil===p?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Formato<select id="sfFormato">${formatos.map(f=>`<option ${(r.formato||'Feed')===f?'selected':''}>${esc(f)}</option>`).join('')}</select></label></div>
    <label>Legenda <span class="st-cont" id="sfCLeg"></span><textarea id="sfLegenda" rows="6" placeholder="Escreva a legenda…">${esc(r.legenda||'')}</textarea></label>
    <div class="st-ia"><button type="button" class="softbtn" id="sfIA">✦ Sugerir legendas com IA</button> <button type="button" class="softbtn" id="sfMod">❏ Modelos de legenda</button><small class="kpi-note">As 125 primeiras letras aparecem antes do "mais".</small></div>
@@ -99,6 +109,8 @@ async function studioCompositor(row,dataIni=''){
    ${sug?`<div class="st-sug"><span>Melhor momento nos seus dados: <b>${esc(h.dia)} às ${h.hora}h</b></span><button type="button" class="softbtn" id="sfSug">Usar</button></div>`:''}
    <label>Mídia (JPEG ou vídeo MP4/MOV; para Carrossel selecione de 2 a 20 arquivos de uma vez)${(()=>{let n=0;try{n=JSON.parse(r.midiasInstagram||'[]').length}catch{}return n>1?` <small>— ${n} itens já anexados; enviar novos substitui todos</small>`:''})()} <input id="sfArq" type="file" multiple accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
    <label class="check-row"><input type="checkbox" id="sfIG" ${(edit?/SIM/i.test(r.publicarInstagram||''):true)?'checked':''}> Publicar no Instagram automaticamente na data e hora marcadas (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
+   <label>Colab com (@usuário; até 3, separados por vírgula)<input id="sfColab" maxlength="120" value="${attr(r.colaboradores||'')}" placeholder="${esc(igContas.filter(c=>c.ig!==(r.contaInstagram||igConta)).map(c=>'@'+c.usuario).join(', ')||'@perfil')}"></label>
+   <p class="kpi-note">Publica como colaboração: o post aparece nos dois perfis depois que o convidado aceitar o convite no Instagram. Vale para Feed e Reels.</p>
    <label class="check-row"><input type="checkbox" id="sfTagCom" ${/SIM/i.test(r.hashtagsComentario||'')?'checked':''}> Colocar as hashtags no primeiro comentário (legenda mais limpa)</label>
    <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="softbtn" type="button" data-s="RASCUNHO">Salvar rascunho</button><button class="softbtn" type="button" data-s="APROVACAO">Enviar para aprovação</button><button class="btn" type="button" data-s="AGENDADO">Agendar</button>${edit?'<button class="softbtn" type="button" data-s="MANTER">Salvar sem mudar a etapa</button>':''}${jaPublicado?'':'<button class="btn accent" type="button" data-s="PUBLICAR">Publicar agora no Instagram</button>'}</div>
    ${edit&&/REVIS/i.test(r.status||'')?'<div class="st-linkbox"><button class="softbtn" type="button" id="sfLink">Gerar link para a direção aprovar</button><small class="kpi-note">Salve as alterações antes. A pessoa abre o link sem login, vê o post e aprova ou pede ajustes.</small><div id="sfLinkBox"></div></div>':''}
@@ -163,6 +175,8 @@ async function studioCompositor(row,dataIni=''){
       if(!confirm(gerente&&!liberado?'Isto APROVA e PUBLICA agora no Instagram do colégio. Não dá para desfazer pelo sistema. Continuar?':'Publicar agora no Instagram do colégio? Não dá para desfazer pelo sistema.'))return;
     }
     const body={titulo,perfil:g('sfPerfil').value,formato:g('sfFormato').value,canal:'Instagram',legenda:leg,hashtags:g('sfTags').value,cta:g('sfCta').value,publicacaoEm:quando,revisor:g('sfRevisor').value,publicarInstagram:g('sfIG').checked?'SIM':'NÃO',hashtagsComentario:g('sfTagCom').checked?'SIM':'NÃO'};
+    if(g('sfConta'))body.contaInstagram=g('sfConta').value;
+    body.colaboradores=g('sfColab').value.split(/[\s,;]+/).map(x=>x.replace(/^@/,'').trim()).filter(Boolean).slice(0,3).map(x=>'@'+x).join(', ');
     if(tipo==='PUBLICAR'){if(!liberado)body.status='APROVADO';if(!body.publicacaoEm)body.publicacaoEm=stAgoraLocal()}else if(tipo!=='MANTER')body.status=ST_ETAPAS[tipo];else if(!edit)body.status='PRODUÇÃO';
     try{
       const salvo=await api(edit?`/data?module=conteudos&id=${encodeURIComponent(r.id)}`:'/data?module=conteudos',{method:edit?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -187,7 +201,8 @@ const IG_TIPO={FEED:'Feed',REELS:'Reels',STORY:'Stories',CAROUSEL_ALBUM:'Carross
 const IG_ORDEM={recentes:['Mais recentes',(a,b)=>String(b.quando).localeCompare(String(a.quando))],interacoes:['Mais interações',(a,b)=>b.interacoes-a.interacoes],alcance:['Maior alcance',(a,b)=>(b.alcance??-1)-(a.alcance??-1)],engajamento:['Maior engajamento',(a,b)=>(b.engajamento??-1)-(a.engajamento??-1)]};
 const igNum=n=>Number(n||0).toLocaleString('pt-BR');
 async function renderIgPosts(){
-  const d=await api('/instagram/posts');
+  await igCarregaContas();
+  const d=await api('/instagram/posts'+igQ());
   if(state.page!=='igposts')return;
   igDados=d;
   desenharIgPosts();
@@ -206,10 +221,11 @@ function desenharIgPosts(){
   const vazio=!todos.length;
   $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · DESEMPENHO</small><h1>O que funcionou em cada publicação</h1><p>${igDados.ultimaSync?`Última leitura da Meta: ${fmtDateTime(igDados.ultimaSync)}.`:'Ainda não houve leitura da Meta.'} Alcance, salvamentos e compartilhamentos vêm das 30 publicações mais recentes.</p></div>${internalSession?.role==='manager'?'<button class="btn" id="igAtualiza">Atualizar agora</button>':''}</div>
   ${vazio?`<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram em Administração → Integrações e clique em “Atualizar agora”.</span></div>`:`
-  <div class="st-toolbar"><div class="st-filtros">${sel('periodo',[['30','Últimos 30 dias'],['90','Últimos 90 dias'],['365','Último ano'],['tudo','Tudo']],igFiltro.periodo)}${sel('tipo',[['','Todos os formatos'],...tipos.map(t=>[t,t])],igFiltro.tipo)}${sel('ordem',Object.entries(IG_ORDEM).map(([k,v])=>[k,v[0]]),igFiltro.ordem)}</div><span class="kpi-note">${rows.length} publicação(ões)</span></div>
+  <div class="st-toolbar"><div class="st-filtros">${igSeletor()}${sel('periodo',[['30','Últimos 30 dias'],['90','Últimos 90 dias'],['365','Último ano'],['tudo','Tudo']],igFiltro.periodo)}${sel('tipo',[['','Todos os formatos'],...tipos.map(t=>[t,t])],igFiltro.tipo)}${sel('ordem',Object.entries(IG_ORDEM).map(([k,v])=>[k,v[0]]),igFiltro.ordem)}</div><span class="kpi-note">${rows.length} publicação(ões)</span></div>
   <div class="ig-resumo">${porTipo.map(x=>`<div class="card ig-tipo"><small>${esc(x.t.toUpperCase())} · ${x.n} POST(S)</small><div class="ig-nums"><div><strong>${x.inter===null?'—':igNum(x.inter)}</strong><span>interações em média</span></div><div><strong>${x.alc===null?'—':igNum(x.alc)}</strong><span>alcance médio</span></div><div><strong>${x.eng===null?'—':String(x.eng).replace('.',',')+'%'}</strong><span>engajamento médio</span></div></div></div>`).join('')||''}</div>
   ${melhor?`<div class="card st-tip"><span>★</span><div>Melhor publicação do período: <b>${esc((melhor.legenda||'sem legenda').slice(0,90))}</b> — ${igNum(melhor.interacoes)} interações.</div></div>`:''}
   <div class="ig-grid">${rows.map(card).join('')||'<div class="empty compact">Nada neste filtro.</div>'}</div>`}`;
+  igLigaSeletor(renderIgPosts);
   $$('[data-igf]').forEach(s=>s.onchange=()=>{igFiltro[s.dataset.igf]=s.value;desenharIgPosts()});
   $$('[data-imp]').forEach(b=>b.onclick=()=>gestorImpulsionar(rows.find(x=>x.id===b.dataset.imp)));
   const b=$('#igAtualiza');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Atualizando…';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});toast('Publicações atualizadas');await renderIgPosts()}catch(e){toast(e.message,'bad');b.disabled=false;b.textContent='Atualizar agora'}};
@@ -351,7 +367,9 @@ const RK_COLS=[['seguidores','Seguidores'],['variacao','Variação'],['alcance',
 const RK_ORDEM={interacoes:['Interações','interacoes'],alcance:['Alcance','alcance'],curtidas:['Curtidas','curtidas'],comentarios:['Comentários','comentarios'],salvos:['Salvamentos','salvos'],compartilhamentos:['Compartilhamentos','compartilhamentos'],engajamento:['Engajamento','engajamento']};
 const rkCorta=(t,max=110)=>{const x=String(t||'').replace(/\s+/g,' ').trim();if(!x)return 'Sem legenda';if(x.length<=max)return x;const c=x.slice(0,max),i=c.lastIndexOf(' ');return (i>max*0.6?c.slice(0,i):c).replace(/[\s,;:.!?-]+$/,'')+'…'};
 async function renderIgRanking(){
-  const [d,sg,met]=await Promise.all([api('/instagram/posts'),api('/instagram/seguidores'),api('/data?module=instagram')]);
+  await igCarregaContas();
+  const [d,sg,met0]=await Promise.all([api('/instagram/posts'+igQ()),api('/instagram/seguidores'+igQ()),api('/data?module=instagram')]);
+  const met={rows:(met0.rows||met0||[]).filter(r=>igContas.length<2||String(r.idExterno||igPrincipal)===igConta)};
   if(state.page!=='igranking')return;
   const posts=d.rows||[],n=x=>Number(x||0);
   const segMes=Object.fromEntries((sg.mensal||[]).map(x=>[x.periodo,x]));
@@ -380,14 +398,15 @@ async function renderIgRanking(){
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${esc(IG_TIPO[r.tipo]||r.tipo||'')}</span>`};
   const nv=v=>v===null||v===undefined?'—':igNum(v);
   const linha=(r,i)=>{const l=urlSegura(r.link);const tx=esc(rkCorta(r.legenda));return `<tr><td><b>${i+1}º</b></td><td class="rk-thumb">${mini(r)}</td><td>${l?`<a class="rk-link" href="${attr(l)}" target="_blank" rel="noopener">${tx}</a>`:tx}<br><small>${esc(IG_TIPO[r.tipo]||r.tipo||'')} · ${esc(fmtDate(String(r.quando).slice(0,10)))}</small></td><td>${nv(r.alcance)}</td><td>${nv(r.curtidas)}</td><td>${nv(r.comentarios)}</td><td>${nv(r.salvos)}</td><td>${nv(r.compartilhamentos)}</td><td><b>${nv(r.interacoes)}</b></td><td>${r.engajamento===null?'—':r.engajamento+'%'}</td></tr>`};
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Métricas por mês e por ano</h1><p>Alcance, interações, seguidores e posts de cada período, com o ranking das publicações. ${sg.atual!==null?`Seguidores hoje: <b>${igNum(sg.atual)}</b>.`:''}</p></div><div class="head-actions"><button class="softbtn" id="rkHist">Carregar histórico (12 meses)</button>${internalSession?.role==='manager'?` <a class="btn" href="/relatorio-instagram.html${rkFiltro.visao==='mes'&&/^\d{4}-\d{2}$/.test(rkFiltro.periodo)?'?mes='+rkFiltro.periodo:''}" target="_blank" rel="noopener">Relatório mensal (PDF)</a> <button class="softbtn" id="rkSegManual">Informar seguidores de um mês</button>`:''}</div></div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Métricas por mês e por ano${igContas.length>1?` <small>${igSeletor()}</small>`:''}</h1><p>Alcance, interações, seguidores e posts de cada período, com o ranking das publicações. ${sg.atual!==null?`Seguidores hoje: <b>${igNum(sg.atual)}</b>.`:''}</p></div><div class="head-actions"><button class="softbtn" id="rkHist">Carregar histórico (12 meses)</button>${internalSession?.role==='manager'?` <a class="btn" href="/relatorio-instagram.html${rkFiltro.visao==='mes'&&/^\d{4}-\d{2}$/.test(rkFiltro.periodo)?'?mes='+rkFiltro.periodo:''}" target="_blank" rel="noopener">Relatório mensal (PDF)</a> <button class="softbtn" id="rkSegManual">Informar seguidores de um mês</button>`:''}</div></div>
   <div class="card"><div class="st-toolbar"><div class="st-filtros"><select data-rk="visao"><option value="mes" ${rkFiltro.visao==='mes'?'selected':''}>Por mês</option><option value="ano" ${rkFiltro.visao==='ano'?'selected':''}>Por ano</option></select></div></div>
   ${tab}
   <p class="kpi-note">Alcance, visualizações e visitas somam os meses carregados (no ano, pessoas alcançadas em meses diferentes podem se repetir). Seguidores: a Meta não informa o passado; o sistema guarda uma foto por sincronização${sg.primeiroRegistro?` desde ${esc(fmtDate(String(sg.primeiroRegistro).slice(0,10)))}`:''}, então meses anteriores ficam "—" até a primeira foto. "Carregar histórico" busca até 12 meses de métricas.</p></div>
   ${!posts.length?'<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram e atualize.</span></div>':`<div class="card"><h3>Posts por mês e por ano</h3><div class="st-toolbar"><div class="st-filtros"><select data-rk="postsPer">${opcoesP.map(([k,l])=>`<option value="${k}" ${k===rkFiltro.postsPer?'selected':''}>${esc(l)}</option>`).join('')}</select><select data-rk="ordem">${Object.entries(RK_ORDEM).map(([k,v])=>`<option value="${k}" ${k===rkFiltro.ordem?'selected':''}>Ordenar por ${esc(v[0])}</option>`).join('')}</select></div></div>
   <div class="tablewrap"><table class="datatable"><thead><tr><th></th><th></th><th>Publicação (${doPeriodo.length}${doPeriodo.length>100?', top 100':''})</th><th>Alcance</th><th>Curtidas</th><th>Comentários</th><th>Salvamentos</th><th>Compartilh.</th><th>Interações</th><th>Engajamento</th></tr></thead><tbody>${doPeriodo.slice(0,100).map(linha).join('')||'<tr><td colspan="10">Sem publicações neste período.</td></tr>'}</tbody></table></div></div>`}`;
+  igLigaSeletor(renderIgRanking);
   $$('[data-rk]').forEach(s=>s.onchange=()=>{rkFiltro[s.dataset.rk]=s.value;if(s.dataset.rk==='visao')rkFiltro.periodo='';renderIgRanking()});
-  const sm=$('#rkSegManual');if(sm)sm.onclick=()=>{const ov=adminOverlay(`<h3>Seguidores de um mês passado</h3><p class="kpi-note">Use o número que aparece no seu Instagram no fim daquele mês (ou o que você anotou). Só vale para meses que o sistema ainda não registrou sozinho.</p><div class="st-form"><div class="st-row"><label>Mês<input id="rkSm" type="month"></label><label>Seguidores<input id="rkSn" type="number" min="0"></label></div><div class="st-acoes"><button class="btn soft" data-close type="button">Cancelar</button><button class="btn" id="rkSs" type="button">Salvar</button></div></div>`);ov.el.querySelector('#rkSs').onclick=async()=>{try{await api('/instagram/seguidores/manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mes:ov.el.querySelector('#rkSm').value,seguidores:Number(ov.el.querySelector('#rkSn').value)})});ov.close();toast('Salvo');await renderIgRanking()}catch(e){toast(e.message,'bad')}}};
+  const sm=$('#rkSegManual');if(sm)sm.onclick=()=>{const ov=adminOverlay(`<h3>Seguidores de um mês passado</h3><p class="kpi-note">Use o número que aparece no seu Instagram no fim daquele mês (ou o que você anotou). Só vale para meses que o sistema ainda não registrou sozinho.</p><div class="st-form"><div class="st-row"><label>Mês<input id="rkSm" type="month"></label><label>Seguidores<input id="rkSn" type="number" min="0"></label></div><div class="st-acoes"><button class="btn soft" data-close type="button">Cancelar</button><button class="btn" id="rkSs" type="button">Salvar</button></div></div>`);ov.el.querySelector('#rkSs').onclick=async()=>{try{await api('/instagram/seguidores/manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conta:igConta,mes:ov.el.querySelector('#rkSm').value,seguidores:Number(ov.el.querySelector('#rkSn').value)})});ov.close();toast('Salvo');await renderIgRanking()}catch(e){toast(e.message,'bad')}}};
   const hb=$('#rkHist');if(hb)hb.onclick=async()=>{hb.disabled=true;hb.textContent='Carregando… pode levar 1 minuto';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meses:12})});toast('Histórico carregado');await renderIgRanking()}catch(e){toast(e.message,'bad');hb.disabled=false;hb.textContent='Carregar histórico (12 meses)'}};
 }
 

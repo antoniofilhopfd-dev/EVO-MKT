@@ -5,7 +5,7 @@ import { audit, getRow, listRows, MODULES } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
-import { igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
+import { contasMonitoradas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
 import { relatorioTrafego } from '../integrations/metarelatorio';
@@ -52,7 +52,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           configurado: (await setting('meta_app_id')) !== '' && (await setting('meta_app_secret')) !== '',
           appId: await setting('meta_app_id'), conectado: await metaConnected(), usuario: await setting('ig_username'), pagina: await setting('meta_page_name'),
           expiraEm: exp ? now(new Date(exp * 1000)) : '', ultimaSync: await setting('ig_last_sync'),
-          contas: JSON.parse((await setting('meta_contas')) || '[]'), igUserId: await setting('ig_user_id'), tokenInvalido: (await setting('meta_token_invalido')) === '1',
+          contas: JSON.parse((await setting('meta_contas')) || '[]'), igUserId: await setting('ig_user_id'), monitoradas: (await contasMonitoradas()).map((x) => x.ig), tokenInvalido: (await setting('meta_token_invalido')) === '1',
           permissoesFaltando: (await setting('meta_perm_faltando')).split(',').filter(Boolean),
         },
         google: {
@@ -210,6 +210,12 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const u = await requireManager(c);
       const input = await c.body();
       const contas: MetaConta[] = JSON.parse((await setting('meta_contas')) || '[]');
+      if (Array.isArray(input.monitorar)) {
+        const ids = input.monitorar.map(String).filter((id: string) => contas.some((x) => x.ig === id));
+        await setSetting('ig_contas_monitoradas', JSON.stringify(ids));
+        await audit(u.codigo, 'instagram-contas-monitoradas', ids.join(','));
+        if (!strv(input.ig_user_id)) return json({ ok: true });
+      }
       const alvo = contas.find((x) => x.ig === strv(input.ig_user_id)) ?? fail(400, 'Conta não encontrada nas Páginas deste usuário.');
       await metaUsarConta(alvo);
       await audit(u.codigo, 'instagram-conta', alvo.usuario);

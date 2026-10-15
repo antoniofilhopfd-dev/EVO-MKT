@@ -125,13 +125,42 @@ async function metaInsightTotal(ig: string, metrics: string[], since: number, un
 }
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-/** Sincroniza o mês atual e o anterior na tela Instagram. Devolve o nº de períodos gravados. */
+/** Contas Instagram acompanhadas pelo sistema (a em uso sempre entra). */
+export async function contasMonitoradas(): Promise<MetaConta[]> {
+  let todas: MetaConta[] = [], ids: string[] = [];
+  try { todas = JSON.parse((await setting('meta_contas')) || '[]'); } catch { /* vazio */ }
+  try { ids = JSON.parse((await setting('ig_contas_monitoradas')) || '[]'); } catch { /* vazio */ }
+  const principal = await setting('ig_user_id');
+  const sel = todas.filter((c) => c.ig === principal || ids.includes(c.ig));
+  return sel.length ? sel : principal ? [{ ig: principal, usuario: await setting('ig_username'), pagina: await setting('meta_page_name') }] : [];
+}
+export async function igContaValida(conta: string): Promise<string> {
+  const cs = await contasMonitoradas();
+  return cs.find((c) => c.ig === conta)?.ig ?? (await setting('ig_user_id'));
+}
+/** Sincroniza o mês atual e o anterior de TODAS as contas acompanhadas. Devolve o nº de períodos gravados. */
 export async function igSync(months = 2): Promise<number> {
   if (!(await metaConnected())) throw new Error('Instagram não conectado.');
-  const ig = await setting('ig_user_id');
+  const principal = await setting('ig_user_id');
+  await run("UPDATE ig_posts SET conta=? WHERE conta=''", [principal]);
+  await run("UPDATE ig_seguidores SET conta=? WHERE conta=''", [principal]).catch(() => {});
+  const cs = await contasMonitoradas();
+  let n = 0, ultimo: any = null, falhas = 0;
+  for (const c of cs) {
+    try { n += await igSyncConta(c.ig, c.usuario, months, cs.length > 1); } catch (e: any) {
+      if ((await setting('meta_token_invalido')) === '1') throw e;
+      falhas++; ultimo = e;
+      await intLog('instagram', 'erro', `@${c.usuario}: ${e.message}`);
+    }
+  }
+  if (cs.length && falhas === cs.length) throw ultimo;
+  await setSetting('ig_last_sync', now());
+  return n;
+}
+async function igSyncConta(ig: string, usuario: string, months: number, varias: boolean): Promise<number> {
   const profile = await metaGet(`/${ig}`, { fields: 'followers_count,follows_count,media_count,username' });
-  await run('INSERT INTO ig_seguidores(dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),seguindo=VALUES(seguindo),midias=VALUES(midias),atualizado_em=VALUES(atualizado_em)',
-    [fmtDate(new Date()), Number(profile.followers_count ?? 0), Number(profile.follows_count ?? 0), Number(profile.media_count ?? 0), now()]);
+  await run('INSERT INTO ig_seguidores(conta,dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),seguindo=VALUES(seguindo),midias=VALUES(midias),atualizado_em=VALUES(atualizado_em)',
+    [ig, fmtDate(new Date()), Number(profile.followers_count ?? 0), Number(profile.follows_count ?? 0), Number(profile.media_count ?? 0), now()]);
   const media: Row[] = [];
   let after = '';
   for (let pg = 0; pg < 10; pg++) { // até 1000 publicações mais recentes
@@ -142,8 +171,8 @@ export async function igSync(months = 2): Promise<number> {
   }
   for (const md of media) {
     const mini = String(md.thumbnail_url || (md.media_type === 'IMAGE' || md.media_type === 'CAROUSEL_ALBUM' ? md.media_url : '') || '');
-    await run('INSERT INTO ig_posts(media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink,miniatura,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),legenda=VALUES(legenda),curtidas=VALUES(curtidas),comentarios=VALUES(comentarios),permalink=VALUES(permalink),miniatura=VALUES(miniatura),atualizado_em=VALUES(atualizado_em)',
-      [String(md.id), String(md.timestamp ?? ''), String(md.media_product_type ?? md.media_type ?? ''), String(md.caption ?? '').replace(/\s+/g, ' ').slice(0, 300), Number(md.like_count ?? 0), Number(md.comments_count ?? 0), String(md.permalink ?? '').slice(0, 300), /^https:\/\//.test(mini) ? mini.slice(0, 1000) : '', now()]);
+    await run('INSERT INTO ig_posts(conta,media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink,miniatura,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE conta=VALUES(conta),tipo=VALUES(tipo),legenda=VALUES(legenda),curtidas=VALUES(curtidas),comentarios=VALUES(comentarios),permalink=VALUES(permalink),miniatura=VALUES(miniatura),atualizado_em=VALUES(atualizado_em)',
+      [ig, String(md.id), String(md.timestamp ?? ''), String(md.media_product_type ?? md.media_type ?? ''), String(md.caption ?? '').replace(/\s+/g, ' ').slice(0, 300), Number(md.like_count ?? 0), Number(md.comments_count ?? 0), String(md.permalink ?? '').slice(0, 300), /^https:\/\//.test(mini) ? mini.slice(0, 1000) : '', now()]);
   }
   // Alcance, salvamentos e compartilhamentos das 30 publicações mais recentes (a Meta não traz isso na lista). Falha numa publicação não derruba a sincronização.
   for (const md of media.slice(0, 30)) {
@@ -157,7 +186,7 @@ export async function igSync(months = 2): Promise<number> {
     }
   }
   let n = 0;
-  const listRowsSeg = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API');
+  const listRowsSeg = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? ig) === ig);
   const lp = localParts(new Date());
   for (let i = 0; i < months; i++) {
     let y = lp.y, m = lp.m - i;
@@ -179,14 +208,14 @@ export async function igSync(months = 2): Promise<number> {
     best.sort((a, b) => b[0] - a[0]);
     const top = best.slice(0, 3).map(([k, md]) => `${String(md.caption ?? 'Sem legenda').replace(/\s+/g, ' ').trim().slice(0, 60)} — ${k} interações (${md.permalink ?? ''})`);
     const row: Row = {
-      titulo: `${MESES[m - 1][0].toUpperCase()}${MESES[m - 1].slice(1)} de ${y}`,
+      titulo: `${MESES[m - 1][0].toUpperCase()}${MESES[m - 1].slice(1)} de ${y}${varias ? ' · @' + usuario : ''}`,
       periodo: per, dataInicio: fmtDate(first), origem: 'INSTAGRAM_API', idExterno: ig, status: 'ATIVO', ultimaSincronizacao: now(),
-      seguidores: i === 0 ? String(profile.followers_count ?? 0) : String((await q1('SELECT seguidores FROM ig_seguidores WHERE dia LIKE ? ORDER BY dia DESC LIMIT 1', [per + '%']))?.seguidores ?? (listRowsSeg.find((r) => r.periodo === per)?.seguidores ?? '')), alcance: String(ins.reach ?? 0), impressoes: String(ins.views ?? 0),
+      seguidores: i === 0 ? String(profile.followers_count ?? 0) : String((await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [ig, per + '%']))?.seguidores ?? (listRowsSeg.find((r) => r.periodo === per)?.seguidores ?? '')), alcance: String(ins.reach ?? 0), impressoes: String(ins.views ?? 0),
       visitasPerfil: String(ins.profile_views ?? 0), interacoes: String(ins.total_interactions ?? 0), curtidas: String(ins.likes ?? 0),
       comentarios: String(ins.comments ?? 0), compartilhamentos: String(ins.shares ?? 0), salvamentos: String(ins.saves ?? 0),
       posts: String(posts), reels: String(reels), melhoresConteudos: top.join('\n'),
     };
-    const exist = (await listRows('instagram')).find((r) => r.origem === 'INSTAGRAM_API' && r.periodo === per);
+    const exist = (await listRows('instagram')).find((r) => r.origem === 'INSTAGRAM_API' && r.periodo === per && String(r.idExterno ?? ig) === ig);
     if (exist) await updateRow('instagram', exist.id, row, 'integracao:instagram');
     else await insertRow('instagram', row, 'integracao:instagram');
     n++;
@@ -238,7 +267,7 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   const itens = midiasDe(r);
   if (carrossel && itens.length < 2) throw new Error('O carrossel precisa de 2 a 20 mídias. Anexe mais itens.');
   const isVideo = ['mp4', 'mov'].includes((rel.split('.').pop() || '').toLowerCase());
-  const ig = await setting('ig_user_id');
+  const ig = await igContaValida(String(r.contaInstagram ?? ''));
   const tags = String(r.hashtags ?? '').trim();
   const tagsNoComentario = /SIM/i.test(String(r.hashtagsComentario ?? '')) && !!tags;
   let caption = String(r.legenda ?? r.titulo ?? '').trim() + (r.cta ? `\n\n${r.cta}` : '');
@@ -248,6 +277,7 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   }
   caption = caption.slice(0, 2200);
   const p: Row = { caption };
+  const colab = String(r.colaboradores ?? '').split(/[\s,;]+/).map((x) => x.replace(/^@/, '').trim()).filter((x) => /^[A-Za-z0-9._]{1,30}$/.test(x)).slice(0, 3);
   const url = signedMediaUrl(rel, 7200);
   if (carrossel) {
     p.media_type = 'CAROUSEL';
@@ -258,6 +288,7 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
     p.media_type = 'REELS';
     p.video_url = url;
   } else p.image_url = url;
+  if (colab.length && !fmt.includes('stor')) p.collaborators = JSON.stringify(colab); // convite de colab: o outro perfil precisa aceitar
   const st = await q1('SELECT * FROM ig_publish WHERE conteudo_id=?', [id]);
   let container: string = st?.container_id ?? '';
   if (!container) {

@@ -108,3 +108,9 @@ Cadastre o **WhatsApp do Colégio** (DDI+DDD, ex.: +5583999999999) em Tráfego �
 - **Comparar anúncios:** ranking por custo por resultado no período, com Pausar.
 - **Rascunho de campanha:** "Salvar rascunho" em qualquer passo da Nova campanha; continuar depois pelo passo 1.
 - **Alerta novo:** custo por resultado subindo (7 dias contra os 7 anteriores).
+
+## Duas (ou mais) contas de Instagram
+- **Conectar:** Administração → Integrações → Instagram → Conectar (ou Reconectar) e marque **todas as Páginas** com os Instagram do Colégio. Depois, em "Contas acompanhadas pelo sistema", marque as contas e salve; clique em Sincronizar.
+- **Separado por conta:** um seletor de conta aparece em Instagram → Estúdio, Desempenho e Ranking. Métricas mensais/anuais, seguidores, melhores posts, melhor horário e relatório mensal em PDF são sempre de uma conta só. Cada post do Estúdio tem o campo **Conta do Instagram** (publica pela conta escolhida).
+- **Colab:** no post, campo "Colab com (@usuário; até 3)". O post é publicado como colaboração: aparece nos dois perfis depois que o convidado aceita o convite no Instagram. Vale para Feed e Reels.
+- **Anúncios:** ao impulsionar, o sistema usa a conta e a Página dona da publicação. A conta de anúncios é uma só (a escolhida em Integrações).

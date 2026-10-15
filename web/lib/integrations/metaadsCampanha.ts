@@ -6,7 +6,7 @@ import { intLog, setting } from '../settings';
 import { now, parseLocal, Row } from '../util';
 import { metaConnected, metaGet, metaPost } from './meta';
 import { paginar } from './metaads';
-import { cfgGestao, contaAds, gestaoPermitida, limitesMes, marcar, menorUnidade, ORCAMENTO_MIN_DIA, paginaDoInstagram } from './metaadsGestao';
+import { cfgGestao, contaAds, gestaoPermitida, limitesMes, marcar, menorUnidade, ORCAMENTO_MIN_DIA, paginaDoInstagram, igDoPost } from './metaadsGestao';
 
 /**
  * Nova campanha completa (Etapa B), com todos os objetivos da Meta. Vai ao ar ATIVA. Só a Gerência.
@@ -190,7 +190,7 @@ export async function lancarCampanha(sp: Spec, quem: string): Promise<Row> {
   const id = Number((await q1('SELECT id FROM ads_lancamentos WHERE chave=?', [chave]))!.id);
   let campanhaId = '';
   try {
-    const pay = await montar(sp, pre, { conta, moeda, pagina: await paginaDoInstagram(), ig: await setting('ig_user_id'), titulo, cidade: (sp.publico?.cidade ?? cfg.publico.cidade)! });
+    const pay = await montar(sp, pre, { conta, moeda, pagina: await paginaDoInstagram(await igDoPost(sp.criativo?.tipo === 'POST_IG' ? sp.criativo.midia : '')), ig: await igDoPost(sp.criativo?.tipo === 'POST_IG' ? sp.criativo.midia : ''), titulo, cidade: (sp.publico?.cidade ?? cfg.publico.cidade)! });
     campanhaId = String((await metaPost(`/act_${conta}/campaigns`, pay.campanha)).id);
     await marcar(id, 'CRIANDO', { campanha_id: campanhaId });
     const conjuntoId = String((await metaPost(`/act_${conta}/adsets`, { ...pay.conjunto, campaign_id: campanhaId })).id);
