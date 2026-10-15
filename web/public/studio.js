@@ -121,16 +121,21 @@ async function studioCompositor(row,dataIni=''){
    ${edit&&/REVIS/i.test(r.status||'')?'<div class="st-linkbox"><button class="softbtn" type="button" id="sfLink">Gerar link para a direção aprovar</button><small class="kpi-note">Salve as alterações antes. A pessoa abre o link sem login, vê o post e aprova ou pede ajustes.</small><div id="sfLinkBox"></div></div>':''}
    ${jaPublicado?`<p class="kpi-note">Já publicado${urlSegura(r.instagramLink)?` — <a href="${attr(urlSegura(r.instagramLink))}" target="_blank" rel="noopener">ver no Instagram</a>`:''}.</p>`:''}
    ${edit?`<p class="kpi-note">Etapa atual: <b>${esc(ST_ROTULO[String(r.status||'').toUpperCase()]||r.status||'—')}</b></p>`:''}</form>
-   <div class="st-prev"><div class="st-fone" id="sfFone"><div class="st-fh"><i></i><b id="pvPerfil"></b></div><div class="st-midia" id="pvMidia"></div><div class="st-fa">♡ ◌ ➤</div><div class="st-fc" id="pvLegenda"></div><small id="pvQuando"></small></div><p class="kpi-note">Prévia aproximada. O Instagram pode cortar a imagem e a legenda de outro jeito.</p></div></div>`);
+   <div class="st-prev"><div class="st-fone" id="sfFone"><div class="st-fh"><i></i><b id="pvPerfil"></b></div><div class="st-midia" id="pvMidia"></div><div class="st-fa"><span class="st-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M20.5 12a8.5 8.5 0 1 1-3.4-6.8L20.5 4l-1 4.2A8.5 8.5 0 0 1 20.5 12z"/></svg><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></span><span class="st-pontos" id="pvPontos"></span><span class="st-ic st-salvar" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3.5h12v17l-6-4.5-6 4.5z"/></svg></span></div><div class="st-fc" id="pvLegenda"></div><small id="pvQuando"></small></div><p class="kpi-note">Prévia aproximada. O Instagram pode cortar a imagem e a legenda de outro jeito.</p></div></div>`);
   o.el.querySelector('.admin-box').classList.add('st-box');
-  const g=id=>o.el.querySelector('#'+id);let arquivoUrl=r.midiaPrevia||'';
+  const g=id=>o.el.querySelector('#'+id);let arquivoUrl=r.midiaPrevia||'';let arqs=arquivoUrl?[{url:arquivoUrl,video:false}]:[],slide=0;
   const pv=()=>{
     const leg=g('sfLegenda').value,tags=g('sfTags').value,cta=g('sfCta').value,perfil=g('sfPerfil').value,fm=g('sfFormato').value;
     g('sfCLeg').textContent=`${leg.length}/2200`;g('sfCLeg').classList.toggle('bad',leg.length>2200);
     const nt=stContaTags(tags)+stContaTags(leg);g('sfCTag').textContent=`${nt}/30`;g('sfCTag').classList.toggle('bad',nt>30);
     g('pvPerfil').textContent=perfil||'perfil';
     const m=g('pvMidia');m.className='st-midia fm-'+(['Reels','Stories','Vídeo'].includes(fm)?'vert':'feed');
-    m.innerHTML=arquivoUrl?(/video/.test(g('sfArq').files?.[0]?.type||'')?`<video src="${attr(arquivoUrl)}" muted></video>`:`<img alt="" src="${attr(arquivoUrl)}">`):`<span>${ST_ICONE[fm]||'◇'}<br>${esc(fm)}</span>`;
+    const carr=fm==='Carrossel',n=arqs.length;if(slide>=n)slide=Math.max(0,n-1);
+    if(carr)m.className='st-midia fm-feed';
+    const slideHtml=n?(arqs[slide].video?`<video src="${attr(arqs[slide].url)}" muted></video>`:`<img alt="Mídia ${slide+1} de ${n}" src="${attr(arqs[slide].url)}">`):`<span>${ST_ICONE[fm]||'◇'}<br>${esc(fm)}${carr?'<br><small>selecione 2 a 20 mídias</small>':''}</span>`;
+    m.innerHTML=slideHtml+(carr&&n>1?`<span class="st-cnt">${slide+1}/${n}</span><button type="button" class="st-seta e" data-sl="-1" aria-label="Mídia anterior" ${slide===0?'disabled':''}>‹</button><button type="button" class="st-seta d" data-sl="1" aria-label="Próxima mídia" ${slide===n-1?'disabled':''}>›</button>`:'');
+    g('pvPontos').innerHTML=carr&&n>1?Array.from({length:Math.min(n,10)},(_,i)=>`<i class="${i===(n>10?Math.round(slide/(n-1)*9):slide)?'on':''}"></i>`).join(''):'';
+    m.querySelectorAll('[data-sl]').forEach(b=>b.onclick=()=>{slide=Math.max(0,Math.min(n-1,slide+(+b.dataset.sl)));pv()});
     const txt=leg+(cta?'\n'+cta:''),corte=txt.length>125?txt.slice(0,125)+'… mais':txt;
     g('pvLegenda').innerHTML=`<b>${esc(perfil)}</b> ${esc(corte).replace(/\n/g,'<br>')}${tags?`<div class="st-tags">${esc(tags)}</div>`:''}`;
     const q=g('sfQuando').value;g('pvQuando').textContent=q?`${fmtDate(q.slice(0,10))} às ${q.slice(11,16)}`:'Sem data';
@@ -142,7 +147,7 @@ async function studioCompositor(row,dataIni=''){
     g('sfGSalvar').onclick=async()=>{const tags=(g('sfTags').value.match(/#[\p{L}\p{N}_]+/gu)||[]);if(!tags.length)return toast('Escreva as hashtags primeiro','warn');const nome=(prompt('Nome do grupo (ex.: Matrículas)')||'').trim();if(!nome)return;grupos=[...grupos.filter(x=>x.nome.toLowerCase()!==nome.toLowerCase()),{nome,tags}];await stSalvaGrupos(grupos);desenhaGrupos();toast('Grupo salvo')};
   };
   ['sfLegenda','sfTags','sfCta','sfPerfil','sfFormato','sfQuando'].forEach(i=>{g(i).oninput=pv;g(i).onchange=pv});
-  g('sfArq').onchange=()=>{const f=g('sfArq').files[0];arquivoUrl=f?URL.createObjectURL(f):'';pv()};
+  g('sfArq').onchange=()=>{const fs=[...g('sfArq').files];arqs=fs.map(f=>({url:URL.createObjectURL(f),video:/video/.test(f.type||'')}));arquivoUrl=arqs[0]?arqs[0].url:'';slide=0;pv()};
   if(g('sfSug'))g('sfSug').onclick=()=>{g('sfQuando').value=sug;pv()};
   // Colab: menu com os outros perfis do Colégio (muda conforme a conta que publica) e opção de outro perfil
   const colabMontar=()=>{

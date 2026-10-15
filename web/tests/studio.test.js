@@ -190,7 +190,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('sem erros de JS no relatório',e5.length===0,e5.join('|'));await rp.close();
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
- await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('trafego')});await m.waitForSelector('#trafegoExtra',{state:'attached',timeout:20000});
+ await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('trafego')});await m.waitForSelector('#tfRaiz .tf-hero',{state:'attached',timeout:20000});
  t('no celular a tela de Tráfego não rola para o lado',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await m.evaluate(()=>go('studio'));await m.waitForSelector('.st-week');
  t('no celular a página não rola para o lado',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));

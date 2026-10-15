@@ -33,6 +33,14 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.selectOption('#sfConta',outraConta);await p.waitForTimeout(200);
  const opc2=await colabOpc();t('trocar a conta que publica troca a opção de colab para o outro perfil',opc2[1]!==opc1[1]&&opc2[1]===contaSel,[opc1,opc2]);
  t('o Perfil acompanha a conta escolhida',await p.$eval('#sfPerfil',e=>e.value).then(v=>/^@/.test(v)||v==='Ambos'));
+ // prévia do carrossel
+ await p.selectOption('#sfFormato','Carrossel');
+ const jpg=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
+ await p.setInputFiles('#sfArq',[1,2,3].map(i=>({name:`f${i}.jpg`,mimeType:'image/jpeg',buffer:jpg})));await p.waitForSelector('.st-cnt');
+ t('prévia do carrossel mostra o contador 1/3, setas e pontos',(await p.$eval('.st-cnt',e=>e.textContent))==='1/3'&&(await p.$$('#pvPontos i')).length===3&&!!(await p.$('.st-seta.d')));
+ await p.click('.st-seta.d');t('seta avança para a mídia 2/3 e o ponto acompanha',(await p.$eval('.st-cnt',e=>e.textContent))==='2/3'&&await p.$eval('#pvPontos i:nth-child(2)',e=>e.classList.contains('on')));
+ await p.click('.st-seta.d');t('na última mídia a seta de avançar fica desabilitada',await p.$eval('.st-seta.d',e=>e.disabled));
+ t('as ações da prévia são ícones (sem o quadrado azul de emoji)',(await p.$$('.st-fa svg')).length>=4);
  await p.selectOption('#sfColabSel','__outro');t('"Outro perfil…" mostra o campo de texto',!(await p.$eval('#sfColabOutroL',e=>e.hidden)));
  t('sem erros de JavaScript',errs.length===0,errs.join(' | '));
  console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
