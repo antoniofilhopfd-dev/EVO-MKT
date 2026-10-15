@@ -4,6 +4,7 @@ import { audit } from '../records';
 import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { metaConnected } from '../integrations/meta';
+import { cfgRegras, enviarRelatorioSemanal, excluirRascunho, listarMatriculas, rascunhos, rodarRegras, salvarMatriculas, salvarRascunho, salvarRegras } from '../integrations/metaadsExtras';
 import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, whatsOk, numWhats, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
 import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel } from '../integrations/metaadsGerenciador';
 import { addDays, fmtDate } from '../util';
@@ -74,6 +75,34 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     if (de > ate) fail(400, 'A data inicial é depois da final.');
     if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 93) fail(400, 'O período vai até 93 dias.');
     try { return json(await arvore(de, ate, c.qs('arquivados') === '1')); } catch (e: any) { return fail(502, e.message); }
+  }
+  if (path === '/ads/extras' && method === 'GET') {
+    return json({ regras: await cfgRegras(), relatorioSemanal: (await setting('ads_relatorio_semanal')) === '1', matriculas: await listarMatriculas(), rascunhos: await rascunhos() });
+  }
+  if (path === '/ads/regras' && method === 'POST') {
+    const b = await c.body();
+    const r = await salvarRegras(b);
+    await audit(String(u.codigo), 'ads-regras', 'ads', r.ativa ? 'ativa' : 'desligada');
+    return json({ ok: true, regras: r });
+  }
+  if (path === '/ads/regras/simular' && method === 'POST') {
+    try { return json(await rodarRegras(true)); } catch (e: any) { return fail(502, e.message); }
+  }
+  if (path === '/ads/relatorio-semanal' && method === 'POST') {
+    const b = await c.body();
+    if ('ativo' in b) await setSetting('ads_relatorio_semanal', b.ativo ? '1' : '0');
+    if (b.enviarAgora === true) { try { await enviarRelatorioSemanal(true); } catch (e: any) { return fail(502, e.message); } }
+    return json({ ok: true, ativo: (await setting('ads_relatorio_semanal')) === '1' });
+  }
+  if (path === '/ads/matriculas' && method === 'POST') {
+    const b = await c.body();
+    try { await salvarMatriculas(strv(b.mes), Number(b.matriculas)); } catch (e: any) { return fail(400, e.message); }
+    return json({ ok: true, matriculas: await listarMatriculas() });
+  }
+  if (path === '/ads/rascunhos' && method === 'POST') {
+    const b = await c.body();
+    if (strv(b.excluir)) { await excluirRascunho(strv(b.excluir)); return json({ ok: true, rascunhos: await rascunhos() }); }
+    try { const r = await salvarRascunho(strv(b.nome), b.dados, strv(b.id) || undefined); return json({ ok: true, rascunho: r, rascunhos: await rascunhos() }); } catch (e: any) { return fail(400, e.message); }
   }
   if (path === '/ads/acoes' && method === 'GET') return json({ rows: await acoesRecentes() });
   if (path === '/ads/editar' && method === 'POST') {

@@ -55,7 +55,7 @@ export async function route(c: Ctx): Promise<Out> {
       return conteudoRoute(c);
     case path === '/comments' || path === '/portal/comments' || path === '/checklist' || path === '/admin/automacoes':
       return trabalhoRoute(c);
-    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/admin/integridade' || path === '/ia/legenda' || path === '/datas' || path === '/studio/hashtags' || path === '/instagram/posts' || path === '/instagram/seguidores':
+    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/admin/integridade' || path === '/ia/legenda' || path === '/datas' || path === '/studio/hashtags' || path === '/instagram/posts' || path === '/instagram/seguidores' || path === '/instagram/seguidores/manual' || path === '/studio/modelos' || path === '/instagram/relatorio':
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);

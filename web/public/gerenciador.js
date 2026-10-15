@@ -33,7 +33,7 @@ function gmAchar(id){for(const c of gmDados.campanhas){if(c.id===id)return [c,'c
 
 function desenharGerenciador(){
   const d=gmDados;
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>GERENCIADOR DE ANÚNCIOS · META</small><h1>Campanhas da conta</h1><p>Tudo o que está na conta de anúncios, não só o que o sistema lançou. Mudanças valem na Meta na hora. Duplicar cria a cópia <b>pausada</b>.</p></div><div class="st-head-btns"><button class="softbtn" id="gmHist">Histórico de alterações</button><button class="btn" id="gmNova">+ Nova campanha</button></div></div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>GERENCIADOR DE ANÚNCIOS · META</small><h1>Campanhas da conta</h1><p>Tudo o que está na conta de anúncios, não só o que o sistema lançou. Mudanças valem na Meta na hora. Duplicar cria a cópia <b>pausada</b>.</p></div><div class="st-head-btns"><button class="softbtn" id="gmComp">Comparar anúncios</button><button class="softbtn" id="gmHist">Histórico de alterações</button><button class="btn" id="gmNova">+ Nova campanha</button></div></div>
   <div class="st-toolbar"><div class="st-filtros"><select id="gmP"><option value="hoje">Hoje</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="mes">Este mês</option><option value="x">Personalizado</option></select><input type="date" id="gmDe" value="${attr(d.de)}"><input type="date" id="gmAte" value="${attr(d.ate)}"><label class="check-row"><input type="checkbox" id="gmArq" ${gmArq?'checked':''}> Mostrar arquivados</label></div><button class="softbtn" id="gmAtualiza">Atualizar</button></div>
   <div class="card"><div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th>Nome</th><th>Ligado</th><th>Estado</th><th>Orçamento</th><th>Resultados</th><th>Custo/resultado</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>CTR</th><th>CPC</th><th></th></tr></thead>
   <tbody>${d.campanhas.map(c=>gmLinha(c,'campanha')).join('')||'<tr><td colspan="12" class="empty compact">Nenhuma campanha neste filtro.</td></tr>'}</tbody>
@@ -43,7 +43,7 @@ function desenharGerenciador(){
   $('#gmDe').onchange=$('#gmAte').onchange=()=>{gmPeriodo={de:$('#gmDe').value,ate:$('#gmAte').value,p:'x'}};
   $('#gmAtualiza').onclick=()=>{gmPeriodo.de=$('#gmDe').value;gmPeriodo.ate=$('#gmAte').value;renderGerenciador()};
   $('#gmArq').onchange=e=>{gmArq=e.target.checked;renderGerenciador()};
-  $('#gmHist').onclick=gmHistorico;$('#gmNova').onclick=()=>{if(typeof novaCampanha==='function')novaCampanha();else toast('A criação completa de campanha chega na próxima etapa.','warn')};
+  $('#gmComp').onclick=gmComparar;$('#gmHist').onclick=gmHistorico;$('#gmNova').onclick=()=>{if(typeof novaCampanha==='function')novaCampanha();else toast('A criação completa de campanha chega na próxima etapa.','warn')};
   $$('[data-abre]').forEach(b=>b.onclick=()=>{const id=b.dataset.abre;gmAberto.has(id)?gmAberto.delete(id):gmAberto.add(id);desenharGerenciador()});
   $$('[data-sw]').forEach(i=>i.onchange=async()=>{const [o,n]=gmAchar(i.dataset.sw);const ativar=i.checked;if(!confirm(ativar?`Ativar "${o.nome}"? Volta a gastar.`:`Pausar "${o.nome}"?`)){i.checked=!ativar;return}await gmEditar(n,o.id,{status:ativar?'ACTIVE':'PAUSED'})});
   $$('[data-edit]').forEach(b=>b.onclick=()=>{const [o,n]=gmAchar(b.dataset.edit);gmEditor(o,n)});
@@ -93,6 +93,8 @@ async function novaCampanha(){
   let op,cfg;try{[op,cfg]=await Promise.all([api('/ads/campanha/opcoes'),api('/ads/gestao')])}catch(e){return toast(e.message,'bad')}
   if(!cfg.config.ativa)return toast('Ligue a gestão de anúncios em Tráfego → Gestor de anúncios antes de criar campanhas.','warn');
   const chave=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');
+  let rascs=[];try{rascs=(await api('/ads/extras')).rascunhos||[]}catch{}
+  let rascId='';
   const pub=cfg.config.publico;
   const w={passo:1,objetivo:'',meta:'',nome:'',publico:{cidade:pub.cidade,raioKm:pub.raioKm,idadeMin:pub.idadeMin,idadeMax:pub.idadeMax,genero:'todos',interesses:[],publicosPersonalizados:[],plataformas:[]},modo:'AUTO',
     orc:{tipo:'DIARIO',valor:20},dias:7,inicio:'',fim:'',lance:{tipo:'MENOR_CUSTO',valor:''},criativo:{tipo:'',midia:'',conteudoId:'',texto:'',titulo:'',descricao:'',cta:''},destino:{mensagem:'DIRECT',whatsapp:cfg.config.whatsapp||'',siteUrl:'',formId:'',pixelId:'',evento:'',appId:'',lojaUrl:''}};
@@ -103,9 +105,9 @@ async function novaCampanha(){
   const setPath=(path,val)=>{const k=path.split('.');let o=w;k.slice(0,-1).forEach(x=>o=o[x]);o[k[k.length-1]]=val};
   const PASSOS=['Objetivo','Público','Orçamento e datas','Anúncio','Revisão'];
   const cab=()=>`<h3>Nova campanha</h3><ol class="wz-passos">${PASSOS.map((p,i)=>`<li class="${i+1===w.passo?'ativo':i+1<w.passo?'feito':''}">${i+1}. ${p}</li>`).join('')}</ol>`;
-  const nav=(prox='Avançar')=>`<div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button>${w.passo>1?'<button class="softbtn" type="button" id="wzVolta">Voltar</button>':''}<button class="btn" type="button" id="wzProx">${prox}</button></div>`;
+  const nav=(prox='Avançar')=>`<div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="softbtn" type="button" id="wzRasc" title="Guardar para continuar depois">Salvar rascunho</button>${w.passo>1?'<button class="softbtn" type="button" id="wzVolta">Voltar</button>':''}<button class="btn" type="button" id="wzProx">${prox}</button></div>`;
   const inp=(l,path,tipo='text',extra='')=>{const v=path.split('.').reduce((o,k)=>o[k],w);return `<label>${l}<input data-w="${path}" type="${tipo}" value="${attr(v??'')}" ${extra}></label>`};
-  const passo1=()=>`${cab()}<p class="kpi-note">Escolha o objetivo, como no Gerenciador da Meta.</p><div class="wz-objs">${Object.entries(op.objetivos).map(([k,o])=>`<button type="button" class="wz-obj ${w.objetivo===k?'sel':''}" data-obj="${k}"><b>${esc(o.rotulo)}</b><small>${esc(o.ajuda)}</small></button>`).join('')}</div>
+  const passo1=()=>`${cab()}${rascs.length?`<div class="card"><b>Rascunhos salvos</b>${rascs.map(r=>`<div class="notif"><span>${esc(r.nome)} <small>${esc(fmtDateTime(r.salvoEm))}</small></span> <button class="softbtn" type="button" data-rabre="${attr(r.id)}">Continuar</button> <button class="softbtn" type="button" data-rdel="${attr(r.id)}">Excluir</button></div>`).join('')}</div>`:''}<p class="kpi-note">Escolha o objetivo, como no Gerenciador da Meta.</p><div class="wz-objs">${Object.entries(op.objetivos).map(([k,o])=>`<button type="button" class="wz-obj ${w.objetivo===k?'sel':''}" data-obj="${k}"><b>${esc(o.rotulo)}</b><small>${esc(o.ajuda)}</small></button>`).join('')}</div>
    ${w.objetivo?`<h4>Resultado que você quer</h4><div class="wz-metas">${Object.entries(op.objetivos[w.objetivo].metas).map(([k,m])=>`<label class="wz-meta"><input type="radio" name="meta" value="${k}" ${w.meta===k?'checked':''}><span><b>${esc(m.rotulo)}</b><small>${esc(m.ajuda)}</small></span></label>`).join('')}</div>`:''}
    ${inp('Nome da campanha (opcional)','nome','text','maxlength="60" placeholder="Ex.: Matrículas 2027"')}${nav()}`;
   const passo2=()=>`${cab()}<div class="st-row">${inp('Raio (km)','publico.raioKm','number','min="1" max="80"')}<label>Cidade<input value="${attr(w.publico.cidade?w.publico.cidade.nome:'')}" disabled></label></div>
@@ -152,6 +154,9 @@ async function novaCampanha(){
     host.querySelectorAll('input[name="ctipo"]').forEach(r=>r.onchange=()=>{w.criativo.tipo=r.value;desenha()});
     host.querySelectorAll('[data-post]').forEach(b=>b.onclick=()=>{w.criativo.midia=b.dataset.post;desenha()});
     const it=host.querySelector('#wzInt');if(it){let tm;it.oninput=()=>{clearTimeout(tm);tm=setTimeout(async()=>{const q=it.value.trim();const box=host.querySelector('#wzIntRes');if(q.length<2){box.innerHTML='';return}try{const r=await api('/ads/campanha/interesses?q='+encodeURIComponent(q));box.innerHTML=r.rows.map(x=>`<button type="button" class="softbtn" data-addint="${attr(x.id)}" data-nome="${attr(x.nome)}">+ ${esc(x.nome)}</button>`).join('');box.querySelectorAll('[data-addint]').forEach(b=>b.onclick=()=>{if(!w.publico.interesses.some(i=>i.id===b.dataset.addint))w.publico.interesses.push({id:b.dataset.addint,nome:b.dataset.nome});desenha()})}catch{}},300)}}
+    const rb=host.querySelector('#wzRasc');if(rb)rb.onclick=async()=>{const nome=prompt('Nome do rascunho',w.nome||'')||'';if(nome===null)return;try{const r=await gmPost('/ads/rascunhos',{nome:nome||w.nome||'Rascunho',dados:w,id:rascId});rascId=r.rascunho.id;rascs=r.rascunhos;toast('Rascunho salvo')}catch(e){toast(e.message,'bad')}};
+    host.querySelectorAll('[data-rabre]').forEach(b=>b.onclick=()=>{const r=rascs.find(x=>x.id===b.dataset.rabre);if(!r)return;Object.assign(w,r.dados,{passo:1});rascId=r.id;desenha()});
+    host.querySelectorAll('[data-rdel]').forEach(b=>b.onclick=async()=>{if(!confirm('Excluir este rascunho?'))return;try{const r=await gmPost('/ads/rascunhos',{excluir:b.dataset.rdel});rascs=r.rascunhos;desenha()}catch(e){toast(e.message,'bad')}});
     const v=host.querySelector('#wzVolta');if(v)v.onclick=()=>{w.passo--;desenha()};
     const p=host.querySelector('#wzProx');if(p)p.onclick=()=>{const e=valida();if(e)return toast(e,'warn');w.passo++;desenha()};
     if(w.passo===5)revisao();
@@ -167,4 +172,16 @@ async function novaCampanha(){
   };
   const desenha=()=>{host.innerHTML=[passo1,passo2,passo3,passo4,passo5][w.passo-1]();bind()};
   desenha();
+}
+
+// Comparar anúncios: melhor e pior custo por resultado no período; permite pausar o pior com um clique.
+function gmComparar(){
+  const todos=[];for(const c of gmDados.campanhas)for(const s of c.conjuntos)for(const a of s.anuncios)todos.push({...a,campanhaNome:c.nome,ativo:a.status==='ACTIVE'});
+  const com=todos.filter(a=>a.gasto>0);
+  const comRes=com.filter(a=>a.resultados>0).sort((a,b)=>a.custoResultado-b.custoResultado);
+  const semRes=com.filter(a=>!(a.resultados>0)).sort((a,b)=>b.gasto-a.gasto);
+  const med=comRes.length?comRes.reduce((s,a)=>s+a.custoResultado,0)/comRes.length:0;
+  const linha=(a,i,sem)=>`<tr><td>${sem?'—':(i+1)+'º'}</td><td>${esc(a.nome)}<br><small>${esc(a.campanhaNome)}</small></td><td>${esc(gmBrl(a.gasto))}</td><td>${gmN(a.resultados)}</td><td>${sem?'<span class="tg-ruim">sem resultado</span>':esc(gmBrl(a.custoResultado))+(med&&a.custoResultado>med*1.5?' <span class="tg-ruim">acima da média</span>':'')}</td><td>${a.ativo?`<button class="softbtn" data-pz="${attr(a.id)}">Pausar</button>`:gmBadge(a.estado)}</td></tr>`;
+  const ov=adminOverlay(`<h3>Comparar anúncios (${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))})</h3><p class="kpi-note">Ordenado do menor para o maior custo por resultado. ${comRes.length?`Média: ${esc(gmBrl(med))}.`:'Nenhum anúncio com resultado no período.'} Pausar vale na Meta na hora.</p><div class="tablewrap"><table class="datatable"><thead><tr><th></th><th>Anúncio</th><th>Gasto</th><th>Resultados</th><th>Custo/resultado</th><th></th></tr></thead><tbody>${comRes.map((a,i)=>linha(a,i,false)).join('')}${semRes.map((a,i)=>linha(a,i,true)).join('')||''}${com.length?'':'<tr><td colspan="6">Nenhum anúncio com gasto neste período.</td></tr>'}</tbody></table></div><div class="st-acoes"><button class="btn soft" data-close type="button">Fechar</button></div>`);
+  ov.el.querySelectorAll('[data-pz]').forEach(b=>b.onclick=async()=>{const a=todos.find(x=>x.id===b.dataset.pz);if(!confirm(`Pausar "${a.nome}"?`))return;ov.close();await gmEditar('anuncio',a.id,{status:'PAUSED'})});
 }

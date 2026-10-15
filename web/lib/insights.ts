@@ -40,7 +40,7 @@ const MIN_AMOSTRA = 8, MIN_BUCKET = 3;
 
 /** Melhor dia e horário a partir dos posts reais já sincronizados (nunca uma tabela genérica de mercado). */
 export async function melhoresHorarios(): Promise<Row> {
-  const posts = await q('SELECT publicado_em,curtidas,comentarios FROM ig_posts');
+  const posts = await q('SELECT publicado_em,curtidas,comentarios,tipo FROM ig_posts');
   if (posts.length < MIN_AMOSTRA) return { amostra: posts.length, minimo: MIN_AMOSTRA, melhor: null };
   const tz = env('TIMEZONE', 'America/Recife');
   const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', hourCycle: 'h23' });
@@ -57,7 +57,22 @@ export async function melhoresHorarios(): Promise<Row> {
   }
   const top = (m: Map<number, number[]>) => [...m.entries()].map(([k, v]) => ({ k, media: Math.round(v.reduce((a, b) => a + b, 0) / v.length), n: v.length })).sort((a, b) => b.media - a.media)[0];
   const d = top(dias), h = top(horas);
-  return { amostra: posts.length, minimo: MIN_AMOSTRA, melhor: { dia: DIAS[d.k], mediaDia: d.media, hora: h.k, mediaHora: h.media, confianca: d.n >= MIN_BUCKET && h.n >= MIN_BUCKET ? 'alta' : 'baixa' } };
+  // melhor dia/hora para cada formato (Feed, Reels, Stories...) com pelo menos 4 posts do formato
+  const porFormato: Record<string, { dia: string; hora: number; n: number }> = {};
+  for (const tipo of new Set(posts.map((p) => String(p.tipo || 'Outro')))) {
+    const ps = posts.filter((p) => String(p.tipo || 'Outro') === tipo);
+    if (ps.length < 4) continue;
+    const dm = new Map<number, number[]>(), hm = new Map<number, number[]>();
+    for (const p of ps) {
+      const dt = new Date(String(p.publicado_em).replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+      if (isNaN(dt.getTime())) continue;
+      const pt = fmt.formatToParts(dt), dd = w[pt.find((x) => x.type === 'weekday')!.value], hh = +pt.find((x) => x.type === 'hour')!.value, e = Number(p.curtidas) + Number(p.comentarios);
+      (dm.get(dd) ?? dm.set(dd, []).get(dd)!).push(e);
+      (hm.get(hh) ?? hm.set(hh, []).get(hh)!).push(e);
+    }
+    if (dm.size && hm.size) porFormato[tipo] = { dia: DIAS[top(dm).k], hora: top(hm).k, n: ps.length };
+  }
+  return { amostra: posts.length, minimo: MIN_AMOSTRA, porFormato, melhor: { dia: DIAS[d.k], mediaDia: d.media, hora: h.k, mediaHora: h.media, confianca: d.n >= MIN_BUCKET && h.n >= MIN_BUCKET ? 'alta' : 'baixa' } };
 }
 
 export async function rankingConteudos(limite = 8): Promise<Row[]> {

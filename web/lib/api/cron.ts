@@ -20,6 +20,7 @@ function cronAuth(c: Ctx): void {
   if (a.length !== b.length || !timingSafeEqual(a, b)) fail(401, 'Não autorizado.');
 }
 
+import { enviarRelatorioSemanal, rodarRegras } from '../integrations/metaadsExtras';
 export async function cronRoute(c: Ctx): Promise<Response> {
   cronAuth(c);
   if (c.path === '/cron/ping') return json({ ok: true, quando: now() });
@@ -34,6 +35,8 @@ async function integracoes(what: string): Promise<Row> {
     try { out[name] = await fn(); } catch (e: any) { out[name] = 'ERRO: ' + e.message; await intLog('cron', 'erro', `${name}: ${e.message}`); }
   };
   if (what === 'publicar' || what === 'tudo') await step('instagram-publicar', async () => ({ publicados: await igPublishDue() }));
+  if (what === 'regras' || what === 'sincronizar' || what === 'tudo') await step('ads-regras', () => rodarRegras());
+  if (what === 'relatorio' || what === 'sincronizar' || what === 'tudo') await step('ads-relatorio-semanal', () => enviarRelatorioSemanal());
   if (what === 'sincronizar' || what === 'tudo') {
     if (await metaConnected()) {
       await step('instagram-token', async () => { await metaRefreshIfNeeded(); return 'ok'; });

@@ -46,7 +46,7 @@ function desenharStudio(){
   const semData=vis.filter(r=>stAtivo(r)&&!stDia(r));
   const sel=(k,lista,cur)=>`<select data-stf="${k}"><option value="">${k==='perfil'?'Todos os perfis':k==='status'?'Todas as etapas':'Todos os formatos'}</option>${lista.map(v=>`<option value="${attr(v)}" ${cur===v?'selected':''}>${esc(ST_ROTULO[v]||v)}</option>`).join('')}</select>`;
   const h=studioCache.horarios;
-  const dica=h?.melhor?`<b>${esc(h.melhor.dia)}</b> às <b>${h.melhor.hora}h</b> tem a melhor média de interações (confiança ${esc(h.melhor.confianca)}, ${h.amostra} posts analisados).`:(h?`Ainda há poucos posts sincronizados para sugerir horário (${h.amostra} de ${h.minimo}).`:'Conecte o Instagram para ver o melhor horário.');
+  const dica=h?.melhor?`<b>${esc(h.melhor.dia)}</b> às <b>${h.melhor.hora}h</b> tem a melhor média de interações (confiança ${esc(h.melhor.confianca)}, ${h.amostra} posts analisados).${h.porFormato&&Object.keys(h.porFormato).length?`<br><small>Por formato: ${Object.entries(h.porFormato).map(([k,v])=>`${esc(IG_TIPO[k]||k)}: ${esc(v.dia)} ${v.hora}h`).join(' · ')}</small>`:''}`:(h?`Ainda há poucos posts sincronizados para sugerir horário (${h.amostra} de ${h.minimo}).`:'Conecte o Instagram para ver o melhor horário.');
   const fmtSem=`${fmtDate(stIso(ini))} a ${fmtDate(stIso(fim))}`;
   $('#content').innerHTML=`<div class="dashboard-head"><div><small>ESTÚDIO DE PUBLICAÇÕES</small><h1>Quem publica o quê, e quando</h1><p>Arraste os posts entre os dias para reagendar. Nada é publicado sozinho sem você marcar e aprovar.</p></div><div class="st-head-btns">${internalSession?.role==='manager'?'<button class="softbtn" id="stCompartilha">Compartilhar calendário</button>':''}<button class="btn" id="stNovo">+ Novo post</button></div></div>
   <div class="kpis st-kpis"><div class="kpi"><small>Rascunhos</small><strong>${cont('PRODUÇÃO')+cont('BRIEFING')+cont('IDEIA')}</strong></div><div class="kpi orange"><small>Em aprovação</small><strong>${cont('REVISÃO')}</strong></div><div class="kpi"><small>Aprovados</small><strong>${cont('APROVADO')}</strong></div><div class="kpi green"><small>Agendados (14 dias)</small><strong>${prox14}</strong></div><div class="kpi"><small>Publicados no mês</small><strong>${pubMes}</strong></div></div>
@@ -91,7 +91,7 @@ async function studioCompositor(row,dataIni=''){
    <label>Título interno<input id="sfTitulo" maxlength="140" value="${attr(r.titulo||'')}" placeholder="Ex.: Aula aberta — Ensino Médio"></label>
    <div class="st-row"><label>Perfil<select id="sfPerfil">${perfis.map(p=>`<option ${r.perfil===p?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Formato<select id="sfFormato">${formatos.map(f=>`<option ${(r.formato||'Feed')===f?'selected':''}>${esc(f)}</option>`).join('')}</select></label></div>
    <label>Legenda <span class="st-cont" id="sfCLeg"></span><textarea id="sfLegenda" rows="6" placeholder="Escreva a legenda…">${esc(r.legenda||'')}</textarea></label>
-   <div class="st-ia"><button type="button" class="softbtn" id="sfIA">✦ Sugerir legendas com IA</button><small class="kpi-note">As 125 primeiras letras aparecem antes do "mais".</small></div>
+   <div class="st-ia"><button type="button" class="softbtn" id="sfIA">✦ Sugerir legendas com IA</button> <button type="button" class="softbtn" id="sfMod">❏ Modelos de legenda</button><small class="kpi-note">As 125 primeiras letras aparecem antes do "mais".</small></div>
    <label>Hashtags <span class="st-cont" id="sfCTag"></span><textarea id="sfTags" rows="2" placeholder="#evolução #colégio">${esc(r.hashtags||'')}</textarea></label>
    <div class="st-grupos" id="sfGrupos"></div>
    <label>Chamada para ação (CTA)<input id="sfCta" maxlength="160" value="${attr(r.cta||'')}" placeholder="Ex.: Link na bio para se inscrever"></label>
@@ -127,6 +127,16 @@ async function studioCompositor(row,dataIni=''){
   ['sfLegenda','sfTags','sfCta','sfPerfil','sfFormato','sfQuando'].forEach(i=>{g(i).oninput=pv;g(i).onchange=pv});
   g('sfArq').onchange=()=>{const f=g('sfArq').files[0];arquivoUrl=f?URL.createObjectURL(f):'';pv()};
   if(g('sfSug'))g('sfSug').onclick=()=>{g('sfQuando').value=sug;pv()};
+  g('sfMod').onclick=async()=>{
+    let lista=[];try{lista=(await api('/studio/modelos')).modelos||[]}catch(e){return toast(e.message,'bad')}
+    const salva=async l=>{await api('/studio/modelos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelos:l})})};
+    const ov=adminOverlay('<div id="mdBox"></div>');
+    const desenha=()=>{ov.el.querySelector('#mdBox').innerHTML=`<h3>Modelos de legenda</h3><p class="kpi-note">Use <b>{curso}</b>, <b>{data}</b>, <b>{link}</b> e escreva por cima depois de inserir.</p><div class="origem-list">${lista.map((m,i)=>`<div class="notif"><b>${esc(m.nome)}</b><div style="white-space:pre-wrap">${esc(m.legenda.slice(0,240))}</div><div><button class="softbtn" type="button" data-mu="${i}">Usar</button> <button class="softbtn" type="button" data-md="${i}">Excluir</button></div></div>`).join('')||'<div class="empty compact">Nenhum modelo ainda.</div>'}</div><div class="st-acoes"><button class="btn soft" type="button" data-close>Fechar</button><button class="btn" type="button" id="mdNovo">Salvar a legenda atual como modelo</button></div>`;
+      ov.el.querySelectorAll('[data-mu]').forEach(b=>b.onclick=()=>{const m=lista[+b.dataset.mu];g('sfLegenda').value=m.legenda;if(m.cta)g('sfCta').value=m.cta;if(m.hashtags)g('sfTags').value=m.hashtags;pv();ov.close()});
+      ov.el.querySelectorAll('[data-md]').forEach(b=>b.onclick=async()=>{if(!confirm('Excluir este modelo?'))return;lista.splice(+b.dataset.md,1);try{await salva(lista);desenha()}catch(e){toast(e.message,'bad')}});
+      ov.el.querySelector('#mdNovo').onclick=async()=>{const leg=g('sfLegenda').value.trim();if(!leg)return toast('Escreva a legenda primeiro','warn');const nome=(prompt('Nome do modelo (ex.: Matrículas abertas)')||'').trim();if(!nome)return;lista.push({nome,legenda:leg,cta:g('sfCta').value,hashtags:g('sfTags').value});try{await salva(lista);desenha();toast('Modelo salvo')}catch(e){toast(e.message,'bad')}};
+    };desenha();
+  };
   g('sfIA').onclick=async()=>{
     if(!edit)return toast('Salve o rascunho primeiro; a IA usa os dados do post salvo.','warn');
     try{const d=await api('/ia/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'conteudos',id:r.id})});
@@ -277,7 +287,7 @@ async function painelTrafegoExtra(){
   const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
   const bt=$('#tgOrcSalva');if(bt)bt.onclick=async()=>{try{await api('/integrations/ads/orcamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valor:Number($('#tgOrc').value||0)})});toast('Orçamento salvo');go('trafego')}catch(e){toast(e.message,'warn')}};
 }
-{const o2=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o2.apply(this,arguments);await painelTrafegoExtra();await painelGestaoAnuncios()}}
+{const o2=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o2.apply(this,arguments);await painelTrafegoExtra();await painelGestaoAnuncios();await painelExtrasAnuncios()}}
 
 
 // ---------- Gestor de anúncios (Fase 1): impulsionar publicação, tetos, pausar/retomar ----------
@@ -359,19 +369,56 @@ async function renderIgRanking(){
   const serie=rkFiltro.visao==='ano'?anos.map(a=>anual[a]):meses.map(m=>mensal[m]);
   const chaves=serie.map(x=>x.periodo).reverse();
   if(!chaves.includes(rkFiltro.periodo))rkFiltro.periodo=chaves[0]||'';
-  const cel=(x,k)=>{const v=x[k];if(v===null||v===undefined)return '—';if(k==='variacao')return `<span class="${v>=0?'tg-bom':'tg-ruim'}">${v>0?'+':''}${igNum(v)}</span>`;return igNum(v)};
-  const tab=`<div class="tablewrap"><table class="datatable"><thead><tr><th>${rkFiltro.visao==='ano'?'Ano':'Mês'}</th>${RK_COLS.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>${[...serie].reverse().map(x=>`<tr><td><b>${esc(rkRotulo(x.periodo))}</b></td>${RK_COLS.map(c=>`<td>${cel(x,c[0])}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="13">Ainda sem dados. Use "Carregar histórico".</td></tr>'}</tbody></table></div>`;
+  const cel=(x,k,i)=>{const v=x[k];if(v===null||v===undefined)return '—';if(k==='variacao')return `<span class="${v>=0?'tg-bom':'tg-ruim'}">${v>0?'+':''}${igNum(v)}</span>`;const pv=i>0?serie[i-1][k]:null;const dl=pv&&k!=='posts'&&k!=='reels'?Math.round((v-pv)/pv*1000)/10:null;return igNum(v)+(dl===null?'':`<br><small class="${dl>=0?'tg-bom':'tg-ruim'}">${dl>=0?'▲':'▼'} ${Math.abs(dl).toLocaleString('pt-BR')}%</small>`)};
+  const tab=`<div class="tablewrap"><table class="datatable"><thead><tr><th>${rkFiltro.visao==='ano'?'Ano':'Mês'}</th>${RK_COLS.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>${serie.map((x,i)=>`<tr><td><b>${esc(rkRotulo(x.periodo))}</b></td>${RK_COLS.map(c=>`<td>${cel(x,c[0],i)}</td>`).join('')}</tr>`).reverse().join('')||'<tr><td colspan="13">Ainda sem dados. Use "Carregar histórico".</td></tr>'}</tbody></table></div>`;
   const [,chave]=RK_ORDEM[rkFiltro.ordem];
   const doPeriodo=posts.filter(r=>String(r.quando).startsWith(rkFiltro.periodo)).sort((a,b)=>(b[chave]??-1)-(a[chave]??-1));
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${esc(IG_TIPO[r.tipo]||r.tipo||'')}</span>`};
   const nv=v=>v===null||v===undefined?'—':igNum(v);
   const linha=(r,i)=>{const l=urlSegura(r.link);const tx=esc((r.legenda||'Sem legenda').slice(0,90));return `<tr><td><b>${i+1}º</b></td><td class="rk-thumb">${mini(r)}</td><td>${l?`<a href="${attr(l)}" target="_blank" rel="noopener">${tx}</a>`:tx}<br><small>${esc(IG_TIPO[r.tipo]||r.tipo||'')} · ${esc(fmtDate(String(r.quando).slice(0,10)))}</small></td><td>${nv(r.alcance)}</td><td>${nv(r.curtidas)}</td><td>${nv(r.comentarios)}</td><td>${nv(r.salvos)}</td><td>${nv(r.compartilhamentos)}</td><td><b>${nv(r.interacoes)}</b></td><td>${r.engajamento===null?'—':r.engajamento+'%'}</td></tr>`};
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Métricas por mês e por ano</h1><p>Alcance, interações, seguidores e posts de cada período, com o ranking das publicações. ${sg.atual!==null?`Seguidores hoje: <b>${igNum(sg.atual)}</b>.`:''}</p></div><div class="head-actions"><button class="softbtn" id="rkHist">Carregar histórico (12 meses)</button></div></div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Métricas por mês e por ano</h1><p>Alcance, interações, seguidores e posts de cada período, com o ranking das publicações. ${sg.atual!==null?`Seguidores hoje: <b>${igNum(sg.atual)}</b>.`:''}</p></div><div class="head-actions"><button class="softbtn" id="rkHist">Carregar histórico (12 meses)</button>${internalSession?.role==='manager'?` <a class="btn" href="/relatorio-instagram.html${rkFiltro.visao==='mes'&&/^\d{4}-\d{2}$/.test(rkFiltro.periodo)?'?mes='+rkFiltro.periodo:''}" target="_blank" rel="noopener">Relatório mensal (PDF)</a> <button class="softbtn" id="rkSegManual">Informar seguidores de um mês</button>`:''}</div></div>
   <div class="card"><div class="st-toolbar"><div class="st-filtros"><select data-rk="visao"><option value="mes" ${rkFiltro.visao==='mes'?'selected':''}>Por mês</option><option value="ano" ${rkFiltro.visao==='ano'?'selected':''}>Por ano</option></select></div></div>
   ${tab}
   <p class="kpi-note">Alcance, visualizações e visitas somam os meses carregados (no ano, pessoas alcançadas em meses diferentes podem se repetir). Seguidores: a Meta não informa o passado; o sistema guarda uma foto por sincronização${sg.primeiroRegistro?` desde ${esc(fmtDate(String(sg.primeiroRegistro).slice(0,10)))}`:''}, então meses anteriores ficam "—" até a primeira foto. "Carregar histórico" busca até 12 meses de métricas.</p></div>
   ${!posts.length?'<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram e atualize.</span></div>':`<div class="card"><h3>Posts do ${rkFiltro.visao==='ano'?'ano':'mês'}</h3><div class="st-toolbar"><div class="st-filtros"><select data-rk="periodo">${chaves.map(k=>`<option value="${k}" ${k===rkFiltro.periodo?'selected':''}>${esc(rkRotulo(k))}</option>`).join('')}</select><select data-rk="ordem">${Object.entries(RK_ORDEM).map(([k,v])=>`<option value="${k}" ${k===rkFiltro.ordem?'selected':''}>Ordenar por ${esc(v[0])}</option>`).join('')}</select></div></div>
   <div class="tablewrap"><table class="datatable"><thead><tr><th></th><th></th><th>Publicação (${doPeriodo.length})</th><th>Alcance</th><th>Curtidas</th><th>Comentários</th><th>Salvamentos</th><th>Compartilh.</th><th>Interações</th><th>Engajamento</th></tr></thead><tbody>${doPeriodo.slice(0,50).map(linha).join('')||'<tr><td colspan="10">Sem publicações neste período.</td></tr>'}</tbody></table></div></div>`}`;
   $$('[data-rk]').forEach(s=>s.onchange=()=>{rkFiltro[s.dataset.rk]=s.value;if(s.dataset.rk==='visao')rkFiltro.periodo='';renderIgRanking()});
+  const sm=$('#rkSegManual');if(sm)sm.onclick=()=>{const ov=adminOverlay(`<h3>Seguidores de um mês passado</h3><p class="kpi-note">Use o número que aparece no seu Instagram no fim daquele mês (ou o que você anotou). Só vale para meses que o sistema ainda não registrou sozinho.</p><div class="st-form"><div class="st-row"><label>Mês<input id="rkSm" type="month"></label><label>Seguidores<input id="rkSn" type="number" min="0"></label></div><div class="st-acoes"><button class="btn soft" data-close type="button">Cancelar</button><button class="btn" id="rkSs" type="button">Salvar</button></div></div>`);ov.el.querySelector('#rkSs').onclick=async()=>{try{await api('/instagram/seguidores/manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mes:ov.el.querySelector('#rkSm').value,seguidores:Number(ov.el.querySelector('#rkSn').value)})});ov.close();toast('Salvo');await renderIgRanking()}catch(e){toast(e.message,'bad')}}};
   const hb=$('#rkHist');if(hb)hb.onclick=async()=>{hb.disabled=true;hb.textContent='Carregando… pode levar 1 minuto';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meses:12})});toast('Histórico carregado');await renderIgRanking()}catch(e){toast(e.message,'bad');hb.disabled=false;hb.textContent='Carregar histórico (12 meses)'}};
+}
+
+
+// ---------- Tráfego: regras automáticas, relatório semanal por e-mail, custo por matrícula ----------
+async function painelExtrasAnuncios(){
+  if(internalSession?.role!=='manager')return;
+  const host=$('#content');if(!host||state.page!=='trafego')return;
+  let d;try{d=await api('/ads/extras')}catch{return}
+  if(state.page!=='trafego'||$('#extrasAds'))return;
+  const r=d.regras,mt=d.matriculas||[];
+  const box=document.createElement('section');box.className='card';box.id='extrasAds';
+  box.innerHTML=`<div class="card-title"><div><small>RECURSOS OPCIONAIS · LIGUE O QUE QUISER</small><h3>Regras, relatório automático e custo por matrícula</h3></div></div>
+  <details open><summary><b>Regras automáticas</b> <span class="badge ${r.ativa?'ok':''}">${r.ativa?'Ligadas':'Desligadas'}</span></summary>
+   <p class="kpi-note">O sistema olha os anúncios ativos a cada hora e avisa (notificação e e-mail) ou pausa o que cumprir a regra. Só mexe em anúncios ativos e registra tudo no histórico.</p>
+   <label class="check-row"><input type="checkbox" id="rgAtiva" ${r.ativa?'checked':''}> Ligar as regras automáticas</label>
+   <div class="st-row"><label>Quando um anúncio gastar (R$) ou mais…<input id="rgGasto" type="number" min="0" step="5" value="${r.gastoSemResultado}"></label><label>…em quantos dias<input id="rgDias" type="number" min="1" max="30" value="${r.dias}"></label></div>
+   <p class="kpi-note">…sem nenhum resultado (conversa/lead). Use 0 para desligar esta regra.</p>
+   <label>Avisar também quando o custo por resultado passar de (R$; 0 = desligado)<input id="rgCusto" type="number" min="0" step="1" value="${r.custoMax}"></label>
+   <label>O que fazer<select id="rgAcao"><option value="AVISAR" ${r.acao==='AVISAR'?'selected':''}>Só avisar (recomendado)</option><option value="PAUSAR" ${r.acao==='PAUSAR'?'selected':''}>Pausar o anúncio e avisar</option></select></label>
+   <div class="st-acoes"><button class="softbtn" id="rgSim" type="button">Ver o que a regra pegaria agora</button><button class="btn" id="rgSalva" type="button">Salvar regras</button></div><div id="rgOut"></div>
+  </details>
+  <details><summary><b>Relatório semanal por e-mail</b> <span class="badge ${d.relatorioSemanal?'ok':''}">${d.relatorioSemanal?'Ligado':'Desligado'}</span></summary>
+   <p class="kpi-note">Toda segunda-feira o sistema envia ao e-mail de avisos um resumo da semana anterior (investimento, alcance, conversas e custo por campanha) com o link do relatório em PDF. Precisa do e-mail de avisos configurado e do cron de sincronização.</p>
+   <div class="st-acoes"><label class="check-row"><input type="checkbox" id="rsAtivo" ${d.relatorioSemanal?'checked':''}> Enviar toda segunda-feira</label><button class="softbtn" id="rsAgora" type="button">Enviar um agora (teste)</button></div>
+  </details>
+  <details><summary><b>Custo por matrícula</b></summary>
+   <p class="kpi-note">Informe quantas matrículas vieram em cada mês; o sistema divide pelo investimento em anúncios.</p>
+   <div class="tablewrap"><table class="datatable"><thead><tr><th>Mês</th><th>Investimento</th><th>Matrículas</th><th>Custo por matrícula</th></tr></thead><tbody>${[...mt].reverse().map(m=>`<tr><td>${esc(m.mes.slice(5)+'/'+m.mes.slice(0,4))}</td><td>${esc(gaBrl(m.gasto))}</td><td><input type="number" min="0" class="mt-in" data-mes="${attr(m.mes)}" value="${m.matriculas===null?'':m.matriculas}" style="width:90px"></td><td>${m.custo===null?'—':esc(gaBrl(m.custo))}</td></tr>`).join('')||'<tr><td colspan="4">Sem dados de investimento ainda.</td></tr>'}</tbody></table></div>
+  </details>`;
+  const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
+  const regra=()=>({ativa:$('#rgAtiva',box).checked,gastoSemResultado:Number($('#rgGasto',box).value),dias:Number($('#rgDias',box).value),custoMax:Number($('#rgCusto',box).value),acao:$('#rgAcao',box).value});
+  $('#rgSalva',box).onclick=async()=>{const b=regra();if(b.ativa&&b.acao==='PAUSAR'&&!confirm('Com "Pausar", o sistema pausa sozinho os anúncios que cumprirem a regra. Continuar?'))return;try{await gaPost('/ads/regras',b);toast('Regras salvas');go('trafego')}catch(e){toast(e.message,'warn')}};
+  $('#rgSim',box).onclick=async()=>{const o=$('#rgOut',box);o.textContent='Lendo a conta…';try{await gaPost('/ads/regras',regra());const x=await gaPost('/ads/regras/simular');o.innerHTML=x.achados.length?`<ul class="gi-lista">${x.achados.map(a=>`<li><b>${esc(a.anuncio)}</b> (${esc(a.campanha)}): ${esc(a.motivo)}</li>`).join('')}</ul>`:'<p class="kpi-note">Nenhum anúncio ativo cumpre a regra agora.</p>'}catch(e){o.textContent='';toast(e.message,'warn')}};
+  $('#rsAtivo',box).onchange=async e=>{try{await gaPost('/ads/relatorio-semanal',{ativo:e.target.checked});toast(e.target.checked?'Relatório semanal ligado':'Relatório semanal desligado')}catch(x){toast(x.message,'warn')}};
+  $('#rsAgora',box).onclick=async()=>{try{await gaPost('/ads/relatorio-semanal',{enviarAgora:true});toast('E-mail enviado (se o e-mail de avisos estiver configurado)')}catch(e){toast(e.message,'warn')}};
+  box.querySelectorAll('.mt-in').forEach(i=>i.onchange=async()=>{if(i.value==='')return;try{await gaPost('/ads/matriculas',{mes:i.dataset.mes,matriculas:Number(i.value)});toast('Salvo');go('trafego')}catch(e){toast(e.message,'warn')}});
 }

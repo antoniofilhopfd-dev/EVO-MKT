@@ -92,3 +92,19 @@ Tráfego → Gerenciador → **+ Nova campanha**: todos os objetivos da Meta (re
 
 ## Conversas no WhatsApp (anúncios)
 Cadastre o **WhatsApp do Colégio** (DDI+DDD, ex.: +5583999999999) em Tráfego → Gestor de anúncios. Ele é usado ao **Impulsionar** com o objetivo "Conversas no WhatsApp" e vem preenchido na Nova campanha (Engajamento/Cadastros → Conversas → WhatsApp). O número precisa estar ligado à Página no Business Manager da Meta.
+
+## Recursos opcionais de Instagram e Tráfego (ligue o que quiser)
+**Instagram**
+- **Ranking** (Instagram → Ranking): métricas completas por mês e por ano (seguidores e variação, alcance, visualizações, visitas, interações, curtidas, comentários, compartilhamentos, salvamentos, posts, reels) com ▲▼ contra o período anterior; posts do mês/ano com todas as métricas e ordenação; **Carregar histórico** (12 meses); **Informar seguidores de um mês** (só meses sem registro automático).
+- **Relatório mensal em PDF:** `/relatorio-instagram.html` (Gerência), com comparação com o mês anterior e top 5 publicações.
+- **Modelos de legenda:** no editor do post, "Modelos de legenda" guarda/usa legenda + CTA + hashtags.
+- **Melhor horário por formato:** aparece na dica do Estúdio (formatos com 4+ posts lidos).
+- A semana do Estúdio já tem arrastar e soltar para reagendar.
+
+**Tráfego** (Tráfego → "Regras, relatório automático e custo por matrícula"; Gerenciador → Comparar anúncios / Salvar rascunho)
+- **Regras automáticas** (desligadas): a cada sincronização do cron, anúncios ativos que gastaram ≥ R$ X em N dias sem resultado, ou com custo por resultado acima de um limite, geram aviso (notificação + e-mail) ou são pausados (exige a gestão ligada). Há "ver o que a regra pegaria agora" (simulação, sem mexer em nada).
+- **Relatório semanal por e-mail** (desligado): toda segunda-feira, resumo da semana anterior com link do PDF. Precisa de e-mail de avisos e do cron `?tarefa=sincronizar`.
+- **Custo por matrícula:** informe as matrículas de cada mês; o sistema divide pelo investimento.
+- **Comparar anúncios:** ranking por custo por resultado no período, com Pausar.
+- **Rascunho de campanha:** "Salvar rascunho" em qualquer passo da Nova campanha; continuar depois pelo passo 1.
+- **Alerta novo:** custo por resultado subindo (7 dias contra os 7 anteriores).

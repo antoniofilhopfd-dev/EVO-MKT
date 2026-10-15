@@ -85,6 +85,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('só endereços https viram miniatura',(ps.rows||[]).every(x=>!x.miniatura||/^https:\/\//.test(x.miniatura))&&(ps.rows||[]).find(x=>x.id==='m1').miniatura.includes('cdninstagram'));
  await p.evaluate(()=>go('igranking'));await p.waitForFunction(()=>/RANKING/.test(document.querySelector('.dashboard-head')?.innerText||''));await p.waitForSelector('[data-rk="visao"]');
  t('ranking do mês: 1º lugar é o post com mais interações do mês',/Bastidores da feira/.test(await p.$eval('.datatable tbody tr:first-child',e=>e.textContent))||(await p.$$('.datatable')).length>=2);
+ t('ranking tem relatório mensal em PDF, histórico e seguidores manuais (Gerência)',!!(await p.$('a[href^="/relatorio-instagram.html"]'))&&!!(await p.$('#rkHist'))&&!!(await p.$('#rkSegManual')));
  t('ranking mostra seguidores por mês e por ano',/Por mês/.test(await p.$eval('#content',e=>e.innerText))&&/Por ano/.test(await p.$eval('#content',e=>e.innerText)));
  await p.evaluate(()=>go('igposts'));await p.waitForSelector('.ig-card');
  t('tela Desempenho mostra um card por publicação do período',(await p.$$('.ig-card')).length>=3);

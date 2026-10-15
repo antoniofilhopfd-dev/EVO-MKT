@@ -5,13 +5,13 @@ import { rateCheck, rateFail } from '../auth';
 import { melhoresHorarios, proximasDatas, rankingConteudos, saudePorSegmento } from '../insights';
 import { listarNotificacoes } from '../notificacoes';
 import { run } from '../db';
-import { q } from '../db';
+import { q, q1 } from '../db';
 import { allowedSegment, requireInternal, requireManager, requirePortal } from '../auth';
 import { fluxoPublico, FINAL_SOLICITACAO } from '../fluxo';
 import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
 import { diasUteisEntre, HistRow, hojeLocal, periodosPorStatus, slaInfo } from '../sla';
-import { addDays, env, fail, fmtDate, Row } from '../util';
+import { addDays, env, fail, fmtDate, localParts, now, Row } from '../util';
 import { json } from './handlers';
 
 const ymd = (s: unknown) => String(s ?? '').slice(0, 10);
@@ -108,6 +108,53 @@ export async function operacaoRoute(c: Ctx) {
   if (path === '/insights') {
     await requireManager(c);
     return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(), ranking: await rankingConteudos() });
+  }
+  if (path === '/studio/modelos') {
+    await requireInternal(c);
+    if (c.method === 'GET') {
+      let modelos: unknown = [];
+      try { modelos = JSON.parse((await setting('studio_modelos')) || '[]'); } catch { /* guardado inválido */ }
+      return json({ modelos });
+    }
+    if (c.method !== 'POST') return fail(405, 'Método não permitido.');
+    const b = await c.body();
+    const lista = Array.isArray(b.modelos) ? b.modelos : fail(400, 'Envie a lista de modelos.');
+    if (lista.length > 50) fail(400, 'No máximo 50 modelos.');
+    const limpos = lista.map((m: any) => {
+      const nome = String(m?.nome ?? '').trim().slice(0, 60);
+      if (!nome) fail(400, 'Todo modelo precisa de um nome.');
+      return { nome, legenda: String(m?.legenda ?? '').slice(0, 2200), cta: String(m?.cta ?? '').slice(0, 160), hashtags: String(m?.hashtags ?? '').slice(0, 600) };
+    });
+    await setSetting('studio_modelos', JSON.stringify(limpos));
+    return json({ ok: true, modelos: limpos });
+  }
+  if (path === '/instagram/seguidores/manual' && c.method === 'POST') {
+    const u = await requireManager(c);
+    const b = await c.body();
+    const mes = String(b.mes ?? '').trim(), n = Math.floor(Number(b.seguidores));
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) fail(400, 'Informe o mês no formato AAAA-MM.');
+    if (!Number.isFinite(n) || n < 0 || n > 100000000) fail(400, 'Número de seguidores inválido.');
+    const [y, m] = mes.split('-').map(Number);
+    const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const hoje = fmtDate(new Date());
+    const dia = `${mes}-${String(ultimo).padStart(2, '0')}`;
+    const alvo = dia > hoje ? hoje : dia;
+    if (await q1('SELECT 1 FROM ig_seguidores WHERE dia LIKE ? AND atualizado_em NOT LIKE ?', [mes + '%', 'manual%'])) fail(409, 'Esse mês já tem registro automático do sistema; o número manual só vale para meses sem registro.');
+    await run('INSERT INTO ig_seguidores(dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,0,0,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),atualizado_em=VALUES(atualizado_em)', [alvo, n, 'manual ' + now()]);
+    await audit(String(u.codigo), 'ig-seguidores-manual', 'instagram', mes);
+    return json({ ok: true });
+  }
+  if (path === '/instagram/relatorio') {
+    await requireManager(c);
+    const lp = localParts(new Date());
+    const mes = /^\d{4}-\d{2}$/.test(c.qs('mes')) ? c.qs('mes') : `${lp.y}-${String(lp.m).padStart(2, '0')}`;
+    const [y, m] = mes.split('-').map(Number);
+    const ant = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+    const linhas = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API');
+    const pega = (per: string) => linhas.find((r) => r.periodo === per) ?? null;
+    const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts WHERE publicado_em LIKE ? ORDER BY publicado_em DESC', [mes + '%'])).map((p) => ({ ...p, interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos) }));
+    const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE dia LIKE ? ORDER BY dia DESC LIMIT 1', [per + '%']))?.seguidores ?? null;
+    return json({ mes, anterior: ant, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: await setting('ig_username') });
   }
   if (path === '/instagram/seguidores') {
     await requireInternal(c);

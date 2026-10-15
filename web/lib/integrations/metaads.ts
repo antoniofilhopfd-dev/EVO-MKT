@@ -242,6 +242,15 @@ export async function alertasExtras(): Promise<AlertaTrafego[]> {
     const ativa = await q1("SELECT 1 FROM ads_snapshots WHERE periodo=(SELECT MAX(periodo) FROM ads_snapshots) AND status='ACTIVE' LIMIT 1");
     if (ativa && ult3.every((d) => Number(d.gasto) === 0) && ant.reduce((s, d) => s + Number(d.gasto), 0) > 0) add('entrega-parou', 'Entrega parou', 'critico', 'Os 3 últimos dias fechados não tiveram gasto, mas há campanha ativa e a semana anterior gastou. Verifique pagamento, aprovação e orçamento.');
   }
+  // custo por resultado subindo: últimos 7 dias fechados contra os 7 anteriores
+  if (fechados.length >= 10) {
+    const u7 = dias.filter((d) => String(d.dia) < hoje).slice(-7), a7 = dias.filter((d) => String(d.dia) < hoje).slice(-14, -7);
+    const sm = (l: Row[], k: string) => l.reduce((s, d) => s + Number(d[k]), 0);
+    if (a7.length === 7 && sm(u7, 'resultados') > 0 && sm(a7, 'resultados') > 0) {
+      const cu = sm(u7, 'gasto') / sm(u7, 'resultados'), ca = sm(a7, 'gasto') / sm(a7, 'resultados');
+      if (cu > ca * 1.4 && sm(u7, 'gasto') >= 30) add('custo-sobe', 'Custo por resultado subindo', 'atencao', `O custo por resultado dos últimos 7 dias (${cu.toFixed(2)}) está ${Math.round((cu / ca - 1) * 100)}% acima da semana anterior (${ca.toFixed(2)}). Veja em Tráfego → Gerenciador → Comparar anúncios.`);
+    }
+  }
   for (const a of await adsAnuncios(per)) {
     if (/DISAPPROVED|WITH_ISSUES/i.test(String(a.status))) add(`anuncio-${a.anuncio_id}`, 'Anúncio com problema', 'critico', `${a.problema ? a.problema : 'A Meta informa ' + a.status + '.'}`, String(a.anuncio));
   }
