@@ -20,7 +20,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});
  [s,r]=await call('POST','/integrations/ads/sync',{});t('sincroniza campanhas e gasto (3 meses × 4 campanhas)',s===200&&r.linhas===12,r);
  [s,r]=await call('GET','/traffic/snapshots');const c1=r.rows.find(x=>x.campanha_id==='c1');
- t('snapshots guardam gasto, moeda, status, objetivo e orçamento diário convertido de centavos',c1&&Number(c1.gasto)===1234.56&&c1.moeda==='BRL'&&c1.status==='PAUSED'&&c1.objetivo==='OUTCOME_LEADS'&&Number(c1.orcamento_diario)===50&&Number(c1.resultados)===55,c1);
+ t('snapshots guardam gasto, moeda, status, objetivo e orçamento diário convertido de centavos',c1&&Number(c1.gasto)===1234.56&&c1.moeda==='BRL'&&c1.status==='PAUSED'&&c1.objetivo==='OUTCOME_LEADS'&&Number(c1.orcamento_diario)===50&&Number(c1.resultados)===55&&Number(c1.conversas)===20&&/2026-09-01/.test(String(c1.inicio)),c1);
  await call('POST','/integrations/ads/sync',{});[,r]=await call('GET','/traffic/snapshots');t('sincronizar de novo não duplica linhas (upsert)',r.rows.length===12,r.rows.length);
  const ms=await mock('/__state');
  const mutacoes=ms.calls.filter(x=>/^(POST|DELETE|PUT) \/graph\/(act_|[0-9]+\/(campaigns|adsets|ads))/.test(x));
@@ -52,7 +52,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('a Gerência é avisada na central, uma vez por campanha, regra e mês (sem repetir a cada sincronização)',nts.length===al.length&&nts.length>=4,[nts.length,al.length]);
  [s]=await call('POST','/integrations/ads/config',{ctrMin:-1});t('limite inválido é recusado (400)',s===400);
  [s]=await call('POST','/integrations/ads/config',{ctrMin:3});[,r]=await call('GET','/traffic/snapshots');
- t('a Gerência ajusta o limite e as regras passam a usá-lo (CTR de 2,3% de c1 agora alerta)',s===200&&r.limites.ctrMin===3&&!!r.alertas.find(a=>a.campanha_id==='c1'&&a.regra==='CTR baixo'));
+ t('a Gerência ajusta o limite e as regras passam a usá-lo (CTR de 2,5% da campanha ativa c2 agora alerta; a pausada c1 não)',s===200&&r.limites.ctrMin===3&&!!r.alertas.find(a=>a.campanha_id==='c2'&&a.regra==='CTR baixo')&&!r.alertas.find(a=>a.campanha_id==='c1'&&a.regra==='CTR baixo'),r.alertas.map(a=>[a.campanha_id,a.regra]));
  await call('POST','/integrations/ads/config',{ctrMin:0.9});
  await call('POST','/integrations/meta/token',{token:'STATUS_TOKEN'});await call('POST','/integrations/ads/sync',{});
  const st2=(await call('GET','/notificacoes'))[1].rows.filter(n=>n.tipo==='ads_status');
@@ -63,6 +63,12 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('GET','/traffic/painel');
  t('painel do tráfego: conta ativa, forma de pagamento e teto de gasto lidos da Meta',s===200&&r.saude&&r.saude.ok===true&&r.saude.rotulo==='Ativa'&&r.saude.forma==='Visa 4242'&&r.saude.tetoGasto===10000&&r.saude.gastoTotal===9500,r.saude);
  t('painel do tráfego: mês atual somado e comparado ao anterior',Math.abs(r.mes.gasto-2084.56)<0.01&&r.mes.resultados===55&&Math.abs(r.mesAnterior.gasto-2084.56)<0.01,[r.mes,r.mesAnterior]);
+ t('painel traz as conversas iniciadas separadas dos leads: mês, dia, anúncio e início da campanha',r.mes.conversas===20&&r.diario.every(d=>d.conversas>=2)&&r.anuncios.find(a=>a.anuncio==='Carrossel valores').conversas===8,[r.mes.conversas,r.diario.slice(0,2),r.anuncios.map(a=>[a.anuncio,a.conversas])]);
+ await call('POST','/integrations/meta/token',{token:'PAUSEDAD_TOKEN'});await call('POST','/integrations/ads/sync',{});
+ [,r]=await call('GET','/traffic/snapshots');t('alertas só para o que está ativo: anúncio pausado com problema deixa de gerar alerta',!r.alertas.find(a=>a.regra==='Anúncio com problema'),r.alertas.map(a=>a.regra));
+ await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await call('POST','/integrations/ads/sync',{});
+ [,r]=await call('GET','/traffic/snapshots');t('...e volta a alertar quando o anúncio está ligado',!!r.alertas.find(a=>a.regra==='Anúncio com problema'),r.alertas.map(a=>a.regra));
+ [,r]=await call('GET','/traffic/painel');
  t('gasto por dia dos últimos 30 dias gravado (10 dias no teste)',r.diario.length===10&&r.diario.every(d=>d.gasto>0),r.diario.length);
  const a3=r.anuncios.find(x=>x.anuncio_id==='a3'),a1=r.anuncios.find(x=>x.anuncio_id==='a1');
  t('anúncios do mês com gasto, resultados e status; o reprovado traz o motivo da Meta',r.anuncios.length===3&&a1&&a1.resultados===30&&a1.gasto===600&&a3&&/DISAPPROVED/.test(a3.status)&&/acima do permitido/.test(a3.problema),r.anuncios);

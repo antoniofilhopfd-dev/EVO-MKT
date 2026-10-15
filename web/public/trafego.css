@@ -12,7 +12,7 @@
 .tf-trilho u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--text,#2B2D3A);text-decoration:none}
 .tf-meter-l{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:13px;color:var(--text,#2B2D3A);flex-wrap:wrap}.tf-meter-l span:last-child{color:var(--muted,#6B6F80)}
 .tf-link{background:none;border:0;color:var(--blue,#063996);cursor:pointer;padding:0 0 0 6px;font:inherit;text-decoration:underline}
-.tf-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.tf-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .tf-tile{background:var(--surface,#fff);border:1px solid var(--border,#E2E4EC);border-radius:14px;padding:14px 16px;display:grid;gap:4px;position:relative;min-height:128px;align-content:start}
 .tf-tile strong{font-size:24px;font-weight:700;color:var(--text,#2B2D3A)}.tf-spark{width:96px;height:28px;margin-top:6px}
 .tf-linha2{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:16px}.tf-linha3{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}.tf-alertas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 32px}.tf-alertas .tf-nota,.tf-alertas .tf-ok{grid-column:1/-1}
@@ -31,7 +31,7 @@
 .tf-alerta{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--border,#E2E4EC)}.tf-alerta:first-of-type{border-top:0}
 .tf-sev{font-size:12px;font-weight:700;white-space:nowrap}.tf-alerta.critico .tf-sev{color:var(--tf-ruim)}.tf-alerta.atencao .tf-sev{color:var(--tf-alerta)}.tf-ok{color:var(--tf-bom);padding:8px 0}
 .tf-tabela summary{cursor:pointer;color:var(--muted,#6B6F80);font-size:13px;margin-top:8px}.tf-manual summary{cursor:pointer;font-weight:600}
-@media(max-width:1200px){.tf-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1200px){.tf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.tf-hero,.tf-linha2,.tf-linha3{grid-template-columns:1fr}.tf-hero-n strong{font-size:40px}}
 @media(max-width:560px){.tf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.tf-head h1{font-size:24px}.tf-bar{grid-template-columns:1fr auto}.tf-bar-t{grid-column:1/-1;order:3}}
 @media(prefers-reduced-motion:no-preference){.tf-trilho i{transition:width .3s}}

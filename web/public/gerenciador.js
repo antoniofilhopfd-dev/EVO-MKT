@@ -1,4 +1,5 @@
 // Gerenciador de Anúncios: campanhas > conjuntos > anúncios da conta inteira, com métricas e edição de tudo (só Gerência).
+let gmOrdem={k:'status',d:1};
 let gmVisao='hierarquia',gmFoco={campanha:'',conjunto:''},gmSel=new Set(),gmFiltro={estado:'',busca:''};
 let gmDados=null,gmAberto=new Set(),gmPeriodo={de:'',ate:'',p:'7'},gmArq=false,gmEdit=null;
 const gmPost=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
@@ -19,16 +20,24 @@ async function renderGerenciador(){
   if(state.page!=='gerenciador')return;
   desenharGerenciador();
 }
+
+const GM_PESO={ACTIVE:0,PENDING_REVIEW:1,IN_PROCESS:1,WITH_ISSUES:2,DISAPPROVED:2,PAUSED:3,CAMPAIGN_PAUSED:3,ADSET_PAUSED:3,ARCHIVED:5};
+const gmPeso=st=>{const k=String(st||'').toUpperCase();return k in GM_PESO?GM_PESO[k]:4};
+const gmInicioDe=x=>String(x.inicio||x.criado||'').slice(0,10);
+const gmInicioTxt=x=>{const d=gmInicioDe(x);return /^\d{4}-\d\d-\d\d$/.test(d)?fmtDate(d):'—'};
+function gmChave(x,k){return k==='status'?gmPeso(x.estado||x.status):k==='inicio'?(gmInicioDe(x)||'9999'):k==='gasto'?x.gasto:k==='conversas'?x.conversas:k==='custo'?(x.custoConversa===null||x.custoConversa===undefined?Infinity:x.custoConversa):k==='resultados'?x.resultados:k==='ctr'?x.ctr:String(x.nome||'').toLowerCase()}
+function gmOrdena(l){const o=gmOrdem;return [...l].sort((a,b)=>{const x=gmChave(a,o.k),y=gmChave(b,o.k);const c=x<y?-1:x>y?1:0;return c?c*o.d:(b.gasto-a.gasto)})}
+function gmThOrd(k,l){return `<th scope="col" aria-sort="${gmOrdem.k===k?(gmOrdem.d>0?'ascending':'descending'):'none'}"><button type="button" class="tf-ord" data-gord="${k}">${l}${gmOrdem.k===k?(gmOrdem.d>0?' ▲':' ▼'):''}</button></th>`}
 function gmBadge(est){const [l,c]=GM_ESTADO[est]||[est||'—',''];return `<span class="badge ${c}">${esc(l)}</span>`}
 function gmOrc(o){if(!o)return '—';if(o.diario)return `${esc(gmBrl(o.diario))}<small>/dia</small>`;if(o.total)return `${esc(gmBrl(o.total))}<small> total</small>`;return '<small>da campanha</small>'}
 function gmLinha(x,nivel,pai=''){
-  const aberto=gmAberto.has(x.id),filhos=nivel==='campanha'?x.conjuntos:nivel==='conjunto'?x.anuncios:[];
+  const aberto=gmAberto.has(x.id),filhos=gmOrdena(nivel==='campanha'?x.conjuntos:nivel==='conjunto'?x.anuncios:[]);
   const ligado=x.status==='ACTIVE';
   return `<tr class="gm-${nivel}" data-id="${attr(x.id)}" data-nivel="${nivel}">
    <td class="gm-nome"><span class="gm-ind gm-i${nivel==='campanha'?0:nivel==='conjunto'?1:2}">${filhos.length?`<button class="gm-seta" data-abre="${attr(x.id)}" aria-label="${aberto?'Recolher':'Expandir'}">${aberto?'▾':'▸'}</button>`:'<span class="gm-seta"></span>'}${x.foto?`<img class="gm-foto" alt="" referrerpolicy="no-referrer" src="${attr(x.foto)}">`:''}<span><b>${esc(x.nome)}</b>${nivel==='campanha'?`<small>${esc(GM_OBJ[x.objetivo]||x.objetivo||'')}</small>`:nivel==='conjunto'?`<small>${esc(x.otimizacao||'')}${x.destino?' · '+esc(x.destino):''}</small>`:''}</span></span></td>
    <td>${adsCompleto?`<label class="gm-sw" title="${ligado?'Pausar':'Ativar'}"><input type="checkbox" data-sw="${attr(x.id)}" ${ligado?'checked':''} ${x.status==='ARCHIVED'||x.status==='DELETED'?'disabled':''}><i></i></label>`:`<span class="badge ${ligado?'ok':''}">${ligado?'Ligado':'Desligado'}</span>`}</td>
-   <td>${gmBadge(x.estado)}</td><td>${nivel==='anuncio'?'—':gmOrc(x.orcamento)}</td>
-   <td>${gmN(x.resultados)}<small>${esc(x.rotuloResultado||'')}</small></td><td>${x.custoResultado===null?'—':esc(gmBrl(x.custoResultado))}</td><td>${esc(gmBrl(x.gasto))}</td><td>${gmN(x.impressoes)}</td><td>${gmN(x.alcance)}</td><td>${x.ctr.toFixed(2).replace('.',',')}%</td><td>${x.cliques?esc(gmBrl(x.cpc)):'—'}</td>
+   <td>${gmBadge(x.estado)}</td><td>${esc(gmInicioTxt(x))}</td><td>${nivel==='anuncio'?'—':gmOrc(x.orcamento)}</td>
+   <td>${gmN(x.conversas)}</td><td>${gmN(x.resultados)}<small>${esc(x.rotuloResultado||'')}</small></td><td>${x.custoResultado===null?'—':esc(gmBrl(x.custoResultado))}</td><td>${esc(gmBrl(x.gasto))}</td><td>${gmN(x.impressoes)}</td><td>${gmN(x.alcance)}</td><td>${x.ctr.toFixed(2).replace('.',',')}%</td><td>${x.cliques?esc(gmBrl(x.cpc)):'—'}</td>
    <td class="gm-acoes">${nivel==='anuncio'?`<label class="check-row" title="Selecionar para comparar"><input type="checkbox" data-gsel="${attr(x.id)}" ${gmSel.has(x.id)?'checked':''}></label>`:''}<button class="softbtn" data-det="${attr(x.id)}">Detalhes</button>${adsCompleto?`<button class="softbtn" data-edit="${attr(x.id)}">Editar</button><button class="softbtn" data-dup="${attr(x.id)}" title="Duplicar (a cópia nasce pausada)">⧉</button>`:''}</td></tr>${aberto?filhos.map(f=>gmLinha(f,nivel==='campanha'?'conjunto':'anuncio',x.id)).join(''):''}`;
 }
 function gmAchar(id){for(const c of gmDados.campanhas){if(c.id===id)return [c,'campanha'];for(const s of c.conjuntos){if(s.id===id)return [s,'conjunto'];for(const a of s.anuncios)if(a.id===id)return [a,'anuncio']}}return [null,'']}
@@ -39,9 +48,9 @@ function desenharGerenciador(){
   <div class="st-toolbar"><div class="st-filtros"><select id="gmP"><option value="hoje">Hoje</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="mes">Este mês</option><option value="x">Personalizado</option></select><input type="date" id="gmDe" value="${attr(d.de)}"><input type="date" id="gmAte" value="${attr(d.ate)}"><label class="check-row"><input type="checkbox" id="gmArq" ${gmArq?'checked':''}> Mostrar arquivados</label></div><button class="softbtn" id="gmAtualiza">Atualizar</button></div>
   ${gmOrcamentoHtml(d)}${gmAbasHtml()}
   ${gmVisao==='hierarquia'?'':gmFlatHtml()}
-  <div class="card" ${gmVisao==='hierarquia'?'':'style="display:none"'}><div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th>Nome</th><th>Ligado</th><th>Estado</th><th>Orçamento</th><th>Resultados</th><th>Custo/resultado</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>CTR</th><th>CPC</th><th></th></tr></thead>
-  <tbody>${d.campanhas.map(c=>gmLinha(c,'campanha')).join('')||'<tr><td colspan="12" class="empty compact">Nenhuma campanha neste filtro.</td></tr>'}</tbody>
-  <tfoot><tr class="tot"><td colspan="6">Total do período (${esc(fmtDate(d.de))} a ${esc(fmtDate(d.ate))})</td><td>${esc(gmBrl(d.totais.gasto))}</td><td>${gmN(d.totais.impressoes)}</td><td>${gmN(d.totais.alcance)}</td><td>${d.totais.ctr.toFixed(2).replace('.',',')}%</td><td>${d.totais.cliques?esc(gmBrl(d.totais.cpc)):'—'}</td><td></td></tr></tfoot></table></div></div>`;
+  <div class="card" ${gmVisao==='hierarquia'?'':'style="display:none"'}><div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th>${'Nome'}</th><th>Ligado</th>${gmThOrd('status','Estado')}${gmThOrd('inicio','Início')}<th>Orçamento</th>${gmThOrd('conversas','Conversas iniciadas')}<th>Resultados</th><th>Custo/resultado</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>CTR</th><th>CPC</th><th></th></tr></thead>
+  <tbody>${gmOrdena(d.campanhas).map(c=>gmLinha(c,'campanha')).join('')||'<tr><td colspan="14" class="empty compact">Nenhuma campanha neste filtro.</td></tr>'}</tbody>
+  <tfoot><tr class="tot"><td colspan="8">Total do período (${esc(fmtDate(d.de))} a ${esc(fmtDate(d.ate))})</td><td>${esc(gmBrl(d.totais.gasto))}</td><td>${gmN(d.totais.impressoes)}</td><td>${gmN(d.totais.alcance)}</td><td>${d.totais.ctr.toFixed(2).replace('.',',')}%</td><td>${d.totais.cliques?esc(gmBrl(d.totais.cpc)):'—'}</td><td></td></tr></tfoot></table></div></div>`;
   const sel=$('#gmP');sel.value=['hoje','7','30','mes'].includes(gmPeriodo.p)?gmPeriodo.p:'x';
   sel.onchange=()=>{gmPeriodo.p=sel.value;if(sel.value!=='x'){[gmPeriodo.de,gmPeriodo.ate]=gmIntervalo(sel.value);renderGerenciador()}};
   $('#gmDe').onchange=$('#gmAte').onchange=()=>{gmPeriodo={de:$('#gmDe').value,ate:$('#gmAte').value,p:'x'}};
@@ -201,25 +210,29 @@ function gmTodos(nivel){const o=[];for(const c of gmDados.campanhas){if(nivel===
 function gmOrcamentoHtml(d){const o=d.orcamentoConta||{};return `<div class="card gm-orc"><b>Orçamento (três números, sem misturar)</b><div class="gm-orc-lin"><div><small>Planejado no EVO MKT (mês)</small><strong>${o.planejadoEvo?esc(gmBrl(o.planejadoEvo)):'não definido'}</strong></div><div><small>Configurado na Meta (campanhas ativas, por dia)</small><strong>${esc(gmBrl(o.configuradoMetaDia||0))}/dia</strong></div><div><small>Gasto no mês</small><strong>${esc(gmBrl(o.gastoMes||0))}</strong></div>${o.planejadoEvo?`<div><small>Saldo do planejado</small><strong>${esc(gmBrl(Math.max(0,o.planejadoEvo-(o.gastoMes||0))))}</strong></div>`:''}</div><small>Lido da Meta em ${esc(fmtDateTime(d.lidoEm))}. O orçamento planejado é definido em Tráfego → Visão do mês.</small></div>`}
 function gmAbasHtml(){const ab=[['hierarquia','Hierarquia'],['campanha','Campanhas'],['conjunto','Conjuntos'],['anuncio','Anúncios']];
   const foco=[];if(gmFoco.campanha){const c=gmDados.campanhas.find(x=>x.id===gmFoco.campanha);foco.push(c?c.nome:gmFoco.campanha)}if(gmFoco.conjunto){const j=gmTodos('conjunto').find(x=>x.id===gmFoco.conjunto);foco.push(j?j.nome:gmFoco.conjunto)}
-  return `<div class="st-toolbar"><div class="st-filtros" role="tablist">${ab.map(([k,l])=>`<button type="button" class="softbtn ${gmVisao===k?'ativo':''}" data-gv="${k}" ${gmVisao===k?'aria-pressed="true"':''}>${l}</button>`).join('')}</div>${foco.length?`<div class="gm-crumb">Filtrado em: <b>${foco.map(esc).join(' › ')}</b> <button type="button" class="softbtn" id="gmLimpaFoco">Ver tudo</button></div>`:''}</div>`}
+  return `<div class="st-toolbar"><div class="st-filtros" role="tablist">${ab.map(([k,l])=>`<button type="button" class="softbtn ${gmVisao===k?'ativo':''}" data-gv="${k}" ${gmVisao===k?'aria-pressed="true"':''}>${l}</button>`).join('')}</div><div class="st-filtros"><label>Ordenar por <select id="gmOrdSel">${[['status','Status'],['inicio','Data de início'],['gasto','Gasto'],['conversas','Conversas iniciadas'],['nome','Nome']].map(([k,l])=>`<option value="${k}" ${gmOrdem.k===k?'selected':''}>${l}</option>`).join('')}</select></label><button type="button" class="softbtn" id="gmOrdDir" title="Inverter a ordem">${gmOrdem.d>0?'↑ crescente':'↓ decrescente'}</button></div>${foco.length?`<div class="gm-crumb">Filtrado em: <b>${foco.map(esc).join(' › ')}</b> <button type="button" class="softbtn" id="gmLimpaFoco">Ver tudo</button></div>`:''}</div>`}
 function gmFlatHtml(){
   const nivel=gmVisao;let lista=gmTodos(nivel);
   if(gmFoco.campanha)lista=lista.filter(x=>nivel==='campanha'?x.id===gmFoco.campanha:x._campanha===gmFoco.campanha);
   if(gmFoco.conjunto)lista=lista.filter(x=>nivel==='conjunto'?x.id===gmFoco.conjunto:x._conjunto===gmFoco.conjunto);
+  lista=gmOrdena(lista);
   const b=gmFiltro.busca.toLowerCase();if(gmFiltro.estado)lista=lista.filter(x=>x.status===gmFiltro.estado);if(b)lista=lista.filter(x=>(x.nome+' '+(x.codigo||'')+' '+x.id).toLowerCase().includes(b));
   const nome={campanha:'campanha',conjunto:'conjunto',anuncio:'anúncio'}[nivel];
   const col=(x,k,f)=>`<td>${f(x[k],x)}</td>`;
   const linhas=lista.map(x=>`<tr data-id="${attr(x.id)}"><td>${nivel==='anuncio'?`<input type="checkbox" data-gsel="${attr(x.id)}" ${gmSel.has(x.id)?'checked':''} aria-label="Selecionar para comparar">`:''}</td>
    <td><b>${esc(x.codigo||'')}</b><br><small>Meta: ${esc(x.id)}</small></td>
    <td>${x.foto?`<img class="gm-foto" alt="" referrerpolicy="no-referrer" src="${attr(x.foto)}"> `:''}${nivel!=='anuncio'?`<a href="#" data-gf="${nivel}:${attr(x.id)}" title="Abrir ${nivel==='campanha'?'os conjuntos':'os anúncios'}"><b>${esc(x.nome)}</b></a>`:`<b>${esc(x.nome)}</b>`}${x._pai?`<br><small>${esc(x._pai)}</small>`:''}</td>
-   <td>${gmBadge(x.estado)}<br><small>Meta: ${esc(x.estado||x.status)}</small></td><td>${nivel==='anuncio'?'—':gmOrc(x.orcamento)}</td>
+   <td>${gmBadge(x.estado)}<br><small>Meta: ${esc(x.estado||x.status)}</small></td><td>${esc(gmInicioTxt(x))}</td><td>${nivel==='anuncio'?'—':gmOrc(x.orcamento)}</td>
    <td>${esc(gmBrl(x.gasto))}</td><td>${gmN(x.impressoes)}</td><td>${gmN(x.alcance)}</td><td>${gmDec(x.frequencia)}</td><td>${gmN(x.cliques)}</td><td>${gmPct(x.ctr)}</td><td>${x.cliques?esc(gmBrl(x.cpc)):'—'}</td><td>${x.impressoes?esc(gmBrl(x.cpm)):'—'}</td>
    <td>${gmN(x.conversas)}</td><td>${esc(gmMoeda(x.custoConversa))}</td><td>${gmN(x.leads)}</td><td>${esc(gmMoeda(x.cpl))}</td><td>${gmN(x.resultados)}<small> ${esc(x.rotuloResultado||'')}</small></td><td>${esc(gmMoeda(x.custoResultado))}</td>
    <td><button class="softbtn" data-det="${attr(x.id)}">Detalhes</button></td></tr>`).join('');
   return `<div class="card"><div class="st-toolbar"><div class="st-filtros"><input type="search" id="gmBusca" placeholder="Buscar por nome ou código" value="${attr(gmFiltro.busca)}"><select id="gmEstadoF"><option value="">Todos os status</option>${['ACTIVE','PAUSED','ARCHIVED'].map(e=>`<option value="${e}" ${gmFiltro.estado===e?'selected':''}>${e==='ACTIVE'?'Ativos':e==='PAUSED'?'Pausados':'Arquivados'}</option>`).join('')}</select></div>${nivel==='anuncio'?`<button class="btn" id="gmCompSel" ${gmSel.size<2?'disabled':''}>Comparar selecionados (${gmSel.size})</button>`:''}</div>
-   <div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th></th><th>Código EVO · ID Meta</th><th>${nome[0].toUpperCase()+nome.slice(1)}</th><th>Status na Meta</th><th>Orçamento</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>Freq.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Conversas</th><th>Custo/conversa</th><th>Leads</th><th>CPL</th><th>Resultados</th><th>Custo/resultado</th><th></th></tr></thead><tbody>${linhas||'<tr><td colspan="20" class="empty compact">Nada neste filtro.</td></tr>'}</tbody></table></div>
+   <div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th></th><th>Código EVO · ID Meta</th><th>${nome[0].toUpperCase()+nome.slice(1)}</th>${gmThOrd('status','Status na Meta')}${gmThOrd('inicio','Início')}<th>Orçamento</th>${gmThOrd('gasto','Gasto')}<th>Impressões</th><th>Alcance</th><th>Freq.</th><th>Cliques</th>${gmThOrd('ctr','CTR')}<th>CPC</th><th>CPM</th>${gmThOrd('conversas','Conversas iniciadas')}${gmThOrd('custo','Custo/conversa')}<th>Leads</th><th>CPL</th>${gmThOrd('resultados','Resultados')}<th>Custo/resultado</th><th></th></tr></thead><tbody>${linhas||'<tr><td colspan="21" class="empty compact">Nada neste filtro.</td></tr>'}</tbody></table></div>
    <p class="kpi-note">${lista.length} ${nome}(s) · período ${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))}. Status e números são os devolvidos pela Meta, sem interpretação.</p></div>`}
 function gmLiga(){
+  $$('[data-gord]').forEach(b=>b.onclick=()=>{const k=b.dataset.gord;gmOrdem=gmOrdem.k===k?{k,d:-gmOrdem.d}:{k,d:['status','inicio','nome'].includes(k)?1:-1};desenharGerenciador()});
+  const so=$('#gmOrdSel');if(so)so.onchange=()=>{gmOrdem={k:so.value,d:['status','inicio','nome'].includes(so.value)?1:-1};desenharGerenciador()};
+  const sd=$('#gmOrdDir');if(sd)sd.onclick=()=>{gmOrdem={...gmOrdem,d:-gmOrdem.d};desenharGerenciador()};
   $$('[data-gv]').forEach(b=>b.onclick=()=>{gmVisao=b.dataset.gv;desenharGerenciador()});
   const lf=$('#gmLimpaFoco');if(lf)lf.onclick=()=>{gmFoco={campanha:'',conjunto:''};desenharGerenciador()};
   $$('[data-gf]').forEach(a=>a.onclick=e=>{e.preventDefault();const [n,id]=a.dataset.gf.split(':');if(n==='campanha'){gmFoco={campanha:id,conjunto:''};gmVisao='conjunto'}else{gmFoco={campanha:(gmTodos('conjunto').find(x=>x.id===id)||{})._campanha||gmFoco.campanha,conjunto:id};gmVisao='anuncio'}desenharGerenciador()});

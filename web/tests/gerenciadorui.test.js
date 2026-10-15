@@ -64,5 +64,15 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  t('comparar selecionados mostra as métricas lado a lado',/Custo por conversa/.test(await p.$eval('.admin-box',e=>e.innerText))&&/CTR/.test(await p.$eval('.admin-box',e=>e.innerText)));
  await p.click('[data-close]');await p.click('[data-gv="hierarquia"]');await p.waitForSelector('tr.gm-campanha');
  t('voltar para a hierarquia mantém a tela funcionando',(await p.$$('tr.gm-campanha')).length===4);
+ // ---- ordenar por data de início e status; conversas iniciadas
+ await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('#gmOrdSel');
+ t('hierarquia mostra Início e Conversas iniciadas e ordena por status (ativos primeiro)',/Início/.test(await p.$eval('.gm-tab thead',e=>e.innerText))&&/Conversas iniciadas/.test(await p.$eval('.gm-tab thead',e=>e.innerText)));
+ const ordemNomes=async()=>p.$$eval('tr.gm-campanha',r=>r.map(x=>x.dataset.id));
+ await p.selectOption('#gmOrdSel','inicio');await p.waitForTimeout(300);const porInicio=await ordemNomes();
+ t('ordenar por data de início reordena as campanhas',porInicio.length===4&&porInicio[0]==='c1',porInicio);
+ await p.click('#gmOrdDir');await p.waitForTimeout(300);t('inverter a ordem funciona',(await ordemNomes())[0]!==porInicio[0]||porInicio.length===1);
+ await p.selectOption('#gmOrdSel','status');await p.click('[data-gv="campanha"]');await p.waitForSelector('[data-gord="inicio"]');
+ t('visão Campanhas tem cabeçalhos clicáveis de status e início',!!(await p.$('[data-gord="status"]'))&&!!(await p.$('[data-gord="inicio"]'))&&!!(await p.$('[data-gord="conversas"]')));
+ await p.click('[data-gord="inicio"]');t('clicar em Início ordena a lista',await p.$eval('[data-gord="inicio"]',e=>e.closest('th').getAttribute('aria-sort')!=='none'));
  console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
 })().catch(e=>{console.error('ERRO',e.message.slice(0,300));process.exit(1)});

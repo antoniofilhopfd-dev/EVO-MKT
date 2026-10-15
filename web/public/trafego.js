@@ -1,7 +1,7 @@
 // Tráfego (visual novo): leitura da Meta em um painel só. Dados: /traffic/painel (mês, 30 dias, anúncios, pacing) e /traffic/snapshots (campanhas, alertas).
 // Regras do gráfico: uma série por gráfico, eixo único, linha 2px, marcador com anel, dica ao passar o mouse e por teclado, tabela como alternativa.
-let tfMetrica='gasto',tfDias=30,tfOrd={k:'gasto',d:-1},tfDados=null,tfSnap=null;
-const TF_MET={gasto:['Investimento','brl'],resultados:['Resultados','n'],cliques:['Cliques','n'],impressoes:['Impressões','n']};
+let tfMetrica='gasto',tfDias=30,tfOrd={k:'status',d:1},tfOrdC={k:'status',d:1},tfDados=null,tfSnap=null;
+const TF_MET={gasto:['Investimento','brl'],conversas:['Conversas iniciadas','n'],resultados:['Resultados','n'],cliques:['Cliques','n'],impressoes:['Impressões','n']};
 const tfMes=p=>{const [a,m]=String(p).split('-');return ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+m-1]+' de '+a};
 const tfBrl=(v,m)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:m||(tfDados&&tfDados.mes.moeda)||'BRL'});
 const tfN=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:0});
@@ -10,6 +10,11 @@ const tfFmt=(v,tipo)=>tipo==='brl'?tfBrl(v):tfN(v);
 const tfPct=v=>Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
 // delta: sinal + seta (nunca só cor); "bomOuRuim": 1 = subir é bom, -1 = subir é ruim, 0 = neutro
 function tfDelta(atual,ant,bom,rotulo){if(!ant)return `<span class="tf-d">sem ${esc(rotulo)} para comparar</span>`;const p=Math.round((atual-ant)/ant*100);if(!p)return `<span class="tf-d">= ${esc(rotulo)}</span>`;const cl=bom===0?'':((p>0)===(bom>0)?'bom':'ruim');return `<span class="tf-d ${cl}"><b aria-hidden="true">${p>0?'▲':'▼'}</b> ${p>0?'+':''}${p}% vs ${esc(rotulo)}</span>`}
+const TF_PESO={ACTIVE:0,PENDING_REVIEW:1,IN_PROCESS:1,WITH_ISSUES:2,DISAPPROVED:2,PAUSED:3,CAMPAIGN_PAUSED:3,ADSET_PAUSED:3,ARCHIVED:5};
+const tfPeso=st=>{const k=String(st||'').toUpperCase();return k in TF_PESO?TF_PESO[k]:4};
+const tfStatusRot=st=>{const k=String(st||'').toUpperCase();return k==='ACTIVE'?'Ativo':/PAUSED/.test(k)?'Pausado':/DISAPPROVED|WITH_ISSUES/.test(k)?'Com problema':/PENDING|IN_PROCESS/.test(k)?'Em análise':k==='ARCHIVED'?'Arquivado':(st||'—')};
+const tfStatusHtml=st=>{const k=String(st||'').toUpperCase();return /DISAPPROVED|WITH_ISSUES/.test(k)?'<span class="tf-st ruim"><b aria-hidden="true">⚠</b> Com problema</span>':k==='ACTIVE'?'<span class="tf-st ok"><b aria-hidden="true">●</b> Ativo</span>':/PAUSED/.test(k)?'<span class="tf-st"><b aria-hidden="true">❚❚</b> Pausado</span>':/PENDING|IN_PROCESS/.test(k)?'<span class="tf-st"><b aria-hidden="true">◔</b> Em análise</span>':`<span class="tf-st">${esc(tfStatusRot(st))}</span>`};
+const tfInicioTxt=v=>{const d=String(v||'').slice(0,10);return /^\d{4}-\d\d-\d\d$/.test(d)?fmtDate(d):'—'};
 function tfSpark(vals,cor){if(vals.filter(v=>v>0).length<2)return '';const w=96,h=28,mx=Math.max(...vals,1),pts=vals.map((v,i)=>`${(i*(w-4)/(vals.length-1)+2).toFixed(1)},${(h-3-(v/mx)*(h-8)).toFixed(1)}`);return `<svg class="tf-spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline fill="none" stroke="var(--tf-mute)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts.slice(0,-1).join(' ')} ${pts.at(-2)}"/><polyline fill="none" stroke="${cor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts.slice(-2).join(' ')}"/><circle cx="${pts.at(-1).split(',')[0]}" cy="${pts.at(-1).split(',')[1]}" r="3" fill="${cor}"/></svg>`}
 function tfDica(){let t=document.getElementById('tfDica');if(!t){t=document.createElement('div');t.id='tfDica';t.className='tf-dica';t.setAttribute('role','status');t.hidden=true;document.body.appendChild(t)}return t}
 function tfMostra(ev,linhas){const t=tfDica();t.textContent='';linhas.forEach((l,i)=>{const d=document.createElement('div');if(i===0){d.className='tf-dica-v';d.textContent=l}else{d.className='tf-dica-s';d.textContent=l}t.appendChild(d)});t.hidden=false;const r=t.getBoundingClientRect();let x=ev.clientX+14,y=ev.clientY-r.height-10;if(x+r.width>innerWidth-8)x=ev.clientX-r.width-14;if(y<8)y=ev.clientY+16;t.style.left=x+'px';t.style.top=y+'px'}
@@ -49,17 +54,24 @@ function tfBarras(){
   const per=tfDados.periodo,rows=(tfSnap.rows||[]).filter(r=>r.periodo===per&&Number(r.gasto)>0).sort((a,b)=>b.gasto-a.gasto);
   if(!rows.length)return '<div class="empty compact">Nenhuma campanha com gasto neste mês.</div>';
   const mx=Math.max(...rows.map(r=>Number(r.gasto)),1),topo=rows.slice(0,8),resto=rows.slice(8);
-  const linha=r=>{const g=Number(r.gasto),res=Number(r.resultados),w=Math.max(2,g/mx*100);return `<div class="tf-bar" tabindex="0" data-g="${attr(tfBrl(g,r.moeda))}" data-r="${attr(tfN(res)+' resultado(s)'+(res?' · '+tfBrl(g/res,r.moeda)+' por resultado':''))}" data-n="${attr(r.campanha)}"><span class="tf-bar-n" title="${attr(r.campanha)}">${esc(r.campanha)}</span><span class="tf-bar-t"><i style="width:${w}%"></i></span><b>${esc(tfBrl(g,r.moeda))}</b></div>`};
+  const linha=r=>{const g=Number(r.gasto),res=Number(r.resultados),w=Math.max(2,g/mx*100);return `<div class="tf-bar" tabindex="0" data-g="${attr(tfBrl(g,r.moeda))}" data-r="${attr(tfN(Number(r.conversas))+' conversa(s) iniciada(s)'+(Number(r.conversas)?' · '+tfBrl(g/Number(r.conversas),r.moeda)+' por conversa':'')+' · '+tfN(res)+' resultado(s)')}" data-n="${attr(r.campanha)}"><span class="tf-bar-n" title="${attr(r.campanha)}">${esc(r.campanha)}</span><span class="tf-bar-t"><i style="width:${w}%"></i></span><b>${esc(tfBrl(g,r.moeda))}</b></div>`};
   return topo.map(linha).join('')+(resto.length?`<p class="tf-nota">+ ${resto.length} campanha(s) com gasto menor (${esc(tfBrl(resto.reduce((s,r)=>s+Number(r.gasto),0)))} no total). Veja todas no Gerenciador.</p>`:'');
 }
+function tfOrdena(lista,ord,val){const f=val[ord.k]||val.status;return [...lista].sort((a,b)=>{const x=f(a),y=f(b);const c=x<y?-1:x>y?1:0;return c?c*ord.d:(val.gasto(b)-val.gasto(a))})}
+function tfTh(k,l,ord,attrN){return `<th scope="col" aria-sort="${ord.k===k?(ord.d>0?'ascending':'descending'):'none'}"><button type="button" class="tf-ord" ${attrN}="${k}">${l}${ord.k===k?(ord.d>0?' ▲':' ▼'):''}</button></th>`}
 function tfTabelaAnuncios(){
   const ads=[...tfDados.anuncios].filter(a=>a.gasto>0||a.problema||/DISAPPROVED|WITH_ISSUES/i.test(a.status||''));
-  const val={gasto:a=>a.gasto,resultados:a=>a.resultados,custo:a=>a.resultados?a.gasto/a.resultados:Infinity,ctr:a=>a.impressoes?a.cliques/a.impressoes:-1,nome:a=>String(a.anuncio).toLowerCase()};
-  const f=val[tfOrd.k]||val.gasto;ads.sort((a,b)=>{const x=f(a),y=f(b);return (x<y?-1:x>y?1:0)*tfOrd.d});
-  if(!ads.length)return '<div class="empty compact">Nenhum anúncio com gasto neste mês.</div>';
-  const th=(k,l)=>`<th scope="col" aria-sort="${tfOrd.k===k?(tfOrd.d>0?'ascending':'descending'):'none'}"><button type="button" class="tf-ord" data-ord="${k}">${l}${tfOrd.k===k?(tfOrd.d>0?' ▲':' ▼'):''}</button></th>`;
-  const est=a=>/DISAPPROVED|WITH_ISSUES/i.test(a.status||'')?'<span class="tf-st ruim"><b aria-hidden="true">⚠</b> Com problema</span>':/ACTIVE/i.test(a.status||'')?'<span class="tf-st ok"><b aria-hidden="true">●</b> Ativo</span>':/PAUSED/i.test(a.status||'')?'<span class="tf-st"><b aria-hidden="true">❚❚</b> Pausado</span>':`<span class="tf-st">${esc(a.status||'—')}</span>`;
-  return `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${th('nome','Anúncio')}<th scope="col">Status</th>${th('gasto','Gasto')}${th('resultados','Resultados')}${th('custo','Custo/resultado')}${th('ctr','CTR')}</tr></thead><tbody>${ads.slice(0,12).map(a=>`<tr><td><b>${esc(a.anuncio)}</b><br><small>${esc(a.campanha||'')}</small></td><td>${est(a)}</td><td>${esc(tfBrl(a.gasto,a.moeda))}</td><td>${tfN(a.resultados)}</td><td>${a.resultados?esc(tfBrl(a.gasto/a.resultados,a.moeda)):'—'}</td><td>${a.impressoes?tfPct(a.cliques/a.impressoes*100):'—'}</td></tr>`).join('')}</tbody></table></div>${ads.length>12?`<p class="tf-nota">Mostrando 12 de ${ads.length} anúncios.</p>`:''}`;
+  const val={status:a=>tfPeso(a.status),inicio:a=>String(a.inicio||'9999'),gasto:a=>a.gasto,conversas:a=>a.conversas,resultados:a=>a.resultados,custo:a=>a.conversas?a.gasto/a.conversas:Infinity,ctr:a=>a.impressoes?a.cliques/a.impressoes:-1,nome:a=>String(a.anuncio).toLowerCase()};
+  const l=tfOrdena(ads,tfOrd,val);
+  if(!l.length)return '<div class="empty compact">Nenhum anúncio com gasto neste mês.</div>';
+  return `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${tfTh('nome','Anúncio',tfOrd,'data-ord')}${tfTh('status','Status',tfOrd,'data-ord')}${tfTh('inicio','Início',tfOrd,'data-ord')}${tfTh('gasto','Gasto',tfOrd,'data-ord')}${tfTh('conversas','Conversas iniciadas',tfOrd,'data-ord')}${tfTh('custo','Custo/conversa',tfOrd,'data-ord')}${tfTh('ctr','CTR',tfOrd,'data-ord')}</tr></thead><tbody>${l.slice(0,15).map(a=>`<tr><td><b>${esc(a.anuncio)}</b><br><small>${esc(a.campanha||'')}</small></td><td>${tfStatusHtml(a.status)}</td><td>${esc(tfInicioTxt(a.inicio))}</td><td>${esc(tfBrl(a.gasto,a.moeda))}</td><td>${tfN(a.conversas)}</td><td>${a.conversas?esc(tfBrl(a.gasto/a.conversas,a.moeda)):'—'}</td><td>${a.impressoes?tfPct(a.cliques/a.impressoes*100):'—'}</td></tr>`).join('')}</tbody></table></div>${l.length>15?`<p class="tf-nota">Mostrando 15 de ${l.length} anúncios.</p>`:''}`;
+}
+function tfTabelaCampanhas(){
+  const rows=(tfSnap.rows||[]).filter(r=>r.periodo===tfDados.periodo&&(Number(r.gasto)>0||/ACTIVE/i.test(r.status||'')));
+  const val={status:r=>tfPeso(r.status),inicio:r=>String(r.inicio||'9999'),gasto:r=>Number(r.gasto),conversas:r=>Number(r.conversas),custo:r=>Number(r.conversas)?Number(r.gasto)/Number(r.conversas):Infinity,resultados:r=>Number(r.resultados),nome:r=>String(r.campanha).toLowerCase()};
+  const l=tfOrdena(rows,tfOrdC,val);
+  if(!l.length)return '<div class="empty compact">Nenhuma campanha com gasto neste mês.</div>';
+  return `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${tfTh('nome','Campanha',tfOrdC,'data-ordc')}${tfTh('status','Status',tfOrdC,'data-ordc')}${tfTh('inicio','Início',tfOrdC,'data-ordc')}${tfTh('gasto','Gasto',tfOrdC,'data-ordc')}${tfTh('conversas','Conversas iniciadas',tfOrdC,'data-ordc')}${tfTh('custo','Custo/conversa',tfOrdC,'data-ordc')}${tfTh('resultados','Resultados',tfOrdC,'data-ordc')}</tr></thead><tbody>${l.map(r=>`<tr><td><b>${esc(r.campanha)}</b></td><td>${tfStatusHtml(r.status)}</td><td>${esc(tfInicioTxt(r.inicio))}</td><td>${esc(tfBrl(r.gasto,r.moeda))}</td><td>${tfN(r.conversas)}</td><td>${Number(r.conversas)?esc(tfBrl(Number(r.gasto)/Number(r.conversas),r.moeda)):'—'}</td><td>${tfN(r.resultados)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function tfOrcamento(){
   const pc=tfDados.pacing,gerente=internalSession?.role==='manager';
@@ -89,16 +101,18 @@ function tfDesenha(){
     <div class="tf-acoes">${status}${gerente?'<button class="softbtn" id="tfAtualiza" type="button">Atualizar agora</button><a class="softbtn" href="/relatorio-trafego.html" target="_blank" rel="noopener">Relatório semanal (PDF)</a>':''}<button class="btn" id="tfGer" type="button">Campanhas e anúncios →</button></div></div>
    <section class="tf-hero card"><div class="tf-hero-n"><small>Investimento em ${esc(tfMes(d.periodo))}</small><strong>${esc(tfBrl(m.gasto))}</strong>${tfDelta(m.gasto,a.gasto,0,rotAnt)}</div>${tfOrcamento()}</section>
    <section class="tf-kpis" aria-label="Indicadores do mês">
+    ${tile('Conversas iniciadas',tfN(m.conversas),tfDelta(m.conversas,a.conversas,1,rotAnt),tfSpark(mk('conversas'),corAcento))}
+    ${tile('Custo por conversa',m.conversas?tfBrl(m.gasto/m.conversas):'—',tfDelta(m.conversas?m.gasto/m.conversas:0,a.conversas?a.gasto/a.conversas:0,-1,rotAnt),tfSpark(dia.map(x=>x.conversas?x.gasto/x.conversas:0),corAcento))}
+    ${tile('Resultados (conversas + leads)',tfN(m.resultados),tfDelta(m.resultados,a.resultados,1,rotAnt),tfSpark(mk('resultados'),corAcento))}
+    ${tile('Custo por resultado',m.resultados?tfBrl(cpr(m)):'—',tfDelta(cpr(m),cpr(a),-1,rotAnt),tfSpark(cprD,corAcento))}
     ${tile('Alcance',tfN(m.alcance),tfDelta(m.alcance,a.alcance,1,rotAnt),'')}
     ${tile('Impressões',tfN(m.impressoes),tfDelta(m.impressoes,a.impressoes,0,rotAnt),tfSpark(mk('impressoes'),corAcento))}
     ${tile('Cliques',tfN(m.cliques),tfDelta(m.cliques,a.cliques,1,rotAnt),tfSpark(mk('cliques'),corAcento))}
     ${tile('CTR',m.impressoes?tfPct(ctr(m)):'—',tfDelta(ctr(m),ctr(a),1,rotAnt),tfSpark(ctrD,corAcento))}
-    ${tile('Resultados',tfN(m.resultados),tfDelta(m.resultados,a.resultados,1,rotAnt),tfSpark(mk('resultados'),corAcento))}
-    ${tile('Custo por resultado',m.resultados?tfBrl(cpr(m)):'—',tfDelta(cpr(m),cpr(a),-1,rotAnt),tfSpark(cprD,corAcento))}
    </section>
    <section class="tf-linha2"><div class="card tf-graf"><div class="tf-cab"><h3>Por dia</h3><div class="tf-chips" role="group" aria-label="Métrica">${Object.entries(TF_MET).map(([k,v])=>`<button type="button" class="tf-chip ${tfMetrica===k?'on':''}" data-met="${k}" aria-pressed="${tfMetrica===k}">${v[0]}</button>`).join('')}</div><div class="tf-chips" role="group" aria-label="Período do gráfico">${[7,14,30].map(n=>`<button type="button" class="tf-chip ${tfDias===n?'on':''}" data-dias="${n}" aria-pressed="${tfDias===n}">${n} dias</button>`).join('')}</div></div>${tfGrafico()}${tfTabelaDiaria()}</div>
     <div class="card tf-camp"><div class="tf-cab"><h3>Investimento por campanha</h3></div>${tfBarras()}</div></section>
-   <section class="tf-linha3"><div class="card"><div class="tf-cab"><h3>Anúncios do mês</h3></div>${tfTabelaAnuncios()}</div>
+   <section class="tf-linha3"><div class="card"><div class="tf-cab"><h3>Campanhas</h3><small>Ordene por status ou data de início</small></div>${tfTabelaCampanhas()}</div><div class="card"><div class="tf-cab"><h3>Anúncios do mês</h3><small>Ordene por status ou data de início</small></div>${tfTabelaAnuncios()}</div>
     <div class="card"><div class="tf-cab"><h3>Alertas</h3></div><div class="tf-alertas">${tfAlertas()}</div></div></section>
    <p class="tf-nota tf-rodape">Números lidos da Meta. O EVO MKT não cria, pausa nem altera anúncios neste modo.</p></div>`;
   return html;
@@ -106,7 +120,9 @@ function tfDesenha(){
 function tfLiga(){
   $$('[data-met]').forEach(b=>b.onclick=()=>{tfMetrica=b.dataset.met;tfRender()});
   $$('[data-dias]').forEach(b=>b.onclick=()=>{tfDias=+b.dataset.dias;tfRender()});
-  $$('[data-ord]').forEach(b=>b.onclick=()=>{const k=b.dataset.ord;tfOrd=tfOrd.k===k?{k,d:-tfOrd.d}:{k,d:k==='nome'||k==='custo'?1:-1};tfRender()});
+  const dir=k=>['nome','custo','status','inicio'].includes(k)?1:-1;
+  $$('[data-ord]').forEach(b=>b.onclick=()=>{const k=b.dataset.ord;tfOrd=tfOrd.k===k?{k,d:-tfOrd.d}:{k,d:dir(k)};tfRender()});
+  $$('[data-ordc]').forEach(b=>b.onclick=()=>{const k=b.dataset.ordc;tfOrdC=tfOrdC.k===k?{k,d:-tfOrdC.d}:{k,d:dir(k)};tfRender()});
   const ger=$('#tfGer');if(ger)ger.onclick=()=>go('gerenciador');
   const at=$('#tfAtualiza');if(at)at.onclick=async()=>{at.disabled=true;at.textContent='Atualizando…';try{const r=await api('/integrations/ads/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});toast(`${r.linhas??0} linha(s) atualizadas`);go('trafego')}catch(e){toast(e.message,'warn');at.disabled=false;at.textContent='Atualizar agora'}};
   const orc=$('#tfOrc');if(orc)orc.onclick=async()=>{const v=prompt('Orçamento de anúncios do mês (R$). Deixe vazio para remover:',tfDados.orcamentoMensal||'');if(v===null)return;try{await api('/integrations/ads/orcamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valor:Number(String(v).replace(',','.'))||0})});go('trafego')}catch(e){toast(e.message,'warn')}};

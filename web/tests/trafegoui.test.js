@@ -13,10 +13,10 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.evaluate(()=>go('trafego'));await p.waitForSelector('.tf-hero',{timeout:20000});
  const tx=await p.$eval('#tfRaiz',e=>e.innerText);
  t('painel novo: título, investimento do mês em destaque e fonte somente leitura',/Visão do mês/.test(tx)&&/SOMENTE LEITURA/i.test(tx)&&/Investimento em/.test(tx)&&/R\$/.test(await p.$eval('.tf-hero-n strong',e=>e.textContent)));
- t('seis indicadores do mês com variação',(await p.$$('.tf-tile')).length===6&&/Alcance/.test(tx)&&/CTR/.test(tx)&&/Custo por resultado/.test(tx));
+ t('oito indicadores do mês, com conversas iniciadas e custo por conversa',(await p.$$('.tf-tile')).length===8&&/Conversas iniciadas/.test(tx)&&/Custo por conversa/.test(tx)&&/Alcance/.test(tx)&&/CTR/.test(tx)&&/Custo por resultado/.test(tx));
  t('o bloco antigo zerado de registro manual não aparece',!/Nenhum período de mídia lançado/.test(tx)&&!(await p.$('.traffic-cockpit:not([hidden])'))||!(await p.$eval('.traffic-cockpit',e=>e.offsetParent!==null).catch(()=>false)));
  t('gráfico por dia é um SVG acessível com 30 dias por padrão',await p.$eval('#tfSvg',e=>e.getAttribute('role')==='img'&&/últimos \d+ dias/.test(e.getAttribute('aria-label'))));
- const bb=await (await p.$('#tfSvg')).boundingBox();await p.mouse.move(bb.x+bb.width*0.3,bb.y+80);await p.mouse.move(bb.x+bb.width*0.5,bb.y+90,{steps:5});await p.waitForTimeout(250);
+ await (await p.$('#tfSvg')).scrollIntoViewIfNeeded();const bb=await (await p.$('#tfSvg')).boundingBox();await p.mouse.move(bb.x+bb.width*0.3,bb.y+80);await p.mouse.move(bb.x+bb.width*0.5,bb.y+90,{steps:5});await p.waitForTimeout(250);
  t('passar o mouse no gráfico mostra a dica com o valor do dia',await p.$eval('#tfDica',e=>!e.hidden&&/\d/.test(e.innerText)));
  await p.click('[data-met="resultados"]');await p.waitForSelector('[data-met="resultados"].on');
  t('trocar a métrica do gráfico (uma série por vez, sem eixo duplo)',await p.$eval('#tfSvg',e=>/Resultados/.test(e.getAttribute('aria-label')))&&(await p.$$('#tfSvg polyline.tf-linha')).length===1);
@@ -26,7 +26,11 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  t('barras por campanha com valor na ponta e dica por teclado/mouse',(await p.$$('.tf-bar')).length>=1);
  await p.hover('.tf-bar');await p.waitForTimeout(200);t('passar o mouse numa barra mostra os resultados da campanha',await p.$eval('#tfDica',e=>!e.hidden&&/resultado/.test(e.innerText)));
  t('tabela de anúncios com status em texto e ícone (não só cor)',/Ativo|Pausado|Com problema/.test(await p.$eval('.tf-tab',e=>e.innerText)));
- await p.click('[data-ord="resultados"]');await p.waitForSelector('th[aria-sort="descending"]');t('tabela de anúncios ordena ao clicar no cabeçalho',true);
+ await p.click('[data-ord="gasto"]');await p.waitForSelector('[data-ord="gasto"]');t('tabela de anúncios ordena ao clicar no cabeçalho',await p.$eval('[data-ord="gasto"]',e=>e.closest('th').getAttribute('aria-sort')==='descending'));
+ t('tabela de anúncios tem Status, Início e Conversas iniciadas',/Status/.test(await p.$eval('.tf-linha3',e=>e.innerText))&&!!(await p.$('[data-ord="inicio"]'))&&!!(await p.$('[data-ord="conversas"]')));
+ await p.click('[data-ordc="inicio"]');t('campanhas ordenam por data de início',await p.$eval('[data-ordc="inicio"]',e=>e.closest('th').getAttribute('aria-sort')==='ascending'));
+ await p.click('[data-ordc="status"]');t('campanhas ordenam por status (ativos primeiro)',await p.$eval('[data-ordc="status"]',e=>e.closest('th').getAttribute('aria-sort')==='ascending')&&/Ativo/.test(await p.$eval('[data-ordc="status"]',e=>e.closest('table').querySelector('tbody tr td:nth-child(2)').innerText)));
+ t('campanhas mostram conversas iniciadas e custo por conversa',/20/.test(await p.$eval('.tf-linha3',e=>e.innerText))&&/Conversas iniciadas/.test(await p.$eval('.tf-linha3',e=>e.innerText)));
  t('alertas agrupados aparecem com gravidade em texto',/Crítico|Atenção|Nenhum alerta/.test(await p.$eval('.tf-linha3',e=>e.innerText)));
  t('Gerência vê Atualizar agora, Relatório semanal e o atalho para o Gerenciador',!!(await p.$('#tfAtualiza'))&&!!(await p.$('a[href="/relatorio-trafego.html"]'))&&!!(await p.$('#tfGer')));
  await p.click('#tfGer');await p.waitForSelector('[data-gv="campanha"]',{timeout:20000});t('"Campanhas e anúncios" leva ao Gerenciador de 3 níveis',true);

@@ -35,6 +35,9 @@ const num = (v: unknown) => Number(v ?? 0) || 0;
 const valorMenor = (v: unknown, moeda: string) => (v === undefined || v === null || v === '' ? 0 : Number(v) / (SEM_CENTAVOS.has(moeda) ? 1 : 100));
 /** Resultados = leads + conversas iniciadas, exatamente como a Meta as relata em "actions". Outras ações (cliques no link etc.) não entram. */
 const RESULTADO = ['lead', 'onsite_conversion.lead_grouped', 'onsite_conversion.messaging_conversation_started_7d'];
+const CONVERSA = ['onsite_conversion.messaging_conversation_started_7d'];
+const emVeiculacao = (a: Row) => ![a.status, a.adset?.status, a.campaign?.status].some((x) => x !== undefined && x !== 'ACTIVE'); // só vale como ativo se anúncio, conjunto e campanha estão ligados
+const somaAcoes = (l: Row, tipos: string[]) => (Array.isArray(l.actions) ? l.actions : []).filter((a: Row) => tipos.includes(String(a.action_type))).reduce((x: number, a: Row) => x + num(a.value), 0);
 
 export async function paginar(path: string, params: Row, max = 5): Promise<Row[]> {
   const out: Row[] = [];
@@ -58,7 +61,7 @@ export async function adsSync(meses = 3): Promise<number> {
   const moeda = info?.moeda ?? '';
   const act = `act_${conta}`;
   const campanhas = new Map<string, Row>();
-  for (const c of await paginar(`/${act}/campaigns`, { fields: 'id,name,status,effective_status,objective,daily_budget,lifetime_budget', limit: 100 })) campanhas.set(String(c.id), c);
+  for (const c of await paginar(`/${act}/campaigns`, { fields: 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time', limit: 100 })) campanhas.set(String(c.id), c);
   const lp = localParts(new Date());
   let n = 0;
   for (let i = 0; i < meses; i++) {
@@ -78,9 +81,9 @@ export async function adsSync(meses = 3): Promise<number> {
         await registrarNotificacao('ads_status', 'gerencia', problema ? 'Campanha com problema na Meta' : 'Status de campanha mudou na Meta', `"${String(l.campaign_name ?? camp.name ?? '')}": ${String(anterior.status) || '—'} → ${statusNovo}. O EVO MKT só lê; a decisão é no Gerenciador de Anúncios.`, 'trafego', String(l.campaign_id));
       }
       await run(
-        `INSERT INTO ads_snapshots(conta,campanha_id,campanha,periodo,gasto,impressoes,alcance,cliques,resultados,moeda,status,objetivo,orcamento_diario,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-         ON DUPLICATE KEY UPDATE campanha=VALUES(campanha),gasto=VALUES(gasto),impressoes=VALUES(impressoes),alcance=VALUES(alcance),cliques=VALUES(cliques),resultados=VALUES(resultados),moeda=VALUES(moeda),status=VALUES(status),objetivo=VALUES(objetivo),orcamento_diario=VALUES(orcamento_diario),atualizado_em=VALUES(atualizado_em)`,
-        [conta, String(l.campaign_id), String(l.campaign_name ?? camp.name ?? '').slice(0, 200), per, num(l.spend), num(l.impressions), num(l.reach), num(l.clicks), resultados, mo, String(camp.effective_status ?? camp.status ?? ''), String(camp.objective ?? ''), valorMenor(camp.daily_budget, mo), now()],
+        `INSERT INTO ads_snapshots(conta,campanha_id,campanha,periodo,gasto,impressoes,alcance,cliques,resultados,conversas,inicio,moeda,status,objetivo,orcamento_diario,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE campanha=VALUES(campanha),gasto=VALUES(gasto),impressoes=VALUES(impressoes),alcance=VALUES(alcance),cliques=VALUES(cliques),resultados=VALUES(resultados),conversas=VALUES(conversas),inicio=VALUES(inicio),moeda=VALUES(moeda),status=VALUES(status),objetivo=VALUES(objetivo),orcamento_diario=VALUES(orcamento_diario),atualizado_em=VALUES(atualizado_em)`,
+        [conta, String(l.campaign_id), String(l.campaign_name ?? camp.name ?? '').slice(0, 200), per, num(l.spend), num(l.impressions), num(l.reach), num(l.clicks), resultados, somaAcoes(l, CONVERSA), String(camp.start_time ?? '').slice(0, 40), mo, String(camp.effective_status ?? camp.status ?? ''), String(camp.objective ?? ''), valorMenor(camp.daily_budget, mo), now()],
       );
       n++;
     }
@@ -99,7 +102,7 @@ export async function adsSync(meses = 3): Promise<number> {
 }
 
 export async function adsSnapshots(periodo?: string): Promise<Row[]> {
-  return q(`SELECT conta,campanha_id,campanha,periodo,gasto,impressoes,alcance,cliques,resultados,moeda,status,objetivo,orcamento_diario,atualizado_em FROM ads_snapshots ${periodo ? 'WHERE periodo=?' : ''} ORDER BY periodo DESC, gasto DESC LIMIT 1000`, periodo ? [periodo] : []);
+  return q(`SELECT conta,campanha_id,campanha,periodo,gasto,impressoes,alcance,cliques,resultados,conversas,inicio,moeda,status,objetivo,orcamento_diario,atualizado_em FROM ads_snapshots ${periodo ? 'WHERE periodo=?' : ''} ORDER BY periodo DESC, gasto DESC LIMIT 1000`, periodo ? [periodo] : []);
 }
 
 // ---------- alertas (regras objetivas, com limites visíveis e ajustáveis; só disparam com dados suficientes) ----------
@@ -119,6 +122,7 @@ export async function alertasTrafego(): Promise<AlertaTrafego[]> {
   const comCliques = rows.filter((r) => Number(r.impressoes) >= lim.impressoesMin && Number(r.cliques) > 0);
   const cpcs = comCliques.map((r) => ({ id: r.campanha_id, cpc: Number(r.gasto) / Number(r.cliques) }));
   for (const r of rows) {
+    if (/PAUSED|ARCHIVED|DELETED/i.test(String(r.status))) continue; // alertas só para campanhas em veiculação
     const imp = Number(r.impressoes), cli = Number(r.cliques), gasto = Number(r.gasto), alc = Number(r.alcance), res = Number(r.resultados);
     const add = (regra: string, severidade: 'atencao' | 'critico', mensagem: string) => out.push({ chave: `${r.campanha_id}|${regra}|${r.periodo}`, campanha_id: String(r.campanha_id), campanha: String(r.campanha), periodo: String(r.periodo), regra, severidade, mensagem });
     if (imp >= lim.impressoesMin) {
@@ -173,8 +177,8 @@ async function adsSyncDiario(conta: string, moeda: string): Promise<void> {
     const dia = String(l.date_start ?? '').slice(0, 10);
     if (!/^\d{4}-\d\d-\d\d$/.test(dia)) continue;
     const resultados = (Array.isArray(l.actions) ? l.actions : []).filter((a: Row) => RESULTADO.includes(String(a.action_type))).reduce((x: number, a: Row) => x + num(a.value), 0);
-    await run('INSERT INTO ads_diario(conta,dia,gasto,impressoes,cliques,resultados,moeda,atualizado_em) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE gasto=VALUES(gasto),impressoes=VALUES(impressoes),cliques=VALUES(cliques),resultados=VALUES(resultados),moeda=VALUES(moeda),atualizado_em=VALUES(atualizado_em)',
-      [conta, dia, num(l.spend), num(l.impressions), num(l.clicks), resultados, String(l.account_currency ?? moeda), now()]);
+    await run('INSERT INTO ads_diario(conta,dia,gasto,impressoes,cliques,resultados,conversas,moeda,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE gasto=VALUES(gasto),impressoes=VALUES(impressoes),cliques=VALUES(cliques),resultados=VALUES(resultados),conversas=VALUES(conversas),moeda=VALUES(moeda),atualizado_em=VALUES(atualizado_em)',
+      [conta, dia, num(l.spend), num(l.impressions), num(l.clicks), resultados, somaAcoes(l, CONVERSA), String(l.account_currency ?? moeda), now()]);
   }
 }
 
@@ -182,7 +186,7 @@ async function adsSyncDiario(conta: string, moeda: string): Promise<void> {
 async function adsSyncAnuncios(conta: string, moeda: string): Promise<void> {
   const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
   const estado = new Map<string, Row>();
-  for (const a of await paginar(`/act_${conta}/ads`, { fields: 'id,effective_status,issues_info', limit: 200 }, 6)) estado.set(String(a.id), a);
+  for (const a of await paginar(`/act_${conta}/ads`, { fields: 'id,status,effective_status,issues_info,created_time,adset{status},campaign{status}', limit: 200 }, 6)) estado.set(String(a.id), a);
   const linhas = await paginar(`/act_${conta}/insights`, { level: 'ad', fields: 'ad_id,ad_name,campaign_name,spend,impressions,reach,clicks,actions,account_currency', time_range: JSON.stringify({ since: `${per}-01`, until: fmtDate(new Date()) }), limit: 200 }, 6);
   const vistos = new Set<string>();
   for (const l of linhas) {
@@ -192,24 +196,24 @@ async function adsSyncAnuncios(conta: string, moeda: string): Promise<void> {
     const st = estado.get(id) ?? {};
     const problema = (Array.isArray(st.issues_info) ? st.issues_info : []).map((i: Row) => String(i.error_summary ?? i.error_message ?? '')).filter(Boolean).join('; ').slice(0, 500);
     const resultados = (Array.isArray(l.actions) ? l.actions : []).filter((a: Row) => RESULTADO.includes(String(a.action_type))).reduce((x: number, a: Row) => x + num(a.value), 0);
-    await run(`INSERT INTO ads_anuncios(conta,anuncio_id,periodo,anuncio,campanha,gasto,impressoes,alcance,cliques,resultados,moeda,status,problema,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-      ON DUPLICATE KEY UPDATE anuncio=VALUES(anuncio),campanha=VALUES(campanha),gasto=VALUES(gasto),impressoes=VALUES(impressoes),alcance=VALUES(alcance),cliques=VALUES(cliques),resultados=VALUES(resultados),moeda=VALUES(moeda),status=VALUES(status),problema=VALUES(problema),atualizado_em=VALUES(atualizado_em)`,
-      [conta, id, per, String(l.ad_name ?? '').slice(0, 250), String(l.campaign_name ?? '').slice(0, 200), num(l.spend), num(l.impressions), num(l.reach), num(l.clicks), resultados, String(l.account_currency ?? moeda), String(st.effective_status ?? '').slice(0, 40), problema, now()]);
+    await run(`INSERT INTO ads_anuncios(conta,anuncio_id,periodo,anuncio,campanha,gasto,impressoes,alcance,cliques,resultados,conversas,inicio,moeda,status,problema,ativo,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE anuncio=VALUES(anuncio),campanha=VALUES(campanha),gasto=VALUES(gasto),impressoes=VALUES(impressoes),alcance=VALUES(alcance),cliques=VALUES(cliques),resultados=VALUES(resultados),conversas=VALUES(conversas),inicio=VALUES(inicio),moeda=VALUES(moeda),status=VALUES(status),problema=VALUES(problema),ativo=VALUES(ativo),atualizado_em=VALUES(atualizado_em)`,
+      [conta, id, per, String(l.ad_name ?? '').slice(0, 250), String(l.campaign_name ?? '').slice(0, 200), num(l.spend), num(l.impressions), num(l.reach), num(l.clicks), resultados, somaAcoes(l, CONVERSA), String(st.created_time ?? '').slice(0, 40), String(l.account_currency ?? moeda), String(st.effective_status ?? '').slice(0, 40), problema, emVeiculacao(st) ? 1 : 0, now()]);
   }
   // anúncio com problema que ainda não gastou no mês também precisa aparecer
   for (const [id, st] of estado) {
     if (vistos.has(id) || !/DISAPPROVED|WITH_ISSUES/i.test(String(st.effective_status ?? ''))) continue;
     const problema = (Array.isArray(st.issues_info) ? st.issues_info : []).map((i: Row) => String(i.error_summary ?? '')).filter(Boolean).join('; ').slice(0, 500);
-    await run("INSERT INTO ads_anuncios(conta,anuncio_id,periodo,anuncio,campanha,moeda,status,problema,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status),problema=VALUES(problema),atualizado_em=VALUES(atualizado_em)",
-      [conta, id, per, `Anúncio ${id}`, '', moeda, String(st.effective_status).slice(0, 40), problema, now()]);
+    await run("INSERT INTO ads_anuncios(conta,anuncio_id,periodo,anuncio,campanha,moeda,status,problema,ativo,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status),problema=VALUES(problema),ativo=VALUES(ativo),atualizado_em=VALUES(atualizado_em)",
+      [conta, id, per, `Anúncio ${id}`, '', moeda, String(st.effective_status).slice(0, 40), problema, emVeiculacao(st) ? 1 : 0, now()]);
   }
 }
 
 export async function adsDiario(dias = 30): Promise<Row[]> {
-  return q('SELECT dia,gasto,impressoes,cliques,resultados,moeda FROM ads_diario WHERE dia>=? ORDER BY dia', [fmtDate(new Date(Date.now() - (dias - 1) * 86400000))]);
+  return q('SELECT dia,gasto,impressoes,cliques,resultados,conversas,moeda FROM ads_diario WHERE dia>=? ORDER BY dia', [fmtDate(new Date(Date.now() - (dias - 1) * 86400000))]);
 }
 export async function adsAnuncios(periodo: string): Promise<Row[]> {
-  return q('SELECT anuncio_id,anuncio,campanha,gasto,impressoes,alcance,cliques,resultados,moeda,status,problema FROM ads_anuncios WHERE periodo=? ORDER BY gasto DESC LIMIT 200', [periodo]);
+  return q('SELECT anuncio_id,anuncio,campanha,gasto,impressoes,alcance,cliques,resultados,conversas,inicio,moeda,status,problema,ativo FROM ads_anuncios WHERE periodo=? ORDER BY gasto DESC LIMIT 200', [periodo]);
 }
 
 /** Orçamento do mês (informado pela Gerência) × gasto acumulado, com projeção linear até o fim do mês. */
@@ -255,7 +259,7 @@ export async function alertasExtras(): Promise<AlertaTrafego[]> {
   // anúncios com problema, agrupados pelo motivo (um aviso por motivo, com a lista dos anúncios)
   const grupos = new Map<string, string[]>();
   for (const a of await adsAnuncios(per)) {
-    if (!/DISAPPROVED|WITH_ISSUES/i.test(String(a.status))) continue;
+    if (!/DISAPPROVED|WITH_ISSUES/i.test(String(a.status)) || Number(a.ativo) === 0) continue; // só anúncios ligados (anúncio, conjunto e campanha)
     const motivo = String(a.problema || 'A Meta informa ' + a.status + '.').trim();
     (grupos.get(motivo) ?? grupos.set(motivo, []).get(motivo)!).push(String(a.anuncio));
   }
