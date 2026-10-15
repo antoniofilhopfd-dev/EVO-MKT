@@ -99,7 +99,7 @@ function tfDesenha(){
    <section class="tf-linha2"><div class="card tf-graf"><div class="tf-cab"><h3>Por dia</h3><div class="tf-chips" role="group" aria-label="Métrica">${Object.entries(TF_MET).map(([k,v])=>`<button type="button" class="tf-chip ${tfMetrica===k?'on':''}" data-met="${k}" aria-pressed="${tfMetrica===k}">${v[0]}</button>`).join('')}</div><div class="tf-chips" role="group" aria-label="Período do gráfico">${[7,14,30].map(n=>`<button type="button" class="tf-chip ${tfDias===n?'on':''}" data-dias="${n}" aria-pressed="${tfDias===n}">${n} dias</button>`).join('')}</div></div>${tfGrafico()}${tfTabelaDiaria()}</div>
     <div class="card tf-camp"><div class="tf-cab"><h3>Investimento por campanha</h3></div>${tfBarras()}</div></section>
    <section class="tf-linha3"><div class="card"><div class="tf-cab"><h3>Anúncios do mês</h3></div>${tfTabelaAnuncios()}</div>
-    <div class="card"><div class="tf-cab"><h3>Alertas</h3></div>${tfAlertas()}</div></section>
+    <div class="card"><div class="tf-cab"><h3>Alertas</h3></div><div class="tf-alertas">${tfAlertas()}</div></div></section>
    <p class="tf-nota tf-rodape">Números lidos da Meta. O EVO MKT não cria, pausa nem altera anúncios neste modo.</p></div>`;
   return html;
 }

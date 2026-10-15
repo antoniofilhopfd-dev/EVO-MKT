@@ -461,4 +461,4 @@ function trafegoSimples(){
   ck.querySelectorAll('.traffic-hero,.empty-rich,.traffic-group,.kpi-note').forEach(e=>e.style.display='none'); // sem registros manuais: esconde o bloco zerado
   if(!document.getElementById('trHead'))ck.insertAdjacentHTML('beforebegin','<div id="trHead" class="dashboard-head"><div><small>TRÁFEGO PAGO · META ADS</small><h1>Métricas dos anúncios</h1><p>Somente leitura: investimento, alcance, conversas e custos lidos da Meta. Nada é criado nem alterado nas campanhas.</p></div></div>');
 }
-{const o3=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o3.apply(this,arguments);trafegoSimples()}}
+{const o3=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o3.apply(this,arguments);if(typeof trafegoNovo==='function'&&await trafegoNovo())return;trafegoSimples()}}
