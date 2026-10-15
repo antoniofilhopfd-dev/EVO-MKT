@@ -121,3 +121,5 @@
 .rk-thumb img{display:block;width:52px;height:52px;object-fit:cover;border-radius:8px}
 .rk-thumb span{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:8px;background:var(--bg,#F5F6FA);font-size:11px;text-align:center;color:var(--muted,#6B6F80)}
 .datatable td:nth-child(3){min-width:220px;max-width:420px;overflow-wrap:anywhere}
+
+.rk-link{color:var(--blue,#063996);text-decoration:none;font-weight:500;line-height:1.35}.rk-link:hover{text-decoration:underline}
