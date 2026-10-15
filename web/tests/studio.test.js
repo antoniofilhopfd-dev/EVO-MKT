@@ -159,14 +159,14 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('sem erros de JS na página pública do calendário',e4.length===0,e4.join('|'));
  // ---- Tráfego: visão do mês, orçamento, gasto por dia e anúncios
  await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});const sa=await api('POST','/integrations/ads/sync',{});
- await p.evaluate(()=>go('trafego'));await p.waitForSelector('#trafegoExtra',{state:'attached',timeout:20000});
- const tg=await p.$eval('#trafegoExtra',e=>e.innerText);
- t('Tráfego mostra a saúde da conta e os indicadores do mês com comparação',/Ativa/.test(tg)&&/Gasto no mês/i.test(tg)&&/Custo por resultado/i.test(tg)&&/vs mês anterior|= mês anterior/i.test(tg),JSON.stringify([sa,tg]).slice(0,900));
- t('gráfico de gasto por dia com 10 barras',(await p.$$('#trafegoExtra .tg-dias span')).length===10);
- t('ranking de anúncios: melhor custo por resultado, gasto sem resultado e anúncio com problema',/Vídeo depoimento/i.test(tg)&&/Cartaz antigo/i.test(tg)&&/acima do permitido/i.test(tg)&&/Melhor custo por resultado/i.test(tg),tg.slice(-500));
- await p.fill('#tgOrc','1000');await p.click('#tgOrcSalva');await p.waitForFunction(()=>/Gasto até hoje/.test(document.querySelector('#trafegoExtra')?.innerText||''),null,{timeout:20000});
- t('a Gerência tem o botão do relatório semanal em PDF no Tráfego',(await p.$eval('#tgRelatorio',e=>e.getAttribute('href')))==='/relatorio-trafego.html');
- t('definir o orçamento mostra o ritmo e a projeção do mês',/No ritmo atual o mês fecha em/.test(await p.$eval('#trafegoExtra',e=>e.innerText)));
+ await p.evaluate(()=>go('trafego'));await p.waitForSelector('#tfRaiz .tf-hero',{timeout:20000});
+ const tg=await p.$eval('#tfRaiz',e=>e.innerText);
+ t('Tráfego mostra a saúde da conta e os indicadores do mês com comparação',/Ativa/.test(tg)&&/Investimento em/i.test(tg)&&/Custo por resultado/i.test(tg)&&/vs |= /i.test(tg),JSON.stringify([sa,tg]).slice(0,900));
+ t('gráfico de gasto por dia lê os 10 dias sincronizados',await p.$eval('#tfSvg',e=>/últimos 10 dias/.test(e.getAttribute('aria-label'))));
+ t('anúncios: melhor custo por resultado, gasto sem resultado e anúncio com problema aparecem',/Vídeo depoimento/i.test(tg)&&/Cartaz antigo/i.test(tg)&&/Com problema/i.test(tg)&&/acima do permitido/i.test(tg),tg.slice(-500));
+ await api('POST','/integrations/ads/orcamento',{valor:1000});await p.evaluate(()=>go('trafego'));await p.waitForFunction(()=>/No ritmo atual, o mês fecha em/.test(document.querySelector('#tfRaiz')?.innerText||''),null,{timeout:20000});
+ t('a Gerência tem o botão do relatório semanal em PDF no Tráfego',(await p.$eval('#tfRaiz a[href="/relatorio-trafego.html"]',e=>e.getAttribute('href')))==='/relatorio-trafego.html');
+ t('definir o orçamento mostra o ritmo e a projeção do mês',/No ritmo atual, o mês fecha em/.test(await p.$eval('#tfRaiz',e=>e.innerText)));
  await p.screenshot({path:PR+'/29_trafego_visao_mes.png',fullPage:true});
  await api('POST','/integrations/ads/orcamento',{valor:0});
  // ---- Dashboard de Tráfego (relatório semanal em PDF)
