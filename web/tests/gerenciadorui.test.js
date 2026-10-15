@@ -46,5 +46,23 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.setViewportSize({width:390,height:844});await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('.gm-tab',{timeout:20000});
  t('no celular a página não rola para o lado (a tabela rola dentro do quadro)',await p.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  t('sem erros de JS',errs.length===0,errs.join('|'));
+ // ---- 3 níveis: abas, drill, detalhes, comparação
+ await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('[data-gv="campanha"]');
+ t('abas Hierarquia | Campanhas | Conjuntos | Anúncios',(await p.$$eval('[data-gv]',b=>b.map(x=>x.textContent))).join()==='Hierarquia,Campanhas,Conjuntos,Anúncios');
+ t('painel de orçamento mostra os três números separados',/Planejado no EVO MKT/.test(await p.$eval('.gm-orc',e=>e.innerText))&&/Configurado na Meta/.test(await p.$eval('.gm-orc',e=>e.innerText))&&/Gasto no mês/.test(await p.$eval('.gm-orc',e=>e.innerText)));
+ await p.click('[data-gv="campanha"]');await p.waitForSelector('[data-gf^="campanha:"]');
+ t('visão Campanhas: código interno, ID da Meta e status da Meta em cada linha',/CAM-\d{4}/.test(await p.$eval('tr[data-id="c1"]',e=>e.innerText))&&/Meta: c1/.test(await p.$eval('tr[data-id="c1"]',e=>e.innerText)));
+ await p.click('[data-gf="campanha:c1"]');await p.waitForSelector('[data-gf^="conjunto:"]');
+ t('abrir a campanha leva aos conjuntos dela, com o filtro visível e sem perder o período',(await p.$$('[data-gf^="conjunto:"]')).length===1&&/Filtrado em/.test(await p.$eval('.gm-crumb',e=>e.innerText)));
+ await p.click('[data-gf="conjunto:s1"]');await p.waitForSelector('[data-gsel="a1"]');
+ t('abrir o conjunto leva aos anúncios dele',(await p.$$('[data-gsel]')).length===2);
+ await p.click('tr[data-id="a1"] [data-det]');await p.waitForSelector('.gm-det');
+ const det=await p.$eval('.admin-box',e=>e.innerText);
+ t('detalhes do anúncio: criativo, botão, link, códigos e métricas completas',/AN-\d{4}/.test(det)&&/Matrículas abertas/.test(det)&&/LEARN_MORE/.test(det)&&/evolucao\.test\/matriculas/.test(det)&&/CPM/.test(det)&&/Frequência/.test(det),det.slice(0,300));
+ await p.click('[data-close]');
+ await p.check('[data-gsel="a1"]');await p.check('[data-gsel="a2"]');await p.click('#gmCompSel');await p.waitForSelector('.gm-best,.gm-worst,.datatable th');
+ t('comparar selecionados mostra as métricas lado a lado',/Custo por conversa/.test(await p.$eval('.admin-box',e=>e.innerText))&&/CTR/.test(await p.$eval('.admin-box',e=>e.innerText)));
+ await p.click('[data-close]');await p.click('[data-gv="hierarquia"]');await p.waitForSelector('tr.gm-campanha');
+ t('voltar para a hierarquia mantém a tela funcionando',(await p.$$('tr.gm-campanha')).length===4);
  console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
 })().catch(e=>{console.error('ERRO',e.message.slice(0,300));process.exit(1)});

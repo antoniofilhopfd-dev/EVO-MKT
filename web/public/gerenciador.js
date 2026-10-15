@@ -1,4 +1,5 @@
 // Gerenciador de Anúncios: campanhas > conjuntos > anúncios da conta inteira, com métricas e edição de tudo (só Gerência).
+let gmVisao='hierarquia',gmFoco={campanha:'',conjunto:''},gmSel=new Set(),gmFiltro={estado:'',busca:''};
 let gmDados=null,gmAberto=new Set(),gmPeriodo={de:'',ate:'',p:'7'},gmArq=false,gmEdit=null;
 const gmPost=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
 const gmBrl=(v,m)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:m||(gmDados&&gmDados.moeda)||'BRL'});
@@ -28,7 +29,7 @@ function gmLinha(x,nivel,pai=''){
    <td>${adsCompleto?`<label class="gm-sw" title="${ligado?'Pausar':'Ativar'}"><input type="checkbox" data-sw="${attr(x.id)}" ${ligado?'checked':''} ${x.status==='ARCHIVED'||x.status==='DELETED'?'disabled':''}><i></i></label>`:`<span class="badge ${ligado?'ok':''}">${ligado?'Ligado':'Desligado'}</span>`}</td>
    <td>${gmBadge(x.estado)}</td><td>${nivel==='anuncio'?'—':gmOrc(x.orcamento)}</td>
    <td>${gmN(x.resultados)}<small>${esc(x.rotuloResultado||'')}</small></td><td>${x.custoResultado===null?'—':esc(gmBrl(x.custoResultado))}</td><td>${esc(gmBrl(x.gasto))}</td><td>${gmN(x.impressoes)}</td><td>${gmN(x.alcance)}</td><td>${x.ctr.toFixed(2).replace('.',',')}%</td><td>${x.cliques?esc(gmBrl(x.cpc)):'—'}</td>
-   <td class="gm-acoes">${adsCompleto?`<button class="softbtn" data-edit="${attr(x.id)}">Editar</button><button class="softbtn" data-dup="${attr(x.id)}" title="Duplicar (a cópia nasce pausada)">⧉</button>`:''}</td></tr>${aberto?filhos.map(f=>gmLinha(f,nivel==='campanha'?'conjunto':'anuncio',x.id)).join(''):''}`;
+   <td class="gm-acoes">${nivel==='anuncio'?`<label class="check-row" title="Selecionar para comparar"><input type="checkbox" data-gsel="${attr(x.id)}" ${gmSel.has(x.id)?'checked':''}></label>`:''}<button class="softbtn" data-det="${attr(x.id)}">Detalhes</button>${adsCompleto?`<button class="softbtn" data-edit="${attr(x.id)}">Editar</button><button class="softbtn" data-dup="${attr(x.id)}" title="Duplicar (a cópia nasce pausada)">⧉</button>`:''}</td></tr>${aberto?filhos.map(f=>gmLinha(f,nivel==='campanha'?'conjunto':'anuncio',x.id)).join(''):''}`;
 }
 function gmAchar(id){for(const c of gmDados.campanhas){if(c.id===id)return [c,'campanha'];for(const s of c.conjuntos){if(s.id===id)return [s,'conjunto'];for(const a of s.anuncios)if(a.id===id)return [a,'anuncio']}}return [null,'']}
 
@@ -36,7 +37,9 @@ function desenharGerenciador(){
   const d=gmDados;
   $('#content').innerHTML=`<div class="dashboard-head"><div><small>GERENCIADOR DE ANÚNCIOS · META</small><h1>Campanhas da conta</h1><p>${adsCompleto?'Tudo o que está na conta de anúncios, não só o que o sistema lançou. Mudanças valem na Meta na hora. Duplicar cria a cópia <b>pausada</b>.':'Somente leitura: campanhas, conjuntos e anúncios da conta com as métricas do período. Para criar ou alterar anúncios, use o Gerenciador de Anúncios da Meta.'}</p></div><div class="st-head-btns"><button class="softbtn" id="gmComp">Comparar anúncios</button>${adsCompleto?'<button class="softbtn" id="gmHist">Histórico de alterações</button><button class="btn" id="gmNova">+ Nova campanha</button>':''}</div></div>
   <div class="st-toolbar"><div class="st-filtros"><select id="gmP"><option value="hoje">Hoje</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="mes">Este mês</option><option value="x">Personalizado</option></select><input type="date" id="gmDe" value="${attr(d.de)}"><input type="date" id="gmAte" value="${attr(d.ate)}"><label class="check-row"><input type="checkbox" id="gmArq" ${gmArq?'checked':''}> Mostrar arquivados</label></div><button class="softbtn" id="gmAtualiza">Atualizar</button></div>
-  <div class="card"><div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th>Nome</th><th>Ligado</th><th>Estado</th><th>Orçamento</th><th>Resultados</th><th>Custo/resultado</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>CTR</th><th>CPC</th><th></th></tr></thead>
+  ${gmOrcamentoHtml(d)}${gmAbasHtml()}
+  ${gmVisao==='hierarquia'?'':gmFlatHtml()}
+  <div class="card" ${gmVisao==='hierarquia'?'':'style="display:none"'}><div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th>Nome</th><th>Ligado</th><th>Estado</th><th>Orçamento</th><th>Resultados</th><th>Custo/resultado</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>CTR</th><th>CPC</th><th></th></tr></thead>
   <tbody>${d.campanhas.map(c=>gmLinha(c,'campanha')).join('')||'<tr><td colspan="12" class="empty compact">Nenhuma campanha neste filtro.</td></tr>'}</tbody>
   <tfoot><tr class="tot"><td colspan="6">Total do período (${esc(fmtDate(d.de))} a ${esc(fmtDate(d.ate))})</td><td>${esc(gmBrl(d.totais.gasto))}</td><td>${gmN(d.totais.impressoes)}</td><td>${gmN(d.totais.alcance)}</td><td>${d.totais.ctr.toFixed(2).replace('.',',')}%</td><td>${d.totais.cliques?esc(gmBrl(d.totais.cpc)):'—'}</td><td></td></tr></tfoot></table></div></div>`;
   const sel=$('#gmP');sel.value=['hoje','7','30','mes'].includes(gmPeriodo.p)?gmPeriodo.p:'x';
@@ -45,6 +48,8 @@ function desenharGerenciador(){
   $('#gmAtualiza').onclick=()=>{gmPeriodo.de=$('#gmDe').value;gmPeriodo.ate=$('#gmAte').value;renderGerenciador()};
   $('#gmArq').onchange=e=>{gmArq=e.target.checked;renderGerenciador()};
   $('#gmComp').onclick=gmComparar;if($('#gmHist'))$('#gmHist').onclick=gmHistorico;if($('#gmNova'))$('#gmNova').onclick=()=>{if(typeof novaCampanha==='function')novaCampanha();else toast('A criação completa de campanha chega na próxima etapa.','warn')};
+  if(gmVisao!=='hierarquia'){const h=document.querySelector('#content .card[style*="display:none"]');if(h)h.remove()} // a árvore só existe na visão Hierarquia
+  gmLiga();
   $$('[data-abre]').forEach(b=>b.onclick=()=>{const id=b.dataset.abre;gmAberto.has(id)?gmAberto.delete(id):gmAberto.add(id);desenharGerenciador()});
   $$('[data-sw]').forEach(i=>i.onchange=async()=>{const [o,n]=gmAchar(i.dataset.sw);const ativar=i.checked;if(!confirm(ativar?`Ativar "${o.nome}"? Volta a gastar.`:`Pausar "${o.nome}"?`)){i.checked=!ativar;return}await gmEditar(n,o.id,{status:ativar?'ACTIVE':'PAUSED'})});
   $$('[data-edit]').forEach(b=>b.onclick=()=>{const [o,n]=gmAchar(b.dataset.edit);gmEditor(o,n)});
@@ -185,4 +190,69 @@ function gmComparar(){
   const linha=(a,i,sem)=>`<tr><td>${sem?'—':(i+1)+'º'}</td><td>${esc(a.nome)}<br><small>${esc(a.campanhaNome)}</small></td><td>${esc(gmBrl(a.gasto))}</td><td>${gmN(a.resultados)}</td><td>${sem?'<span class="tg-ruim">sem resultado</span>':esc(gmBrl(a.custoResultado))+(med&&a.custoResultado>med*1.5?' <span class="tg-ruim">acima da média</span>':'')}</td><td>${a.ativo&&adsCompleto?`<button class="softbtn" data-pz="${attr(a.id)}">Pausar</button>`:gmBadge(a.estado)}</td></tr>`;
   const ov=adminOverlay(`<h3>Comparar anúncios (${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))})</h3><p class="kpi-note">Ordenado do menor para o maior custo por resultado. ${comRes.length?`Média: ${esc(gmBrl(med))}.`:'Nenhum anúncio com resultado no período.'} Pausar vale na Meta na hora.</p><div class="tablewrap"><table class="datatable"><thead><tr><th></th><th>Anúncio</th><th>Gasto</th><th>Resultados</th><th>Custo/resultado</th><th></th></tr></thead><tbody>${comRes.map((a,i)=>linha(a,i,false)).join('')}${semRes.map((a,i)=>linha(a,i,true)).join('')||''}${com.length?'':'<tr><td colspan="6">Nenhum anúncio com gasto neste período.</td></tr>'}</tbody></table></div><div class="st-acoes"><button class="btn soft" data-close type="button">Fechar</button></div>`);
   ov.el.querySelectorAll('[data-pz]').forEach(b=>b.onclick=async()=>{const a=todos.find(x=>x.id===b.dataset.pz);if(!confirm(`Pausar "${a.nome}"?`))return;ov.close();await gmEditar('anuncio',a.id,{status:'PAUSED'})});
+}
+
+
+// ---------- Tráfego em 3 níveis: Campanhas | Conjuntos | Anúncios, detalhes, comparação e vínculo com Conteúdo ----------
+const gmPct=v=>Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+const gmDec=v=>Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const gmMoeda=v=>v===null||v===undefined?'—':gmBrl(v);
+function gmTodos(nivel){const o=[];for(const c of gmDados.campanhas){if(nivel==='campanha'){o.push({...c,_pai:''});continue}for(const j of c.conjuntos){if(nivel==='conjunto'){o.push({...j,_pai:c.nome,_campanha:c.id});continue}for(const a of j.anuncios)o.push({...a,_pai:`${c.nome} › ${j.nome}`,_campanha:c.id,_conjunto:j.id})}}return o}
+function gmOrcamentoHtml(d){const o=d.orcamentoConta||{};return `<div class="card gm-orc"><b>Orçamento (três números, sem misturar)</b><div class="gm-orc-lin"><div><small>Planejado no EVO MKT (mês)</small><strong>${o.planejadoEvo?esc(gmBrl(o.planejadoEvo)):'não definido'}</strong></div><div><small>Configurado na Meta (campanhas ativas, por dia)</small><strong>${esc(gmBrl(o.configuradoMetaDia||0))}/dia</strong></div><div><small>Gasto no mês</small><strong>${esc(gmBrl(o.gastoMes||0))}</strong></div>${o.planejadoEvo?`<div><small>Saldo do planejado</small><strong>${esc(gmBrl(Math.max(0,o.planejadoEvo-(o.gastoMes||0))))}</strong></div>`:''}</div><small>Lido da Meta em ${esc(fmtDateTime(d.lidoEm))}. O orçamento planejado é definido em Tráfego → Visão do mês.</small></div>`}
+function gmAbasHtml(){const ab=[['hierarquia','Hierarquia'],['campanha','Campanhas'],['conjunto','Conjuntos'],['anuncio','Anúncios']];
+  const foco=[];if(gmFoco.campanha){const c=gmDados.campanhas.find(x=>x.id===gmFoco.campanha);foco.push(c?c.nome:gmFoco.campanha)}if(gmFoco.conjunto){const j=gmTodos('conjunto').find(x=>x.id===gmFoco.conjunto);foco.push(j?j.nome:gmFoco.conjunto)}
+  return `<div class="st-toolbar"><div class="st-filtros" role="tablist">${ab.map(([k,l])=>`<button type="button" class="softbtn ${gmVisao===k?'ativo':''}" data-gv="${k}" ${gmVisao===k?'aria-pressed="true"':''}>${l}</button>`).join('')}</div>${foco.length?`<div class="gm-crumb">Filtrado em: <b>${foco.map(esc).join(' › ')}</b> <button type="button" class="softbtn" id="gmLimpaFoco">Ver tudo</button></div>`:''}</div>`}
+function gmFlatHtml(){
+  const nivel=gmVisao;let lista=gmTodos(nivel);
+  if(gmFoco.campanha)lista=lista.filter(x=>nivel==='campanha'?x.id===gmFoco.campanha:x._campanha===gmFoco.campanha);
+  if(gmFoco.conjunto)lista=lista.filter(x=>nivel==='conjunto'?x.id===gmFoco.conjunto:x._conjunto===gmFoco.conjunto);
+  const b=gmFiltro.busca.toLowerCase();if(gmFiltro.estado)lista=lista.filter(x=>x.status===gmFiltro.estado);if(b)lista=lista.filter(x=>(x.nome+' '+(x.codigo||'')+' '+x.id).toLowerCase().includes(b));
+  const nome={campanha:'campanha',conjunto:'conjunto',anuncio:'anúncio'}[nivel];
+  const col=(x,k,f)=>`<td>${f(x[k],x)}</td>`;
+  const linhas=lista.map(x=>`<tr data-id="${attr(x.id)}"><td>${nivel==='anuncio'?`<input type="checkbox" data-gsel="${attr(x.id)}" ${gmSel.has(x.id)?'checked':''} aria-label="Selecionar para comparar">`:''}</td>
+   <td><b>${esc(x.codigo||'')}</b><br><small>Meta: ${esc(x.id)}</small></td>
+   <td>${x.foto?`<img class="gm-foto" alt="" referrerpolicy="no-referrer" src="${attr(x.foto)}"> `:''}${nivel!=='anuncio'?`<a href="#" data-gf="${nivel}:${attr(x.id)}" title="Abrir ${nivel==='campanha'?'os conjuntos':'os anúncios'}"><b>${esc(x.nome)}</b></a>`:`<b>${esc(x.nome)}</b>`}${x._pai?`<br><small>${esc(x._pai)}</small>`:''}</td>
+   <td>${gmBadge(x.estado)}<br><small>Meta: ${esc(x.estado||x.status)}</small></td><td>${nivel==='anuncio'?'—':gmOrc(x.orcamento)}</td>
+   <td>${esc(gmBrl(x.gasto))}</td><td>${gmN(x.impressoes)}</td><td>${gmN(x.alcance)}</td><td>${gmDec(x.frequencia)}</td><td>${gmN(x.cliques)}</td><td>${gmPct(x.ctr)}</td><td>${x.cliques?esc(gmBrl(x.cpc)):'—'}</td><td>${x.impressoes?esc(gmBrl(x.cpm)):'—'}</td>
+   <td>${gmN(x.conversas)}</td><td>${esc(gmMoeda(x.custoConversa))}</td><td>${gmN(x.leads)}</td><td>${esc(gmMoeda(x.cpl))}</td><td>${gmN(x.resultados)}<small> ${esc(x.rotuloResultado||'')}</small></td><td>${esc(gmMoeda(x.custoResultado))}</td>
+   <td><button class="softbtn" data-det="${attr(x.id)}">Detalhes</button></td></tr>`).join('');
+  return `<div class="card"><div class="st-toolbar"><div class="st-filtros"><input type="search" id="gmBusca" placeholder="Buscar por nome ou código" value="${attr(gmFiltro.busca)}"><select id="gmEstadoF"><option value="">Todos os status</option>${['ACTIVE','PAUSED','ARCHIVED'].map(e=>`<option value="${e}" ${gmFiltro.estado===e?'selected':''}>${e==='ACTIVE'?'Ativos':e==='PAUSED'?'Pausados':'Arquivados'}</option>`).join('')}</select></div>${nivel==='anuncio'?`<button class="btn" id="gmCompSel" ${gmSel.size<2?'disabled':''}>Comparar selecionados (${gmSel.size})</button>`:''}</div>
+   <div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th></th><th>Código EVO · ID Meta</th><th>${nome[0].toUpperCase()+nome.slice(1)}</th><th>Status na Meta</th><th>Orçamento</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>Freq.</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>CPM</th><th>Conversas</th><th>Custo/conversa</th><th>Leads</th><th>CPL</th><th>Resultados</th><th>Custo/resultado</th><th></th></tr></thead><tbody>${linhas||'<tr><td colspan="20" class="empty compact">Nada neste filtro.</td></tr>'}</tbody></table></div>
+   <p class="kpi-note">${lista.length} ${nome}(s) · período ${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))}. Status e números são os devolvidos pela Meta, sem interpretação.</p></div>`}
+function gmLiga(){
+  $$('[data-gv]').forEach(b=>b.onclick=()=>{gmVisao=b.dataset.gv;desenharGerenciador()});
+  const lf=$('#gmLimpaFoco');if(lf)lf.onclick=()=>{gmFoco={campanha:'',conjunto:''};desenharGerenciador()};
+  $$('[data-gf]').forEach(a=>a.onclick=e=>{e.preventDefault();const [n,id]=a.dataset.gf.split(':');if(n==='campanha'){gmFoco={campanha:id,conjunto:''};gmVisao='conjunto'}else{gmFoco={campanha:(gmTodos('conjunto').find(x=>x.id===id)||{})._campanha||gmFoco.campanha,conjunto:id};gmVisao='anuncio'}desenharGerenciador()});
+  $$('[data-det]').forEach(b=>b.onclick=()=>gmDetalhes(b.dataset.det));
+  $$('[data-gsel]').forEach(c=>c.onchange=()=>{c.checked?gmSel.add(c.dataset.gsel):gmSel.delete(c.dataset.gsel);const bt=$('#gmCompSel');if(bt){bt.disabled=gmSel.size<2;bt.textContent=`Comparar selecionados (${gmSel.size})`}});
+  const bs=$('#gmBusca');if(bs)bs.oninput=()=>{gmFiltro.busca=bs.value;clearTimeout(gmLiga.t);gmLiga.t=setTimeout(()=>{desenharGerenciador();const n=$('#gmBusca');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},350)};
+  const ef=$('#gmEstadoF');if(ef)ef.onchange=()=>{gmFiltro.estado=ef.value;desenharGerenciador()};
+  const cs=$('#gmCompSel');if(cs)cs.onclick=gmCompararSel;
+}
+// Detalhes: todos os campos que a Meta devolve para o nível, mais o código interno e o vínculo com Conteúdo
+async function gmDetalhes(id){
+  const [o,nivel]=gmAchar(id);if(!o)return;
+  const p=o.publico||{},cr=o.criativo||{};
+  const lin=(r,v)=>v===undefined||v===null||v===''||(Array.isArray(v)&&!v.length)?'':`<tr><th>${esc(r)}</th><td>${v}</td></tr>`;
+  const loc=[...(p.cidades||[]).map(c=>`${esc(c.nome)}${c.raioKm?` (+${c.raioKm} km)`:''}`),...(p.regioes||[]).map(esc),...(p.paises||[]).map(esc)].join(', ');
+  const idade=p.idadeMin||p.idadeMax?`${p.idadeMin||'—'} a ${p.idadeMax||'—'} anos`:'';
+  const metr=`<tr><th>Gasto</th><td>${esc(gmBrl(o.gasto))}</td></tr>${lin('Impressões',gmN(o.impressoes))}${lin('Alcance',gmN(o.alcance))}${lin('Frequência',gmDec(o.frequencia))}${lin('Cliques',gmN(o.cliques))}${lin('CTR',gmPct(o.ctr))}${lin('CPC',o.cliques?esc(gmBrl(o.cpc)):'—')}${lin('CPM',o.impressoes?esc(gmBrl(o.cpm)):'—')}${lin('Conversas',gmN(o.conversas))}${lin('Custo por conversa',esc(gmMoeda(o.custoConversa)))}${lin('Leads',gmN(o.leads))}${lin('CPL',esc(gmMoeda(o.cpl)))}${lin('Resultados ('+esc(o.rotuloResultado||'')+')',gmN(o.resultados))}${lin('Custo por resultado',esc(gmMoeda(o.custoResultado)))}`;
+  let conteudos=[];if(nivel==='anuncio'&&internalSession?.role==='manager'){try{conteudos=(await getRows('conteudos')).rows||[]}catch{}}
+  const vinc=nivel==='anuncio'?`<h4>Vínculo com Conteúdo</h4><p class="kpi-note">Liga o anúncio a um Conteúdo do EVO MKT (produção orgânica → mídia paga). Não altera nada na Meta.</p><div class="st-row"><label>Conteúdo<select id="gdConteudo"><option value="">(nenhum)</option>${conteudos.map(c=>`<option value="${attr(c.id)}" ${o.conteudo&&o.conteudo.id===c.id?'selected':''}>${esc((c.titulo||c.id).slice(0,70))}</option>`).join('')}${o.conteudo&&!conteudos.some(c=>c.id===o.conteudo.id)?`<option value="${attr(o.conteudo.id)}" selected>${esc(o.conteudo.titulo||o.conteudo.id)}</option>`:''}</select></label><button class="softbtn" id="gdVinc" type="button">Salvar vínculo</button></div>`:'';
+  const ov=adminOverlay(`<h3>${esc(o.nome)}</h3><p class="kpi-note">${nivel==='campanha'?'Campanha':nivel==='conjunto'?'Conjunto de anúncios':'Anúncio'} · código EVO <b>${esc(o.codigo||'')}</b> · ID na Meta <b>${esc(o.id)}</b></p>
+   ${o.foto?`<img class="gm-foto" alt="" referrerpolicy="no-referrer" src="${attr(o.foto)}" style="width:96px;height:auto;border-radius:10px">`:''}
+   <table class="datatable gm-det"><tbody>${lin('Status na Meta',esc(o.estado||o.status))}${lin('Objetivo',esc(GM_OBJ[o.objetivo]||o.objetivo||''))}${lin('Orçamento na Meta',nivel==='anuncio'?'':gmOrc(o.orcamento))}${lin('Criado em',o.criado?esc(fmtDateTime(o.criado)):'')}${lin('Início',o.inicio?esc(fmtDateTime(o.inicio)):'')}${lin('Término',o.fim?esc(fmtDateTime(o.fim)):'')}
+   ${nivel==='conjunto'?lin('Localização',loc)+lin('Faixa etária',idade)+lin('Gênero',(p.generos||[]).map(esc).join(', ')||'Todos')+lin('Plataformas',(p.plataformas||[]).map(esc).join(', '))+lin('Posicionamentos',(p.posicionamentos||[]).map(esc).join(', ')||'Automáticos')+lin('Otimização',esc(o.otimizacao))+lin('Evento de conversão',esc(o.evento))+lin('Destino',esc(o.destino))+lin('Estratégia de lance',esc(o.estrategiaLance)):''}
+   ${nivel==='anuncio'?lin('Formato',esc(cr.formato||''))+lin('Título',esc(cr.titulo))+lin('Texto principal',esc(cr.texto))+lin('Descrição',esc(cr.descricao))+lin('Botão (CTA)',esc(cr.cta))+lin('Endereço (URL)',cr.url?`<a href="${attr(cr.url)}" target="_blank" rel="noopener">${esc(cr.url)}</a>`:'')+lin('Publicação no Instagram',cr.instagram?`<a href="${attr(cr.instagram)}" target="_blank" rel="noopener">abrir</a>`:'')+lin('Página do Facebook (ID)',esc(cr.paginaId))+lin('Instagram usado (ID)',esc(cr.instagramId)):''}
+   </tbody></table><h4>Métricas do período (${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))})</h4><table class="datatable gm-det"><tbody>${metr}</tbody></table>${vinc}
+   <div class="st-acoes"><button class="btn soft" data-close type="button">Fechar</button></div>`);
+  const vb=ov.el.querySelector('#gdVinc');if(vb)vb.onclick=async()=>{try{await gmPost('/ads/vinculo',{ad:o.id,conteudo:ov.el.querySelector('#gdConteudo').value});toast('Vínculo salvo');ov.close();renderGerenciador()}catch(e){toast(e.message,'bad')}};
+}
+// Comparar anúncios escolhidos: destaca o melhor e o pior de cada métrica de taxa/custo, sem recomendar nada
+function gmCompararSel(){
+  const itens=gmTodos('anuncio').filter(a=>gmSel.has(a.id));if(itens.length<2)return toast('Selecione pelo menos 2 anúncios','warn');
+  const M=[['gasto','Investimento',v=>esc(gmBrl(v)),0],['impressoes','Impressões',gmN,0],['alcance','Alcance',gmN,0],['ctr','CTR',gmPct,1],['cpc','CPC',v=>esc(gmMoeda(v)),-1],['cpm','CPM',v=>esc(gmMoeda(v)),-1],['conversas','Conversas',gmN,1],['custoConversa','Custo por conversa',v=>esc(gmMoeda(v)),-1],['leads','Leads',gmN,1],['cpl','CPL',v=>esc(gmMoeda(v)),-1]];
+  const linhas=M.map(([k,r,f,dir])=>{const vals=itens.map(a=>a[k]);const val=vals.filter(v=>v!==null&&v!==undefined&&!(dir===-1&&!v));let best=null,worst=null;if(dir&&val.length>1){best=dir===1?Math.max(...val):Math.min(...val);worst=dir===1?Math.min(...val):Math.max(...val);if(best===worst)best=worst=null}
+    return `<tr><th>${r}</th>${itens.map(a=>{const v=a[k];const cl=v===best?'gm-best':v===worst?'gm-worst':'';return `<td class="${cl}">${v===null||v===undefined||(dir===-1&&!v)?'—':f(v)}${cl==='gm-best'?' <small>melhor</small>':cl==='gm-worst'?' <small>pior</small>':''}</td>`}).join('')}</tr>`}).join('');
+  adminOverlay(`<h3>Comparar anúncios (${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))})</h3><p class="kpi-note">Em CTR, conversas e leads, maior é melhor; em CPC, CPM e custos, menor é melhor. Os destaques são só comparação numérica entre os selecionados.</p><div class="tablewrap"><table class="datatable"><thead><tr><th></th>${itens.map(a=>`<th>${esc(a.codigo||'')}<br><small>${esc(a.nome)}</small></th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table></div><div class="st-acoes"><button class="btn soft" data-close type="button">Fechar</button></div>`);
 }

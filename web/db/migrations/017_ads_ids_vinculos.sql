@@ -1,0 +1,3 @@
+-- Tráfego: códigos internos do EVO MKT para campanha/conjunto/anúncio (sem trocar os IDs da Meta) e vínculo de anúncio com Conteúdo.
+CREATE TABLE IF NOT EXISTS ads_ids(meta_id VARCHAR(64) NOT NULL,nivel VARCHAR(10) NOT NULL,codigo VARCHAR(20) NOT NULL,criado_em VARCHAR(40) NOT NULL,PRIMARY KEY(meta_id),UNIQUE KEY uq_ads_codigo(nivel,codigo)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS ads_vinculos(ad_id VARCHAR(64) NOT NULL,conteudo_id VARCHAR(40) NOT NULL,quem VARCHAR(80) NOT NULL DEFAULT '',quando VARCHAR(40) NOT NULL,PRIMARY KEY(ad_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

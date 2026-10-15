@@ -6,7 +6,7 @@ import { fail, Row, strv } from '../util';
 import { metaConnected } from '../integrations/meta';
 import { cfgRegras, enviarRelatorioSemanal, excluirRascunho, listarMatriculas, rascunhos, rodarRegras, salvarMatriculas, salvarRascunho, salvarRegras } from '../integrations/metaadsExtras';
 import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, whatsOk, numWhats, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
-import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel } from '../integrations/metaadsGerenciador';
+import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel, vincularConteudo } from '../integrations/metaadsGerenciador';
 import { addDays, fmtDate } from '../util';
 import { lancarCampanha, opcoesCampanha, pesquisarInteresse, previaCampanha, Spec } from '../integrations/metaadsCampanha';
 import { json } from './handlers';
@@ -116,6 +116,12 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     const b = await c.body();
     if (strv(b.excluir)) { await excluirRascunho(strv(b.excluir)); return json({ ok: true, rascunhos: await rascunhos() }); }
     try { const r = await salvarRascunho(strv(b.nome), b.dados, strv(b.id) || undefined); return json({ ok: true, rascunho: r, rascunhos: await rascunhos() }); } catch (e: any) { return fail(400, e.message); }
+  }
+  if (path === '/ads/vinculo' && method === 'POST') { // metadado local do EVO MKT (não altera nada na Meta): liga um anúncio a um Conteúdo
+    const b = await c.body();
+    try { await vincularConteudo(strv(b.ad), strv(b.conteudo), String(u.nome || u.codigo)); } catch (e: any) { return fail(400, e.message); }
+    await audit(String(u.codigo), 'ads-vinculo', 'ads', strv(b.ad));
+    return json({ ok: true });
   }
   if (path === '/ads/acoes' && method === 'GET') return json({ rows: await acoesRecentes() });
   if (path === '/ads/editar' && method === 'POST') {

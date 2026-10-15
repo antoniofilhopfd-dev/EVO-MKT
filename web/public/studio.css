@@ -123,3 +123,7 @@
 .datatable td:nth-child(3){min-width:220px;max-width:420px;overflow-wrap:anywhere}
 
 .rk-link{color:var(--blue,#063996);text-decoration:none;font-weight:500;line-height:1.35}.rk-link:hover{text-decoration:underline}
+
+.gm-orc{display:grid;gap:8px}.gm-orc-lin{display:flex;flex-wrap:wrap;gap:24px}.gm-orc-lin div{display:grid}.gm-orc-lin strong{font-size:18px}.gm-orc-lin small{color:var(--muted,#6B6F80)}
+.gm-crumb{display:flex;gap:8px;align-items:center}.softbtn.ativo{background:var(--blue,#063996);color:#fff;border-color:var(--blue,#063996)}
+.gm-best{color:#1E7E4D;font-weight:700}.gm-worst{color:#C0392B;font-weight:700}.gm-det th{text-align:left;width:34%;color:var(--muted,#6B6F80);font-weight:600;vertical-align:top}

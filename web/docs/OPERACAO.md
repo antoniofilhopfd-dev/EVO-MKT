@@ -119,3 +119,15 @@ Cadastre o **WhatsApp do Colégio** (DDI+DDD, ex.: +5583999999999) em Tráfego �
 - **Padrão:** o Tráfego só LÊ e mostra métricas (painel do mês, relatório semanal em PDF, alertas, Gerenciador em leitura com "Comparar anúncios", custo por matrícula e relatório semanal por e-mail). Não aparecem os botões de criar, editar, pausar, duplicar nem Impulsionar, e o servidor recusa (403) qualquer escrita.
 - **Modo completo (opcional):** Administração → Integrações → Anúncios → "Modo completo". Libera Gestor de anúncios, Impulsionar, Nova campanha, edição/pausa e regras automáticas. Depois, siga o guia do Gestor (ligar a gestão e reconectar a Meta com ads_management).
 - **Alertas:** anúncios com problema aparecem agrupados por motivo.
+
+## Tráfego em 3 níveis (Campanha → Conjunto → Anúncio)
+Tráfego → **Gerenciador** (Gerência), somente leitura por padrão:
+- **Abas:** Hierarquia | Campanhas | Conjuntos | Anúncios. Clicar no nome de uma campanha abre os conjuntos dela; no de um conjunto, os anúncios. Um aviso "Filtrado em…" com **Ver tudo** mantém o contexto; período, busca e status continuam ao navegar.
+- **Códigos:** cada objeto recebe um código interno estável do EVO MKT (CAM-0001, CJ-0001, AN-0001). O ID da Meta é mostrado ao lado e nunca é trocado.
+- **Métricas em cada nível:** investimento, impressões, alcance, frequência, cliques, CTR, CPC, CPM, conversas, custo por conversa, leads, CPL, resultado e custo por resultado.
+- **Detalhes:** status na Meta (como a API devolve), orçamento, datas, e no conjunto: localização, idade, gênero, plataformas e posicionamentos, otimização, evento de conversão, destino e lance; no anúncio: formato, título, texto, descrição, botão, link, publicação do Instagram, Página e perfil usados.
+- **Orçamento:** três números separados: planejado no EVO MKT (mês), configurado na Meta (campanhas ativas, por dia) e gasto no mês.
+- **Comparar:** marque 2 ou mais anúncios e use "Comparar selecionados": métricas lado a lado, com melhor/pior destacados só pela comparação numérica (CTR, conversas e leads: maior é melhor; CPC, CPM e custos: menor é melhor).
+- **Vínculo com Conteúdo:** em Detalhes do anúncio, ligue-o a um Conteúdo do EVO MKT (liga produção orgânica à mídia paga). É um registro local; nada muda na Meta.
+- **Criar/publicar/pausar:** só no modo completo (Administração → Integrações → Anúncios), com confirmação, tetos, auditoria (quem, quando, antes/depois, resposta da Meta) e a campanha incompleta removida se a Meta recusar. Credenciais da Meta ficam só no servidor.
+- **Ainda não existe:** biblioteca de criativos separada e rascunho local de conjunto/anúncio dentro de uma campanha existente (hoje o assistente "Nova campanha" cria campanha, conjunto e anúncio de uma vez).

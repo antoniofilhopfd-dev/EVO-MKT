@@ -21,6 +21,18 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('custo por resultado = gasto ÷ resultados (nulo sem resultado)',Math.abs(s1.custoResultado-1234.56/35)<0.01&&r.campanhas.find(c=>c.id==='c3').custoResultado===null);
  t('orçamento em unidade normal (5000 centavos = 50), público e anúncios com foto só https',s1.orcamento.diario===50&&s1.publico.idadeMin===25&&s1.publico.cidades[0].raioKm===15&&s1.anuncios[0].foto==='https://scontent.fbcdn.net/a1.jpg'&&s1.anuncios[1].foto==='',[s1.orcamento,s1.publico,s1.anuncios.map(a=>a.foto)]);
  t('totais da conta somam as campanhas',Math.abs(r.totais.gasto-2084.56)<0.01&&r.totais.cliques===2920);
+ // ---- métricas ampliadas, códigos internos, criativo, orçamento e vínculo com Conteúdo
+ const a1=s1.anuncios.find(a=>a.id==='a1');
+ t('métricas ampliadas por nível: frequência, CPM, conversas, leads e CPL',Math.abs(s1.frequencia-90000/41000)<0.001&&Math.abs(s1.cpm-1234.56/90000*1000)<0.01&&s1.leads===35&&Math.abs(s1.cpl-1234.56/35)<0.01&&s1.conversas===0&&s1.custoConversa===null,[s1.frequencia,s1.cpm,s1.leads,s1.cpl]);
+ t('cada objeto recebe um código interno do EVO MKT (CAM-/CJ-/AN-) sem trocar o ID da Meta',/^CAM-\d{4}$/.test(c1.codigo)&&/^CJ-\d{4}$/.test(s1.codigo)&&/^AN-\d{4}$/.test(a1.codigo)&&c1.id==='c1'&&a1.id==='a1',[c1.codigo,s1.codigo,a1.codigo]);
+ const r2=(await call('GET','/ads/arvore'))[1];t('os códigos são estáveis entre leituras',r2.campanhas.find(c=>c.id==='c1').codigo===c1.codigo&&r2.campanhas.find(c=>c.id==='c1').conjuntos[0].anuncios[0].codigo===a1.codigo);
+ t('anúncio traz o criativo como a Meta devolve: título, texto, botão, formato, link e perfil',a1.criativo.titulo==='Matrículas abertas'&&a1.criativo.cta==='LEARN_MORE'&&a1.criativo.formato==='Vídeo'&&a1.criativo.url==='https://evolucao.test/matriculas'&&/instagram\.com/.test(a1.criativo.instagram)&&a1.criativo.paginaId==='p1',a1.criativo);
+ t('orçamento mostra três números separados: planejado no EVO, configurado na Meta e gasto',typeof r.orcamentoConta.planejadoEvo==='number'&&typeof r.orcamentoConta.configuradoMetaDia==='number'&&typeof r.orcamentoConta.gastoMes==='number',r.orcamentoConta);
+ const cid=(await call('POST','/data?module=conteudos',{titulo:'Vídeo Matrículas Infantil',status:'APROVADO'}))[1].id;
+ [s]=await call('POST','/ads/vinculo',{ad:'a1',conteudo:'CON-9999'});t('vincular a Conteúdo que não existe: 400',s===400);
+ [s]=await call('POST','/ads/vinculo',{ad:'a1',conteudo:cid});r2.x=0;const r3=(await call('GET','/ads/arvore'))[1];
+ t('anúncio vinculado a um Conteúdo mostra o conteúdo na árvore',s===200&&r3.campanhas.find(c=>c.id==='c1').conjuntos[0].anuncios[0].conteudo.titulo==='Vídeo Matrículas Infantil',r3.campanhas.find(c=>c.id==='c1').conjuntos[0].anuncios[0].conteudo);
+ await call('POST','/ads/vinculo',{ad:'a1',conteudo:''});t('desvincular remove o vínculo',(await call('GET','/ads/arvore'))[1].campanhas.find(c=>c.id==='c1').conjuntos[0].anuncios[0].conteudo===null);
  [s]=await call('GET','/ads/arvore',null,E);t('Equipe não vê o gerenciador (403)',s===403);
  [s]=await call('GET','/ads/arvore?de=2026-10-10&ate=2026-10-01');t('período invertido: 400',s===400);
  [s]=await call('GET','/ads/arvore?de=2026-01-01&ate=2026-12-31');t('período acima de 93 dias: 400',s===400);
