@@ -1,4 +1,5 @@
 import { q, q1, run } from '../db';
+import { sha256 } from '../crypto';
 import { registrarNotificacao } from '../notificacoes';
 import { intLog, setSetting, setting } from '../settings';
 import { fmtDate, localParts, now, Row } from '../util';
@@ -251,8 +252,16 @@ export async function alertasExtras(): Promise<AlertaTrafego[]> {
       if (cu > ca * 1.4 && sm(u7, 'gasto') >= 30) add('custo-sobe', 'Custo por resultado subindo', 'atencao', `O custo por resultado dos últimos 7 dias (${cu.toFixed(2)}) está ${Math.round((cu / ca - 1) * 100)}% acima da semana anterior (${ca.toFixed(2)}). Veja em Tráfego → Gerenciador → Comparar anúncios.`);
     }
   }
+  // anúncios com problema, agrupados pelo motivo (um aviso por motivo, com a lista dos anúncios)
+  const grupos = new Map<string, string[]>();
   for (const a of await adsAnuncios(per)) {
-    if (/DISAPPROVED|WITH_ISSUES/i.test(String(a.status))) add(`anuncio-${a.anuncio_id}`, 'Anúncio com problema', 'critico', `${a.problema ? a.problema : 'A Meta informa ' + a.status + '.'}`, String(a.anuncio));
+    if (!/DISAPPROVED|WITH_ISSUES/i.test(String(a.status))) continue;
+    const motivo = String(a.problema || 'A Meta informa ' + a.status + '.').trim();
+    (grupos.get(motivo) ?? grupos.set(motivo, []).get(motivo)!).push(String(a.anuncio));
+  }
+  for (const [motivo, nomes] of grupos) {
+    const lista = nomes.slice(0, 5).join(', ') + (nomes.length > 5 ? ` e mais ${nomes.length - 5}` : '');
+    add(`anuncio-${sha256(motivo).slice(0, 12)}`, 'Anúncio com problema', 'critico', `${nomes.length} anúncio(s): ${motivo.replace(/\.$/, '')}. Confira no Gerenciador de Anúncios.`, lista);
   }
   return out;
 }
