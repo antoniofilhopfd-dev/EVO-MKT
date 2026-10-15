@@ -134,7 +134,7 @@ export async function igSync(months = 2): Promise<number> {
     [fmtDate(new Date()), Number(profile.followers_count ?? 0), Number(profile.follows_count ?? 0), Number(profile.media_count ?? 0), now()]);
   const media: Row[] = [];
   let after = '';
-  for (let pg = 0; pg < 3; pg++) { // até 300 publicações mais recentes
+  for (let pg = 0; pg < 10; pg++) { // até 1000 publicações mais recentes
     const r = await metaGet(`/${ig}/media`, { fields: 'id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink,media_url,thumbnail_url', limit: 100, ...(after ? { after } : {}) });
     media.push(...(r.data ?? []));
     after = String(r.paging?.cursors?.after ?? '');

@@ -169,7 +169,7 @@ export async function operacaoRoute(c: Ctx) {
   }
   if (path === '/instagram/posts') {
     await requireInternal(c);
-    const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts ORDER BY publicado_em DESC LIMIT 300')).map((p) => {
+    const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts ORDER BY publicado_em DESC LIMIT 1000')).map((p) => {
       const interacoes = Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos);
       const alcance = p.alcance === null || p.alcance === undefined ? null : Number(p.alcance);
       return {
