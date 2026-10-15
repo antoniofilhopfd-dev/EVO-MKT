@@ -1,6 +1,6 @@
 # Gestor de Anúncios no EVO MKT — desenho (para aprovação)
 
-Status: **Fase 1 implementada** (impulsionar publicação, tetos, confirmação, pausar/retomar/pausar tudo). Fases 2 e 3 pendentes. Os valores abaixo foram escolhidos por padrão e a Gerência os altera em Tráfego → Gestor de anúncios. Hoje o Tráfego é somente leitura (decisão original). Este documento muda essa regra de forma controlada: o EVO MKT passa a **criar e gerir campanhas que vão ao ar ATIVAS**, como o Gerenciador de Anúncios do Colégio.
+Status: **Fases 1, 2 e 3 implementadas** (impulsionar publicação; Gerenciador da conta inteira com edição; nova campanha completa com todos os objetivos). Fase 4 (relatórios que marcam o que o sistema lançou) pendente. Os valores abaixo foram escolhidos por padrão e a Gerência os altera em Tráfego → Gestor de anúncios. Hoje o Tráfego é somente leitura (decisão original). Este documento muda essa regra de forma controlada: o EVO MKT passa a **criar e gerir campanhas que vão ao ar ATIVAS**, como o Gerenciador de Anúncios do Colégio.
 
 ## 1. Princípios
 1. **Vai ao ar ativo.** Campanha, conjunto e anúncio são criados `ACTIVE`. Eles entram na análise da Meta (`PENDING_REVIEW`) e passam a rodar sozinhos depois de aprovados.
@@ -84,3 +84,20 @@ Os pedidos à Meta (`montarPayloads` em `lib/integrations/metaadsGestao.ts`) seg
 2. Confira a campanha no Gerenciador de Anúncios da Meta (nome começa com `[EVO MKT]`).
 3. Se a Meta recusar algum campo, o erro aparece na tela, a campanha incompleta é pausada e removida, e o lançamento fica registrado como ERRO com o motivo. Ajuste só `montarPayloads`.
 4. Pause pelo sistema (**Pausar**) ou, em emergência, **Pausar tudo**.
+
+
+## 11. Nova campanha completa (todos os objetivos)
+Tráfego → Gerenciador → **+ Nova campanha**. Assistente de 5 passos: objetivo/resultado → público (cidade, raio, idade, gênero, interesses pesquisados na Meta, públicos personalizados, posicionamento automático ou manual) → orçamento diário ou total, datas e lance (menor custo ou limite de custo) → anúncio → revisão com total comprometido e confirmação.
+
+| Objetivo (Meta) | Resultados oferecidos | O que a Meta exige |
+|---|---|---|
+| Reconhecimento | Alcance, Impressões | nada extra; publicação do Instagram ou imagem nova |
+| Tráfego | Cliques no link, Visualizações da página, Visitas ao perfil | site https (imagem nova); perfil aceita publicação |
+| Engajamento | Engajamento com a publicação, Conversas (Direct, Messenger, WhatsApp), ThruPlay | publicação do Instagram; WhatsApp pede o número |
+| Cadastros (leads) | Formulário instantâneo, Conversas | ID do formulário (lista os ativos da Página) |
+| Vendas | Conversões no site | site https, pixel e evento |
+| Promoção do app | Instalações | ID do app e link da loja |
+
+Criativos: **publicação existente do Instagram** (qualquer uma lida no Desempenho) ou **imagem JPEG de um post do Estúdio** (enviada à Meta no lançamento). Vídeo novo não é enviado pelo sistema: use um Reel já publicado. Regras iguais às do Gestor: vai ativa, teto por dia e por mês, término obrigatório, duração máxima, chave única (não duplica) e compensação em falha (pausa e remove a campanha incompleta).
+
+**Para o primeiro teste real de cada objetivo**, use R$ 6/dia por 1 dia. Os pedidos à Meta (`lib/integrations/metaadsCampanha.ts`, função `montar`) foram validados só contra o simulador; se a Meta recusar algum campo, o erro aparece na tela e o ajuste fica só nessa função. Um ponto a observar: versões novas da API podem exigir `targeting_automation.advantage_audience` no conjunto de anúncios.

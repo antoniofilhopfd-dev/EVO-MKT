@@ -78,3 +78,6 @@ Tráfego → **Gestor de anúncios** (só Gerência). Cria e gere anúncios de v
 
 ## Gerenciador de Anúncios (Etapa A)
 Tráfego → **Gerenciador** (só Gerência). Lê a conta de anúncios inteira (não só o que o sistema lançou): campanhas > conjuntos > anúncios, com ligado/pausado, estado na Meta, orçamento, resultados conforme o objetivo, custo por resultado, gasto, impressões, alcance, CTR e CPC, para hoje, 7/30 dias, mês ou período livre (até 93 dias). Dá para: ligar/pausar pelo interruptor, **editar** nome, orçamento diário ou total, início, término e público do conjunto (idade e raio), **duplicar** (a cópia nasce pausada, como na Meta), **arquivar** e **excluir** (exige confirmação). Regras: só mexe em objeto da conta escolhida; respeita os tetos do Gestor; a gestão precisa estar ligada; tudo vai para o **Histórico de alterações** (quem, quando, antes e depois) e as mudanças graves avisam a Gerência.
+
+## Nova campanha completa (Etapa B)
+Tráfego → Gerenciador → **+ Nova campanha**: todos os objetivos da Meta (reconhecimento, tráfego, engajamento, cadastros, vendas, app), com público detalhado, orçamento diário ou total, datas, lance e criativo (publicação do Instagram ou imagem do Estúdio). A revisão mostra o total comprometido e o teto do mês; só lança depois da confirmação, ativa. Tabela de objetivos e exigências em `GESTOR_DE_ANUNCIOS_DESENHO.md`.

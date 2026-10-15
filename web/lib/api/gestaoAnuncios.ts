@@ -7,6 +7,7 @@ import { metaConnected } from '../integrations/meta';
 import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
 import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel } from '../integrations/metaadsGerenciador';
 import { addDays, fmtDate } from '../util';
+import { lancarCampanha, opcoesCampanha, pesquisarInteresse, previaCampanha, Spec } from '../integrations/metaadsCampanha';
 import { json } from './handlers';
 
 /** Rotas do Gestor de Anúncios. Todas só da Gerência. */
@@ -85,6 +86,22 @@ export async function gestaoAnunciosRoute(c: Ctx) {
       await audit(String(u.codigo), 'ads-duplicar', 'ads', strv(b.id));
       return json(r);
     } catch (e: any) { return fail(/Meta recusou/.test(e.message) ? 502 : 400, e.message); }
+  }
+  if (path === '/ads/campanha/opcoes' && method === 'GET') { try { return json(await opcoesCampanha()); } catch (e: any) { return fail(502, e.message); } }
+  if (path === '/ads/campanha/interesses' && method === 'GET') {
+    const t = c.qs('q').trim();
+    if (t.length < 2) return json({ rows: [] });
+    try { return json({ rows: await pesquisarInteresse(t.slice(0, 60)) }); } catch (e: any) { return fail(502, e.message); }
+  }
+  if (path === '/ads/campanha/previa' && method === 'POST') return json(await previaCampanha((await c.body()) as unknown as Spec));
+  if (path === '/ads/campanha/lancar' && method === 'POST') {
+    const b = await c.body();
+    if (b.confirmou !== true) fail(400, 'Confirme o lançamento na tela de resumo.');
+    try {
+      const r = await lancarCampanha(b.spec as Spec, String(u.nome || u.codigo));
+      await audit(String(u.codigo), 'ads-campanha', 'ads', String(r.id));
+      return json({ ok: true, lancamento: r });
+    } catch (e: any) { return fail(502, e.message); }
   }
   if (path === '/ads/pausar-tudo' && method === 'POST') {
     const r = await pausarTudo();

@@ -20,7 +20,7 @@ const OBJETIVOS: Record<Objetivo, { rotulo: string; objective: string; goal: str
   ALCANCE: { rotulo: 'Alcance (mostrar para mais pessoas)', objective: 'OUTCOME_AWARENESS', goal: 'REACH' },
 };
 const SEM_CENTAVOS = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'HUF', 'TWD']);
-const menorUnidade = (v: number, moeda: string) => String(Math.round(v * (SEM_CENTAVOS.has(moeda) ? 1 : 100)));
+export const menorUnidade = (v: number, moeda: string) => String(Math.round(v * (SEM_CENTAVOS.has(moeda) ? 1 : 100)));
 const num = (v: unknown, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
 
 export interface Publico { cidade: { key: string; nome: string; regiao: string } | null; raioKm: number; idadeMin: number; idadeMax: number }
@@ -46,13 +46,13 @@ export async function resolverCidade(texto: string): Promise<NonNullable<Publico
   return { key: String(c.key), nome: String(c.name ?? texto), regiao: String(c.region ?? '') };
 }
 
-async function contaAds(): Promise<{ id: string; moeda: string }> {
+export async function contaAds(): Promise<{ id: string; moeda: string }> {
   const id = await setting('meta_ads_conta');
   if (!id) throw new Error('Escolha a conta de anúncios em Integrações.');
   const info = (JSON.parse((await setting('meta_ads_contas')) || '[]') as ContaAds[]).find((c) => c.id === id);
   return { id, moeda: info?.moeda || 'BRL' };
 }
-async function paginaDoInstagram(): Promise<string> {
+export async function paginaDoInstagram(): Promise<string> {
   const salvo = await setting('meta_page_id');
   if (salvo) return salvo;
   const ig = await setting('ig_user_id');
@@ -61,6 +61,18 @@ async function paginaDoInstagram(): Promise<string> {
   if (!p?.id) throw new Error('Não achei a Página do Facebook ligada ao Instagram conectado.');
   await setSetting('meta_page_id', String(p.id));
   return String(p.id);
+}
+
+/** Gasto do mês já lido da Meta + campanhas do sistema em andamento + a nova, contra o teto mensal. */
+export async function limitesMes(compromisso: number, tetoMes: number): Promise<{ gastoMes: number; pendente: number; erros: string[]; avisos: string[] }> {
+  const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
+  const gastoMes = Number((await q1('SELECT COALESCE(SUM(gasto),0) g FROM ads_snapshots WHERE periodo=?', [per]))?.g ?? 0);
+  const ativos = await q("SELECT orcamento_dia,fim FROM ads_lancamentos WHERE estado='ATIVO' AND fim>?", [now()]);
+  const pendente = ativos.reduce((s, r) => s + Number(r.orcamento_dia) * Math.max(0, Math.ceil((new Date(String(r.fim)).getTime() - Date.now()) / 86400000)), 0);
+  const erros: string[] = [], avisos: string[] = [];
+  if (gastoMes + pendente + compromisso > tetoMes) erros.push(`O compromisso total (gasto do mês ${gastoMes.toFixed(2)} + campanhas em andamento ${pendente.toFixed(2)} + esta ${compromisso.toFixed(2)}) passa do teto mensal (${tetoMes}).`);
+  else if (gastoMes + pendente + compromisso > tetoMes * 0.8) avisos.push('Com esta campanha o mês passa de 80% do teto mensal.');
+  return { gastoMes, pendente, erros, avisos };
 }
 
 export interface PedidoImpulso { chave: string; midia: string; orcamentoDia: number; dias: number; objetivo: Objetivo }
@@ -82,12 +94,10 @@ export async function previaImpulso(p: PedidoImpulso) {
   let moeda = 'BRL';
   try { moeda = (await contaAds()).moeda; } catch (e: any) { erros.push(e.message); }
   const compromisso = Math.round(orc * dias * 100) / 100;
-  const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
-  const gastoMes = Number((await q1('SELECT COALESCE(SUM(gasto),0) g FROM ads_snapshots WHERE periodo=?', [per]))?.g ?? 0);
-  const ativos = await q("SELECT orcamento_dia,fim FROM ads_lancamentos WHERE estado='ATIVO' AND fim>?", [now()]);
-  const pendente = ativos.reduce((s, r) => s + Number(r.orcamento_dia) * Math.max(0, Math.ceil((new Date(String(r.fim)).getTime() - Date.now()) / 86400000)), 0);
-  if (gastoMes + pendente + compromisso > cfg.tetoMes) erros.push(`O compromisso total (gasto do mês ${gastoMes.toFixed(2)} + campanhas em andamento ${pendente.toFixed(2)} + esta ${compromisso.toFixed(2)}) passa do teto mensal (${cfg.tetoMes}).`);
-  else if (gastoMes + pendente + compromisso > cfg.tetoMes * 0.8) avisos.push('Com esta campanha o mês passa de 80% do teto mensal.');
+  const lm = await limitesMes(compromisso, cfg.tetoMes);
+  const { gastoMes, pendente } = lm;
+  erros.push(...lm.erros);
+  avisos.push(...lm.avisos);
   const fim = new Date(Date.now() + dias * 86400000);
   return {
     ok: erros.length === 0, erros, avisos, moeda, compromisso, gastoMes, pendente, tetoDia: cfg.tetoDia, tetoMes: cfg.tetoMes, diasMax: cfg.diasMax, fim: now(fim),
@@ -112,7 +122,7 @@ function montarPayloads(p: PedidoImpulso, o: { moeda: string; pagina: string; ig
   return { campanha, conjunto, criativo };
 }
 
-async function marcar(id: number, estado: string, extra: { campanha_id?: string; conjunto_id?: string; anuncio_id?: string; erro?: string } = {}) {
+export async function marcar(id: number, estado: string, extra: { campanha_id?: string; conjunto_id?: string; anuncio_id?: string; erro?: string } = {}) {
   await run('UPDATE ads_lancamentos SET estado=?,atualizado_em=?,campanha_id=COALESCE(?,campanha_id),conjunto_id=COALESCE(?,conjunto_id),anuncio_id=COALESCE(?,anuncio_id),erro=COALESCE(?,erro) WHERE id=?',
     [estado, now(), extra.campanha_id ?? null, extra.conjunto_id ?? null, extra.anuncio_id ?? null, extra.erro ?? null, id]);
 }

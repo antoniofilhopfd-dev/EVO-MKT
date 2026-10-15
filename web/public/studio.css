@@ -107,3 +107,11 @@
 .gm-sw{position:relative;display:inline-block;width:38px;height:22px}.gm-sw input{opacity:0;width:100%;height:100%;position:absolute;margin:0;cursor:pointer}.gm-sw i{position:absolute;inset:0;background:#C9CFDB;border-radius:99px;transition:.15s}.gm-sw i::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.15s}.gm-sw input:checked+i{background:var(--ok)}.gm-sw input:checked+i::after{left:19px}.gm-sw input:focus-visible+i{outline:2px solid var(--brand)}
 .gm-acoes{display:flex;gap:6px}
 .gm-tab tfoot .tot td{font-weight:700;background:var(--line-2)}
+/* assistente de campanha */
+.wz-passos{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0 14px}.wz-passos li{padding:4px 10px;border-radius:99px;background:var(--line-2);color:var(--ink-3);font-size:12px}.wz-passos li.ativo{background:var(--brand);color:#fff;font-weight:700}.wz-passos li.feito{background:var(--ok-bg);color:var(--ok)}
+.wz-objs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:10px}
+.wz-obj{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit;color:var(--ink)}.wz-obj.sel{border-color:var(--brand);background:var(--brand-bg)}.wz-obj small{display:block;color:var(--ink-3);margin-top:2px}
+.wz-metas{display:grid;gap:6px;margin:6px 0 10px}.wz-meta{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-weight:400!important}.wz-meta small{display:block;color:var(--ink-3)}
+.wz-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.wz-posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;max-height:230px;overflow:auto;margin:6px 0}.wz-post{border:2px solid var(--line);border-radius:8px;background:var(--card);padding:4px;cursor:pointer;font:inherit;text-align:left}.wz-post.sel{border-color:var(--brand)}.wz-post img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:4px}.wz-post span{display:grid;place-items:center;aspect-ratio:1/1;background:var(--line-2)}.wz-post small{display:block;font-size:11px;color:var(--ink-3)}
+.st-form h4{margin:14px 0 4px}
