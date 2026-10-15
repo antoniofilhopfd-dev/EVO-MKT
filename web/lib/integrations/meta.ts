@@ -105,6 +105,19 @@ export async function metaRefreshIfNeeded(): Promise<void> {
     throw e;
   }
 }
+/** Métricas da conta num intervalo de datas (AAAA-MM-DD), lidas ao vivo da Meta em janelas de até 30 dias (alcance de janelas diferentes se soma). */
+export async function igMetricasJanela(ig: string, de: string, ate: string): Promise<Record<string, number>> {
+  const soma: Record<string, number> = {};
+  let ini = parseLocal(de + 'T00:00:00');
+  const fim = Math.min(parseLocal(ate + 'T23:59:59').getTime(), Date.now());
+  while (ini.getTime() <= fim) {
+    const fimJ = Math.min(ini.getTime() + 30 * 86400000 - 1000, fim);
+    const r = await metaInsightTotal(ig, ['reach', 'views', 'profile_views', 'total_interactions', 'likes', 'comments', 'shares', 'saves'], Math.floor(ini.getTime() / 1000), Math.floor(fimJ / 1000));
+    for (const [k, v] of Object.entries(r)) soma[k] = (soma[k] ?? 0) + v;
+    ini = new Date(fimJ + 1000);
+  }
+  return soma;
+}
 async function metaInsightTotal(ig: string, metrics: string[], since: number, until: number): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
   const pede = async (ms: string[]) => {

@@ -12,7 +12,7 @@ import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
 import { diasUteisEntre, HistRow, hojeLocal, periodosPorStatus, slaInfo } from '../sla';
 import { addDays, env, fail, fmtDate, localParts, now, Row } from '../util';
-import { contasMonitoradas, igContaValida } from '../integrations/meta';
+import { contasMonitoradas, igContaValida, igMetricasJanela, metaConnected } from '../integrations/meta';
 import { json } from './handlers';
 
 const ymd = (s: unknown) => String(s ?? '').slice(0, 10);
@@ -157,6 +157,59 @@ export async function operacaoRoute(c: Ctx) {
     const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts WHERE conta=? AND publicado_em LIKE ? ORDER BY publicado_em DESC', [conta, mes + '%'])).map((p) => ({ ...p, interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos) }));
     const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [conta, per + '%']))?.seguidores ?? null;
     return json({ mes, anterior: ant, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' });
+  }
+  if (path === '/instagram/periodo') {
+    await requireInternal(c);
+    const conta = await igContaValida(c.qs('conta'));
+    const modo = ['7', '30', '90', 'ano', 'tudo'].includes(c.qs('p')) ? c.qs('p') : '30';
+    const hoje = fmtDate(new Date()), ymd = (d: Date) => fmtDate(d);
+    const vazio = { alcance: 0, impressoes: 0, visitasPerfil: 0, interacoes: 0, curtidas: 0, comentarios: 0, compartilhamentos: 0, salvamentos: 0 };
+    const n = (v: unknown) => Number(v ?? 0) || 0;
+    const linhas = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? conta) === conta && /^\d{4}-\d{2}$/.test(String(r.periodo ?? '')));
+    const dasLinhas = (fil: (per: string) => boolean) => {
+      const rs = linhas.filter((r) => fil(String(r.periodo)));
+      const o: Record<string, number> = { ...vazio };
+      for (const r of rs) for (const k of Object.keys(vazio)) o[k] += n(r[k]);
+      return { ...o, meses: rs.length };
+    };
+    const daMeta = async (de: string, ate: string) => {
+      const m = await igMetricasJanela(conta, de, ate);
+      return { alcance: n(m.reach), impressoes: n(m.views), visitasPerfil: n(m.profile_views), interacoes: n(m.total_interactions), curtidas: n(m.likes), comentarios: n(m.comments), compartilhamentos: n(m.shares), salvamentos: n(m.saves) };
+    };
+    const posts = async (de: string, ate: string) => {
+      const rs = await q('SELECT tipo FROM ig_posts WHERE conta=? AND SUBSTR(publicado_em,1,10)>=? AND SUBSTR(publicado_em,1,10)<=?', [conta, de, ate]);
+      return { posts: rs.filter((x) => x.tipo !== 'REELS').length, reels: rs.filter((x) => x.tipo === 'REELS').length };
+    };
+    let de = '', ate = hoje, rotulo = '', atual: Row = {}, anterior: Row | null = null, fonte = '', aviso = '';
+    try {
+      if (modo === 'ano' || modo === 'tudo') {
+        const ano = hoje.slice(0, 4);
+        de = modo === 'ano' ? `${ano}-01-01` : (linhas.map((r) => String(r.periodo)).sort()[0] ?? hoje.slice(0, 7)) + '-01';
+        rotulo = modo === 'ano' ? `Ano ${ano} (parcial)` : 'Todo o período sincronizado';
+        atual = dasLinhas((p) => modo === 'tudo' || p.startsWith(ano));
+        anterior = modo === 'ano' ? dasLinhas((p) => p.startsWith(String(Number(ano) - 1))) : null;
+        if (anterior && !(anterior as any).meses) anterior = null;
+        fonte = 'meses sincronizados';
+        if (!(atual as any).meses) aviso = 'Ainda não há meses sincronizados. Use "Carregar histórico" em Instagram → Ranking.';
+      } else {
+        const dias = Number(modo);
+        de = ymd(new Date(Date.now() - (dias - 1) * 86400000));
+        const deAnt = ymd(new Date(Date.now() - (2 * dias - 1) * 86400000)), ateAnt = ymd(new Date(Date.now() - dias * 86400000));
+        rotulo = `Últimos ${dias} dias`;
+        if (!(await metaConnected())) throw new Error('Instagram não conectado.');
+        atual = await daMeta(de, hoje);
+        try { anterior = await daMeta(deAnt, ateAnt); } catch { anterior = null; }
+        fonte = 'Meta ao vivo';
+      }
+    } catch (e: any) { return fail(502, e.message); }
+    Object.assign(atual, await posts(de, ate));
+    if (anterior) Object.assign(anterior, await posts(modo === 'ano' ? `${Number(hoje.slice(0, 4)) - 1}-01-01` : ymd(new Date(Date.now() - (2 * Number(modo) - 1) * 86400000)), modo === 'ano' ? `${Number(hoje.slice(0, 4)) - 1}-12-31` : ymd(new Date(Date.now() - Number(modo) * 86400000))));
+    const snaps = await q('SELECT dia,seguidores FROM ig_seguidores WHERE conta=? ORDER BY dia', [conta]);
+    const atualSeg = snaps.length ? Number(snaps[snaps.length - 1].seguidores) : null;
+    const antes = snaps.filter((x) => String(x.dia) <= de).pop() ?? snaps[0];
+    const inicioSeg = antes ? Number(antes.seguidores) : null;
+    const usuario = (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '';
+    return json({ modo, rotulo, de, ate, conta, usuario, fonte, aviso, atual, anterior, seguidores: { atual: atualSeg, inicio: inicioSeg, novos: atualSeg !== null && inicioSeg !== null && snaps.length > 1 ? atualSeg - inicioSeg : null, desde: antes ? String(antes.dia) : '' } });
   }
   if (path === '/instagram/contas') {
     await requireInternal(c);

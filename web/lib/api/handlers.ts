@@ -55,7 +55,7 @@ export async function route(c: Ctx): Promise<Out> {
       return conteudoRoute(c);
     case path === '/comments' || path === '/portal/comments' || path === '/checklist' || path === '/admin/automacoes':
       return trabalhoRoute(c);
-    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/admin/integridade' || path === '/ia/legenda' || path === '/datas' || path === '/studio/hashtags' || path === '/instagram/posts' || path === '/instagram/seguidores' || path === '/instagram/contas' || path === '/instagram/seguidores/manual' || path === '/studio/modelos' || path === '/instagram/relatorio':
+    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/admin/integridade' || path === '/ia/legenda' || path === '/datas' || path === '/studio/hashtags' || path === '/instagram/posts' || path === '/instagram/seguidores' || path === '/instagram/contas' || path === '/instagram/periodo' || path === '/instagram/seguidores/manual' || path === '/studio/modelos' || path === '/instagram/relatorio':
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);
@@ -230,7 +230,7 @@ export async function route(c: Ctx): Promise<Out> {
     }
     case path === '/file': {
       await requireInternal(c);
-      return serveFile(c.qs('path'), null);
+      return serveFile(c.qs('path'), null, ['ANEXOS/SOLICITACOES/', 'ANEXOS/CONTEUDOS/']); // mídias dos posts também (prévia no Estúdio)
     }
 
     // ---------- Integrações (Instagram / Google) ----------

@@ -13,7 +13,7 @@ const igQ=(pre='?')=>igConta?`${pre}conta=${encodeURIComponent(igConta)}`:'';
 async function igCarregaContas(){try{const d=await api('/instagram/contas');igContas=d.contas||[];igPrincipal=d.principal||'';if(!igConta||!igContas.some(c=>c.ig===igConta))igConta=igPrincipal||(igContas[0]&&igContas[0].ig)||''}catch{igContas=[]}igTopo()}
 const igSeletor=()=>'';
 const igSeletorTopo=()=>igContas.length>=1?`<select data-igconta aria-label="Trocar a conta do Instagram" class="ig-conta-sel">${igContas.map(c=>`<option value="${attr(c.ig)}" ${c.ig===igConta?'selected':''}>@${esc(c.usuario)}</option>`).join('')}<option value="__admin">＋ Adicionar / gerenciar contas…</option></select>`:'';
-const IG_PAGINAS={studio:()=>renderStudio(),igposts:()=>renderIgPosts(),igranking:()=>renderIgRanking()};
+const IG_PAGINAS={studio:()=>renderStudio(),igposts:()=>renderIgPosts(),igranking:()=>renderIgRanking(),instagram:()=>go('instagram')};
 function igTopo(){const el=document.getElementById('igTop');if(!el)return;const ativo=IG_PAGINAS[state.page]&&igContas.length>=1;el.innerHTML=ativo?igSeletorTopo():'';el.querySelectorAll('[data-igconta]').forEach(sel=>sel.onchange=()=>{if(sel.value==='__admin'){sel.value=igConta;return go('administracao')}igConta=sel.value;try{localStorage.setItem('evo.igConta',igConta)}catch{};IG_PAGINAS[state.page]()})}
 function igLigaSeletor(){igTopo()}
 const igContaDoPost=r=>String(r.contaInstagram||igPrincipal||'');
@@ -123,7 +123,7 @@ async function studioCompositor(row,dataIni=''){
    ${edit?`<p class="kpi-note">Etapa atual: <b>${esc(ST_ROTULO[String(r.status||'').toUpperCase()]||r.status||'—')}</b></p>`:''}</form>
    <div class="st-prev"><div class="st-fone" id="sfFone"><div class="st-fh"><i></i><b id="pvPerfil"></b></div><div class="st-midia" id="pvMidia"></div><div class="st-fa"><span class="st-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M20.5 12a8.5 8.5 0 1 1-3.4-6.8L20.5 4l-1 4.2A8.5 8.5 0 0 1 20.5 12z"/></svg><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></span><span class="st-pontos" id="pvPontos"></span><span class="st-ic st-salvar" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3.5h12v17l-6-4.5-6 4.5z"/></svg></span></div><div class="st-fc" id="pvLegenda"></div><small id="pvQuando"></small></div><p class="kpi-note">Prévia aproximada. O Instagram pode cortar a imagem e a legenda de outro jeito.</p></div></div>`);
   o.el.querySelector('.admin-box').classList.add('st-box');
-  const g=id=>o.el.querySelector('#'+id);let arquivoUrl=r.midiaPrevia||'';let arqs=arquivoUrl?[{url:arquivoUrl,video:false}]:[],slide=0;
+  const g=id=>o.el.querySelector('#'+id);let arquivoUrl='';let arqs=(()=>{let l=[];try{l=JSON.parse(r.midiasInstagram||'[]')}catch{}if(!Array.isArray(l)||!l.length)l=r.midiaInstagram?[r.midiaInstagram]:[];return l.map(rel=>({url:API+'/file?path='+encodeURIComponent(rel),video:/\.(mp4|mov)$/i.test(rel)}))})(),slide=0;if(arqs[0])arquivoUrl=arqs[0].url;
   const pv=()=>{
     const leg=g('sfLegenda').value,tags=g('sfTags').value,cta=g('sfCta').value,perfil=g('sfPerfil').value,fm=g('sfFormato').value;
     g('sfCLeg').textContent=`${leg.length}/2200`;g('sfCLeg').classList.toggle('bad',leg.length>2200);
@@ -132,10 +132,15 @@ async function studioCompositor(row,dataIni=''){
     const m=g('pvMidia');m.className='st-midia fm-'+(['Reels','Stories','Vídeo'].includes(fm)?'vert':'feed');
     const carr=fm==='Carrossel',n=arqs.length;if(slide>=n)slide=Math.max(0,n-1);
     if(carr)m.className='st-midia fm-feed';
-    const slideHtml=n?(arqs[slide].video?`<video src="${attr(arqs[slide].url)}" muted></video>`:`<img alt="Mídia ${slide+1} de ${n}" src="${attr(arqs[slide].url)}">`):`<span>${ST_ICONE[fm]||'◇'}<br>${esc(fm)}${carr?'<br><small>selecione 2 a 20 mídias</small>':''}</span>`;
+    const slideHtml=n?(arqs[slide].video?`<video src="${attr(arqs[slide].url)}" muted></video>`:`<img alt="Mídia ${slide+1} de ${n}" draggable="false" src="${attr(arqs[slide].url)}">`):`<span>${ST_ICONE[fm]||'◇'}<br>${esc(fm)}${carr?'<br><small>selecione 2 a 20 mídias</small>':''}</span>`;
     m.innerHTML=slideHtml+(carr&&n>1?`<span class="st-cnt">${slide+1}/${n}</span><button type="button" class="st-seta e" data-sl="-1" aria-label="Mídia anterior" ${slide===0?'disabled':''}>‹</button><button type="button" class="st-seta d" data-sl="1" aria-label="Próxima mídia" ${slide===n-1?'disabled':''}>›</button>`:'');
     g('pvPontos').innerHTML=carr&&n>1?Array.from({length:Math.min(n,10)},(_,i)=>`<i class="${i===(n>10?Math.round(slide/(n-1)*9):slide)?'on':''}"></i>`).join(''):'';
     m.querySelectorAll('[data-sl]').forEach(b=>b.onclick=()=>{slide=Math.max(0,Math.min(n-1,slide+(+b.dataset.sl)));pv()});
+    const vai=d=>{if(n>1&&carr){const nv=Math.max(0,Math.min(n-1,slide+d));if(nv!==slide){slide=nv;pv()}}};
+    m.tabIndex=carr&&n>1?0:-1;let x0=null;
+    m.onpointerdown=e=>{x0=e.clientX};
+    m.onpointerup=e=>{if(x0===null)return;const dx=e.clientX-x0;x0=null;if(Math.abs(dx)>40)vai(dx<0?1:-1);else if(!e.target.closest('[data-sl]')&&carr&&n>1){const r=m.getBoundingClientRect();vai(e.clientX>r.left+r.width/2?1:-1)}};
+    m.onkeydown=e=>{if(e.key==='ArrowRight'){e.preventDefault();vai(1)}else if(e.key==='ArrowLeft'){e.preventDefault();vai(-1)}};
     const txt=leg+(cta?'\n'+cta:''),corte=txt.length>125?txt.slice(0,125)+'… mais':txt;
     g('pvLegenda').innerHTML=`<b>${esc(perfil)}</b> ${esc(corte).replace(/\n/g,'<br>')}${tags?`<div class="st-tags">${esc(tags)}</div>`:''}`;
     const q=g('sfQuando').value;g('pvQuando').textContent=q?`${fmtDate(q.slice(0,10))} às ${q.slice(11,16)}`:'Sem data';
@@ -482,3 +487,39 @@ function trafegoSimples(){
   if(!document.getElementById('trHead'))ck.insertAdjacentHTML('beforebegin','<div id="trHead" class="dashboard-head"><div><small>TRÁFEGO PAGO · META ADS</small><h1>Métricas dos anúncios</h1><p>Somente leitura: investimento, alcance, conversas e custos lidos da Meta. Nada é criado nem alterado nas campanhas.</p></div></div>');
 }
 {const o3=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o3.apply(this,arguments);if(typeof trafegoNovo==='function'&&await trafegoNovo())return;trafegoSimples()}}
+
+/* Instagram → Métricas: filtro de período e uma conta por vez */
+let igPer=(()=>{try{return localStorage.getItem('evo.igPer')||'30'}catch{return '30'}})();
+const IG_PERS=[['7','7 dias'],['30','30 dias'],['90','90 dias'],['ano','Ano'],['tudo','Todo']];
+const _renderInstagramBase=renderInstagramWorkspace;
+renderInstagramWorkspace=async function(force=false){
+  await igCarregaContas();
+  const d=await getRows('instagram',force);
+  const pr=igPrincipal||igConta;
+  const filtro={...d,rows:(d.rows||[]).filter(r=>r.origem!=='INSTAGRAM_API'||String(r.idExterno||pr)===igConta)};
+  state.cache.set('instagram',filtro);
+  try{await _renderInstagramBase(false)}finally{state.cache.set('instagram',d)}
+  const kp=document.querySelector('#content .social-kpis');if(!kp)return;
+  const nota=kp.nextElementSibling&&kp.nextElementSibling.classList.contains('kpi-note')?kp.nextElementSibling:null;
+  const box=document.createElement('div');box.id='igPerBox';
+  box.innerHTML='<div class="ig-per" role="group" aria-label="Período">'+IG_PERS.map(([k,l])=>`<button type="button" class="chip${k===igPer?' on':''}" data-igper="${k}" aria-pressed="${k===igPer}">${l}</button>`).join('')+'</div><div id="igPerKpis" class="social-kpis six"><article><small>Carregando…</small></article></div><p class="kpi-note" id="igPerNota"></p>';
+  kp.replaceWith(box);if(nota)nota.remove();
+  box.querySelectorAll('[data-igper]').forEach(b=>b.onclick=()=>{igPer=b.dataset.igper;try{localStorage.setItem('evo.igPer',igPer)}catch{};igPerCarrega(box)});
+  igPerCarrega(box);
+};
+async function igPerCarrega(box){
+  box.querySelectorAll('[data-igper]').forEach(b=>{const on=b.dataset.igper===igPer;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});
+  const k=box.querySelector('#igPerKpis'),n=box.querySelector('#igPerNota'),meu=igPer+'|'+igConta;box.dataset.req=meu;
+  k.innerHTML='<article><small>Carregando…</small></article>';
+  let d;try{d=await api('/instagram/periodo?p='+encodeURIComponent(igPer)+igQ('&'))}catch(e){if(box.dataset.req===meu){k.innerHTML='';n.textContent='Não foi possível carregar este período: '+e.message}return}
+  if(box.dataset.req!==meu)return;
+  const f=v=>(v==null?'—':Number(v).toLocaleString('pt-BR')),a=d.atual||{},p=d.anterior,sg=d.seguidores||{};
+  const eng=a.alcance?a.interacoes/a.alcance*100:0,engP=p&&p.alcance?p.interacoes/p.alcance*100:0;
+  const dl=(x,y)=>p?kpiDelta(x,y):'<span>sem período anterior</span>';
+  const t=(l,v,sub)=>`<article><small>${l}</small><strong>${v}</strong>${sub}</article>`;
+  k.innerHTML=t('Seguidores',f(sg.atual),`<span>${sg.novos==null?'variação ainda sem histórico':(sg.novos>=0?'+':'')+f(sg.novos)+' no período'}</span>`)
+   +t('Alcance',f(a.alcance),dl(a.alcance,p&&p.alcance))+t('Impressões',f(a.impressoes),dl(a.impressoes,p&&p.impressoes))
+   +t('Visitas ao perfil',f(a.visitasPerfil),dl(a.visitasPerfil,p&&p.visitasPerfil))+t('Interações',f(a.interacoes),dl(a.interacoes,p&&p.interacoes))
+   +t('Engajamento',pct(eng),dl(eng,engP));
+  n.innerHTML=`<b>${esc(d.rotulo)}</b> · ${d.usuario?'@'+esc(d.usuario)+' · ':''}${esc(fmtDate(d.de))} a ${esc(fmtDate(d.ate))} · ${esc(d.fonte)}. ${a.posts!=null?`${a.posts} post(s) e ${a.reels} reel(s) publicados no período. `:''}Engajamento = interações ÷ alcance.${d.aviso?` <b>${esc(d.aviso)}</b>`:''}`;
+}
