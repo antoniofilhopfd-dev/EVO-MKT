@@ -16,9 +16,11 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  t('Tráfego mostra o Gestor de anúncios desligado, com aviso de que os anúncios vão ao ar ativos',/Desligado/.test(tx)&&/vão ao ar ativos/i.test(tx)&&/Teto por campanha/.test(tx),tx.slice(0,300));
  t('valores padrão do desenho aparecem (R$ 50/dia, R$ 3.000, 14 dias, 20 km, 25 a 55)',(await p.$eval('#gaTetoDia',e=>e.value))==='50'&&(await p.$eval('#gaTetoMes',e=>e.value))==='3000'&&(await p.$eval('#gaDiasMax',e=>e.value))==='14'&&(await p.$eval('#gaRaio',e=>e.value))==='20'&&(await p.$eval('#gaIdMin',e=>e.value))==='25'&&(await p.$eval('#gaIdMax',e=>e.value))==='55');
  await p.screenshot({path:PR+'/31_gestor_config.png',fullPage:true});
+ for(const id of ['gaTetoDia','gaTetoMes','gaDiasMax','gaRaio','gaIdMin','gaIdMax'])await p.fill('#'+id,''); // campos vazios não devem derrubar o salvamento
  await p.check('#gaAtiva');await p.fill('#gaCidade','João Pessoa');await p.click('#gaSalva');
  await p.waitForFunction(()=>/Ligado/.test(document.querySelector('#gestorAds .badge')?.innerText||''),null,{timeout:20000});
  tx=await p.$eval('#gestorAds',e=>e.textContent);t('salvar liga a gestão e mostra a cidade resolvida na Meta',/Ligado/.test(tx)&&/João Pessoa/.test(tx),tx.slice(0,400));
+ const cfg0=await p.evaluate(async()=>(await api('/ads/gestao')).config);t('campos vazios mantêm os valores padrão (50/dia, 3000/mês, 14 dias, 20 km, 25 a 55)',cfg0.tetoDia===50&&cfg0.tetoMes===3000&&cfg0.diasMax===14&&cfg0.publico.raioKm===20&&cfg0.publico.idadeMin===25&&cfg0.publico.idadeMax===55,JSON.stringify(cfg0));
  // ---- impulsionar
  await p.evaluate(()=>go('igposts'));await p.waitForSelector('.ig-imp',{timeout:20000});
  t('cada publicação tem o botão Impulsionar (só Gerência)',(await p.$$('.ig-imp')).length>=3);
