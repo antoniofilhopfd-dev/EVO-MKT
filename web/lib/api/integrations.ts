@@ -231,7 +231,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     }
     case path === '/integrations/instagram/sync' && method === 'POST': {
       await requireManager(c);
-      try { await metaRefreshIfNeeded(); const meses = Math.min(24, Math.max(2, Math.floor(Number((await c.body().catch(() => ({}))).meses) || 2))); return json({ periodos: await igSync(meses) }); } catch (e: any) { return bad('instagram', e); }
+      try { await metaRefreshIfNeeded(); const meses = Math.min(24, Math.max(2, Math.floor(Number(((await c.body().catch(() => ({}))) as Row).meses) || 2))); return json({ periodos: await igSync(meses) }); } catch (e: any) { return bad('instagram', e); }
     }
     case path === '/integrations/instagram/queue': {
       await requireInternal(c);
