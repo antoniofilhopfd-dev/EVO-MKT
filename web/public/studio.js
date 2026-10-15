@@ -10,9 +10,9 @@ let igConta=(()=>{try{return localStorage.getItem('evo.igConta')||''}catch{retur
 const igQ=(pre='?')=>igConta?`${pre}conta=${encodeURIComponent(igConta)}`:'';
 async function igCarregaContas(){try{const d=await api('/instagram/contas');igContas=d.contas||[];igPrincipal=d.principal||'';if(!igConta||!igContas.some(c=>c.ig===igConta))igConta=igPrincipal||(igContas[0]&&igContas[0].ig)||''}catch{igContas=[]}igTopo()}
 const igSeletor=()=>'';
-const igSeletorTopo=()=>igContas.length>1?`<select data-igconta aria-label="Conta do Instagram" class="ig-conta-sel">${igContas.map(c=>`<option value="${attr(c.ig)}" ${c.ig===igConta?'selected':''}>@${esc(c.usuario)}</option>`).join('')}</select>`:'';
+const igSeletorTopo=()=>igContas.length>=1?`<select data-igconta aria-label="Trocar a conta do Instagram" class="ig-conta-sel">${igContas.map(c=>`<option value="${attr(c.ig)}" ${c.ig===igConta?'selected':''}>@${esc(c.usuario)}</option>`).join('')}<option value="__admin">＋ Adicionar / gerenciar contas…</option></select>`:'';
 const IG_PAGINAS={studio:()=>renderStudio(),igposts:()=>renderIgPosts(),igranking:()=>renderIgRanking()};
-function igTopo(){const el=document.getElementById('igTop');if(!el)return;const ativo=IG_PAGINAS[state.page]&&igContas.length>1;el.innerHTML=ativo?igSeletorTopo():'';el.querySelectorAll('[data-igconta]').forEach(sel=>sel.onchange=()=>{igConta=sel.value;try{localStorage.setItem('evo.igConta',igConta)}catch{};IG_PAGINAS[state.page]()})}
+function igTopo(){const el=document.getElementById('igTop');if(!el)return;const ativo=IG_PAGINAS[state.page]&&igContas.length>=1;el.innerHTML=ativo?igSeletorTopo():'';el.querySelectorAll('[data-igconta]').forEach(sel=>sel.onchange=()=>{if(sel.value==='__admin'){sel.value=igConta;return go('administracao')}igConta=sel.value;try{localStorage.setItem('evo.igConta',igConta)}catch{};IG_PAGINAS[state.page]()})}
 function igLigaSeletor(){igTopo()}
 const igContaDoPost=r=>String(r.contaInstagram||igPrincipal||'');
 let studioSemana=null,studioFiltro={perfil:'',status:'',formato:''},studioCache={rows:[],estados:new Map(),datas:[],horarios:null};
@@ -365,6 +365,7 @@ function gestorImpulsionar(post){
 // ---------- Ranking: métricas completas por mês e por ano, seguidores e posts ----------
 let rkFiltro={visao:'mes',periodo:'',ordem:'interacoes',postsPer:''};
 const RK_MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const rkEmAndamento=p=>{const h=new Date(),a=String(h.getFullYear()),m=a+'-'+String(h.getMonth()+1).padStart(2,'0');return String(p)===m||String(p)===a};
 const rkRotulo=p=>String(p).length===4?String(p):RK_MESES[+String(p).slice(5,7)-1]+' de '+String(p).slice(0,4);
 const RK_COLS=[['seguidores','Seguidores'],['variacao','Variação'],['alcance','Alcance'],['impressoes','Visualizações'],['visitasPerfil','Visitas ao perfil'],['interacoes','Interações'],['curtidas','Curtidas'],['comentarios','Comentários'],['compartilhamentos','Compartilh.'],['salvamentos','Salvamentos'],['posts','Posts'],['reels','Reels']];
 const RK_ORDEM={interacoes:['Interações','interacoes'],alcance:['Alcance','alcance'],curtidas:['Curtidas','curtidas'],comentarios:['Comentários','comentarios'],salvos:['Salvamentos','salvos'],compartilhamentos:['Compartilhamentos','compartilhamentos'],engajamento:['Engajamento','engajamento']};
@@ -394,8 +395,8 @@ async function renderIgRanking(){
   const anosP=[...new Set(posts.map(x=>String(x.quando).slice(0,4)))].sort().reverse(),mesesP=[...new Set(posts.map(x=>String(x.quando).slice(0,7)))].sort().reverse();
   const opcoesP=[...anosP.map(a=>[a,'Ano '+a]),...mesesP.map(m=>[m,rkRotulo(m)])];
   if(!opcoesP.some(o=>o[0]===rkFiltro.postsPer))rkFiltro.postsPer=mesesP[0]||'';
-  const cel=(x,k,i)=>{const v=x[k];if(v===null||v===undefined)return '—';if(k==='variacao')return `<span class="${v>=0?'tg-bom':'tg-ruim'}">${v>0?'+':''}${igNum(v)}</span>`;const pv=i>0?serie[i-1][k]:null;const dl=pv&&k!=='posts'&&k!=='reels'?Math.round((v-pv)/pv*1000)/10:null;return igNum(v)+(dl===null?'':`<br><small class="${dl>=0?'tg-bom':'tg-ruim'}">${dl>=0?'▲':'▼'} ${Math.abs(dl).toLocaleString('pt-BR')}%</small>`)};
-  const tab=`<div class="tablewrap"><table class="datatable"><thead><tr><th>${rkFiltro.visao==='ano'?'Ano':'Mês'}</th>${RK_COLS.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>${serie.map((x,i)=>`<tr><td><b>${esc(rkRotulo(x.periodo))}</b></td>${RK_COLS.map(c=>`<td>${cel(x,c[0],i)}</td>`).join('')}</tr>`).reverse().join('')||'<tr><td colspan="13">Ainda sem dados. Use "Carregar histórico".</td></tr>'}</tbody></table></div>`;
+  const cel=(x,k,i)=>{const v=x[k];if(v===null||v===undefined)return '—';if(k==='variacao')return `<span class="${v>=0?'tg-bom':'tg-ruim'}">${v>0?'+':''}${igNum(v)}</span>`;const pv=i>0?serie[i-1][k]:null;const dl=pv&&k!=='posts'&&k!=='reels'&&!rkEmAndamento(x.periodo)?Math.round((v-pv)/pv*1000)/10:null;return igNum(v)+(dl===null?'':`<br><small class="${dl>=0?'tg-bom':'tg-ruim'}">${dl>=0?'▲':'▼'} ${Math.abs(dl).toLocaleString('pt-BR')}%</small>`)};
+  const tab=`<div class="tablewrap"><table class="datatable"><thead><tr><th>${rkFiltro.visao==='ano'?'Ano':'Mês'}</th>${RK_COLS.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>${serie.map((x,i)=>`<tr><td><b>${esc(rkRotulo(x.periodo))}</b>${rkEmAndamento(x.periodo)?'<br><small>em andamento (parcial)</small>':''}</td>${RK_COLS.map(c=>`<td>${cel(x,c[0],i)}</td>`).join('')}</tr>`).reverse().join('')||'<tr><td colspan="13">Ainda sem dados. Use "Carregar histórico".</td></tr>'}</tbody></table></div>`;
   const [,chave]=RK_ORDEM[rkFiltro.ordem];
   const doPeriodo=posts.filter(r=>String(r.quando).startsWith(rkFiltro.postsPer)).sort((a,b)=>(b[chave]??-1)-(a[chave]??-1));
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${esc(IG_TIPO[r.tipo]||r.tipo||'')}</span>`};
