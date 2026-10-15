@@ -333,29 +333,45 @@ function gestorImpulsionar(post){
   atualiza();
 }
 
-// ---------- Ranking de publicações por mês e seguidores por mês/ano ----------
-let rkFiltro={mes:'',metrica:'interacoes'};
-const RK_METRICA={interacoes:['Interações','interacoes'],alcance:['Alcance','alcance'],curtidas:['Curtidas','curtidas'],salvos:['Salvamentos','salvos'],engajamento:['Engajamento (%)','engajamento']};
-const rkMesRotulo=m=>{const [a,b]=String(m).split('-');return ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+b-1]+' de '+a};
+// ---------- Ranking: métricas completas por mês e por ano, seguidores e posts ----------
+let rkFiltro={visao:'mes',periodo:'',ordem:'interacoes'};
+const RK_MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const rkRotulo=p=>String(p).length===4?String(p):RK_MESES[+String(p).slice(5,7)-1]+' de '+String(p).slice(0,4);
+const RK_COLS=[['seguidores','Seguidores'],['variacao','Variação'],['alcance','Alcance'],['impressoes','Visualizações'],['visitasPerfil','Visitas ao perfil'],['interacoes','Interações'],['curtidas','Curtidas'],['comentarios','Comentários'],['compartilhamentos','Compartilh.'],['salvamentos','Salvamentos'],['posts','Posts'],['reels','Reels']];
+const RK_ORDEM={interacoes:['Interações','interacoes'],alcance:['Alcance','alcance'],curtidas:['Curtidas','curtidas'],comentarios:['Comentários','comentarios'],salvos:['Salvamentos','salvos'],compartilhamentos:['Compartilhamentos','compartilhamentos'],engajamento:['Engajamento','engajamento']};
 async function renderIgRanking(){
-  const [d,sg]=await Promise.all([api('/instagram/posts'),api('/instagram/seguidores')]);
+  const [d,sg,met]=await Promise.all([api('/instagram/posts'),api('/instagram/seguidores'),api('/data?module=instagram')]);
   if(state.page!=='igranking')return;
-  const rows=d.rows||[],meses=[...new Set(rows.map(r=>String(r.quando).slice(0,7)).filter(Boolean))].sort().reverse();
-  if(!rkFiltro.mes||!meses.includes(rkFiltro.mes))rkFiltro.mes=meses[0]||'';
-  const [rotM,chave]=RK_METRICA[rkFiltro.metrica];
-  const doMes=rows.filter(r=>String(r.quando).slice(0,7)===rkFiltro.mes).sort((a,b)=>(b[chave]??-1)-(a[chave]??-1));
-  const val=(r)=>r[chave]===null||r[chave]===undefined?'—':chave==='engajamento'?r[chave]+'%':igNum(r[chave]);
+  const posts=d.rows||[],n=x=>Number(x||0);
+  const segMes=Object.fromEntries((sg.mensal||[]).map(x=>[x.periodo,x]));
+  // métricas mensais (linhas do módulo Instagram vindas da API da Meta)
+  const mensal={};
+  for(const r of (met.rows||met||[]).filter(r=>r.origem==='INSTAGRAM_API'&&/^\d{4}-\d{2}$/.test(r.periodo||''))){
+    const m=r.periodo;mensal[m]={periodo:m,seguidores:segMes[m]?segMes[m].seguidores:(r.seguidores===''?null:n(r.seguidores)),variacao:segMes[m]?segMes[m].variacao:null,alcance:n(r.alcance),impressoes:n(r.impressoes),visitasPerfil:n(r.visitasPerfil),interacoes:n(r.interacoes),curtidas:n(r.curtidas),comentarios:n(r.comentarios),compartilhamentos:n(r.compartilhamentos),salvamentos:n(r.salvamentos)}}
+  // posts e reels contados a partir das publicações lidas (mais completo que o mês sincronizado)
+  const contaPosts=(rs)=>({posts:rs.filter(x=>x.tipo!=='REELS').length,reels:rs.filter(x=>x.tipo==='REELS').length});
+  for(const m of new Set(posts.map(x=>String(x.quando).slice(0,7)))){mensal[m]=mensal[m]||{periodo:m,seguidores:segMes[m]?segMes[m].seguidores:null,variacao:segMes[m]?segMes[m].variacao:null};Object.assign(mensal[m],contaPosts(posts.filter(x=>String(x.quando).slice(0,7)===m)))}
+  const meses=Object.keys(mensal).sort();
+  const anual={};
+  for(const m of meses){const a=m.slice(0,4),x=mensal[m];const y=anual[a]=anual[a]||{periodo:a,seguidores:null,alcance:0,impressoes:0,visitasPerfil:0,interacoes:0,curtidas:0,comentarios:0,compartilhamentos:0,salvamentos:0,posts:0,reels:0,meses:0};
+    for(const k of ['alcance','impressoes','visitasPerfil','interacoes','curtidas','comentarios','compartilhamentos','salvamentos','posts','reels'])y[k]+=n(x[k]);y.meses++;if(x.seguidores!==null&&x.seguidores!==undefined)y.seguidores=x.seguidores}
+  const anos=Object.keys(anual).sort();anos.forEach((a,i)=>{const prev=anual[anos[i-1]];const sa=(sg.anual||[]).find(z=>z.periodo===a);if(sa){anual[a].seguidores=sa.seguidores;anual[a].variacao=sa.variacao}else anual[a].variacao=prev&&prev.seguidores!==null&&anual[a].seguidores!==null?anual[a].seguidores-prev.seguidores:null});
+  const serie=rkFiltro.visao==='ano'?anos.map(a=>anual[a]):meses.map(m=>mensal[m]);
+  const chaves=serie.map(x=>x.periodo).reverse();
+  if(!chaves.includes(rkFiltro.periodo))rkFiltro.periodo=chaves[0]||'';
+  const cel=(x,k)=>{const v=x[k];if(v===null||v===undefined)return '—';if(k==='variacao')return `<span class="${v>=0?'tg-bom':'tg-ruim'}">${v>0?'+':''}${igNum(v)}</span>`;return igNum(v)};
+  const tab=`<div class="tablewrap"><table class="datatable"><thead><tr><th>${rkFiltro.visao==='ano'?'Ano':'Mês'}</th>${RK_COLS.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>${[...serie].reverse().map(x=>`<tr><td><b>${esc(rkRotulo(x.periodo))}</b></td>${RK_COLS.map(c=>`<td>${cel(x,c[0])}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="13">Ainda sem dados. Use "Carregar histórico".</td></tr>'}</tbody></table></div>`;
+  const [,chave]=RK_ORDEM[rkFiltro.ordem];
+  const doPeriodo=posts.filter(r=>String(r.quando).startsWith(rkFiltro.periodo)).sort((a,b)=>(b[chave]??-1)-(a[chave]??-1));
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${esc(IG_TIPO[r.tipo]||r.tipo||'')}</span>`};
-  const linha=(r,i)=>{const l=urlSegura(r.link);return `<tr><td><b>${i+1}º</b></td><td class="rk-thumb">${mini(r)}</td><td>${l?`<a href="${attr(l)}" target="_blank" rel="noopener">${esc((r.legenda||'Sem legenda').slice(0,90))}</a>`:esc((r.legenda||'Sem legenda').slice(0,90))}<br><small>${esc(IG_TIPO[r.tipo]||r.tipo||'')} · ${esc(fmtDate(String(r.quando).slice(0,10)))}</small></td><td><b>${val(r)}</b></td><td>${igNum(r.interacoes)}</td><td>${r.alcance===null?'—':igNum(r.alcance)}</td></tr>`};
-  const resumo=meses.slice(0,12).map(m=>{const rs=rows.filter(r=>String(r.quando).slice(0,7)===m);const top=[...rs].sort((a,b)=>b.interacoes-a.interacoes)[0];return `<tr><td>${esc(rkMesRotulo(m))}</td><td>${rs.length}</td><td>${igNum(rs.reduce((s,r)=>s+r.interacoes,0))}</td><td>${top?esc((top.legenda||'Sem legenda').slice(0,60)):'—'}</td></tr>`}).join('');
-  const sv=(arr,rot)=>arr.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>${rot}</th><th>Seguidores</th><th>Variação</th></tr></thead><tbody>${[...arr].reverse().map(x=>`<tr><td>${esc(rot==='Mês'?rkMesRotulo(x.periodo):x.periodo)}</td><td>${igNum(x.seguidores)}</td><td>${x.variacao===null?'—':`<span class="${x.variacao>=0?'tg-bom':'tg-ruim'}">${x.variacao>0?'+':''}${igNum(x.variacao)}</span>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty compact">Ainda sem registros.</div>';
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Ranking de publicações e seguidores</h1><p>Publicações ordenadas por mês e a evolução de seguidores por mês e por ano.</p></div></div>
-  <div class="card"><h3>Seguidores ${sg.atual!==null?`<small>· hoje ${igNum(sg.atual)}</small>`:''}</h3>
-  <p class="kpi-note">A Meta não informa o histórico de seguidores: o sistema guarda uma foto a cada sincronização${sg.primeiroRegistro?` (primeiro registro em ${esc(fmtDate(String(sg.primeiroRegistro).slice(0,10)))})`:''}. A variação só aparece a partir do 2º período registrado.</p>
-  <div class="grid2"><div><h4>Por mês</h4>${sv(sg.mensal,'Mês')}</div><div><h4>Por ano</h4>${sv(sg.anual,'Ano')}</div></div></div>
-  ${!rows.length?'<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram e atualize em Desempenho.</span></div>':`
-  <div class="card"><h3>Ranking do mês</h3><div class="st-toolbar"><div class="st-filtros"><select data-rk="mes">${meses.map(m=>`<option value="${m}" ${m===rkFiltro.mes?'selected':''}>${esc(rkMesRotulo(m))}</option>`).join('')}</select><select data-rk="metrica">${Object.entries(RK_METRICA).map(([k,v])=>`<option value="${k}" ${k===rkFiltro.metrica?'selected':''}>Ordenar por ${esc(v[0])}</option>`).join('')}</select></div></div>
-  <div class="tablewrap"><table class="datatable"><thead><tr><th></th><th></th><th>Publicação</th><th>${esc(rotM)}</th><th>Interações</th><th>Alcance</th></tr></thead><tbody>${doMes.slice(0,20).map(linha).join('')||'<tr><td colspan="6">Sem publicações neste mês.</td></tr>'}</tbody></table></div></div>
-  <div class="card"><h3>Mês a mês</h3><div class="tablewrap"><table class="datatable"><thead><tr><th>Mês</th><th>Publicações</th><th>Interações</th><th>Campeã do mês</th></tr></thead><tbody>${resumo}</tbody></table></div></div>`}`;
-  $$('[data-rk]').forEach(s=>s.onchange=()=>{rkFiltro[s.dataset.rk]=s.value;renderIgRanking()});
+  const nv=v=>v===null||v===undefined?'—':igNum(v);
+  const linha=(r,i)=>{const l=urlSegura(r.link);const tx=esc((r.legenda||'Sem legenda').slice(0,90));return `<tr><td><b>${i+1}º</b></td><td class="rk-thumb">${mini(r)}</td><td>${l?`<a href="${attr(l)}" target="_blank" rel="noopener">${tx}</a>`:tx}<br><small>${esc(IG_TIPO[r.tipo]||r.tipo||'')} · ${esc(fmtDate(String(r.quando).slice(0,10)))}</small></td><td>${nv(r.alcance)}</td><td>${nv(r.curtidas)}</td><td>${nv(r.comentarios)}</td><td>${nv(r.salvos)}</td><td>${nv(r.compartilhamentos)}</td><td><b>${nv(r.interacoes)}</b></td><td>${r.engajamento===null?'—':r.engajamento+'%'}</td></tr>`};
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Métricas por mês e por ano</h1><p>Alcance, interações, seguidores e posts de cada período, com o ranking das publicações. ${sg.atual!==null?`Seguidores hoje: <b>${igNum(sg.atual)}</b>.`:''}</p></div><div class="head-actions"><button class="softbtn" id="rkHist">Carregar histórico (12 meses)</button></div></div>
+  <div class="card"><div class="st-toolbar"><div class="st-filtros"><select data-rk="visao"><option value="mes" ${rkFiltro.visao==='mes'?'selected':''}>Por mês</option><option value="ano" ${rkFiltro.visao==='ano'?'selected':''}>Por ano</option></select></div></div>
+  ${tab}
+  <p class="kpi-note">Alcance, visualizações e visitas somam os meses carregados (no ano, pessoas alcançadas em meses diferentes podem se repetir). Seguidores: a Meta não informa o passado; o sistema guarda uma foto por sincronização${sg.primeiroRegistro?` desde ${esc(fmtDate(String(sg.primeiroRegistro).slice(0,10)))}`:''}, então meses anteriores ficam "—" até a primeira foto. "Carregar histórico" busca até 12 meses de métricas.</p></div>
+  ${!posts.length?'<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram e atualize.</span></div>':`<div class="card"><h3>Posts do ${rkFiltro.visao==='ano'?'ano':'mês'}</h3><div class="st-toolbar"><div class="st-filtros"><select data-rk="periodo">${chaves.map(k=>`<option value="${k}" ${k===rkFiltro.periodo?'selected':''}>${esc(rkRotulo(k))}</option>`).join('')}</select><select data-rk="ordem">${Object.entries(RK_ORDEM).map(([k,v])=>`<option value="${k}" ${k===rkFiltro.ordem?'selected':''}>Ordenar por ${esc(v[0])}</option>`).join('')}</select></div></div>
+  <div class="tablewrap"><table class="datatable"><thead><tr><th></th><th></th><th>Publicação (${doPeriodo.length})</th><th>Alcance</th><th>Curtidas</th><th>Comentários</th><th>Salvamentos</th><th>Compartilh.</th><th>Interações</th><th>Engajamento</th></tr></thead><tbody>${doPeriodo.slice(0,50).map(linha).join('')||'<tr><td colspan="10">Sem publicações neste período.</td></tr>'}</tbody></table></div></div>`}`;
+  $$('[data-rk]').forEach(s=>s.onchange=()=>{rkFiltro[s.dataset.rk]=s.value;if(s.dataset.rk==='visao')rkFiltro.periodo='';renderIgRanking()});
+  const hb=$('#rkHist');if(hb)hb.onclick=async()=>{hb.disabled=true;hb.textContent='Carregando… pode levar 1 minuto';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meses:12})});toast('Histórico carregado');await renderIgRanking()}catch(e){toast(e.message,'bad');hb.disabled=false;hb.textContent='Carregar histórico (12 meses)'}};
 }

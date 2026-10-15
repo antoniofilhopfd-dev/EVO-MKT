@@ -74,7 +74,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  novo=await api('GET','/data?module=conteudos&id='+novo.id);t('"Salvar sem mudar a etapa" preserva o status',novo.status==='PROGRAMADO'&&novo.cta==='Novo CTA',novo);
  // ---- área Instagram no menu + desempenho por publicação
  await p.evaluate(()=>go('studio'));await p.waitForSelector('.st-week');
- t('menu tem a área Instagram com Estúdio, Métricas e Desempenho',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&subs.join()==='Estúdio,Métricas,Desempenho'}));
+ t('menu tem a área Instagram com Estúdio, Métricas, Desempenho e Ranking',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&subs.join()==='Estúdio,Métricas,Desempenho,Ranking'}));
  t('a área Conteúdo não tem mais Instagram nem Estúdio',await p.evaluate(()=>{const a=AREAS.find(x=>x.k==='conteudo');return !a.pages.includes('instagram')&&!a.pages.includes('studio')}));
  await p.evaluate(()=>go('igposts'));await p.waitForFunction(()=>/DESEMPENHO/.test(document.querySelector('.dashboard-head')?.innerText||''));
  t('sem Instagram sincronizado mostra aviso claro',/Nenhuma publicação lida ainda/.test(await p.$eval('#content',e=>e.innerText)));
