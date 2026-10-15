@@ -147,7 +147,6 @@ async function studioCompositor(row,dataIni=''){
     const gerente=internalSession?.role==='manager',liberado=/^(APROVADO|PROGRAMADO)$/i.test(r.status||'');
     if(tipo==='AGENDADO'&&!gerente&&!liberado)return toast('Só agenda depois de aprovado. Use "Enviar para aprovação".','warn');
     if(g('sfFormato').value==='Carrossel'&&g('sfArq').files.length===1)return toast('O carrossel precisa de 2 a 10 mídias: selecione todas de uma vez.','warn');
-    if(tipo==='AGENDADO'&&g('sfIG').checked&&!g('sfArq').files[0]&&!r.midiaInstagram)return toast('Anexe a mídia (JPEG ou vídeo): sem ela o post não sai sozinho.','warn');
     if(tipo==='PUBLICAR'){
       if(!g('sfArq').files[0]&&!r.midiaInstagram)return toast('Anexe a mídia (JPEG ou vídeo) antes de publicar','warn');
       if(!gerente&&!liberado)return toast('Só publica depois de aprovado. Use "Enviar para aprovação".','warn');
@@ -164,7 +163,7 @@ async function studioCompositor(row,dataIni=''){
         try{const pr=await api('/integrations/instagram/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});invalidate('conteudos');o.close();toast(pr.status==='PUBLICADO'?'Publicado no Instagram!':'O Instagram está processando o vídeo; o sistema conclui sozinho');await renderStudio();return}
         catch(e){invalidate('conteudos');o.close();toast('Salvo, mas não publicou: '+e.message,'bad');await renderStudio();return}
       }
-      invalidate('conteudos');o.close();toast(tipo==='APROVACAO'?'Enviado para aprovação':tipo==='AGENDADO'?(g('sfIG').checked?'Agendado: publica sozinho em '+quando.slice(8,10)+'/'+quando.slice(5,7)+' às '+quando.slice(11,16):'Post agendado (sem publicação automática)'):'Post salvo');await renderStudio();
+      invalidate('conteudos');o.close();toast(tipo==='APROVACAO'?'Enviado para aprovação':tipo==='AGENDADO'?(g('sfIG').checked&&!f&&!r.midiaInstagram?'Agendado, mas SEM mídia anexada: o post não sai sozinho até você anexar':g('sfIG').checked?'Agendado: publica sozinho em '+quando.slice(8,10)+'/'+quando.slice(5,7)+' às '+quando.slice(11,16):'Post agendado (sem publicação automática)'):'Post salvo');await renderStudio();
     }catch(e){toast(e.message,'bad')}
   };
   o.el.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>salvar(b.dataset.s));
