@@ -71,7 +71,8 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.click(`.st-card[data-id="${novo.id}"]`);await p.waitForSelector('.st-form');await p.fill('#sfQuando',dia2+'T12:00');await p.click('[data-s="AGENDADO"]');await p.waitForSelector('.st-form',{state:'detached'});
  novo=await api('GET','/data?module=conteudos&id='+novo.id);t('"Agendar" muda para PROGRAMADO com data e hora',novo.status==='PROGRAMADO'&&novo.publicacaoEm===dia2+'T12:00',novo);
  await p.click(`.st-card[data-id="${novo.id}"]`);await p.waitForSelector('.st-form');await p.fill('#sfCta','Novo CTA');await p.click('[data-s="MANTER"]');await p.waitForSelector('.st-form',{state:'detached'});
- novo=await api('GET','/data?module=conteudos&id='+novo.id);t('"Salvar sem mudar a etapa" preserva o status',novo.status==='PROGRAMADO'&&novo.cta==='Novo CTA',novo);
+ for(let i=0;i<20;i++){novo=await api('GET','/data?module=conteudos&id='+novo.id);if(novo.cta==='Novo CTA')break;await p.waitForTimeout(250)}
+ t('"Salvar sem mudar a etapa" preserva o status',novo.status==='PROGRAMADO'&&novo.cta==='Novo CTA',novo);
  // ---- área Instagram no menu + desempenho por publicação
  await p.evaluate(()=>go('studio'));await p.waitForSelector('.st-week');
  t('menu tem a área Instagram com Estúdio, Métricas, Desempenho e Ranking',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&subs.join()==='Estúdio,Métricas,Desempenho,Ranking'}));
