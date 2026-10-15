@@ -97,7 +97,7 @@ async function studioCompositor(row,dataIni=''){
    <label>Chamada para ação (CTA)<input id="sfCta" maxlength="160" value="${attr(r.cta||'')}" placeholder="Ex.: Link na bio para se inscrever"></label>
    <div class="st-row"><label>Data e hora<input id="sfQuando" type="datetime-local" value="${attr(r.publicacaoEm||(dataIni?dataIni+'T09:00':''))}"></label><label>Revisor<input id="sfRevisor" value="${attr(r.revisor||'')}" placeholder="Quem aprova"></label></div>
    ${sug?`<div class="st-sug"><span>Melhor momento nos seus dados: <b>${esc(h.dia)} às ${h.hora}h</b></span><button type="button" class="softbtn" id="sfSug">Usar</button></div>`:''}
-   <label>Mídia (JPEG ou vídeo MP4/MOV; para Carrossel selecione de 2 a 10 arquivos de uma vez)${(()=>{let n=0;try{n=JSON.parse(r.midiasInstagram||'[]').length}catch{}return n>1?` <small>— ${n} itens já anexados; enviar novos substitui todos</small>`:''})()} <input id="sfArq" type="file" multiple accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
+   <label>Mídia (JPEG ou vídeo MP4/MOV; para Carrossel selecione de 2 a 20 arquivos de uma vez)${(()=>{let n=0;try{n=JSON.parse(r.midiasInstagram||'[]').length}catch{}return n>1?` <small>— ${n} itens já anexados; enviar novos substitui todos</small>`:''})()} <input id="sfArq" type="file" multiple accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
    <label class="check-row"><input type="checkbox" id="sfIG" ${(edit?/SIM/i.test(r.publicarInstagram||''):true)?'checked':''}> Publicar no Instagram automaticamente na data e hora marcadas (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
    <label class="check-row"><input type="checkbox" id="sfTagCom" ${/SIM/i.test(r.hashtagsComentario||'')?'checked':''}> Colocar as hashtags no primeiro comentário (legenda mais limpa)</label>
    <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="softbtn" type="button" data-s="RASCUNHO">Salvar rascunho</button><button class="softbtn" type="button" data-s="APROVACAO">Enviar para aprovação</button><button class="btn" type="button" data-s="AGENDADO">Agendar</button>${edit?'<button class="softbtn" type="button" data-s="MANTER">Salvar sem mudar a etapa</button>':''}${jaPublicado?'':'<button class="btn accent" type="button" data-s="PUBLICAR">Publicar agora no Instagram</button>'}</div>
@@ -156,7 +156,7 @@ async function studioCompositor(row,dataIni=''){
     if(tipo==='AGENDADO'&&!quando)return toast('Escolha a data e a hora para agendar','warn');
     const gerente=internalSession?.role==='manager',liberado=/^(APROVADO|PROGRAMADO)$/i.test(r.status||'');
     if(tipo==='AGENDADO'&&!gerente&&!liberado)return toast('Só agenda depois de aprovado. Use "Enviar para aprovação".','warn');
-    if(g('sfFormato').value==='Carrossel'&&g('sfArq').files.length===1)return toast('O carrossel precisa de 2 a 10 mídias: selecione todas de uma vez.','warn');
+    if(g('sfFormato').value==='Carrossel'&&g('sfArq').files.length===1)return toast('O carrossel precisa de 2 a 20 mídias: selecione todas de uma vez.','warn');
     if(tipo==='PUBLICAR'){
       if(!g('sfArq').files[0]&&!r.midiaInstagram)return toast('Anexe a mídia (JPEG ou vídeo) antes de publicar','warn');
       if(!gerente&&!liberado)return toast('Só publica depois de aprovado. Use "Enviar para aprovação".','warn');

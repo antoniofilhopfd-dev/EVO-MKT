@@ -111,7 +111,7 @@ if (str_starts_with($p, '/graph')) {
     if ($g === "/$IG/media" && $m === 'POST') {
         if (($in['media_type'] ?? '') === 'CAROUSEL') {
             $kids = array_filter(explode(',', $in['children'] ?? ''));
-            if (count($kids) < 2 || count($kids) > 10) j(['error' => ['message' => 'carousel needs 2-10 children']], 400);
+            if (count($kids) < 2 || count($kids) > 20) j(['error' => ['message' => 'carousel needs 2-20 children']], 400);
             $id = nid('CONT_'); $S['containers'][$id] = ['params' => $in, 'bytes' => 0, 'type' => 'carousel', 'status' => 'FINISHED']; j(['id' => $id]);
         }
         $url = $in['image_url'] ?? $in['video_url'] ?? '';

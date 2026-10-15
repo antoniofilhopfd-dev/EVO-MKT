@@ -72,8 +72,9 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  cc=(await rows('conteudos')).find(c=>c.id===car);t('carrossel guarda a lista de mídias',JSON.parse(cc.midiasInstagram).length===3&&cc.midiaInstagram===JSON.parse(cc.midiasInstagram)[0]);
  cron('publicar');cc=(await rows('conteudos')).find(c=>c.id===car);const stc=await mock('/__state');const pai=Object.values(stc.containers).find(c=>c.params.media_type==='CAROUSEL');
  t('cron publica o carrossel com 3 itens filhos',cc.status==='PUBLICADO'&&pai&&pai.params.children.split(',').length===3&&pai.params.caption==='Carrossel de teste',[cc.status,pai&&pai.params]);
+ const carG=await mk2({titulo:'Carrossel grande',formato:'Carrossel',status:'BRIEFING'});t('carrossel aceita 20 mídias',(await upN(carG,20))===200);t('carrossel com 21 mídias é recusado',(await upN(carG,21))===400);
  const car1=await mk2({titulo:'Carrossel curto',formato:'Carrossel'});await up(car1,'a.jpg',jpg);
- r=await call('/integrations/instagram/publish',{m:'POST',ck:G,b:{id:car1}});t('carrossel com 1 item não publica e explica',r.s===502&&/2 a 10/.test(r.j.error),r);
+ r=await call('/integrations/instagram/publish',{m:'POST',ck:G,b:{id:car1}});t('carrossel com 1 item não publica e explica',r.s===502&&/2 a 20/.test(r.j.error),r);
  r=await call('/integrations/instagram/queue',{ck:G});t('falha aparece na fila com o motivo',r.j.find(q=>q.id===car1).estado==='ERRO');
  r=await call('/integrations/instagram/retry',{m:'POST',ck:G,b:{id:car1}});t('"Tentar de novo" libera o post para o cron',r.s===200);
  r=await call('/integrations/instagram/retry',{m:'POST',ck:G,b:{id:car1}});t('nova tentativa sem falha anterior: 409',r.s===409);

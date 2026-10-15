@@ -86,7 +86,7 @@ Tráfego → Gerenciador → **+ Nova campanha**: todos os objetivos da Meta (re
 - **Fluxo:** Instagram → Estúdio → Novo post → legenda, hashtags, mídia → *Enviar para aprovação* → após **Aprovado**, *Agendar* (Gerência agenda direto). Com "Publicar no Instagram automaticamente" marcado (padrão em posts novos), o cron publica na data e hora marcadas.
 - **Trava de aprovação:** a Equipe só agenda depois de Aprovado; a Gerência pode agendar direto.
 - **Hashtags:** o campo de hashtags entra no fim da legenda publicada. Marcando "hashtags no primeiro comentário", a legenda sai limpa e o sistema comenta as hashtags logo após publicar (se o comentário falhar, o post continua publicado e o erro vai ao registro).
-- **Carrossel:** selecione de 2 a 10 arquivos (JPEG/MP4/MOV) de uma vez no campo Mídia. Enviar novos arquivos substitui todos.
+- **Carrossel:** selecione de 2 a 20 arquivos (JPEG/MP4/MOV) de uma vez no campo Mídia. Enviar novos arquivos substitui todos.
 - **Falhas:** o post fica com a falha visível no editor ("A publicação automática falhou: …") com o botão **Tentar de novo**; a Gerência recebe notificação (e e-mail, se configurado).
 - **Cron de publicação (Hostinger → Cron Jobs, a cada 10 minutos):** o comando aparece em Admin → Prontidão ("Cron de PUBLICAÇÃO no Instagram"): `curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/integracoes?tarefa=publicar`. A Prontidão avisa se há posts agendados e o cron não rodou nos últimos 30 minutos.
 

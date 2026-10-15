@@ -208,7 +208,7 @@ export async function igSaveMedia(conteudoId: string, file: File | null, adicion
   const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', mp4: 'video/mp4', mov: 'video/quicktime' }[ext]!;
   await run('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)', [rel, mime, file.size, Buffer.from(await file.arrayBuffer()), now()]);
   const lista = adicionar ? midiasDe(row) : [];
-  if (lista.length >= 10) fail(400, 'O carrossel aceita no máximo 10 itens.');
+  if (lista.length >= 20) fail(400, 'O carrossel aceita no máximo 20 itens.');
   lista.push(rel);
   row.midiaInstagram = lista[0];
   row.midiasInstagram = JSON.stringify(lista);
@@ -236,7 +236,7 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   const fmt = String(r.formato ?? 'feed').toLocaleLowerCase('pt-BR');
   const carrossel = fmt.includes('carrossel');
   const itens = midiasDe(r);
-  if (carrossel && itens.length < 2) throw new Error('O carrossel precisa de 2 a 10 mídias. Anexe mais itens.');
+  if (carrossel && itens.length < 2) throw new Error('O carrossel precisa de 2 a 20 mídias. Anexe mais itens.');
   const isVideo = ['mp4', 'mov'].includes((rel.split('.').pop() || '').toLowerCase());
   const ig = await setting('ig_user_id');
   const tags = String(r.hashtags ?? '').trim();
