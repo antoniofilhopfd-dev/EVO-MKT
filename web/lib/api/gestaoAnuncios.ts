@@ -5,6 +5,8 @@ import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { metaConnected } from '../integrations/meta';
 import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
+import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel } from '../integrations/metaadsGerenciador';
+import { addDays, fmtDate } from '../util';
 import { json } from './handlers';
 
 /** Rotas do Gestor de Anúncios. Todas só da Gerência. */
@@ -59,6 +61,30 @@ export async function gestaoAnunciosRoute(c: Ctx) {
       await audit(String(u.codigo), path === '/ads/pausar' ? 'ads-pausar' : 'ads-retomar', 'ads', String(id));
       return json({ ok: true, lancamento: r });
     } catch (e: any) { return fail(409, e.message); }
+  }
+  if (path === '/ads/arvore' && method === 'GET') {
+    const ymd = (v: string) => (/^\d{4}-\d\d-\d\d$/.test(v) ? v : '');
+    const ate = ymd(c.qs('ate')) || fmtDate(new Date()), de = ymd(c.qs('de')) || fmtDate(addDays(new Date(), -6));
+    if (de > ate) fail(400, 'A data inicial é depois da final.');
+    if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 93) fail(400, 'O período vai até 93 dias.');
+    try { return json(await arvore(de, ate, c.qs('arquivados') === '1')); } catch (e: any) { return fail(502, e.message); }
+  }
+  if (path === '/ads/acoes' && method === 'GET') return json({ rows: await acoesRecentes() });
+  if (path === '/ads/editar' && method === 'POST') {
+    const b = await c.body();
+    try {
+      const r = await editarObjeto(strv(b.nivel) as Nivel, strv(b.id), (b.campos ?? {}) as Row, b.confirmou === true, String(u.nome || u.codigo));
+      await audit(String(u.codigo), 'ads-editar', 'ads', strv(b.id));
+      return json(r);
+    } catch (e: any) { return fail(/Meta recusou/.test(e.message) ? 502 : 400, e.message); }
+  }
+  if (path === '/ads/duplicar' && method === 'POST') {
+    const b = await c.body();
+    try {
+      const r = await duplicarObjeto(strv(b.nivel) as Nivel, strv(b.id), String(u.nome || u.codigo));
+      await audit(String(u.codigo), 'ads-duplicar', 'ads', strv(b.id));
+      return json(r);
+    } catch (e: any) { return fail(/Meta recusou/.test(e.message) ? 502 : 400, e.message); }
   }
   if (path === '/ads/pausar-tudo' && method === 'POST') {
     const r = await pausarTudo();
