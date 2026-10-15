@@ -221,7 +221,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         const ids = input.monitorar.map(String).filter((id: string) => contas.some((x) => x.ig === id));
         await setSetting('ig_contas_monitoradas', JSON.stringify(ids));
         await audit(u.codigo, 'instagram-contas-monitoradas', ids.join(','));
-        if (!strv(input.ig_user_id)) return json({ ok: true });
+        if (!strv(input.ig_user_id)) return json({ ok: true, monitoradas: (await contasMonitoradas()).map((x) => x.usuario) });
       }
       const alvo = contas.find((x) => x.ig === strv(input.ig_user_id)) ?? fail(400, 'Conta não encontrada nas Páginas deste usuário.');
       await metaUsarConta(alvo);

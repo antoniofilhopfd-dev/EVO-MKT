@@ -36,6 +36,13 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('conta oculta some das acompanhadas; a conta em uso nunca pode ser ocultada',s===200&&st.ocultas.join()===IG2&&!st.monitoradas.includes(IG2)&&st.monitoradas.includes(IG1),st);
  [,r]=await call('GET','/instagram/contas');t('seletor lista só as contas não ocultas',r.contas.length===1&&r.contas[0].ig===IG1,r);
  await call('POST','/integrations/meta/account',{ocultar:[],monitorar:[IG1,IG2]});
+ // conta em uso = segunda conta; marcar as duas deve persistir
+ await call('POST','/integrations/meta/account',{ig_user_id:IG2});
+ [s]=await call('POST','/integrations/meta/account',{monitorar:[IG1]});st=(await call('GET','/integrations/status'))[1].instagram;
+ t('com a conta em uso na segunda, marcar só a primeira guarda as duas (a em uso sempre entra)',s===200&&st.monitoradas.includes(IG1)&&st.monitoradas.includes(IG2),st.monitoradas);
+ [s]=await call('POST','/integrations/meta/account',{monitorar:[IG1,IG2]});st=(await call('GET','/integrations/status'))[1].instagram;
+ t('salvar as duas marcadas persiste depois de recarregar',s===200&&st.monitoradas.length===2,st.monitoradas);
+ await call('POST','/integrations/meta/account',{ig_user_id:IG1});
  // publicar pela conta escolhida + colab
  const jpg=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
  const up=async id=>{const fd=new FormData();fd.append('files',new Blob([jpg]),'a.jpg');const rr=await fetch(B+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G.Cookie,'X-EVO':'1'},body:fd});return rr.status};
