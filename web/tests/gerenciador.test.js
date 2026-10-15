@@ -9,6 +9,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const call=async(m,u,b,h=G)=>{const x=await fetch(B+u,{method:m,headers:h,body:b?JSON.stringify(b):undefined});let j=null;try{j=await x.json()}catch{}return [x.status,j]};
  const mock=async p=>(await fetch('http://127.0.0.1:8099'+p)).json();
  let s,r;
+ await call('POST','/ads/modo',{gestao:true}); // o Tráfego nasce só-leitura; estas suítes testam o modo completo
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await call('GET','/integrations/ads/accounts');await call('POST','/integrations/ads/account',{conta:'111222333'});
  const hoje=new Date().toISOString().slice(0,10);
  // ---- árvore

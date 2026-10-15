@@ -10,6 +10,7 @@ function gmIntervalo(p){const h=new Date();h.setHours(12,0,0,0);const f=d=>new D
 
 async function renderGerenciador(){
   if(internalSession?.role!=='manager')return go('minhaarea');
+  await adsCarregaModo();
   if(!gmPeriodo.de){[gmPeriodo.de,gmPeriodo.ate]=gmIntervalo(gmPeriodo.p)}
   $('#content').innerHTML='<div class="loading"><span></span><b>Lendo a conta na Meta…</b></div>';
   try{gmDados=await api(`/ads/arvore?de=${gmPeriodo.de}&ate=${gmPeriodo.ate}${gmArq?'&arquivados=1':''}`)}
@@ -24,16 +25,16 @@ function gmLinha(x,nivel,pai=''){
   const ligado=x.status==='ACTIVE';
   return `<tr class="gm-${nivel}" data-id="${attr(x.id)}" data-nivel="${nivel}">
    <td class="gm-nome"><span class="gm-ind gm-i${nivel==='campanha'?0:nivel==='conjunto'?1:2}">${filhos.length?`<button class="gm-seta" data-abre="${attr(x.id)}" aria-label="${aberto?'Recolher':'Expandir'}">${aberto?'▾':'▸'}</button>`:'<span class="gm-seta"></span>'}${x.foto?`<img class="gm-foto" alt="" referrerpolicy="no-referrer" src="${attr(x.foto)}">`:''}<span><b>${esc(x.nome)}</b>${nivel==='campanha'?`<small>${esc(GM_OBJ[x.objetivo]||x.objetivo||'')}</small>`:nivel==='conjunto'?`<small>${esc(x.otimizacao||'')}${x.destino?' · '+esc(x.destino):''}</small>`:''}</span></span></td>
-   <td><label class="gm-sw" title="${ligado?'Pausar':'Ativar'}"><input type="checkbox" data-sw="${attr(x.id)}" ${ligado?'checked':''} ${x.status==='ARCHIVED'||x.status==='DELETED'?'disabled':''}><i></i></label></td>
+   <td>${adsCompleto?`<label class="gm-sw" title="${ligado?'Pausar':'Ativar'}"><input type="checkbox" data-sw="${attr(x.id)}" ${ligado?'checked':''} ${x.status==='ARCHIVED'||x.status==='DELETED'?'disabled':''}><i></i></label>`:`<span class="badge ${ligado?'ok':''}">${ligado?'Ligado':'Desligado'}</span>`}</td>
    <td>${gmBadge(x.estado)}</td><td>${nivel==='anuncio'?'—':gmOrc(x.orcamento)}</td>
    <td>${gmN(x.resultados)}<small>${esc(x.rotuloResultado||'')}</small></td><td>${x.custoResultado===null?'—':esc(gmBrl(x.custoResultado))}</td><td>${esc(gmBrl(x.gasto))}</td><td>${gmN(x.impressoes)}</td><td>${gmN(x.alcance)}</td><td>${x.ctr.toFixed(2).replace('.',',')}%</td><td>${x.cliques?esc(gmBrl(x.cpc)):'—'}</td>
-   <td class="gm-acoes"><button class="softbtn" data-edit="${attr(x.id)}">Editar</button><button class="softbtn" data-dup="${attr(x.id)}" title="Duplicar (a cópia nasce pausada)">⧉</button></td></tr>${aberto?filhos.map(f=>gmLinha(f,nivel==='campanha'?'conjunto':'anuncio',x.id)).join(''):''}`;
+   <td class="gm-acoes">${adsCompleto?`<button class="softbtn" data-edit="${attr(x.id)}">Editar</button><button class="softbtn" data-dup="${attr(x.id)}" title="Duplicar (a cópia nasce pausada)">⧉</button>`:''}</td></tr>${aberto?filhos.map(f=>gmLinha(f,nivel==='campanha'?'conjunto':'anuncio',x.id)).join(''):''}`;
 }
 function gmAchar(id){for(const c of gmDados.campanhas){if(c.id===id)return [c,'campanha'];for(const s of c.conjuntos){if(s.id===id)return [s,'conjunto'];for(const a of s.anuncios)if(a.id===id)return [a,'anuncio']}}return [null,'']}
 
 function desenharGerenciador(){
   const d=gmDados;
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>GERENCIADOR DE ANÚNCIOS · META</small><h1>Campanhas da conta</h1><p>Tudo o que está na conta de anúncios, não só o que o sistema lançou. Mudanças valem na Meta na hora. Duplicar cria a cópia <b>pausada</b>.</p></div><div class="st-head-btns"><button class="softbtn" id="gmComp">Comparar anúncios</button><button class="softbtn" id="gmHist">Histórico de alterações</button><button class="btn" id="gmNova">+ Nova campanha</button></div></div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>GERENCIADOR DE ANÚNCIOS · META</small><h1>Campanhas da conta</h1><p>${adsCompleto?'Tudo o que está na conta de anúncios, não só o que o sistema lançou. Mudanças valem na Meta na hora. Duplicar cria a cópia <b>pausada</b>.':'Somente leitura: campanhas, conjuntos e anúncios da conta com as métricas do período. Para criar ou alterar anúncios, use o Gerenciador de Anúncios da Meta.'}</p></div><div class="st-head-btns"><button class="softbtn" id="gmComp">Comparar anúncios</button>${adsCompleto?'<button class="softbtn" id="gmHist">Histórico de alterações</button><button class="btn" id="gmNova">+ Nova campanha</button>':''}</div></div>
   <div class="st-toolbar"><div class="st-filtros"><select id="gmP"><option value="hoje">Hoje</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="mes">Este mês</option><option value="x">Personalizado</option></select><input type="date" id="gmDe" value="${attr(d.de)}"><input type="date" id="gmAte" value="${attr(d.ate)}"><label class="check-row"><input type="checkbox" id="gmArq" ${gmArq?'checked':''}> Mostrar arquivados</label></div><button class="softbtn" id="gmAtualiza">Atualizar</button></div>
   <div class="card"><div class="tablewrap gm-wrap"><table class="datatable gm-tab"><thead><tr><th>Nome</th><th>Ligado</th><th>Estado</th><th>Orçamento</th><th>Resultados</th><th>Custo/resultado</th><th>Gasto</th><th>Impressões</th><th>Alcance</th><th>CTR</th><th>CPC</th><th></th></tr></thead>
   <tbody>${d.campanhas.map(c=>gmLinha(c,'campanha')).join('')||'<tr><td colspan="12" class="empty compact">Nenhuma campanha neste filtro.</td></tr>'}</tbody>
@@ -43,7 +44,7 @@ function desenharGerenciador(){
   $('#gmDe').onchange=$('#gmAte').onchange=()=>{gmPeriodo={de:$('#gmDe').value,ate:$('#gmAte').value,p:'x'}};
   $('#gmAtualiza').onclick=()=>{gmPeriodo.de=$('#gmDe').value;gmPeriodo.ate=$('#gmAte').value;renderGerenciador()};
   $('#gmArq').onchange=e=>{gmArq=e.target.checked;renderGerenciador()};
-  $('#gmComp').onclick=gmComparar;$('#gmHist').onclick=gmHistorico;$('#gmNova').onclick=()=>{if(typeof novaCampanha==='function')novaCampanha();else toast('A criação completa de campanha chega na próxima etapa.','warn')};
+  $('#gmComp').onclick=gmComparar;if($('#gmHist'))$('#gmHist').onclick=gmHistorico;if($('#gmNova'))$('#gmNova').onclick=()=>{if(typeof novaCampanha==='function')novaCampanha();else toast('A criação completa de campanha chega na próxima etapa.','warn')};
   $$('[data-abre]').forEach(b=>b.onclick=()=>{const id=b.dataset.abre;gmAberto.has(id)?gmAberto.delete(id):gmAberto.add(id);desenharGerenciador()});
   $$('[data-sw]').forEach(i=>i.onchange=async()=>{const [o,n]=gmAchar(i.dataset.sw);const ativar=i.checked;if(!confirm(ativar?`Ativar "${o.nome}"? Volta a gastar.`:`Pausar "${o.nome}"?`)){i.checked=!ativar;return}await gmEditar(n,o.id,{status:ativar?'ACTIVE':'PAUSED'})});
   $$('[data-edit]').forEach(b=>b.onclick=()=>{const [o,n]=gmAchar(b.dataset.edit);gmEditor(o,n)});
@@ -181,7 +182,7 @@ function gmComparar(){
   const comRes=com.filter(a=>a.resultados>0).sort((a,b)=>a.custoResultado-b.custoResultado);
   const semRes=com.filter(a=>!(a.resultados>0)).sort((a,b)=>b.gasto-a.gasto);
   const med=comRes.length?comRes.reduce((s,a)=>s+a.custoResultado,0)/comRes.length:0;
-  const linha=(a,i,sem)=>`<tr><td>${sem?'—':(i+1)+'º'}</td><td>${esc(a.nome)}<br><small>${esc(a.campanhaNome)}</small></td><td>${esc(gmBrl(a.gasto))}</td><td>${gmN(a.resultados)}</td><td>${sem?'<span class="tg-ruim">sem resultado</span>':esc(gmBrl(a.custoResultado))+(med&&a.custoResultado>med*1.5?' <span class="tg-ruim">acima da média</span>':'')}</td><td>${a.ativo?`<button class="softbtn" data-pz="${attr(a.id)}">Pausar</button>`:gmBadge(a.estado)}</td></tr>`;
+  const linha=(a,i,sem)=>`<tr><td>${sem?'—':(i+1)+'º'}</td><td>${esc(a.nome)}<br><small>${esc(a.campanhaNome)}</small></td><td>${esc(gmBrl(a.gasto))}</td><td>${gmN(a.resultados)}</td><td>${sem?'<span class="tg-ruim">sem resultado</span>':esc(gmBrl(a.custoResultado))+(med&&a.custoResultado>med*1.5?' <span class="tg-ruim">acima da média</span>':'')}</td><td>${a.ativo&&adsCompleto?`<button class="softbtn" data-pz="${attr(a.id)}">Pausar</button>`:gmBadge(a.estado)}</td></tr>`;
   const ov=adminOverlay(`<h3>Comparar anúncios (${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))})</h3><p class="kpi-note">Ordenado do menor para o maior custo por resultado. ${comRes.length?`Média: ${esc(gmBrl(med))}.`:'Nenhum anúncio com resultado no período.'} Pausar vale na Meta na hora.</p><div class="tablewrap"><table class="datatable"><thead><tr><th></th><th>Anúncio</th><th>Gasto</th><th>Resultados</th><th>Custo/resultado</th><th></th></tr></thead><tbody>${comRes.map((a,i)=>linha(a,i,false)).join('')}${semRes.map((a,i)=>linha(a,i,true)).join('')||''}${com.length?'':'<tr><td colspan="6">Nenhum anúncio com gasto neste período.</td></tr>'}</tbody></table></div><div class="st-acoes"><button class="btn soft" data-close type="button">Fechar</button></div>`);
   ov.el.querySelectorAll('[data-pz]').forEach(b=>b.onclick=async()=>{const a=todos.find(x=>x.id===b.dataset.pz);if(!confirm(`Pausar "${a.nome}"?`))return;ov.close();await gmEditar('anuncio',a.id,{status:'PAUSED'})});
 }

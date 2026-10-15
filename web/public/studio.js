@@ -6,6 +6,8 @@ const ST_ROTULO={IDEIA:'Ideia',BRIEFING:'Briefing','PRODUÇÃO':'Rascunho','REVI
 const ST_ICONE={Feed:'▦',Stories:'◔',Reels:'▶',Carrossel:'❏','Vídeo':'▶',Foto:'▣',Outro:'◇'};
 const ST_DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 // ---------- várias contas de Instagram ----------
+let adsCompleto=false;
+async function adsCarregaModo(){try{adsCompleto=internalSession?.role==='manager'?!!(await api('/ads/modo')).gestao:false}catch{adsCompleto=false}}
 let igConta=(()=>{try{return localStorage.getItem('evo.igConta')||''}catch{return ''}})(),igContas=[],igPrincipal='';
 const igQ=(pre='?')=>igConta?`${pre}conta=${encodeURIComponent(igConta)}`:'';
 async function igCarregaContas(){try{const d=await api('/instagram/contas');igContas=d.contas||[];igPrincipal=d.principal||'';if(!igConta||!igContas.some(c=>c.ig===igConta))igConta=igPrincipal||(igContas[0]&&igContas[0].ig)||''}catch{igContas=[]}igTopo()}
@@ -204,7 +206,7 @@ const IG_TIPO={FEED:'Feed',REELS:'Reels',STORY:'Stories',CAROUSEL_ALBUM:'Carross
 const IG_ORDEM={recentes:['Mais recentes',(a,b)=>String(b.quando).localeCompare(String(a.quando))],interacoes:['Mais interações',(a,b)=>b.interacoes-a.interacoes],alcance:['Maior alcance',(a,b)=>(b.alcance??-1)-(a.alcance??-1)],engajamento:['Maior engajamento',(a,b)=>(b.engajamento??-1)-(a.engajamento??-1)]};
 const igNum=n=>Number(n||0).toLocaleString('pt-BR');
 async function renderIgPosts(){
-  await igCarregaContas();
+  await igCarregaContas();await adsCarregaModo();
   const d=await api('/instagram/posts'+igQ());
   if(state.page!=='igposts')return;
   igDados=d;
@@ -220,7 +222,7 @@ function desenharIgPosts(){
   const melhor=[...rows].sort(IG_ORDEM.interacoes[1])[0];
   const sel=(k,opts,cur)=>`<select data-igf="${k}">${opts.map(([v,l])=>`<option value="${attr(v)}" ${String(cur)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${ST_ICONE[tipoDe(r)]||'◇'}<br>${esc(tipoDe(r))}</span>`};
-  const card=r=>{const l=urlSegura(r.link),dt=String(r.quando).slice(0,10);return `<article class="ig-card"><${l?`a href="${attr(l)}" target="_blank" rel="noopener"`:'div'} class="ig-thumb" title="Abrir no Instagram">${mini(r)}</${l?'a':'div'}><div class="ig-body"><div class="ig-meta"><b>${esc(tipoDe(r))}</b><span>${dt?fmtDate(dt):''}</span></div>${internalSession?.role==='manager'?`<button class="softbtn ig-imp" data-imp="${attr(r.id)}">Impulsionar</button>`:''}<p>${esc(r.legenda||'(sem legenda)')}</p><dl><div><dt>Curtidas</dt><dd>${igNum(r.curtidas)}</dd></div><div><dt>Comentários</dt><dd>${igNum(r.comentarios)}</dd></div><div><dt>Salvos</dt><dd>${igNum(r.salvos)}</dd></div><div><dt>Compart.</dt><dd>${igNum(r.compartilhamentos)}</dd></div><div><dt>Alcance</dt><dd>${r.alcance===null?'—':igNum(r.alcance)}</dd></div><div><dt>Engajamento</dt><dd>${r.engajamento===null?'—':String(r.engajamento).replace('.',',')+'%'}</dd></div></dl></div></article>`};
+  const card=r=>{const l=urlSegura(r.link),dt=String(r.quando).slice(0,10);return `<article class="ig-card"><${l?`a href="${attr(l)}" target="_blank" rel="noopener"`:'div'} class="ig-thumb" title="Abrir no Instagram">${mini(r)}</${l?'a':'div'}><div class="ig-body"><div class="ig-meta"><b>${esc(tipoDe(r))}</b><span>${dt?fmtDate(dt):''}</span></div>${internalSession?.role==='manager'&&adsCompleto?`<button class="softbtn ig-imp" data-imp="${attr(r.id)}">Impulsionar</button>`:''}<p>${esc(r.legenda||'(sem legenda)')}</p><dl><div><dt>Curtidas</dt><dd>${igNum(r.curtidas)}</dd></div><div><dt>Comentários</dt><dd>${igNum(r.comentarios)}</dd></div><div><dt>Salvos</dt><dd>${igNum(r.salvos)}</dd></div><div><dt>Compart.</dt><dd>${igNum(r.compartilhamentos)}</dd></div><div><dt>Alcance</dt><dd>${r.alcance===null?'—':igNum(r.alcance)}</dd></div><div><dt>Engajamento</dt><dd>${r.engajamento===null?'—':String(r.engajamento).replace('.',',')+'%'}</dd></div></dl></div></article>`};
   const vazio=!todos.length;
   $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · DESEMPENHO</small><h1>O que funcionou em cada publicação</h1><p>${igDados.ultimaSync?`Última leitura da Meta: ${fmtDateTime(igDados.ultimaSync)}.`:'Ainda não houve leitura da Meta.'} Alcance, salvamentos e compartilhamentos vêm das 30 publicações mais recentes.</p></div>${internalSession?.role==='manager'?'<button class="btn" id="igAtualiza">Atualizar agora</button>':''}</div>
   ${vazio?`<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram em Administração → Integrações e clique em “Atualizar agora”.</span></div>`:`
@@ -306,7 +308,7 @@ async function painelTrafegoExtra(){
   const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
   const bt=$('#tgOrcSalva');if(bt)bt.onclick=async()=>{try{await api('/integrations/ads/orcamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valor:Number($('#tgOrc').value||0)})});toast('Orçamento salvo');go('trafego')}catch(e){toast(e.message,'warn')}};
 }
-{const o2=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o2.apply(this,arguments);await painelTrafegoExtra();await painelGestaoAnuncios();await painelExtrasAnuncios()}}
+{const o2=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o2.apply(this,arguments);await adsCarregaModo();await painelTrafegoExtra();await painelGestaoAnuncios();await painelExtrasAnuncios()}}
 
 
 // ---------- Gestor de anúncios (Fase 1): impulsionar publicação, tetos, pausar/retomar ----------
@@ -314,7 +316,7 @@ const GA_EST={ATIVO:['Ativo','ok'],PAUSADO:['Pausado',''],ERRO:['Erro','bad'],CR
 const gaPost=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
 const gaBrl=(v,m)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:m||'BRL'});
 async function painelGestaoAnuncios(){
-  if(internalSession?.role!=='manager')return;
+  if(internalSession?.role!=='manager'||!adsCompleto)return;
   const host=$('#content');if(!host||state.page!=='trafego')return;
   let d;try{d=await api('/ads/gestao')}catch{return}
   if(state.page!=='trafego')return;
@@ -424,8 +426,8 @@ async function painelExtrasAnuncios(){
   if(state.page!=='trafego'||$('#extrasAds'))return;
   const r=d.regras,mt=d.matriculas||[];
   const box=document.createElement('section');box.className='card';box.id='extrasAds';
-  box.innerHTML=`<div class="card-title"><div><small>RECURSOS OPCIONAIS · LIGUE O QUE QUISER</small><h3>Regras, relatório automático e custo por matrícula</h3></div></div>
-  <details open><summary><b>Regras automáticas</b> <span class="badge ${r.ativa?'ok':''}">${r.ativa?'Ligadas':'Desligadas'}</span></summary>
+  box.innerHTML=`<div class="card-title"><div><small>RECURSOS OPCIONAIS</small><h3>${d.gestao?'Regras, relatório automático e custo por matrícula':'Relatório automático e custo por matrícula'}</h3></div></div>
+  ${d.gestao?`<details open><summary><b>Regras automáticas</b> <span class="badge ${r.ativa?'ok':''}">${r.ativa?'Ligadas':'Desligadas'}</span></summary>
    <p class="kpi-note">O sistema olha os anúncios ativos a cada hora e avisa (notificação e e-mail) ou pausa o que cumprir a regra. Só mexe em anúncios ativos e registra tudo no histórico.</p>
    <label class="check-row"><input type="checkbox" id="rgAtiva" ${r.ativa?'checked':''}> Ligar as regras automáticas</label>
    <div class="st-row"><label>Quando um anúncio gastar (R$) ou mais…<input id="rgGasto" type="number" min="0" step="5" value="${r.gastoSemResultado}"></label><label>…em quantos dias<input id="rgDias" type="number" min="1" max="30" value="${r.dias}"></label></div>
@@ -433,7 +435,7 @@ async function painelExtrasAnuncios(){
    <label>Avisar também quando o custo por resultado passar de (R$; 0 = desligado)<input id="rgCusto" type="number" min="0" step="1" value="${r.custoMax}"></label>
    <label>O que fazer<select id="rgAcao"><option value="AVISAR" ${r.acao==='AVISAR'?'selected':''}>Só avisar (recomendado)</option><option value="PAUSAR" ${r.acao==='PAUSAR'?'selected':''}>Pausar o anúncio e avisar</option></select></label>
    <div class="st-acoes"><button class="softbtn" id="rgSim" type="button">Ver o que a regra pegaria agora</button><button class="btn" id="rgSalva" type="button">Salvar regras</button></div><div id="rgOut"></div>
-  </details>
+  </details>`:''}
   <details><summary><b>Relatório semanal por e-mail</b> <span class="badge ${d.relatorioSemanal?'ok':''}">${d.relatorioSemanal?'Ligado':'Desligado'}</span></summary>
    <p class="kpi-note">Toda segunda-feira o sistema envia ao e-mail de avisos um resumo da semana anterior (investimento, alcance, conversas e custo por campanha) com o link do relatório em PDF. Precisa do e-mail de avisos configurado e do cron de sincronização.</p>
    <div class="st-acoes"><label class="check-row"><input type="checkbox" id="rsAtivo" ${d.relatorioSemanal?'checked':''}> Enviar toda segunda-feira</label><button class="softbtn" id="rsAgora" type="button">Enviar um agora (teste)</button></div>
@@ -444,8 +446,8 @@ async function painelExtrasAnuncios(){
   </details>`;
   const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
   const regra=()=>({ativa:$('#rgAtiva',box).checked,gastoSemResultado:Number($('#rgGasto',box).value),dias:Number($('#rgDias',box).value),custoMax:Number($('#rgCusto',box).value),acao:$('#rgAcao',box).value});
-  $('#rgSalva',box).onclick=async()=>{const b=regra();if(b.ativa&&b.acao==='PAUSAR'&&!confirm('Com "Pausar", o sistema pausa sozinho os anúncios que cumprirem a regra. Continuar?'))return;try{await gaPost('/ads/regras',b);toast('Regras salvas');go('trafego')}catch(e){toast(e.message,'warn')}};
-  $('#rgSim',box).onclick=async()=>{const o=$('#rgOut',box);o.textContent='Lendo a conta…';try{await gaPost('/ads/regras',regra());const x=await gaPost('/ads/regras/simular');o.innerHTML=x.achados.length?`<ul class="gi-lista">${x.achados.map(a=>`<li><b>${esc(a.anuncio)}</b> (${esc(a.campanha)}): ${esc(a.motivo)}</li>`).join('')}</ul>`:'<p class="kpi-note">Nenhum anúncio ativo cumpre a regra agora.</p>'}catch(e){o.textContent='';toast(e.message,'warn')}};
+  if($('#rgSalva',box)){$('#rgSalva',box).onclick=async()=>{const b=regra();if(b.ativa&&b.acao==='PAUSAR'&&!confirm('Com "Pausar", o sistema pausa sozinho os anúncios que cumprirem a regra. Continuar?'))return;try{await gaPost('/ads/regras',b);toast('Regras salvas');go('trafego')}catch(e){toast(e.message,'warn')}};
+  $('#rgSim',box).onclick=async()=>{const o=$('#rgOut',box);o.textContent='Lendo a conta…';try{await gaPost('/ads/regras',regra());const x=await gaPost('/ads/regras/simular');o.innerHTML=x.achados.length?`<ul class="gi-lista">${x.achados.map(a=>`<li><b>${esc(a.anuncio)}</b> (${esc(a.campanha)}): ${esc(a.motivo)}</li>`).join('')}</ul>`:'<p class="kpi-note">Nenhum anúncio ativo cumpre a regra agora.</p>'}catch(e){o.textContent='';toast(e.message,'warn')}}}
   $('#rsAtivo',box).onchange=async e=>{try{await gaPost('/ads/relatorio-semanal',{ativo:e.target.checked});toast(e.target.checked?'Relatório semanal ligado':'Relatório semanal desligado')}catch(x){toast(x.message,'warn')}};
   $('#rsAgora',box).onclick=async()=>{try{await gaPost('/ads/relatorio-semanal',{enviarAgora:true});toast('E-mail enviado (se o e-mail de avisos estiver configurado)')}catch(e){toast(e.message,'warn')}};
   box.querySelectorAll('.mt-in').forEach(i=>i.onchange=async()=>{if(i.value==='')return;try{await gaPost('/ads/matriculas',{mes:i.dataset.mes,matriculas:Number(i.value)});toast('Salvo');go('trafego')}catch(e){toast(e.message,'warn')}});

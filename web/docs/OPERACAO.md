@@ -114,3 +114,8 @@ Cadastre o **WhatsApp do Colégio** (DDI+DDD, ex.: +5583999999999) em Tráfego �
 - **Separado por conta:** um seletor de conta aparece em Instagram → Estúdio, Desempenho e Ranking. Métricas mensais/anuais, seguidores, melhores posts, melhor horário e relatório mensal em PDF são sempre de uma conta só. Cada post do Estúdio tem o campo **Conta do Instagram** (publica pela conta escolhida).
 - **Colab:** no post, campo "Colab com (@usuário; até 3)". O post é publicado como colaboração: aparece nos dois perfis depois que o convidado aceita o convite no Instagram. Vale para Feed e Reels.
 - **Anúncios:** ao impulsionar, o sistema usa a conta e a Página dona da publicação. A conta de anúncios é uma só (a escolhida em Integrações).
+
+## Tráfego: somente leitura por padrão
+- **Padrão:** o Tráfego só LÊ e mostra métricas (painel do mês, relatório semanal em PDF, alertas, Gerenciador em leitura com "Comparar anúncios", custo por matrícula e relatório semanal por e-mail). Não aparecem os botões de criar, editar, pausar, duplicar nem Impulsionar, e o servidor recusa (403) qualquer escrita.
+- **Modo completo (opcional):** Administração → Integrações → Anúncios → "Modo completo". Libera Gestor de anúncios, Impulsionar, Nova campanha, edição/pausa e regras automáticas. Depois, siga o guia do Gestor (ligar a gestão e reconectar a Meta com ads_management).
+- **Alertas:** anúncios com problema aparecem agrupados por motivo.

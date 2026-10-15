@@ -30,6 +30,7 @@ export async function salvarRegras(b: Row): Promise<Regras> {
 /** Avalia os anúncios ativos dos últimos N dias. Devolve o que encontrou/fez. `simular` só mostra, sem pausar nem avisar. */
 export async function rodarRegras(simular = false): Promise<Row> {
   const cfg = await cfgRegras();
+  if ((await setting('trafego_gestao')) !== '1') return { ativa: false, motivo: 'modo somente leitura' };
   if (!cfg.ativa && !simular) return { ativa: false };
   if (!(await metaConnected())) throw new Error('Instagram/Meta não conectado.');
   const ate = fmtDate(new Date()), de = fmtDate(addDays(new Date(), -(cfg.dias - 1)));

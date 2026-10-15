@@ -11,6 +11,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const novos=async()=>Object.entries((await mock('/__state')).ads_novos||{});
  let s,r;
  // preparação: Meta conectada, conta escolhida, publicações lidas e gasto do mês
+ await call('POST','/ads/modo',{gestao:true}); // o Tráfego nasce só-leitura; estas suítes testam o modo completo
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await call('POST','/integrations/instagram/sync',{});
  await call('GET','/integrations/ads/accounts');await call('POST','/integrations/ads/account',{conta:'111222333'});await call('POST','/integrations/ads/sync',{});
  // ---- desligado por padrão e só Gerência

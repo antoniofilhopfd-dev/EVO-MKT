@@ -12,6 +12,7 @@ const JPG=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP///////////////////////
  const api=(m,u,body)=>p.evaluate(async([m,u,body])=>{try{return await api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})}catch(e){return {erro:e.message}}},[m,u,body]);
  const mock=async q=>(await fetch('http://127.0.0.1:8099'+q)).json();
  const novos=async tipo=>Object.entries((await mock('/__state')).ads_novos||{}).filter(([,v])=>v.tipo===tipo).map(([,v])=>v.params);
+ await api('POST','/ads/modo',{gestao:true}); // modo completo ligado para testar a criação/edição
  await api('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await api('POST','/integrations/instagram/sync',{});await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});await api('POST','/integrations/ads/sync',{});
  await api('POST','/ads/gestao/config',{ativa:true,cidade:'João Pessoa'});
  const post=(await api('POST','/data?module=conteudos',{titulo:'Arte da matrícula',legenda:'Matrículas abertas',status:'APROVADO',formato:'Feed'})).id;

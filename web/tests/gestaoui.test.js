@@ -9,6 +9,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  let logado=false;p.on('dialog',d=>d.accept(d.type()==='prompt'?(logado?'x':'Senha26x'):undefined));
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');logado=true;
  const api=(m,u,body)=>p.evaluate(async([m,u,body])=>{try{return await api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})}catch(e){return {erro:e.message}}},[m,u,body]);
+ await api('POST','/ads/modo',{gestao:true}); // modo completo ligado para testar a criação/edição
  await api('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await api('POST','/integrations/instagram/sync',{});await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});await api('POST','/integrations/ads/sync',{});
  // ---- configuração
  await p.evaluate(()=>go('trafego'));await p.waitForSelector('#gestorAds',{state:'attached',timeout:20000});

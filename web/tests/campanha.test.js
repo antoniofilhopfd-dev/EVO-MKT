@@ -12,6 +12,7 @@ const JPG=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP///////////////////////
  const novos=async()=>Object.entries((await mock('/__state')).ads_novos||{});
  const ultimo=async tipo=>{const l=(await novos()).filter(([,v])=>v.tipo===tipo);return l.length?l[l.length-1][1].params:null};
  let s,r,n=0;const chave=()=>'campanhaTeste'+String(++n).padStart(8,'0')+'abcdef';
+ await call('POST','/ads/modo',{gestao:true}); // o Tráfego nasce só-leitura; estas suítes testam o modo completo
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await call('POST','/integrations/instagram/sync',{});await call('GET','/integrations/ads/accounts');await call('POST','/integrations/ads/account',{conta:'111222333'});await call('POST','/integrations/ads/sync',{});
  await call('POST','/ads/gestao/config',{ativa:true,cidade:'João Pessoa',tetoDia:100,tetoMes:6000,diasMax:30});
  // imagem do Estúdio (JPEG anexado a um post)

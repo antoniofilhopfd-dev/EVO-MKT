@@ -12,6 +12,12 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  let s,r;
  await call('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await call('POST','/integrations/instagram/sync',{});
  await call('GET','/integrations/ads/accounts');await call('POST','/integrations/ads/account',{conta:'111222333'});await call('POST','/integrations/ads/sync',{});
+ // modo do Tráfego: nasce somente leitura
+ [,r]=await call('GET','/ads/modo');t('Tráfego nasce em modo somente leitura',r.gestao===false,r);
+ for(const [m,u,b] of [['POST','/ads/impulsionar',{confirmou:true}],['POST','/ads/editar',{}],['POST','/ads/duplicar',{}],['POST','/ads/campanha/lancar',{}],['POST','/ads/pausar-tudo',{}],['POST','/ads/gestao/config',{ativa:true}],['POST','/ads/regras',{ativa:true}]]){[s,r]=await call(m,u,b);t(`somente leitura bloqueia ${u} (403)`,s===403&&/somente leitura/.test(r.error||''),r)}
+ [s]=await call('GET','/ads/gestao');t('somente leitura ainda mostra a configuração e métricas (/ads/gestao, /ads/arvore)',s===200&&(await call('GET','/ads/arvore'))[0]===200);
+ [s,r]=await call('POST','/ads/modo',{gestao:true},E);t('Equipe não muda o modo (403)',s===403);
+ [s,r]=await call('POST','/ads/modo',{gestao:true});t('Gerência liga o modo completo',s===200&&r.gestao===true);
  // permissões
  for(const [m,u,b] of [['GET','/ads/extras'],['POST','/ads/regras',{ativa:true}],['POST','/ads/regras/simular',{}],['POST','/ads/relatorio-semanal',{ativo:true}],['POST','/ads/matriculas',{mes:'2026-01',matriculas:3}],['POST','/ads/rascunhos',{nome:'x',dados:{}}],['GET','/instagram/relatorio'],['POST','/instagram/seguidores/manual',{mes:'2025-01',seguidores:10}]]){[s]=await call(m,u,b,E);t(`Equipe não acessa ${u} (403)`,s===403)}
  // modelos de legenda (Equipe pode)

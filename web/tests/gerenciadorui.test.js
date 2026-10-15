@@ -11,6 +11,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  const api=(m,u,body)=>p.evaluate(async([m,u,body])=>{try{return await api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})}catch(e){return {erro:e.message}}},[m,u,body]);
  const mock=async q=>(await fetch('http://127.0.0.1:8099'+q)).json();
  const edits=async id=>((await mock('/__state')).edits||{})[id]||[];
+ await api('POST','/ads/modo',{gestao:true}); // modo completo ligado para testar a criação/edição
  await api('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});await api('POST','/ads/gestao/config',{ativa:true,cidade:'João Pessoa'});
  await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('.gm-tab tr.gm-campanha',{timeout:20000});
  t('Tráfego tem a seção Gerenciador entre as abas',await p.evaluate(()=>[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent).includes('Gerenciador')));

@@ -20,6 +20,19 @@ const faixa = (v: unknown, min: number, max: number, nome: string) => { const n 
 export async function gestaoAnunciosRoute(c: Ctx) {
   const { path, method } = c;
   const u = await requireManager(c);
+  // Modo do Tráfego: por padrão SOMENTE LEITURA (métricas). Criar/editar/pausar anúncios só com a chave ligada em Administração → Integrações.
+  const completo = (await setting('trafego_gestao')) === '1';
+  if (path === '/ads/modo') {
+    if (method === 'POST') {
+      const b = await c.body();
+      await setSetting('trafego_gestao', b.gestao === true ? '1' : '0');
+      await audit(String(u.codigo), 'ads-modo', 'ads', b.gestao === true ? 'completo' : 'leitura');
+      return json({ ok: true, gestao: b.gestao === true });
+    }
+    return json({ gestao: completo });
+  }
+  const ESCRITA = ['/ads/gestao/config', '/ads/previa', '/ads/impulsionar', '/ads/pausar', '/ads/retomar', '/ads/pausar-tudo', '/ads/editar', '/ads/duplicar', '/ads/campanha/opcoes', '/ads/campanha/interesses', '/ads/campanha/previa', '/ads/campanha/lancar', '/ads/regras', '/ads/regras/simular', '/ads/rascunhos'];
+  if (!completo && ESCRITA.includes(path)) fail(403, 'O Tráfego está em modo somente leitura (só métricas). Para criar ou editar anúncios pelo sistema, ligue o modo completo em Administração → Integrações.');
   if (path === '/ads/gestao' && method === 'GET') {
     let permissao = false;
     try { permissao = (await metaConnected()) && (await gestaoPermitida()); } catch { /* sem Meta */ }
@@ -77,7 +90,7 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     try { return json(await arvore(de, ate, c.qs('arquivados') === '1')); } catch (e: any) { return fail(502, e.message); }
   }
   if (path === '/ads/extras' && method === 'GET') {
-    return json({ regras: await cfgRegras(), relatorioSemanal: (await setting('ads_relatorio_semanal')) === '1', matriculas: await listarMatriculas(), rascunhos: await rascunhos() });
+    return json({ gestao: completo, regras: await cfgRegras(), relatorioSemanal: (await setting('ads_relatorio_semanal')) === '1', matriculas: await listarMatriculas(), rascunhos: await rascunhos() });
   }
   if (path === '/ads/regras' && method === 'POST') {
     const b = await c.body();
