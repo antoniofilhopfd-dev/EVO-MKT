@@ -16,7 +16,9 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.evaluate(()=>{adminTab='integracoes';go('administracao')});await p.waitForSelector('[data-igmon]',{timeout:20000});
  const marcadas=async()=>p.$$eval('[data-igmon]',els=>els.filter(e=>e.checked).map(e=>e.dataset.igmon));
  t('com a conta em uso na segunda, só ela vem marcada',(await marcadas()).join()===IG2,await marcadas());
- await p.check(`[data-igmon="${IG1}"]`);await p.click('#igMonSalvar');await p.waitForTimeout(1500);await p.waitForSelector('[data-igmon]');
+ await p.check(`[data-igmon="${IG1}"]`);await p.waitForTimeout(1200);
+ t('marcar já mostra na tela quem está sendo acompanhado (salva sozinho)',/@evolucaopb/.test(await p.$eval('#igMonStatus',e=>e.textContent))&&/@outraconta/.test(await p.$eval('#igMonStatus',e=>e.textContent)),await p.$eval('#igMonStatus',e=>e.textContent));
+ await p.evaluate(()=>{adminTab='integracoes';go('administracao')});await p.waitForSelector('[data-igmon]');await p.waitForTimeout(800);
  const dep=await marcadas();
  t('marcar a primeira e salvar mantém as duas marcadas depois de recarregar a tela',dep.length===2&&dep.includes(IG1)&&dep.includes(IG2),dep);
  await p.evaluate(()=>go('studio'));await p.waitForSelector('[data-igconta]',{timeout:20000});
