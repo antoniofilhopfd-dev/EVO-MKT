@@ -187,7 +187,7 @@ function desenharIgPosts(){
   const melhor=[...rows].sort(IG_ORDEM.interacoes[1])[0];
   const sel=(k,opts,cur)=>`<select data-igf="${k}">${opts.map(([v,l])=>`<option value="${attr(v)}" ${String(cur)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${ST_ICONE[tipoDe(r)]||'◇'}<br>${esc(tipoDe(r))}</span>`};
-  const card=r=>{const l=urlSegura(r.link),dt=String(r.quando).slice(0,10);return `<article class="ig-card"><${l?`a href="${attr(l)}" target="_blank" rel="noopener"`:'div'} class="ig-thumb" title="Abrir no Instagram">${mini(r)}</${l?'a':'div'}><div class="ig-body"><div class="ig-meta"><b>${esc(tipoDe(r))}</b><span>${dt?fmtDate(dt):''}</span></div><p>${esc(r.legenda||'(sem legenda)')}</p><dl><div><dt>Curtidas</dt><dd>${igNum(r.curtidas)}</dd></div><div><dt>Comentários</dt><dd>${igNum(r.comentarios)}</dd></div><div><dt>Salvos</dt><dd>${igNum(r.salvos)}</dd></div><div><dt>Compart.</dt><dd>${igNum(r.compartilhamentos)}</dd></div><div><dt>Alcance</dt><dd>${r.alcance===null?'—':igNum(r.alcance)}</dd></div><div><dt>Engajamento</dt><dd>${r.engajamento===null?'—':String(r.engajamento).replace('.',',')+'%'}</dd></div></dl></div></article>`};
+  const card=r=>{const l=urlSegura(r.link),dt=String(r.quando).slice(0,10);return `<article class="ig-card"><${l?`a href="${attr(l)}" target="_blank" rel="noopener"`:'div'} class="ig-thumb" title="Abrir no Instagram">${mini(r)}</${l?'a':'div'}><div class="ig-body"><div class="ig-meta"><b>${esc(tipoDe(r))}</b><span>${dt?fmtDate(dt):''}</span></div>${internalSession?.role==='manager'?`<button class="softbtn ig-imp" data-imp="${attr(r.id)}">Impulsionar</button>`:''}<p>${esc(r.legenda||'(sem legenda)')}</p><dl><div><dt>Curtidas</dt><dd>${igNum(r.curtidas)}</dd></div><div><dt>Comentários</dt><dd>${igNum(r.comentarios)}</dd></div><div><dt>Salvos</dt><dd>${igNum(r.salvos)}</dd></div><div><dt>Compart.</dt><dd>${igNum(r.compartilhamentos)}</dd></div><div><dt>Alcance</dt><dd>${r.alcance===null?'—':igNum(r.alcance)}</dd></div><div><dt>Engajamento</dt><dd>${r.engajamento===null?'—':String(r.engajamento).replace('.',',')+'%'}</dd></div></dl></div></article>`};
   const vazio=!todos.length;
   $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · DESEMPENHO</small><h1>O que funcionou em cada publicação</h1><p>${igDados.ultimaSync?`Última leitura da Meta: ${fmtDateTime(igDados.ultimaSync)}.`:'Ainda não houve leitura da Meta.'} Alcance, salvamentos e compartilhamentos vêm das 30 publicações mais recentes.</p></div>${internalSession?.role==='manager'?'<button class="btn" id="igAtualiza">Atualizar agora</button>':''}</div>
   ${vazio?`<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram em Administração → Integrações e clique em “Atualizar agora”.</span></div>`:`
@@ -196,6 +196,7 @@ function desenharIgPosts(){
   ${melhor?`<div class="card st-tip"><span>★</span><div>Melhor publicação do período: <b>${esc((melhor.legenda||'sem legenda').slice(0,90))}</b> — ${igNum(melhor.interacoes)} interações.</div></div>`:''}
   <div class="ig-grid">${rows.map(card).join('')||'<div class="empty compact">Nada neste filtro.</div>'}</div>`}`;
   $$('[data-igf]').forEach(s=>s.onchange=()=>{igFiltro[s.dataset.igf]=s.value;desenharIgPosts()});
+  $$('[data-imp]').forEach(b=>b.onclick=()=>gestorImpulsionar(rows.find(x=>x.id===b.dataset.imp)));
   const b=$('#igAtualiza');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Atualizando…';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});toast('Publicações atualizadas');await renderIgPosts()}catch(e){toast(e.message,'bad');b.disabled=false;b.textContent='Atualizar agora'}};
 }
 
@@ -271,4 +272,57 @@ async function painelTrafegoExtra(){
   const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
   const bt=$('#tgOrcSalva');if(bt)bt.onclick=async()=>{try{await api('/integrations/ads/orcamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({valor:Number($('#tgOrc').value||0)})});toast('Orçamento salvo');go('trafego')}catch(e){toast(e.message,'warn')}};
 }
-{const o2=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o2.apply(this,arguments);await painelTrafegoExtra()}}
+{const o2=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o2.apply(this,arguments);await painelTrafegoExtra();await painelGestaoAnuncios()}}
+
+
+// ---------- Gestor de anúncios (Fase 1): impulsionar publicação, tetos, pausar/retomar ----------
+const GA_EST={ATIVO:['Ativo','ok'],PAUSADO:['Pausado',''],ERRO:['Erro','bad'],CRIANDO:['Criando','warn']};
+const gaPost=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+const gaBrl=(v,m)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:m||'BRL'});
+async function painelGestaoAnuncios(){
+  if(internalSession?.role!=='manager')return;
+  const host=$('#content');if(!host||state.page!=='trafego')return;
+  let d;try{d=await api('/ads/gestao')}catch{return}
+  if(state.page!=='trafego')return;
+  const c=d.config,pb=c.publico,cid=pb.cidade;
+  const box=document.createElement('section');box.className='card';box.id='gestorAds';
+  box.innerHTML=`<div class="card-title"><div><small>GESTOR DE ANÚNCIOS</small><h3>Campanhas lançadas pelo sistema</h3></div><div><span class="badge ${c.ativa?'ok':''}">${c.ativa?'Ligado':'Desligado'}</span>${c.ativa&&!d.permissao?' <span class="badge bad">Falta a permissão ads_management</span>':''}</div></div>
+  <p class="kpi-note">Aqui o sistema <b>cria e gere anúncios de verdade</b>: eles vão ao ar <b>ativos</b> assim que a Meta aprovar. Só a Gerência lança. Cada lançamento mostra o total que você está comprometendo e respeita os tetos abaixo. Para impulsionar uma publicação, use o botão <b>Impulsionar</b> em Instagram → Desempenho.</p>
+  <details ${c.ativa?'':'open'}><summary><b>Configuração e tetos</b></summary><div class="ga-form">
+   <label class="check-row"><input type="checkbox" id="gaAtiva" ${c.ativa?'checked':''}> Habilitar a gestão de anúncios (depois de salvar, reconecte a Meta para aceitar a permissão nova)</label>
+   <div class="st-row"><label>Teto por campanha (R$/dia)<input id="gaTetoDia" type="number" min="${d.minimoDia}" step="5" value="${c.tetoDia}"></label><label>Teto mensal (R$)<input id="gaTetoMes" type="number" min="${d.minimoDia}" step="100" value="${c.tetoMes}"></label></div>
+   <div class="st-row"><label>Duração máxima (dias)<input id="gaDiasMax" type="number" min="1" max="60" value="${c.diasMax}"></label><label>Cidade do público<input id="gaCidade" placeholder="${cid?esc(cid.nome+', '+cid.regiao):'Ex.: João Pessoa'}"></label></div>
+   <div class="st-row"><label>Raio (km)<input id="gaRaio" type="number" min="1" max="80" value="${pb.raioKm}"></label><div class="st-row"><label>Idade mín.<input id="gaIdMin" type="number" min="18" max="65" value="${pb.idadeMin}"></label><label>Idade máx.<input id="gaIdMax" type="number" min="18" max="65" value="${pb.idadeMax}"></label></div></div>
+   <p class="kpi-note">Público padrão: ${cid?esc(cid.nome+' ('+cid.regiao+')'):'<b>cidade ainda não definida</b>'}, raio de ${pb.raioKm} km, ${pb.idadeMin} a ${pb.idadeMax} anos, só no Instagram. Mínimo por campanha: ${gaBrl(d.minimoDia)}/dia.</p>
+   <div class="st-acoes"><button class="btn" id="gaSalva">Salvar configuração</button>${c.ativa&&!d.permissao?'<a class="softbtn" href="/api/integrations/meta/connect">Reconectar a Meta</a>':''}</div></div></details>
+  <div class="tg-secao"><div class="card-title"><h4>Lançamentos</h4>${d.lancamentos.some(l=>l.estado==='ATIVO')?'<button class="softbtn ga-perigo" id="gaPausaTudo">Pausar tudo</button>':''}</div>
+  ${d.lancamentos.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>Quando</th><th>Anúncio</th><th>Objetivo</th><th>R$/dia × dias</th><th>Término</th><th>Estado</th><th></th></tr></thead><tbody>${d.lancamentos.map(l=>{const [r,cl]=GA_EST[l.estado]||[l.estado,''];return `<tr><td>${esc(fmtDateTime(l.quando))}<br><small>${esc(l.quem)}</small></td><td>${esc(l.titulo)}${l.erro?`<br><small class="tg-ruim">${esc(l.erro)}</small>`:''}</td><td>${l.objetivo==='ALCANCE'?'Alcance':'Conversas'}</td><td>${esc(gaBrl(l.orcamento_dia,l.moeda))} × ${l.dias}<br><small>até ${esc(gaBrl(l.compromisso,l.moeda))}</small></td><td>${esc(fmtDate(String(l.fim).slice(0,10)))}</td><td><span class="badge ${cl}">${esc(r)}</span></td><td>${l.estado==='ATIVO'?`<button class="softbtn" data-ga="pausar" data-id="${l.id}">Pausar</button>`:l.estado==='PAUSADO'?`<button class="softbtn" data-ga="retomar" data-id="${l.id}">Retomar</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty compact">Nenhum lançamento ainda.</div>'}</div>`;
+  const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
+  $('#gaSalva',box).onclick=async()=>{const b={ativa:$('#gaAtiva',box).checked,tetoDia:Number($('#gaTetoDia',box).value),tetoMes:Number($('#gaTetoMes',box).value),diasMax:Number($('#gaDiasMax',box).value),raioKm:Number($('#gaRaio',box).value),idadeMin:Number($('#gaIdMin',box).value),idadeMax:Number($('#gaIdMax',box).value)};const cidade=$('#gaCidade',box).value.trim();if(cidade)b.cidade=cidade;try{await gaPost('/ads/gestao/config',b);toast('Configuração salva');go('trafego')}catch(e){toast(e.message,'warn')}};
+  box.querySelectorAll('[data-ga]').forEach(bt=>bt.onclick=async()=>{const acao=bt.dataset.ga;if(!confirm(acao==='pausar'?'Pausar este anúncio na Meta?':'Retomar este anúncio na Meta? Ele volta a gastar.'))return;try{await gaPost('/ads/'+acao,{id:Number(bt.dataset.id)});toast(acao==='pausar'?'Anúncio pausado':'Anúncio retomado');go('trafego')}catch(e){toast(e.message,'warn')}});
+  const pt=$('#gaPausaTudo',box);if(pt)pt.onclick=async()=>{if(!confirm('Pausar TODOS os anúncios que o sistema lançou? Eles param de gastar na hora.'))return;try{const r=await gaPost('/ads/pausar-tudo');toast(`${r.pausados} anúncio(s) pausado(s)${r.falhas.length?' · falhas: '+r.falhas.join('; '):''}`);go('trafego')}catch(e){toast(e.message,'bad')}};
+}
+
+function gestorImpulsionar(post){
+  if(!post)return;
+  const chave=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');
+  const o=adminOverlay(`<h3>Impulsionar publicação</h3><p class="kpi-note">${esc(String(post.legenda||'(sem legenda)').slice(0,140))}</p>
+   <div class="st-form"><div class="st-row"><label>Orçamento por dia (R$)<input id="giOrc" type="number" step="5" value="20"></label><label>Duração (dias)<input id="giDias" type="number" min="1" step="1" value="7"></label></div>
+   <label>Objetivo<select id="giObj"><option value="CONVERSAS">Conversas no Instagram Direct</option><option value="ALCANCE">Alcance (mostrar para mais pessoas)</option></select></label>
+   <div id="giPrev" class="gi-prev">Calculando…</div>
+   <label class="check-row"><input type="checkbox" id="giOk"> <span id="giTxt">Entendo que o anúncio vai ao ar agora, ativo, e pode gastar até o total acima.</span></label>
+   <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="btn accent" type="button" id="giLanca" disabled>Lançar agora</button></div></div>`);
+  const g=id=>o.el.querySelector('#'+id);let prev=null,tm=null;
+  const pedido=()=>({chave,midia:post.id,orcamentoDia:Number(g('giOrc').value),dias:Number(g('giDias').value),objetivo:g('giObj').value});
+  const atualiza=async()=>{
+    try{prev=await gaPost('/ads/previa',pedido())}catch(e){g('giPrev').textContent=e.message;return}
+    const pb=prev.resumo.publico,cid=pb.cidade;
+    g('giPrev').innerHTML=`<ul class="gi-lista"><li><b>Objetivo:</b> ${esc(prev.resumo.objetivo)}</li><li><b>Público:</b> ${cid?esc(cid.nome):'<span class="tg-ruim">cidade não definida</span>'}, raio de ${pb.raioKm} km, ${pb.idadeMin} a ${pb.idadeMax} anos · só Instagram</li><li><b>Total comprometido:</b> até ${esc(gaBrl(prev.compromisso,prev.moeda))} (${esc(gaBrl(prev.resumo.orcamentoDia,prev.moeda))}/dia × ${prev.resumo.dias} dia(s)), termina em ${esc(fmtDate(String(prev.fim).slice(0,10)))}</li><li><b>Mês:</b> já gasto ${esc(gaBrl(prev.gastoMes,prev.moeda))} + em andamento ${esc(gaBrl(prev.pendente,prev.moeda))} · teto mensal ${esc(gaBrl(prev.tetoMes,prev.moeda))}</li></ul>${prev.erros.map(e=>`<p class="tg-ruim">✖ ${esc(e)}</p>`).join('')}${prev.avisos.map(e=>`<p class="kpi-note">⚠ ${esc(e)}</p>`).join('')}`;
+    g('giTxt').textContent=`Entendo que o anúncio vai ao ar agora, ativo, e pode gastar até ${gaBrl(prev.compromisso,prev.moeda)}.`;
+    g('giLanca').disabled=!(prev.ok&&g('giOk').checked);
+  };
+  ['giOrc','giDias','giObj'].forEach(i=>{g(i).oninput=g(i).onchange=()=>{g('giOk').checked=false;g('giLanca').disabled=true;clearTimeout(tm);tm=setTimeout(atualiza,300)}});
+  g('giOk').onchange=()=>{g('giLanca').disabled=!(prev&&prev.ok&&g('giOk').checked)};
+  g('giLanca').onclick=async()=>{g('giLanca').disabled=true;g('giLanca').textContent='Lançando…';try{const r=await gaPost('/ads/impulsionar',{...pedido(),confirmou:true});o.close();toast(r.lancamento.repetido?'Esse lançamento já existia':'Anúncio lançado. A Meta vai analisar e ele começa a rodar.');}catch(e){toast(e.message,'bad');g('giLanca').textContent='Lançar agora';g('giLanca').disabled=false}};
+  atualiza();
+}

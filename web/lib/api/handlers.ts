@@ -24,6 +24,7 @@ import { trabalhoRoute } from './trabalho';
 import { conteudoRoute } from './conteudo';
 import { relatoriosRoute } from './relatorios';
 import { calendarioPublicoRoute } from './calendarioPublico';
+import { gestaoAnunciosRoute } from './gestaoAnuncios';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
@@ -46,6 +47,8 @@ export async function route(c: Ctx): Promise<Out> {
       return aprovacaoPublicaRoute(c);
     case path === '/manager/calendario-link' || path === '/public/calendario':
       return calendarioPublicoRoute(c);
+    case path.startsWith('/ads/'):
+      return gestaoAnunciosRoute(c);
     case path.startsWith('/reports/'):
       return relatoriosRoute(c);
     case path.startsWith('/content/'):

@@ -1,6 +1,6 @@
 # Gestor de Anúncios no EVO MKT — desenho (para aprovação)
 
-Status: **proposta, nada implementado.** Hoje o Tráfego é somente leitura (decisão original). Este documento muda essa regra de forma controlada: o EVO MKT passa a **criar e gerir campanhas que vão ao ar ATIVAS**, como o Gerenciador de Anúncios do Colégio.
+Status: **Fase 1 implementada** (impulsionar publicação, tetos, confirmação, pausar/retomar/pausar tudo). Fases 2 e 3 pendentes. Os valores abaixo foram escolhidos por padrão e a Gerência os altera em Tráfego → Gestor de anúncios. Hoje o Tráfego é somente leitura (decisão original). Este documento muda essa regra de forma controlada: o EVO MKT passa a **criar e gerir campanhas que vão ao ar ATIVAS**, como o Gerenciador de Anúncios do Colégio.
 
 ## 1. Princípios
 1. **Vai ao ar ativo.** Campanha, conjunto e anúncio são criados `ACTIVE`. Eles entram na análise da Meta (`PENDING_REVIEW`) e passam a rodar sozinhos depois de aprovados.
@@ -70,3 +70,17 @@ Editar orçamento diário (dentro dos tetos), estender ou antecipar o término, 
 - **Erro de público:** predefinição do Colégio e prévia do resumo antes de confirmar.
 - **Reprovação pela Meta:** o status e o motivo aparecem no Tráfego e geram alerta.
 - **Primeiro teste real:** com um valor pequeno (ex.: R$ 10/dia por 1 dia), campanha de teste supervisionada, antes de usar no dia a dia.
+
+
+## 9. Valores padrão adotados (editáveis na tela)
+- Objetivo padrão: **conversas no Instagram Direct** (alcance como segunda opção).
+- Teto por campanha: **R$ 50/dia** · teto mensal: **R$ 3.000** · duração máxima: **14 dias** (padrão de 7 e R$ 20/dia ao impulsionar).
+- Público: **João Pessoa, raio de 20 km, 25 a 55 anos, só Instagram**.
+- A gestão vem **desligada**. Para usar: Tráfego → Gestor de anúncios → ligar → salvar → **reconectar a Meta** (aceitar `ads_management`).
+
+## 10. Primeiro lançamento real (teste supervisionado)
+Os pedidos à Meta (`montarPayloads` em `lib/integrations/metaadsGestao.ts`) seguem a documentação e foram validados **só contra o simulador**. Faça o primeiro com valor pequeno:
+1. Instagram → Desempenho → **Impulsionar** numa publicação, **R$ 6/dia por 1 dia**.
+2. Confira a campanha no Gerenciador de Anúncios da Meta (nome começa com `[EVO MKT]`).
+3. Se a Meta recusar algum campo, o erro aparece na tela, a campanha incompleta é pausada e removida, e o lançamento fica registrado como ERRO com o motivo. Ajuste só `montarPayloads`.
+4. Pause pelo sistema (**Pausar**) ou, em emergência, **Pausar tudo**.

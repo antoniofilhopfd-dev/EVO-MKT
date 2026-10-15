@@ -1,5 +1,6 @@
 <?php
 // Servidor SIMULADO da Meta (Graph API) e do Google — somente para testes. Uso: php -S 127.0.0.1:8099 tests/mock_apis.php
+date_default_timezone_set(getenv('TIMEZONE') ?: 'America/Recife'); // mesmo fuso do sistema (senão as datas viram o dia seguinte à noite)
 $F = sys_get_temp_dir() . '/evo_mock_state.json';
 $S = is_file($F) ? json_decode(file_get_contents($F), true) : [];
 $S += ['seq' => 0, 'containers' => [], 'published' => [], 'events' => [], 'folders' => [], 'files' => [], 'sheets' => [], 'values' => [], 'calls' => []];
@@ -39,7 +40,13 @@ if (str_starts_with($p, '/graph')) {
     }
     if ($tok === '') j(['error' => ['message' => 'Missing access token']], 401);
     if ($tok === 'EXPIRED_TOKEN') j(['error' => ['message' => 'Error validating access token: Session has expired', 'type' => 'OAuthException', 'code' => 190]], 400);
-    if ($g === '/me/permissions') { $all = ['instagram_basic', 'instagram_manage_insights', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'business_management', 'ads_read']; $d = []; foreach ($all as $x) { $d[] = ['permission' => $x, 'status' => (($tok === 'LIMITED_TOKEN' && $x === 'instagram_content_publish') || ($tok === 'NOADS_TOKEN' && $x === 'ads_read')) ? 'declined' : 'granted']; } j(['data' => $d]); }
+    if ($g === '/me/permissions') { $all = ['instagram_basic', 'instagram_manage_insights', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'business_management', 'ads_read', 'ads_management']; $d = []; foreach ($all as $x) { $d[] = ['permission' => $x, 'status' => (($tok === 'LIMITED_TOKEN' && $x === 'instagram_content_publish') || ($tok === 'NOADS_TOKEN' && $x === 'ads_read') || ($tok === 'NOMGMT_TOKEN' && $x === 'ads_management')) ? 'declined' : 'granted']; } j(['data' => $d]); }
+    if ($g === '/search') { $qq = $_GET['q'] ?? ''; j(['data' => str_contains($qq, 'Naolandia') ? [] : [['key' => '2430536', 'name' => $qq === '' ? 'Cidade' : (str_contains($qq, 'Jo') ? 'João Pessoa' : $qq), 'region' => 'Paraíba', 'country_code' => 'BR']]]); }
+    if ($g === '/act_111222333/campaigns' && $m === 'POST') { $id = nid('CAMP_'); $S['ads_novos'][$id] = ['tipo' => 'campanha', 'params' => $in, 'status' => $in['status'] ?? '']; j(['id' => $id]); }
+    if ($g === '/act_111222333/adsets' && $m === 'POST') { if ($tok === 'FAILSET_TOKEN') j(['error' => ['message' => 'Invalid parameter: destination_type']], 400); $id = nid('SET_'); $S['ads_novos'][$id] = ['tipo' => 'conjunto', 'params' => $in, 'status' => $in['status'] ?? '']; j(['id' => $id]); }
+    if ($g === '/act_111222333/adcreatives' && $m === 'POST') { $id = nid('CRE_'); $S['ads_novos'][$id] = ['tipo' => 'criativo', 'params' => $in]; j(['id' => $id]); }
+    if ($g === '/act_111222333/ads' && $m === 'POST') { $id = nid('AD_'); $S['ads_novos'][$id] = ['tipo' => 'anuncio', 'params' => $in, 'status' => $in['status'] ?? '']; j(['id' => $id]); }
+    if (preg_match('#^/(CAMP_\d+)$#', $g, $mm) && $m === 'POST') { $S['ads_novos'][$mm[1]]['status'] = $in['status'] ?? ''; $S['ads_novos'][$mm[1]]['mudancas'][] = $in['status'] ?? ''; j(['success' => true]); }
     if ($g === '/me/adaccounts') j(['data' => [['account_id' => '111222333', 'name' => 'Conta Colégio', 'currency' => 'BRL', 'account_status' => 1], ['account_id' => '999', 'name' => 'Outra conta', 'currency' => 'USD', 'account_status' => 1]]]);
     if ($g === '/act_111222333/campaigns') j(['data' => [['id' => 'c1', 'name' => 'Matrículas 2027', 'status' => 'PAUSED', 'effective_status' => ($tok === 'STATUS_TOKEN' ? 'WITH_ISSUES' : 'PAUSED'), 'objective' => 'OUTCOME_LEADS', 'daily_budget' => '5000'], ['id' => 'c2', 'name' => 'Open day', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'objective' => 'OUTCOME_ENGAGEMENT', 'daily_budget' => '2000'], ['id' => 'c3', 'name' => 'Boost do cartaz', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'objective' => 'OUTCOME_TRAFFIC', 'daily_budget' => '1000'], ['id' => 'c4', 'name' => 'Captação de leads', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'objective' => 'OUTCOME_LEADS', 'daily_budget' => '3000']]]);
     if ($g === '/act_111222333' && $m === 'GET') j(['account_status' => ($tok === 'BADACCT_TOKEN' ? 3 : 1), 'spend_cap' => '1000000', 'amount_spent' => '950000', 'currency' => 'BRL', 'funding_source_details' => ['display_string' => 'Visa 4242']]);

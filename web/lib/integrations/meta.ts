@@ -38,7 +38,7 @@ export async function metaConnectUrl(): Promise<string> {
   if (!id || !(await setting('meta_app_secret'))) fail(400, 'Informe o App ID e o App Secret da Meta primeiro.');
   return `${metaOauth()}?${qsOf({
     client_id: id, redirect_uri: publicUrl() + '/api/integrations/meta/callback', state: signState('meta'), response_type: 'code',
-    scope: 'instagram_basic,instagram_manage_insights,instagram_content_publish,pages_show_list,pages_read_engagement,business_management' + ((await setting('meta_ads_ativar')) === '1' ? ',ads_read' : ''),
+    scope: 'instagram_basic,instagram_manage_insights,instagram_content_publish,pages_show_list,pages_read_engagement,business_management' + ((await setting('meta_ads_ativar')) === '1' ? ',ads_read' : '') + ((await setting('meta_ads_gestao')) === '1' ? ',ads_management' : ''),
   })}`;
 }
 export async function metaFinishConnect(code: string): Promise<void> {
