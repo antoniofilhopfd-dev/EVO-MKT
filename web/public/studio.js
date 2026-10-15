@@ -452,3 +452,13 @@ async function painelExtrasAnuncios(){
   $('#rsAgora',box).onclick=async()=>{try{await gaPost('/ads/relatorio-semanal',{enviarAgora:true});toast('E-mail enviado (se o e-mail de avisos estiver configurado)')}catch(e){toast(e.message,'warn')}};
   box.querySelectorAll('.mt-in').forEach(i=>i.onchange=async()=>{if(i.value==='')return;try{await gaPost('/ads/matriculas',{mes:i.dataset.mes,matriculas:Number(i.value)});toast('Salvo');go('trafego')}catch(e){toast(e.message,'warn')}});
 }
+
+
+// ---------- Tráfego simples: sem registros manuais, mostra só as métricas lidas da Meta ----------
+function trafegoSimples(){
+  if(state.page!=='trafego')return;
+  const ck=document.querySelector('.traffic-cockpit');if(!ck||(state.rows||[]).length)return; // se houver registros manuais antigos, mantém a visão deles
+  ck.querySelectorAll('.traffic-hero,.empty-rich,.traffic-group,.kpi-note').forEach(e=>e.style.display='none'); // sem registros manuais: esconde o bloco zerado
+  if(!document.getElementById('trHead'))ck.insertAdjacentHTML('beforebegin','<div id="trHead" class="dashboard-head"><div><small>TRÁFEGO PAGO · META ADS</small><h1>Métricas dos anúncios</h1><p>Somente leitura: investimento, alcance, conversas e custos lidos da Meta. Nada é criado nem alterado nas campanhas.</p></div></div>');
+}
+{const o3=renderTrafficWorkspace;renderTrafficWorkspace=async function(){await o3.apply(this,arguments);trafegoSimples()}}
