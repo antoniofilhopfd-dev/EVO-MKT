@@ -4,7 +4,7 @@ import { audit } from '../records';
 import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { metaConnected } from '../integrations/meta';
-import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
+import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, whatsOk, numWhats, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
 import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel } from '../integrations/metaadsGerenciador';
 import { addDays, fmtDate } from '../util';
 import { lancarCampanha, opcoesCampanha, pesquisarInteresse, previaCampanha, Spec } from '../integrations/metaadsCampanha';
@@ -30,6 +30,11 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     if ('tetoDia' in b) await setSetting('ads_teto_dia', String(faixa(b.tetoDia, ORCAMENTO_MIN_DIA, 10000, 'O teto por dia')));
     if ('tetoMes' in b) await setSetting('ads_teto_mes', String(faixa(b.tetoMes, ORCAMENTO_MIN_DIA, 1_000_000, 'O teto mensal')));
     if ('diasMax' in b) await setSetting('ads_dias_max', String(Math.floor(faixa(b.diasMax, 1, 60, 'A duração máxima'))));
+    if ('whatsapp' in b) {
+      const w = strv(b.whatsapp).trim();
+      if (w && !whatsOk(w)) fail(400, 'Número de WhatsApp inválido. Use DDI e DDD (ex.: +55 83 99999-9999).');
+      await setSetting('ads_whatsapp', w ? numWhats(w) : '');
+    }
     if ('raioKm' in b) await setSetting('ads_raio_km', String(faixa(b.raioKm, 1, 80, 'O raio')));
     if ('idadeMin' in b || 'idadeMax' in b) {
       const a = faixa(b.idadeMin ?? (await cfgGestao()).publico.idadeMin, 18, 65, 'A idade mínima'), z = faixa(b.idadeMax ?? (await cfgGestao()).publico.idadeMax, 18, 65, 'A idade máxima');

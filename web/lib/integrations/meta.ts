@@ -2,6 +2,7 @@ import { q, q1, run } from '../db';
 import { audit, getRow, insertRow, listRows, saveRow, updateRow } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { notifyMail } from '../mail';
+import { registrarNotificacao } from '../notificacoes';
 import { env, fail, fmtDate, localParts, now, parseLocal, Row, strv } from '../util';
 import { httpCall, httpOk, publicUrl, qsOf, signState, signedMediaUrl } from './http';
 
@@ -193,7 +194,8 @@ export async function igSync(months = 2): Promise<number> {
 }
 
 // ---------- mídia do conteúdo (guardada no MySQL) ----------
-export async function igSaveMedia(conteudoId: string, file: File | null): Promise<string> {
+export const midiasDe = (r: Row): string[] => { try { const l = JSON.parse(String(r.midiasInstagram ?? '[]')); if (Array.isArray(l) && l.length) return l.map(String); } catch { /* lista inválida */ } return r.midiaInstagram ? [String(r.midiaInstagram)] : []; };
+export async function igSaveMedia(conteudoId: string, file: File | null, adicionar = false): Promise<string> {
   const row = (await getRow('conteudos', conteudoId)) ?? fail(404, 'Conteúdo não encontrado.');
   if (!file) fail(400, 'Envie um arquivo.');
   const ext = (file.name.split('.').pop() || '').toLowerCase();
@@ -202,7 +204,11 @@ export async function igSaveMedia(conteudoId: string, file: File | null): Promis
   const rel = `ANEXOS/CONTEUDOS/${conteudoId.replace(/[^A-Za-z0-9._-]/g, '_')}/midia_${Math.random().toString(16).slice(2, 10)}.${ext}`;
   const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', mp4: 'video/mp4', mov: 'video/quicktime' }[ext]!;
   await run('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)', [rel, mime, file.size, Buffer.from(await file.arrayBuffer()), now()]);
-  row.midiaInstagram = rel;
+  const lista = adicionar ? midiasDe(row) : [];
+  if (lista.length >= 10) fail(400, 'O carrossel aceita no máximo 10 itens.');
+  lista.push(rel);
+  row.midiaInstagram = lista[0];
+  row.midiasInstagram = JSON.stringify(lista);
   row.atualizadoEm = now();
   await saveRow('conteudos', row);
   return rel;
@@ -225,13 +231,24 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   if (!rel) throw new Error('Anexe a mídia (JPEG ou vídeo) antes de publicar.');
   if (r.instagramMediaId) throw new Error('Este conteúdo já foi publicado.');
   const fmt = String(r.formato ?? 'feed').toLocaleLowerCase('pt-BR');
-  if (fmt.includes('carrossel')) throw new Error('Carrossel ainda não é publicado automaticamente: publique manualmente.');
+  const carrossel = fmt.includes('carrossel');
+  const itens = midiasDe(r);
+  if (carrossel && itens.length < 2) throw new Error('O carrossel precisa de 2 a 10 mídias. Anexe mais itens.');
   const isVideo = ['mp4', 'mov'].includes((rel.split('.').pop() || '').toLowerCase());
   const ig = await setting('ig_user_id');
-  const caption = String(r.legenda ?? r.titulo ?? '').trim() + (r.cta ? `\n\n${r.cta}` : '');
+  const tags = String(r.hashtags ?? '').trim();
+  const tagsNoComentario = /SIM/i.test(String(r.hashtagsComentario ?? '')) && !!tags;
+  let caption = String(r.legenda ?? r.titulo ?? '').trim() + (r.cta ? `\n\n${r.cta}` : '');
+  if (tags && !tagsNoComentario) {
+    const novas = (tags.match(/#[\p{L}\p{N}_]+/gu) ?? []).filter((t) => !caption.toLowerCase().includes(t.toLowerCase()));
+    if (novas.length) caption += `\n\n${novas.join(' ')}`;
+  }
+  caption = caption.slice(0, 2200);
   const p: Row = { caption };
   const url = signedMediaUrl(rel, 7200);
-  if (fmt.includes('stor')) {
+  if (carrossel) {
+    p.media_type = 'CAROUSEL';
+  } else if (fmt.includes('stor')) {
     p.media_type = 'STORIES';
     p[isVideo ? 'video_url' : 'image_url'] = url;
   } else if (isVideo || fmt.includes('reel')) {
@@ -241,6 +258,21 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   const st = await q1('SELECT * FROM ig_publish WHERE conteudo_id=?', [id]);
   let container: string = st?.container_id ?? '';
   if (!container) {
+    if (carrossel) {
+      const filhos: string[] = [];
+      for (const m of itens) {
+        const v = ['mp4', 'mov'].includes((m.split('.').pop() || '').toLowerCase());
+        const f = String((await metaPost(`/${ig}/media`, { is_carousel_item: 'true', ...(v ? { media_type: 'VIDEO', video_url: signedMediaUrl(m, 7200) } : { image_url: signedMediaUrl(m, 7200) }) })).id);
+        for (let i = 0; i < Number(env('IG_POLL_TRIES', '12')); i++) {
+          const sc = String((await metaGet(`/${f}`, { fields: 'status_code' })).status_code ?? 'FINISHED');
+          if (sc === 'FINISHED') break;
+          if (sc === 'ERROR' || sc === 'EXPIRED') throw new Error(`O Instagram recusou um item do carrossel (${sc}).`);
+          await sleep(Number(env('IG_POLL_MS', '5000')));
+        }
+        filhos.push(f);
+      }
+      p.children = filhos.join(',');
+    }
     container = String((await metaPost(`/${ig}/media`, p)).id);
     await run('DELETE FROM ig_publish WHERE conteudo_id=?', [id]);
     await run('INSERT INTO ig_publish(conteudo_id,status,container_id,media_id,erro,quando) VALUES(?,?,?,?,?,?)', [id, 'PROCESSANDO', container, '', '', now()]);
@@ -263,12 +295,17 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   const mediaId = String((await metaPost(`/${ig}/media_publish`, { creation_id: container })).id);
   const link = String((await metaGet(`/${mediaId}`, { fields: 'permalink' })).permalink ?? '');
   await run('UPDATE ig_publish SET status=?,media_id=?,erro=?,quando=? WHERE conteudo_id=?', ['PUBLICADO', mediaId, '', now(), id]);
+  if (tagsNoComentario) {
+    try { await metaPost(`/${mediaId}/comments`, { message: (tags.match(/#[\p{L}\p{N}_]+/gu) ?? []).join(' ').slice(0, 2200) }); }
+    catch (e: any) { await intLog('instagram', 'erro', `${id}: publicado, mas o comentário das hashtags falhou: ${e.message}`); }
+  }
   await updateRow('conteudos', id, { status: 'PUBLICADO', instagramMediaId: mediaId, instagramLink: link, publicadoEm: now() }, ator);
   await intLog('instagram', 'ok', `Publicado: ${id} → ${link}`);
   return { status: 'PUBLICADO', link };
 }
 /** Publica o que está programado e vencido (usado pelo cron). */
 export async function igPublishDue(): Promise<number> {
+  await setSetting('ig_last_publish_run', now());
   if (!(await metaConnected())) return 0;
   let n = 0;
   for (const r of await listRows('conteudos')) {
@@ -284,6 +321,7 @@ export async function igPublishDue(): Promise<number> {
       await igMarkError(r.id, e.message);
       await intLog('instagram', 'erro', `${r.id}: ${e.message}`);
       await notifyMail('Falha ao publicar no Instagram', `${r.titulo ?? r.id}\n${e.message}`);
+      await registrarNotificacao('ig_falha', 'gerencia', 'Falha ao publicar no Instagram', `${r.titulo ?? r.id}: ${e.message}`, 'conteudos', String(r.id));
     }
   }
   return n;

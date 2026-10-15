@@ -1,5 +1,5 @@
 import { Ctx } from '../ctx';
-import { q, q1 } from '../db';
+import { q, q1, run } from '../db';
 import { requireInternal, requireManager, stepUp } from '../auth';
 import { audit, getRow, listRows, MODULES } from '../records';
 import { intLog, setSetting, setting } from '../settings';
@@ -98,10 +98,14 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       add('g_conn', await gConnected(), 'erro', 'Google: conta conectada (Agenda, Drive, Planilhas)', 'Clique em "Conectar com Google" e aceite as permissões.');
       const recente = async (k: string) => { const v = await setting(k); return v !== '' && Date.now() - new Date(v).getTime() < 2 * 86400000; };
       add('cron_roda', (!metaOn || (await recente('ig_last_sync'))) && (!(await gConnected()) || (await recente('g_last_cal_sync'))), 'aviso', 'Sincronização rodou nos últimos 2 dias', 'Crie o cron da Hostinger (comando abaixo) ou use os botões "Sincronizar agora".');
+      const agendados = metaOn ? (await listRows('conteudos')).filter((r) => r.publicarInstagram === 'SIM' && !r.instagramMediaId && r.midiaInstagram && /APROVADO|PROGRAMADO/i.test(String(r.status ?? ''))).length : 0;
+      const ultPub = await setting('ig_last_publish_run');
+      add('cron_publicar', agendados === 0 || (ultPub !== '' && Date.now() - new Date(ultPub.replace(' ', 'T')).getTime() < 30 * 60000), 'aviso', 'Publicação automática: o cron rodou nos últimos 30 minutos', `Há ${agendados} post(s) agendado(s) para sair sozinhos, mas o cron de publicação não rodou. Crie o cron da Hostinger a cada 10 minutos (comando "cronPublicar" abaixo).`);
       return json({
         pronto: it.every((x) => x.ok || x.nivel === 'aviso'), itens: it,
         urls: { site: origin, privacidade: origin + '/privacidade.html', termos: origin + '/termos.html', metaRedirect: origin + '/api/integrations/meta/callback', googleRedirect: origin + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + origin + '/api/cron/integracoes?tarefa=sincronizar',
+        cronPublicar: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + origin + '/api/cron/integracoes?tarefa=publicar',
       });
     }
     case path === '/integrations/settings' && method === 'POST': {
@@ -244,10 +248,20 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/instagram/media' && method === 'POST': {
       const u = await requireInternal(c);
       const form = await c.req.formData();
-      const f = (form.getAll('files')[0] ?? form.get('file')) as File | string | null;
-      const rel = await igSaveMedia(c.qs('id'), f && typeof f !== 'string' ? f : null);
+      const arqs = (form.getAll('files').length ? form.getAll('files') : [form.get('file')]).filter((f): f is File => !!f && typeof f !== 'string');
+      let rel = '';
+      for (let i = 0; i < Math.max(1, arqs.length); i++) rel = await igSaveMedia(c.qs('id'), arqs[i] ?? null, c.qs('add') === '1' || i > 0);
       await audit(u.codigo, 'instagram-midia', 'conteudos', c.qs('id'));
       return json({ midia: rel });
+    }
+    case path === '/integrations/instagram/retry' && method === 'POST': {
+      const u = await requireInternal(c);
+      const id = strv((await c.body()).id);
+      const cur = await q1('SELECT status FROM ig_publish WHERE conteudo_id=?', [id]);
+      if (cur?.status !== 'ERRO') fail(409, 'Este post não está com falha de publicação.');
+      await run("DELETE FROM ig_publish WHERE conteudo_id=? AND status='ERRO'", [id]);
+      await audit(u.codigo, 'instagram-nova-tentativa', 'conteudos', id);
+      return json({ ok: true });
     }
     case path === '/integrations/instagram/publish' && method === 'POST': {
       const u = await requireInternal(c);

@@ -95,7 +95,7 @@ async function novaCampanha(){
   const chave=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');
   const pub=cfg.config.publico;
   const w={passo:1,objetivo:'',meta:'',nome:'',publico:{cidade:pub.cidade,raioKm:pub.raioKm,idadeMin:pub.idadeMin,idadeMax:pub.idadeMax,genero:'todos',interesses:[],publicosPersonalizados:[],plataformas:[]},modo:'AUTO',
-    orc:{tipo:'DIARIO',valor:20},dias:7,inicio:'',fim:'',lance:{tipo:'MENOR_CUSTO',valor:''},criativo:{tipo:'',midia:'',conteudoId:'',texto:'',titulo:'',descricao:'',cta:''},destino:{mensagem:'DIRECT',whatsapp:'',siteUrl:'',formId:'',pixelId:'',evento:'',appId:'',lojaUrl:''}};
+    orc:{tipo:'DIARIO',valor:20},dias:7,inicio:'',fim:'',lance:{tipo:'MENOR_CUSTO',valor:''},criativo:{tipo:'',midia:'',conteudoId:'',texto:'',titulo:'',descricao:'',cta:''},destino:{mensagem:'DIRECT',whatsapp:cfg.config.whatsapp||'',siteUrl:'',formId:'',pixelId:'',evento:'',appId:'',lojaUrl:''}};
   const ov=adminOverlay('<div id="wz" class="st-form"></div>');ov.el.querySelector('.admin-box').classList.add('st-box');
   const host=ov.el.querySelector('#wz');
   const meta=()=>op.objetivos[w.objetivo]&&op.objetivos[w.objetivo].metas[w.meta];

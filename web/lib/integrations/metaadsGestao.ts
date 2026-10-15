@@ -14,9 +14,10 @@ import { ContaAds } from './metaads';
  */
 export const PADRAO_GESTAO = { tetoDia: 50, tetoMes: 3000, diasMax: 14, raioKm: 20, idadeMin: 25, idadeMax: 55, orcamentoPadrao: 20, diasPadrao: 7 };
 export const ORCAMENTO_MIN_DIA = 6;
-export type Objetivo = 'CONVERSAS' | 'ALCANCE';
+export type Objetivo = 'CONVERSAS' | 'WHATSAPP' | 'ALCANCE';
 const OBJETIVOS: Record<Objetivo, { rotulo: string; objective: string; goal: string; destino?: string }> = {
   CONVERSAS: { rotulo: 'Conversas no Instagram Direct', objective: 'OUTCOME_ENGAGEMENT', goal: 'CONVERSATIONS', destino: 'INSTAGRAM_DIRECT' },
+  WHATSAPP: { rotulo: 'Conversas no WhatsApp', objective: 'OUTCOME_ENGAGEMENT', goal: 'CONVERSATIONS', destino: 'WHATSAPP' },
   ALCANCE: { rotulo: 'Alcance (mostrar para mais pessoas)', objective: 'OUTCOME_AWARENESS', goal: 'REACH' },
 };
 const SEM_CENTAVOS = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'HUF', 'TWD']);
@@ -24,11 +25,13 @@ export const menorUnidade = (v: number, moeda: string) => String(Math.round(v * 
 const num = (v: unknown, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
 
 export interface Publico { cidade: { key: string; nome: string; regiao: string } | null; raioKm: number; idadeMin: number; idadeMax: number }
+export const numWhats = (v: unknown) => String(v ?? '').replace(/[\s()-]/g, '');
+export const whatsOk = (v: unknown) => /^\+?\d{10,15}$/.test(numWhats(v));
 export async function cfgGestao() {
   let cidade: Publico['cidade'] = null;
   try { cidade = JSON.parse((await setting('ads_cidade')) || 'null'); } catch { /* guardado inválido */ }
   return {
-    ativa: (await setting('meta_ads_gestao')) === '1',
+    ativa: (await setting('meta_ads_gestao')) === '1', whatsapp: (await setting('ads_whatsapp')) || '',
     tetoDia: num(await setting('ads_teto_dia'), PADRAO_GESTAO.tetoDia), tetoMes: num(await setting('ads_teto_mes'), PADRAO_GESTAO.tetoMes), diasMax: num(await setting('ads_dias_max'), PADRAO_GESTAO.diasMax),
     publico: { cidade, raioKm: num(await setting('ads_raio_km'), PADRAO_GESTAO.raioKm), idadeMin: num(await setting('ads_idade_min'), PADRAO_GESTAO.idadeMin), idadeMax: num(await setting('ads_idade_max'), PADRAO_GESTAO.idadeMax) } as Publico,
   };
@@ -83,6 +86,7 @@ export async function previaImpulso(p: PedidoImpulso) {
   const erros: string[] = [], avisos: string[] = [];
   if (!cfg.ativa) erros.push('A gestão de anúncios está desligada. Ligue em Tráfego → Gestor de anúncios e reconecte a Meta.');
   if (!(p.objetivo in OBJETIVOS)) erros.push('Objetivo inválido.');
+  if (p.objetivo === 'WHATSAPP' && !whatsOk(cfg.whatsapp)) erros.push('Cadastre o número do WhatsApp do Colégio em Tráfego → Gestor de anúncios.');
   const orc = Number(p.orcamentoDia), dias = Math.floor(Number(p.dias));
   if (!Number.isFinite(orc) || orc < ORCAMENTO_MIN_DIA) erros.push(`O orçamento diário mínimo é ${ORCAMENTO_MIN_DIA}.`);
   if (orc > cfg.tetoDia) erros.push(`O orçamento diário (${orc}) passa do teto por campanha (${cfg.tetoDia}).`);
@@ -106,18 +110,18 @@ export async function previaImpulso(p: PedidoImpulso) {
 }
 
 /** Monta os 4 pedidos à Meta (campanha, conjunto, criativo, anúncio). É o único ponto a ajustar se a Meta recusar algum campo. */
-function montarPayloads(p: PedidoImpulso, o: { moeda: string; pagina: string; ig: string; cidade: NonNullable<Publico['cidade']>; pub: Publico; titulo: string; fim: Date }) {
+function montarPayloads(p: PedidoImpulso, o: { whatsapp: string; moeda: string; pagina: string; ig: string; cidade: NonNullable<Publico['cidade']>; pub: Publico; titulo: string; fim: Date }) {
   const ob = OBJETIVOS[p.objetivo];
   const campanha = { name: `[EVO MKT] ${o.titulo}`, objective: ob.objective, status: 'ACTIVE', special_ad_categories: '[]', buying_type: 'AUCTION', is_adset_budget_sharing_enabled: 'false' };
   const conjunto = {
     name: `[EVO MKT] ${o.titulo} · público`, status: 'ACTIVE', daily_budget: menorUnidade(p.orcamentoDia, o.moeda), start_time: new Date(Date.now() + 120000).toISOString(), end_time: o.fim.toISOString(),
     billing_event: 'IMPRESSIONS', optimization_goal: ob.goal, bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-    ...(ob.destino ? { destination_type: ob.destino, promoted_object: JSON.stringify({ page_id: o.pagina }) } : {}),
+    ...(ob.destino ? { destination_type: ob.destino, promoted_object: JSON.stringify({ page_id: o.pagina, ...(ob.destino === 'WHATSAPP' ? { whatsapp_phone_number: numWhats(o.whatsapp) } : {}) }) } : {}),
     targeting: JSON.stringify({ geo_locations: { cities: [{ key: o.cidade.key, radius: o.pub.raioKm, distance_unit: 'kilometer' }] }, age_min: o.pub.idadeMin, age_max: o.pub.idadeMax, publisher_platforms: ['instagram'] }),
   };
   const criativo = {
     name: `[EVO MKT] ${o.titulo} · criativo`, object_id: o.pagina, instagram_user_id: o.ig, source_instagram_media_id: p.midia,
-    ...(ob.destino ? { call_to_action: JSON.stringify({ type: 'INSTAGRAM_MESSAGE', value: { app_destination: 'INSTAGRAM_DIRECT' } }) } : {}),
+    ...(ob.destino ? { call_to_action: JSON.stringify({ type: ob.destino === 'WHATSAPP' ? 'WHATSAPP_MESSAGE' : 'INSTAGRAM_MESSAGE', value: { app_destination: ob.destino } }) } : {}),
   };
   return { campanha, conjunto, criativo };
 }
@@ -147,7 +151,7 @@ export async function lancarImpulso(p: PedidoImpulso, quem: string): Promise<Row
   const id = Number(row.id);
   let campanhaId = '';
   try {
-    const pay = montarPayloads(p, { moeda, pagina: await paginaDoInstagram(), ig: await setting('ig_user_id'), cidade: cfg.publico.cidade!, pub: cfg.publico, titulo, fim });
+    const pay = montarPayloads(p, { whatsapp: cfg.whatsapp, moeda, pagina: await paginaDoInstagram(), ig: await setting('ig_user_id'), cidade: cfg.publico.cidade!, pub: cfg.publico, titulo, fim });
     campanhaId = String((await metaPost(`/act_${conta}/campaigns`, pay.campanha)).id);
     await marcar(id, 'CRIANDO', { campanha_id: campanhaId });
     const conjuntoId = String((await metaPost(`/act_${conta}/adsets`, { ...pay.conjunto, campaign_id: campanhaId })).id);

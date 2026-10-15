@@ -69,6 +69,13 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('objetivo alcance: otimiza REACH e não usa destino de mensagem',s===200&&set2.params.optimization_goal==='REACH'&&!set2.params.destination_type,set2.params);
  [s,r]=await call('POST','/ads/pausar-tudo',{});const camps=(await novos()).filter(([,v])=>v.tipo==='campanha');
  t('"Pausar tudo" pausa todas as campanhas lançadas pelo sistema',s===200&&r.pausados===2&&camps.every(([,v])=>v.status==='PAUSED'),[r,camps.map(([,v])=>v.status)]);
+ // WhatsApp como resultado próprio
+ [s,r]=await call('POST','/ads/previa',{...base,chave:'abcdefghijklmnop0007',objetivo:'WHATSAPP'});t('impulsionar para WhatsApp sem número cadastrado: recusado',r.ok===false&&r.erros.some(e=>/WhatsApp/.test(e)),r);
+ [s,r]=await call('POST','/ads/gestao/config',{whatsapp:'abc'});t('número de WhatsApp inválido: 400',s===400,r);
+ [s,r]=await call('POST','/ads/gestao/config',{whatsapp:'+55 83 99999-0000'});t('número do WhatsApp do Colégio é salvo',s===200&&r.config.whatsapp==='+5583999990000',r);
+ [s,r]=await call('POST','/ads/impulsionar',{chave:'abcdefghijklmnop0007',midia:'m1',orcamentoDia:10,dias:3,objetivo:'WHATSAPP',confirmou:true});
+ const setW=(await novos()).filter(([,v])=>v.tipo==='conjunto').pop()[1], criW=(await novos()).filter(([,v])=>v.tipo==='criativo').pop()[1];
+ t('impulsionar WhatsApp: destino WHATSAPP, número no objeto promovido e botão do WhatsApp',s===200&&setW.params.destination_type==='WHATSAPP'&&JSON.parse(setW.params.promoted_object).whatsapp_phone_number==='+5583999990000'&&/WHATSAPP_MESSAGE/.test(criW.params.call_to_action),[setW.params,criW.params]);
  // falha no meio: compensação
  await call('POST','/integrations/meta/token',{token:'FAILSET_TOKEN'});
  [s,r]=await call('POST','/ads/impulsionar',{chave:'abcdefghijklmnop0005',midia:'m3',orcamentoDia:10,dias:3,objetivo:'CONVERSAS',confirmou:true});

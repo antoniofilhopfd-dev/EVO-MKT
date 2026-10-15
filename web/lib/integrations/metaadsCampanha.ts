@@ -55,6 +55,7 @@ const ID = (v: unknown) => /^[A-Za-z0-9_.-]{3,64}$/.test(String(v ?? ''));
 /** Confere TUDO sem escrever na Meta. */
 export async function previaCampanha(sp: Spec) {
   const cfg = await cfgGestao();
+  if (sp.destino && !String(sp.destino.whatsapp ?? '').trim() && cfg.whatsapp) sp.destino.whatsapp = cfg.whatsapp; // número padrão do Colégio
   const erros: string[] = [], avisos: string[] = [];
   if (!cfg.ativa) erros.push('A gestão de anúncios está desligada. Ligue em Tráfego → Gestor de anúncios e reconecte a Meta.');
   const ob = OBJETIVOS[sp.objetivo], mt = ob?.metas[sp.meta];

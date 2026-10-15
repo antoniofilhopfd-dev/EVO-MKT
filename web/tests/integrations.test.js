@@ -55,6 +55,26 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  const o=cron('publicar');cc=await rows('conteudos');
  t('cron publica o programado vencido',cc.find(c=>c.id===due).status==='PUBLICADO'&&/publicados":1/.test(o),o);
  t('cron não publica futuro nem rascunho',cc.find(c=>c.id===fut).status==='PROGRAMADO'&&cc.find(c=>c.id===draft).status==='BRIEFING');
+ // hashtags, primeiro comentário, carrossel, nova tentativa
+ const mk2=async(b)=>{const c=(await call('/data?module=conteudos',{m:'POST',ck:G,b:{legenda:b.titulo,status:'PROGRAMADO',formato:'Feed',publicarInstagram:'SIM',publicacaoEm:'2020-03-01T09:00',...b}})).j.id;return c};
+ const upN=async(id,n)=>{const fd=new FormData();for(let i=0;i<n;i++)fd.append('files',new Blob([jpg]),`f${i}.jpg`);const rr=await fetch(API+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return rr.status};
+ const hT=await mk2({titulo:'Com hashtags',hashtags:'#evolucao #matriculas'});await up(hT,'a.jpg',jpg);
+ const hC=await mk2({titulo:'Tags no comentario',hashtags:'#primeirocomentario #evo',hashtagsComentario:'SIM'});await up(hC,'a.jpg',jpg);
+ cron('publicar');const stp=await mock('/__state');const caps=Object.values(stp.containers).map(c=>c.params.caption||'');
+ t('as hashtags do post entram no fim da legenda publicada',caps.some(c=>/Com hashtags[\s\S]*#evolucao #matriculas/.test(c)));
+ t('com "hashtags no primeiro comentário", a legenda fica limpa',caps.some(c=>c==='Tags no comentario')&&!caps.some(c=>/Tags no comentario[\s\S]*#primeirocomentario/.test(c)));
+ t('...e as hashtags vão como primeiro comentário do post publicado',Object.values(stp.comments||{}).some(l=>l.some(m=>/#primeirocomentario #evo/.test(m))),stp.comments);
+ const car=await mk2({titulo:'Carrossel de teste',formato:'Carrossel'});
+ t('carrossel: envia vários arquivos de uma vez',(await upN(car,3))===200);
+ cc=(await rows('conteudos')).find(c=>c.id===car);t('carrossel guarda a lista de mídias',JSON.parse(cc.midiasInstagram).length===3&&cc.midiaInstagram===JSON.parse(cc.midiasInstagram)[0]);
+ cron('publicar');cc=(await rows('conteudos')).find(c=>c.id===car);const stc=await mock('/__state');const pai=Object.values(stc.containers).find(c=>c.params.media_type==='CAROUSEL');
+ t('cron publica o carrossel com 3 itens filhos',cc.status==='PUBLICADO'&&pai&&pai.params.children.split(',').length===3&&pai.params.caption==='Carrossel de teste',[cc.status,pai&&pai.params]);
+ const car1=await mk2({titulo:'Carrossel curto',formato:'Carrossel'});await up(car1,'a.jpg',jpg);
+ r=await call('/integrations/instagram/publish',{m:'POST',ck:G,b:{id:car1}});t('carrossel com 1 item não publica e explica',r.s===502&&/2 a 10/.test(r.j.error),r);
+ r=await call('/integrations/instagram/queue',{ck:G});t('falha aparece na fila com o motivo',r.j.find(q=>q.id===car1).estado==='ERRO');
+ r=await call('/integrations/instagram/retry',{m:'POST',ck:G,b:{id:car1}});t('"Tentar de novo" libera o post para o cron',r.s===200);
+ r=await call('/integrations/instagram/retry',{m:'POST',ck:G,b:{id:car1}});t('nova tentativa sem falha anterior: 409',r.s===409);
+ r=await call('/integrations/prontidao',{ck:G});t('prontidão confirma que o cron de publicação rodou e mostra o comando',r.j.itens.find(i=>i.id==='cron_publicar').ok===true&&/tarefa=publicar/.test(r.j.cronPublicar),r.j.cronPublicar);
  // ---------- Google: conectar ----------
  r=await call('/integrations/google/connect',{ck:G,manual:true});const gu=new URL(r.loc);
  t('conectar Google redireciona com escopos de Agenda/Drive/Planilhas e acesso offline',r.s===302&&/calendar/.test(gu.searchParams.get('scope'))&&/drive.file/.test(gu.searchParams.get('scope'))&&/spreadsheets/.test(gu.searchParams.get('scope'))&&gu.searchParams.get('access_type')==='offline');

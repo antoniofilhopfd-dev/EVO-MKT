@@ -109,6 +109,11 @@ if (str_starts_with($p, '/graph')) {
         ]]);
     }
     if ($g === "/$IG/media" && $m === 'POST') {
+        if (($in['media_type'] ?? '') === 'CAROUSEL') {
+            $kids = array_filter(explode(',', $in['children'] ?? ''));
+            if (count($kids) < 2 || count($kids) > 10) j(['error' => ['message' => 'carousel needs 2-10 children']], 400);
+            $id = nid('CONT_'); $S['containers'][$id] = ['params' => $in, 'bytes' => 0, 'type' => 'carousel', 'status' => 'FINISHED']; j(['id' => $id]);
+        }
         $url = $in['image_url'] ?? $in['video_url'] ?? '';
         if ($url === '') j(['error' => ['message' => 'media url required']], 400);
         $ch = curl_init($url); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10]); $body = curl_exec($ch); $st = curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $ct = curl_getinfo($ch, CURLINFO_CONTENT_TYPE); curl_close($ch);
@@ -120,6 +125,7 @@ if (str_starts_with($p, '/graph')) {
         $c = $in['creation_id'] ?? ''; if (!isset($S['containers'][$c])) j(['error' => ['message' => 'bad creation_id']], 400);
         $id = nid('MEDIA_'); $S['published'][$id] = $c; j(['id' => $id]);
     }
+    if (preg_match('#^/(MEDIA_\d+)/comments$#', $g, $mm)) { $S['comments'][$mm[1]][] = $in['message'] ?? ''; j(['id' => nid('CMT_')]); }
     if (preg_match('#^/(CONT_\d+)$#', $g, $mm)) j(['status_code' => $S['containers'][$mm[1]]['status'] ?? 'ERROR']);
     if (preg_match('#^/(MEDIA_\d+)$#', $g, $mm)) j(['permalink' => 'https://www.instagram.com/p/' . $mm[1] . '/']);
     j(['error' => ['message' => "rota Meta desconhecida $g"]], 404);
