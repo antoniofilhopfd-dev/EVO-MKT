@@ -114,7 +114,7 @@ async function studioCompositor(row,dataIni=''){
    ${sug?`<div class="st-sug"><span>Melhor momento nos seus dados: <b>${esc(h.dia)} às ${h.hora}h</b></span><button type="button" class="softbtn" id="sfSug">Usar</button></div>`:''}
    <label>Mídia (JPEG ou vídeo MP4/MOV; para Carrossel selecione de 2 a 20 arquivos de uma vez)${(()=>{let n=0;try{n=JSON.parse(r.midiasInstagram||'[]').length}catch{}return n>1?` <small>— ${n} itens já anexados; enviar novos substitui todos</small>`:''})()} <input id="sfArq" type="file" multiple accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
    <label class="check-row"><input type="checkbox" id="sfIG" ${(edit?/SIM/i.test(r.publicarInstagram||''):true)?'checked':''}> Publicar no Instagram automaticamente na data e hora marcadas (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
-   <label>Colab com (@usuário; até 3, separados por vírgula)<input id="sfColab" maxlength="120" value="${attr(r.colaboradores||'')}" placeholder="${esc(igContas.filter(c=>c.ig!==(r.contaInstagram||igConta)).map(c=>'@'+c.usuario).join(', ')||'@perfil')}"></label>
+   <div class="st-row"><label>Colab com<select id="sfColabSel"></select></label><label id="sfColabOutroL" hidden>Outro perfil (@usuário; até 3, separados por vírgula)<input id="sfColab" maxlength="120" value="${attr(r.colaboradores||'')}" placeholder="@perfil"></label></div>
    <p class="kpi-note">Publica como colaboração: o post aparece nos dois perfis depois que o convidado aceitar o convite no Instagram. Vale para Feed e Reels.</p>
    <label class="check-row"><input type="checkbox" id="sfTagCom" ${/SIM/i.test(r.hashtagsComentario||'')?'checked':''}> Colocar as hashtags no primeiro comentário (legenda mais limpa)</label>
    <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="softbtn" type="button" data-s="RASCUNHO">Salvar rascunho</button><button class="softbtn" type="button" data-s="APROVACAO">Enviar para aprovação</button><button class="btn" type="button" data-s="AGENDADO">Agendar</button>${edit?'<button class="softbtn" type="button" data-s="MANTER">Salvar sem mudar a etapa</button>':''}${jaPublicado?'':'<button class="btn accent" type="button" data-s="PUBLICAR">Publicar agora no Instagram</button>'}</div>
@@ -144,6 +144,21 @@ async function studioCompositor(row,dataIni=''){
   ['sfLegenda','sfTags','sfCta','sfPerfil','sfFormato','sfQuando'].forEach(i=>{g(i).oninput=pv;g(i).onchange=pv});
   g('sfArq').onchange=()=>{const f=g('sfArq').files[0];arquivoUrl=f?URL.createObjectURL(f):'';pv()};
   if(g('sfSug'))g('sfSug').onclick=()=>{g('sfQuando').value=sug;pv()};
+  // Colab: menu com os outros perfis do Colégio (muda conforme a conta que publica) e opção de outro perfil
+  const colabMontar=()=>{
+    const sel=g('sfColabSel'),outro=g('sfColab'),contaAtual=g('sfConta')?g('sfConta').value:(r.contaInstagram||igConta),salvo=String(outro.value||'').trim();
+    const outras=igContas.filter(c=>c.ig!==contaAtual).map(c=>'@'+c.usuario);
+    const dentro=outras.includes(salvo);
+    sel.innerHTML=`<option value="">Sem colab</option>${outras.map(u=>`<option value="${attr(u)}" ${dentro&&salvo===u?'selected':''}>${esc(u)}</option>`).join('')}<option value="__outro" ${salvo&&!dentro?'selected':''}>Outro perfil…</option>`;
+    g('sfColabOutroL').hidden=sel.value!=='__outro';
+  };
+  g('sfColabSel').onchange=()=>{g('sfColabOutroL').hidden=g('sfColabSel').value!=='__outro';if(g('sfColabSel').value&&g('sfColabSel').value!=='__outro')g('sfColab').value=g('sfColabSel').value;else if(!g('sfColabSel').value)g('sfColab').value=''};
+  if(g('sfConta'))g('sfConta').addEventListener('change',()=>{const v=String(g('sfColab').value||'').trim();if(igContas.some(c=>'@'+c.usuario===v)&&v==='@'+((igContas.find(c=>c.ig===g('sfConta').value)||{}).usuario))g('sfColab').value='';colabMontar()});
+  colabMontar();
+  // Perfil acompanha a conta escolhida (a prévia e o filtro usam o Perfil)
+  const perfilSincroniza=()=>{if(!g('sfConta')||!g('sfPerfil'))return;const c=igContas.find(x=>x.ig===g('sfConta').value);if(!c)return;const alvo=[...g('sfPerfil').options].find(o=>o.value.replace(/[.@]/g,'').toLowerCase()===c.usuario.replace(/[.@]/g,'').toLowerCase());if(alvo){g('sfPerfil').value=alvo.value;g('sfPerfil').dispatchEvent(new Event('change'))}};
+  if(g('sfConta'))g('sfConta').addEventListener('change',perfilSincroniza);
+  if(!edit)perfilSincroniza();
   g('sfMod').onclick=async()=>{
     let lista=[];try{lista=(await api('/studio/modelos')).modelos||[]}catch(e){return toast(e.message,'bad')}
     const salva=async l=>{await api('/studio/modelos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelos:l})})};
@@ -181,7 +196,7 @@ async function studioCompositor(row,dataIni=''){
     }
     const body={titulo,perfil:g('sfPerfil').value,formato:g('sfFormato').value,canal:'Instagram',legenda:leg,hashtags:g('sfTags').value,cta:g('sfCta').value,publicacaoEm:quando,revisor:g('sfRevisor').value,publicarInstagram:g('sfIG').checked?'SIM':'NÃO',hashtagsComentario:g('sfTagCom').checked?'SIM':'NÃO'};
     if(g('sfConta'))body.contaInstagram=g('sfConta').value;
-    body.colaboradores=g('sfColab').value.split(/[\s,;]+/).map(x=>x.replace(/^@/,'').trim()).filter(Boolean).slice(0,3).map(x=>'@'+x).join(', ');
+    const colabSel=g('sfColabSel').value;body.colaboradores=(colabSel&&colabSel!=='__outro'?colabSel:colabSel==='__outro'?g('sfColab').value:'').split(/[\s,;]+/).map(x=>x.replace(/^@/,'').trim()).filter(Boolean).slice(0,3).map(x=>'@'+x).join(', ');
     if(tipo==='PUBLICAR'){if(!liberado)body.status='APROVADO';if(!body.publicacaoEm)body.publicacaoEm=stAgoraLocal()}else if(tipo!=='MANTER')body.status=ST_ETAPAS[tipo];else if(!edit)body.status='PRODUÇÃO';
     try{
       const salvo=await api(edit?`/data?module=conteudos&id=${encodeURIComponent(r.id)}`:'/data?module=conteudos',{method:edit?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});

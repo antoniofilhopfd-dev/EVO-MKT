@@ -24,6 +24,16 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.evaluate(()=>go('studio'));await p.waitForSelector('[data-igconta]',{timeout:20000});
  const opcoes=await p.$$eval('[data-igconta] option',o=>o.map(x=>x.textContent));
  t('o seletor do topo lista as duas contas e o atalho de gerenciar',opcoes.filter(x=>/^@/.test(x)).length===2&&opcoes.some(x=>/gerenciar/i.test(x)),opcoes);
+ await p.evaluate(()=>studioCompositor(null,'2026-10-20'));await p.waitForSelector('#sfColabSel');
+ const colabOpc=async()=>p.$$eval('#sfColabSel option',o=>o.map(x=>x.textContent));
+ const contaSel=await p.$eval('#sfConta',e=>e.selectedOptions[0].textContent);
+ const opc1=await colabOpc();
+ t('Colab é um menu: "Sem colab", o outro perfil do Colégio e "Outro perfil…" (nunca a própria conta)',opc1[0]==='Sem colab'&&opc1.length===3&&!opc1.includes(contaSel)&&opc1.some(x=>/^@/.test(x))&&/Outro/.test(opc1[2]),[contaSel,opc1]);
+ const outraConta=await p.$eval('#sfConta',e=>[...e.options].find(o=>!o.selected).value);
+ await p.selectOption('#sfConta',outraConta);await p.waitForTimeout(200);
+ const opc2=await colabOpc();t('trocar a conta que publica troca a opção de colab para o outro perfil',opc2[1]!==opc1[1]&&opc2[1]===contaSel,[opc1,opc2]);
+ t('o Perfil acompanha a conta escolhida',await p.$eval('#sfPerfil',e=>e.value).then(v=>/^@/.test(v)||v==='Ambos'));
+ await p.selectOption('#sfColabSel','__outro');t('"Outro perfil…" mostra o campo de texto',!(await p.$eval('#sfColabOutroL',e=>e.hidden)));
  t('sem erros de JavaScript',errs.length===0,errs.join(' | '));
  console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
