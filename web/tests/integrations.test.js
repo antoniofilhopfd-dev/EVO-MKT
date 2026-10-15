@@ -36,6 +36,9 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  t('conta posts e reels do mês pelo /media',cur&&cur.posts==='2'&&cur.reels==='1');
  t('melhores conteúdos ordenados por interações',cur&&/^Bastidores da feira/.test(cur.melhoresConteudos));
  await call('/integrations/instagram/sync',{m:'POST',ck:G,b:{}});ig=(await rows('instagram')).filter(x=>x.origem==='INSTAGRAM_API');t('sincronizar de novo não duplica',ig.length===2);
+ r=await call('/instagram/seguidores',{ck:G});const mesAtual=new Date().toISOString().slice(0,7);
+ t('seguidores: guarda a foto do dia e entrega por mês e por ano',r.s===200&&r.j.mensal.length>=1&&r.j.anual.length>=1&&r.j.atual>0&&r.j.mensal[r.j.mensal.length-1].seguidores===r.j.atual,r);
+ r=await call('/instagram/seguidores',{ck:E});t('seguidores: visível à Equipe',r.s===200);
  // ---------- Instagram: publicar ----------
  const jpg=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
  const up=async(id,name,buf)=>{const fd=new FormData();fd.append('files',new Blob([buf]),name);const rr=await fetch(API+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return{s:rr.status,j:await rr.json().catch(()=>null)}};

@@ -109,6 +109,17 @@ export async function operacaoRoute(c: Ctx) {
     await requireManager(c);
     return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(), ranking: await rankingConteudos() });
   }
+  if (path === '/instagram/seguidores') {
+    await requireInternal(c);
+    const snaps = await q('SELECT dia,seguidores FROM ig_seguidores ORDER BY dia');
+    const ult = (chave: (d: string) => string) => {
+      const m = new Map<string, number>();
+      for (const s of snaps) m.set(chave(String(s.dia)), Number(s.seguidores)); // ordenado: o último do período vence
+      const ks = [...m.keys()];
+      return ks.map((k, i) => ({ periodo: k, seguidores: m.get(k)!, variacao: i ? m.get(k)! - m.get(ks[i - 1])! : null }));
+    };
+    return json({ mensal: ult((d) => d.slice(0, 7)), anual: ult((d) => d.slice(0, 4)), primeiroRegistro: snaps[0]?.dia ?? '', atual: snaps.length ? Number(snaps[snaps.length - 1].seguidores) : null });
+  }
   if (path === '/instagram/posts') {
     await requireInternal(c);
     const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts ORDER BY publicado_em DESC LIMIT 300')).map((p) => {

@@ -332,3 +332,30 @@ function gestorImpulsionar(post){
   g('giLanca').onclick=async()=>{g('giLanca').disabled=true;g('giLanca').textContent='Lançando…';try{const r=await gaPost('/ads/impulsionar',{...pedido(),confirmou:true});o.close();toast(r.lancamento.repetido?'Esse lançamento já existia':'Anúncio lançado. A Meta vai analisar e ele começa a rodar.');}catch(e){toast(e.message,'bad');g('giLanca').textContent='Lançar agora';g('giLanca').disabled=false}};
   atualiza();
 }
+
+// ---------- Ranking de publicações por mês e seguidores por mês/ano ----------
+let rkFiltro={mes:'',metrica:'interacoes'};
+const RK_METRICA={interacoes:['Interações','interacoes'],alcance:['Alcance','alcance'],curtidas:['Curtidas','curtidas'],salvos:['Salvamentos','salvos'],engajamento:['Engajamento (%)','engajamento']};
+const rkMesRotulo=m=>{const [a,b]=String(m).split('-');return ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+b-1]+' de '+a};
+async function renderIgRanking(){
+  const [d,sg]=await Promise.all([api('/instagram/posts'),api('/instagram/seguidores')]);
+  if(state.page!=='igranking')return;
+  const rows=d.rows||[],meses=[...new Set(rows.map(r=>String(r.quando).slice(0,7)).filter(Boolean))].sort().reverse();
+  if(!rkFiltro.mes||!meses.includes(rkFiltro.mes))rkFiltro.mes=meses[0]||'';
+  const [rotM,chave]=RK_METRICA[rkFiltro.metrica];
+  const doMes=rows.filter(r=>String(r.quando).slice(0,7)===rkFiltro.mes).sort((a,b)=>(b[chave]??-1)-(a[chave]??-1));
+  const val=(r)=>r[chave]===null||r[chave]===undefined?'—':chave==='engajamento'?r[chave]+'%':igNum(r[chave]);
+  const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${esc(IG_TIPO[r.tipo]||r.tipo||'')}</span>`};
+  const linha=(r,i)=>{const l=urlSegura(r.link);return `<tr><td><b>${i+1}º</b></td><td class="rk-thumb">${mini(r)}</td><td>${l?`<a href="${attr(l)}" target="_blank" rel="noopener">${esc((r.legenda||'Sem legenda').slice(0,90))}</a>`:esc((r.legenda||'Sem legenda').slice(0,90))}<br><small>${esc(IG_TIPO[r.tipo]||r.tipo||'')} · ${esc(fmtDate(String(r.quando).slice(0,10)))}</small></td><td><b>${val(r)}</b></td><td>${igNum(r.interacoes)}</td><td>${r.alcance===null?'—':igNum(r.alcance)}</td></tr>`};
+  const resumo=meses.slice(0,12).map(m=>{const rs=rows.filter(r=>String(r.quando).slice(0,7)===m);const top=[...rs].sort((a,b)=>b.interacoes-a.interacoes)[0];return `<tr><td>${esc(rkMesRotulo(m))}</td><td>${rs.length}</td><td>${igNum(rs.reduce((s,r)=>s+r.interacoes,0))}</td><td>${top?esc((top.legenda||'Sem legenda').slice(0,60)):'—'}</td></tr>`}).join('');
+  const sv=(arr,rot)=>arr.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>${rot}</th><th>Seguidores</th><th>Variação</th></tr></thead><tbody>${[...arr].reverse().map(x=>`<tr><td>${esc(rot==='Mês'?rkMesRotulo(x.periodo):x.periodo)}</td><td>${igNum(x.seguidores)}</td><td>${x.variacao===null?'—':`<span class="${x.variacao>=0?'tg-bom':'tg-ruim'}">${x.variacao>0?'+':''}${igNum(x.variacao)}</span>`}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty compact">Ainda sem registros.</div>';
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Ranking de publicações e seguidores</h1><p>Publicações ordenadas por mês e a evolução de seguidores por mês e por ano.</p></div></div>
+  <div class="card"><h3>Seguidores ${sg.atual!==null?`<small>· hoje ${igNum(sg.atual)}</small>`:''}</h3>
+  <p class="kpi-note">A Meta não informa o histórico de seguidores: o sistema guarda uma foto a cada sincronização${sg.primeiroRegistro?` (primeiro registro em ${esc(fmtDate(String(sg.primeiroRegistro).slice(0,10)))})`:''}. A variação só aparece a partir do 2º período registrado.</p>
+  <div class="grid2"><div><h4>Por mês</h4>${sv(sg.mensal,'Mês')}</div><div><h4>Por ano</h4>${sv(sg.anual,'Ano')}</div></div></div>
+  ${!rows.length?'<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram e atualize em Desempenho.</span></div>':`
+  <div class="card"><h3>Ranking do mês</h3><div class="st-toolbar"><div class="st-filtros"><select data-rk="mes">${meses.map(m=>`<option value="${m}" ${m===rkFiltro.mes?'selected':''}>${esc(rkMesRotulo(m))}</option>`).join('')}</select><select data-rk="metrica">${Object.entries(RK_METRICA).map(([k,v])=>`<option value="${k}" ${k===rkFiltro.metrica?'selected':''}>Ordenar por ${esc(v[0])}</option>`).join('')}</select></div></div>
+  <div class="tablewrap"><table class="datatable"><thead><tr><th></th><th></th><th>Publicação</th><th>${esc(rotM)}</th><th>Interações</th><th>Alcance</th></tr></thead><tbody>${doMes.slice(0,20).map(linha).join('')||'<tr><td colspan="6">Sem publicações neste mês.</td></tr>'}</tbody></table></div></div>
+  <div class="card"><h3>Mês a mês</h3><div class="tablewrap"><table class="datatable"><thead><tr><th>Mês</th><th>Publicações</th><th>Interações</th><th>Campeã do mês</th></tr></thead><tbody>${resumo}</tbody></table></div></div>`}`;
+  $$('[data-rk]').forEach(s=>s.onchange=()=>{rkFiltro[s.dataset.rk]=s.value;renderIgRanking()});
+}

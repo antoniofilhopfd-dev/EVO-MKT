@@ -27,6 +27,7 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   record_comments: { cols: ['id', 'modulo', 'registro', 'autor', 'autor_tipo', 'quando', 'texto', 'interno'], restore: 'replace', opt: true },
   record_checklist: { cols: ['id', 'modulo', 'registro', 'texto', 'feito', 'ordem', 'atualizado_em'], restore: 'replace', opt: true },
   ads_snapshots: { cols: ['id', 'conta', 'campanha_id', 'campanha', 'periodo', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'moeda', 'status', 'objetivo', 'orcamento_diario', 'atualizado_em'], restore: 'replace', opt: true },
+  ig_seguidores: { cols: ['dia', 'seguidores', 'seguindo', 'midias', 'atualizado_em'], restore: 'replace', opt: true },
   ads_diario: { cols: ['conta', 'dia', 'gasto', 'impressoes', 'cliques', 'resultados', 'moeda', 'atualizado_em'], restore: 'replace', opt: true },
   ads_anuncios: { cols: ['conta', 'anuncio_id', 'periodo', 'anuncio', 'campanha', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'moeda', 'status', 'problema', 'atualizado_em'], restore: 'replace', opt: true },
   ads_lancamentos: { cols: ['id', 'chave', 'quem', 'quando', 'tipo', 'referencia', 'titulo', 'objetivo', 'orcamento_dia', 'dias', 'inicio', 'fim', 'compromisso', 'moeda', 'publico', 'campanha_id', 'conjunto_id', 'anuncio_id', 'estado', 'erro', 'atualizado_em'], restore: 'replace', opt: true },

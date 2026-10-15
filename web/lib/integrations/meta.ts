@@ -130,6 +130,8 @@ export async function igSync(months = 2): Promise<number> {
   if (!(await metaConnected())) throw new Error('Instagram não conectado.');
   const ig = await setting('ig_user_id');
   const profile = await metaGet(`/${ig}`, { fields: 'followers_count,follows_count,media_count,username' });
+  await run('INSERT INTO ig_seguidores(dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),seguindo=VALUES(seguindo),midias=VALUES(midias),atualizado_em=VALUES(atualizado_em)',
+    [fmtDate(new Date()), Number(profile.followers_count ?? 0), Number(profile.follows_count ?? 0), Number(profile.media_count ?? 0), now()]);
   const media: Row[] = [];
   let after = '';
   for (let pg = 0; pg < 3; pg++) { // até 300 publicações mais recentes
@@ -155,6 +157,7 @@ export async function igSync(months = 2): Promise<number> {
     }
   }
   let n = 0;
+  const listRowsSeg = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API');
   const lp = localParts(new Date());
   for (let i = 0; i < months; i++) {
     let y = lp.y, m = lp.m - i;
@@ -178,7 +181,7 @@ export async function igSync(months = 2): Promise<number> {
     const row: Row = {
       titulo: `${MESES[m - 1][0].toUpperCase()}${MESES[m - 1].slice(1)} de ${y}`,
       periodo: per, dataInicio: fmtDate(first), origem: 'INSTAGRAM_API', idExterno: ig, status: 'ATIVO', ultimaSincronizacao: now(),
-      seguidores: String(profile.followers_count ?? 0), alcance: String(ins.reach ?? 0), impressoes: String(ins.views ?? 0),
+      seguidores: i === 0 ? String(profile.followers_count ?? 0) : String((await q1('SELECT seguidores FROM ig_seguidores WHERE dia LIKE ? ORDER BY dia DESC LIMIT 1', [per + '%']))?.seguidores ?? (listRowsSeg.find((r) => r.periodo === per)?.seguidores ?? '')), alcance: String(ins.reach ?? 0), impressoes: String(ins.views ?? 0),
       visitasPerfil: String(ins.profile_views ?? 0), interacoes: String(ins.total_interactions ?? 0), curtidas: String(ins.likes ?? 0),
       comentarios: String(ins.comments ?? 0), compartilhamentos: String(ins.shares ?? 0), salvamentos: String(ins.saves ?? 0),
       posts: String(posts), reels: String(reels), melhoresConteudos: top.join('\n'),
