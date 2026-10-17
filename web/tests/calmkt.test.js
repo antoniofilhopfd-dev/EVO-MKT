@@ -75,7 +75,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.click('#cmForm [data-close]');await p.waitForSelector('#cmForm',{state:'detached'});
  await p.click('#fSalvar').catch(()=>{});
  await p.click('[data-modo="week"]');await p.waitForSelector('.cm-semana');
- await p.click(`.cm-col[data-date="${D0}"]`,{position:{x:6,y:150}});await p.waitForSelector('#cmForm');t('na Semana, clicar no espaço livre também cria',(await p.inputValue('#fData'))===D0);
+ await p.click(`.cm-col[data-date="${D0}"]`,{position:{x:6,y:150}});await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="mkt"]');await p.waitForSelector('#cmForm');t('na Semana, clicar no espaço livre também cria',(await p.inputValue('#fData'))===D0);
  await p.click('#cmForm [data-close]');await p.click('[data-modo="month"]');await p.waitForSelector('.cm-mes');
  await p.click('#cmNovo');await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="mkt"]');await p.waitForSelector('#cmForm');await p.click('#fSalvar');t('o formulário exige título',/título/i.test(await p.textContent('#fErro')));await p.click('#cmForm [data-close]');
 

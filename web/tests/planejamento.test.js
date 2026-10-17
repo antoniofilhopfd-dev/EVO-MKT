@@ -191,7 +191,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  // equipe
  const pe=await entra('MON-3303');
  const ie=await pe.$$eval('#nav .navitem .navlabel',e=>e.map(x=>x.textContent.trim()));
- t('equipe vê o menu sem Administração e sem Configurações',!ie.includes('Configurações')&&!ie.includes('Integrações')&&!ie.includes('Usuários e permissões')&&ie.includes('Planejamento')&&ie.includes('Calendários')&&ie.includes('Solicitações'),ie.join('|'));
+ t('equipe vê o menu sem Equipe nem Relatórios; Configurações só com Perfil e preferências',ie.includes('Configurações')&&!ie.includes('Relatórios')&&!ie.includes('Equipe')&&ie.includes('Planejamento')&&ie.includes('Calendário')&&!ie.includes('Integrações')&&!ie.includes('Usuários e permissões'),ie.join('|'));
  await pe.evaluate(()=>go('planejamento'));await pe.waitForSelector('.pl-faixa');await pe.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
  await pe.click('.cm-item:has-text("Homenagem aos professores")');await pe.waitForSelector('#plForm');t('equipe consulta ação de outra pessoa em modo leitura (sem Salvar/Excluir)',await pe.$('#pSalvar')===null&&await pe.$('#plExc')===null&&await pe.$eval('#pTitulo',e=>e.disabled));
  // celular
