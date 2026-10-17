@@ -37,7 +37,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  t('não mostra tarefas, campanhas nem solicitações já concluídas',!/Tarefa que não aparece|Campanha que não aparece|Pedido já entregue/.test(txt));
  t('o título é "Calendário de Marketing"',/Calendário de Marketing/.test(await p.$eval('#content h1',e=>e.textContent)));
  t('o prazo da solicitação usa o registro original (um só cadastro)',(await lista('solicitacoes')).length===antes.sol&&(await p.$$eval('.cm-item.t-PRAZO',e=>e.length))===1);
- t('tipos têm classe/cor própria e o filtro mostra os 6 tipos',(await p.$$eval('.cm-tipo',e=>e.length))===6&&await p.$('.cm-item.t-REUNIAO')!==null&&await p.$('.cm-item.t-COBERTURA')!==null&&await p.$('.cm-item.t-PUBLICACAO')!==null);
+ t('tipos têm classe/cor própria e o filtro mostra os 7 tipos',(await p.$$eval('.cm-tipo',e=>e.length))===7&&await p.$('.cm-item.t-REUNIAO')!==null&&await p.$('.cm-item.t-COBERTURA')!==null&&await p.$('.cm-item.t-PUBLICACAO')!==null);
  t('o compromisso antigo (Lembrete) continua visível como Compromisso',await p.$('.cm-item.t-COMPROMISSO')!==null);
 
  // ---- visualizações e navegação ----
