@@ -10,7 +10,7 @@ const tx=(n,txt,re)=>{const c=re.test(txt);t(n,c);if(!c)console.log('     texto 
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');
  const A=(path,opt)=>p.evaluate(([a,o])=>api(a,o),[path,opt||{}]);
  const rows=async m=>(await A('/data?module='+m)).rows;
- await p.waitForSelector('.today-banner');await p.evaluate(()=>{adminTab='integracoes';go('administracao')});await p.waitForSelector('#metaForm');
+ await p.waitForSelector('.db-topo');await p.evaluate(()=>{adminTab='integracoes';go('administracao')});await p.waitForSelector('#metaForm');
  tx('aba Integrações mostra Instagram e Google não conectados',await p.$eval('#adminBody',e=>e.innerText),/Instagram[\s\S]*Não conectado[\s\S]*GOOGLE[\s\S]*Não conectado/i);
  tx('mostra os endereços de redirecionamento para cadastrar',await p.$eval('#adminBody',e=>e.innerText),/api\/integrations\/meta\/callback[\s\S]*api\/integrations\/google\/callback/);
  await p.fill('#metaForm [name=meta_app_id]','APPID');await p.fill('#metaForm [name=meta_app_secret]','META_SECRET');await p.click('#metaForm button[type=submit]');await p.waitForSelector('a[href="/api/integrations/meta/connect"]');

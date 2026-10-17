@@ -7,7 +7,7 @@ const P='"><img src=x onerror="window.__xss=(window.__xss||0)+1"><svg onload="wi
 (async()=>{
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const ctx=await b.newContext({viewport:{width:1366,height:900}});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));let ans='Senha26x';p.on('dialog',d=>d.accept(ans));
- await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');
+ await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.db-topo');
  const api=(m,u,body)=>p.evaluate(async([m,u,body])=>api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}),[m,u,body]);
  const ids={};
  for(const [m,extra] of [['tarefas',{descricao:P,responsavel:P}],['projetos',{descricao:P}],['eventos',{local:P}],['campanhas',{objetivo:P,publico:P,metaAdsId:P}],['ideias',{descricao:P}],['conteudos',{legenda:P,hashtags:P,linkPublicacao:'javascript:window.__xss=55',revisor:P,canal:'TikTok'}],['equipe',{funcao:P,email:P}],['arquivos',{caminhoArquivo:P}],['trafego',{periodo:P}],['instagram',{periodo:P,seguidores:'1'}],['agenda',{local:P}],['templates',{descricao:P}],['relatorios',{descricao:P}],['aprovacoes',{aprovador:P}]]){

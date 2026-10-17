@@ -5,7 +5,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
 (async()=>{
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept('Senha26x'));
- await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');
+ await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.db-topo');
  const d=new Date();d.setDate(d.getDate()+2);const ds=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
  const post=(m,o)=>p.evaluate(async([m,o])=>{await api('/data?module='+m,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});invalidate(m)},[m,o]);
  await post('eventos',{titulo:'Feira de Ciências',dataInicio:ds,status:'PRÉ-EVENTO'});

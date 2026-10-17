@@ -9,7 +9,7 @@ import openpyxl,sys
 wb=openpyxl.Workbook();ws=wb.active;ws.append(['id','titulo','status','descricao']);ws.append(['IDE-0005','Ideia vinda da planilha','IDEIA','Ação ç']);wb.save(sys.argv[1])`,f]);
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept('Senha26x'));
- await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');
+ await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.db-topo');
  await p.evaluate(()=>{adminTab='backups';go('administracao')});await p.waitForSelector('#xlsxImport');
  t('aba Backups mostra o importador de planilhas',true);
  await p.setInputFiles('#xlsxFiles',f);await p.click('#xlsxImport');await p.waitForSelector('.admin-overlay');

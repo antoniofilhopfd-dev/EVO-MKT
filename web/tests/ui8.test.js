@@ -6,7 +6,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const p=await (await b.newContext({viewport:{width:1440,height:1000}})).newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
  const prompts=[];let logado=false;p.on('dialog',d=>{if(!logado)return d.accept('Senha26x');prompts.push(d.message());d.accept('Triagem precisa rever')});
- await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.today-banner');logado=true;
+ await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.db-topo');logado=true;
  // dados: uma solicitação em EM ANÁLISE
  const id=await p.evaluate(async()=>{const r=await api('/data?module=solicitacoes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titulo:'Demanda da interface',segmento:'Infantil',tipoSolicitacao:'Post',status:'EM ANÁLISE'})});return r.id});
  await p.evaluate(()=>go('central'));await p.waitForSelector('#indPainel .ind');
