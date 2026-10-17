@@ -56,6 +56,32 @@ async function avisarGerencia(u: Row, titulo: string, texto: string, id: string)
   if (u.role !== 'manager') await registrarNotificacao('solicitacao', 'gerencia', titulo, texto, 'solicitacoes', id);
 }
 
+/** Cadastro interno (WhatsApp, pessoalmente, evento escolar…). `extras` carrega vínculos opcionais, como o evento escolar de origem. */
+export async function criarSolicitacaoInterna(u: Row, b: Row, extras: Row = {}): Promise<Row> {
+  const gerente = u.role === 'manager';
+  const titulo = strv(b.titulo).trim();
+  if (titulo.length < 3) fail(400, 'Informe o título (mínimo 3 letras).');
+  const prioridade = strv(b.prioridade).trim().toUpperCase() || 'MÉDIA';
+  if (!PRIORIDADES.includes(prioridade)) fail(400, 'Prioridade inválida.');
+  const prazo = strv(b.prazo).trim();
+  if (prazo && !/^\d{4}-\d{2}-\d{2}$/.test(prazo)) fail(400, 'Prazo inválido.');
+  const resp = strv(b.responsavel).trim();
+  if (resp && !gerente && lower(resp) !== lower(String(u.nome))) fail(403, 'Só a Gerente distribui para outras pessoas.');
+  const descricao = strv(b.descricao).trim();
+  const status = resp ? 'DISTRIBUÍDA' : 'AGUARDANDO TRIAGEM';
+  const row: Row = {
+    titulo, descricao, objetivo: descricao, solicitante: strv(b.solicitante).trim() || String(u.nome), segmento: strv(b.segmento).trim(),
+    responsavel: resp, prazo, prioridade, status, triagemStatus: status, origem: 'INTERNO', tipoSolicitacao: 'Demanda interna',
+    exigeAprovacao: sim(b.exigeAprovacao) ? '1' : '0', aprovacaoSolicitante: 'PENDENTE', ...extras,
+  };
+  if (resp) { row.gerenteTriagem = String(u.nome); row.distribuidoEm = now(); }
+  const novo = await insertRow('solicitacoes', row, u.codigo);
+  await notifyAssignment('solicitacoes', novo, null, u.nome);
+  if (resp && lower(resp) !== lower(String(u.nome))) await registrarNotificacao('responsavel', resp, 'Demanda atribuída a você', `"${titulo}" agora está com você.`, 'solicitacoes', String(novo.id));
+  await avisarGerencia(u, 'Nova solicitação', `${u.nome} cadastrou "${titulo}".`, String(novo.id));
+  return enriquecer(novo, fmtDate(new Date()));
+}
+
 export async function solicitacoesRoute(c: Ctx): Promise<Response> {
   const { path, method } = c;
   const u = await requireInternal(c);
@@ -67,30 +93,7 @@ export async function solicitacoesRoute(c: Ctx): Promise<Response> {
     return json({ rows: rows.map((r) => enriquecer(r, hoje)), opcoes: await opcoes(rows), eu: { nome: u.nome, role: u.role, codigo: u.codigo }, hoje, portalAtivo: await portalAtivo() });
   }
 
-  if (path === '/solicitacoes/nova' && method === 'POST') {
-    const b = await c.body();
-    const titulo = strv(b.titulo).trim();
-    if (titulo.length < 3) fail(400, 'Informe o título (mínimo 3 letras).');
-    const prioridade = strv(b.prioridade).trim().toUpperCase() || 'MÉDIA';
-    if (!PRIORIDADES.includes(prioridade)) fail(400, 'Prioridade inválida.');
-    const prazo = strv(b.prazo).trim();
-    if (prazo && !/^\d{4}-\d{2}-\d{2}$/.test(prazo)) fail(400, 'Prazo inválido.');
-    const resp = strv(b.responsavel).trim();
-    if (resp && !gerente && lower(resp) !== lower(String(u.nome))) fail(403, 'Só a Gerente distribui para outras pessoas.');
-    const descricao = strv(b.descricao).trim();
-    const status = resp ? 'DISTRIBUÍDA' : 'AGUARDANDO TRIAGEM';
-    const row: Row = {
-      titulo, descricao, objetivo: descricao, solicitante: strv(b.solicitante).trim() || String(u.nome), segmento: strv(b.segmento).trim(),
-      responsavel: resp, prazo, prioridade, status, triagemStatus: status, origem: 'INTERNO', tipoSolicitacao: 'Demanda interna',
-      exigeAprovacao: sim(b.exigeAprovacao) ? '1' : '0', aprovacaoSolicitante: 'PENDENTE',
-    };
-    if (resp) { row.gerenteTriagem = String(u.nome); row.distribuidoEm = now(); }
-    const novo = await insertRow('solicitacoes', row, u.codigo);
-    await notifyAssignment('solicitacoes', novo, null, u.nome);
-    if (resp && lower(resp) !== lower(String(u.nome))) await registrarNotificacao('responsavel', resp, 'Demanda atribuída a você', `"${titulo}" agora está com você.`, 'solicitacoes', String(novo.id));
-    await avisarGerencia(u, 'Nova solicitação', `${u.nome} cadastrou "${titulo}".`, String(novo.id));
-    return json(enriquecer(novo, fmtDate(new Date())), 201);
-  }
+  if (path === '/solicitacoes/nova' && method === 'POST') return json(await criarSolicitacaoInterna(u, await c.body()), 201);
 
   if (path === '/solicitacoes/editar' && method === 'POST') {
     const b = await c.body();

@@ -1,0 +1,15 @@
+/* Calendário Escolar: cores discretas por tipo de evento (mesma lógica do Calendário de Marketing) */
+.t-EVENTO{--c:#3f6fd1;--bg:#e8efff;--tx:#1c3a8a}.t-PROVA{--c:#c0392b;--bg:#fdeaea;--tx:#8a2a22}.t-PROJETO{--c:#2f9d8a;--bg:#e2f4f0;--tx:#17695b}
+.t-PASSEIO{--c:#d98a1f;--bg:#fff1dc;--tx:#7a4a00}.t-REUNIAO_PAIS{--c:#7a63c9;--bg:#eeeaff;--tx:#43338f}.t-ESPORTIVA{--c:#4aa04a;--bg:#e8f5e6;--tx:#256425}
+.t-CULTURAL{--c:#c2559a;--bg:#fbe9f4;--tx:#7d2a62}.t-SOLENIDADE{--c:#b08a1a;--bg:#f8f0d4;--tx:#6a5200}.t-INSTITUCIONAL{--c:#5f7690;--bg:#e8eef4;--tx:#33495e}
+.t-OUTRO{--c:#8a93a8;--bg:#eef0f4;--tx:#3b4054}
+.cm-busca{min-height:36px;min-width:180px;flex:1 1 200px;max-width:320px}
+.cm-segs{border:1px solid var(--border,#E2E4EC);border-radius:12px;padding:8px 12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin:0}
+.cm-segs legend{font-size:12px;font-weight:800;color:#545b6d;padding:0 4px}
+.cm-pedidos{border-top:1px solid #eef0f4;padding-top:8px}.cm-pedidos h4{margin:0 0 4px}
+.cm-acoes,.cm-vinc{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.cm-proximos{display:grid;gap:14px}.cm-proximos h3{margin:0 0 6px;font-size:14px;text-transform:capitalize;color:var(--muted,#6B6F80)}
+.cm-prox-linha{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px;align-items:center;background:#fff;border:1px solid var(--border,#E2E4EC);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+.cm-prox-linha .cm-quando{font-weight:800;font-size:12px;color:var(--muted,#6B6F80)}.cm-prox-linha small{color:var(--muted,#6B6F80)}
+.cm-item.cont{opacity:.85;border-left-style:dashed}
+@media(max-width:719px){.cm-segs{grid-template-columns:minmax(0,1fr)}.cm-prox-linha{grid-template-columns:minmax(0,1fr)}.cm-busca{max-width:none;width:100%}}

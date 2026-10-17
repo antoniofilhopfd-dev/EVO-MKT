@@ -10,7 +10,7 @@ export const EVO_VERSION = '5.0.0-web';
 export const MODULES: Record<string, string> = {
   agenda: 'AGE', aprovacoes: 'APR', arquivos: 'ARQ', calendario: 'CAL', campanhas: 'CAM', configuracoes: 'CFG', conteudos: 'CON',
   equipe: 'EQP', eventos: 'EVT', ideias: 'IDE', instagram: 'INS', integracoes: 'INT', lixeira: 'LIX', projetos: 'PRJ',
-  relatorios: 'REL', solicitacoes: 'SOL', tarefas: 'TAR', templates: 'TPL', trafego: 'TRF',
+  relatorios: 'REL', calescolar: 'ESC', solicitacoes: 'SOL', tarefas: 'TAR', templates: 'TPL', trafego: 'TRF',
 };
 export const BASE_HEADERS = ['id', 'titulo', 'status', 'prioridade', 'responsavel', 'segmento', 'dataInicio', 'prazo', 'descricao', 'tags', 'origem', 'idExterno', 'ultimaSincronizacao', 'criadoEm', 'atualizadoEm'];
 export const TEAM_WRITE = ['agenda', 'calendario', 'tarefas', 'projetos', 'eventos', 'conteudos', 'ideias', 'campanhas', 'aprovacoes', 'instagram', 'trafego', 'templates', 'arquivos', 'solicitacoes', 'relatorios'];
