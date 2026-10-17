@@ -115,13 +115,13 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  t('eventos existentes foram preservados',(await lista('calendario')).some(x=>x.id===reuniao.id)&&(await lista('calendario')).some(x=>x.titulo==='Lembrete antigo'));
 
  // ---- permissões: quem não é responsável não arrasta o prazo ----
- const pm=await entra('MON-3303');await pm.evaluate(()=>go('calendario'));await pm.waitForSelector('.cm-mes');await pm.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
+ const pm=await entra('MON-3303');await pm.evaluate(()=>go('calendario'));await pm.waitForSelector('.cm-semana, .cm-mes');await pm.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pm.$('.cm-mes'))){await pm.click('[data-modo="month"]');await pm.waitForSelector('.cm-mes')}
  t('equipe vê o prazo, mas só arrasta o que é dela (a solicitação é de outra pessoa)',await pm.$eval('.cm-item.t-PRAZO',e=>!e.hasAttribute('draggable')));
  await pm.dragAndDrop('.cm-item.t-PRAZO',`.cm-dia[data-date="${D1}"]`).catch(()=>{});await pm.waitForTimeout(600);
  s1=(await lista('solicitacoes')).find(x=>x.id===sol.id);t('e o servidor também recusa (prazo intacto)',s1.prazo===D3,s1);
 
  // ---- celular ----
- const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('calendario'));await pc.waitForSelector('.cm-mes');await pc.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
+ const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('calendario'));await pc.waitForSelector('.cm-semana, .cm-mes');await pc.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pc.$('.cm-mes'))){await pc.click('[data-modo="month"]');await pc.waitForSelector('.cm-mes')}
  t('celular: sem rolagem horizontal',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  t('celular: mostra pontos coloridos em vez de títulos no mês',await pc.$$eval('.cm-pontos',e=>e.some(x=>getComputedStyle(x).display!=='none'))&&await pc.$$eval('.cm-dia .cm-lista',e=>e.every(x=>getComputedStyle(x).display==='none')));
  await pc.click(`.cm-dia[data-date="${D3}"]`,{position:{x:6,y:40}});await pc.waitForSelector('.cm-diaVista');t('celular: tocar num dia com itens abre a lista do dia',/Cartaz da feira|Gravação|Post da feira/.test(await pc.$eval('.cm-diaVista',e=>e.innerText)));
