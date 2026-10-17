@@ -11,7 +11,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass','errada');await p.click('#internalLoginBtn');await p.waitForTimeout(400);
  t('senha errada recusada',/inválidos/.test(await p.$eval('#internalLoginError',e=>e.innerText)));
  await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem',{timeout:5000});t('login + troca obrigatória de senha',true);
- const pages=await p.$$eval('#nav .navitem',e=>e.map(x=>x.dataset.page));t('menu inclui Administração',pages.includes('administracao'));
+ const pages=await p.$$eval('#nav .navitem',e=>e.map(x=>x.dataset.page));t('menu inclui Configurações (que abriga a Administração)',pages.includes('configuracoes'));
  let broken=[];for(const pg of pages){errs.length=0;await p.evaluate(x=>go(x),pg);await p.waitForTimeout(250);const bad2=await p.$eval('#content',e=>/Não foi possível carregar/.test(e.innerText));if(errs.length||bad2)broken.push(pg+':'+errs.join('|'))}
  t(`${pages.length} telas abrem sem erro`,broken.length===0);if(broken.length)console.log(broken);
  // Tráfego: importação CSV
