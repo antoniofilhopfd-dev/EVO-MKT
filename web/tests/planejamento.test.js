@@ -159,8 +159,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  // resumo clicável
  await pg.click('[data-plf="situacao:EXECUCAO"]');await pg.waitForTimeout(250);t('clicar no resumo aplica o filtro',(await pg.inputValue('#cmExtra'))==='EXECUCAO');await pg.selectOption('#cmExtra','');
  // visões mensal e semanal
- await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes');t('visão mensal mostra as ações com data',/Semana do Livro/.test(await pg.$eval('.cm-mes',e=>e.innerText))||(await pg.$$eval('.cm-item.t-PL_EVENTOS',e=>e.length))>0);
- await pg.click('[data-modo="week"]');await pg.waitForSelector('.cm-semana');t('visão semanal',(await pg.$$eval('.cm-col',e=>e.length))===7&&/Semana do Livro/.test(await pg.$eval('.cm-semana',e=>e.innerText)));
+ await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes');await pg.fill('#cmIr',dia(3));await pg.dispatchEvent('#cmIr','change');await pg.waitForTimeout(300);t('visão mensal mostra as ações com data',/Semana do Livro/.test(await pg.$eval('.cm-mes',e=>e.innerText))||(await pg.$$eval('.cm-item.t-PL_EVENTOS',e=>e.length))>0);
+ await pg.click('[data-modo="week"]');await pg.waitForSelector('.cm-semana');await pg.fill('#cmIr',dia(3));await pg.dispatchEvent('#cmIr','change');await pg.waitForTimeout(300);t('visão semanal (semana de uma ação em curso)',(await pg.$$eval('.cm-col',e=>e.length))===7&&/Semana do Livro/.test(await pg.$eval('.cm-semana',e=>e.innerText)));
  await pg.click('[data-modo="list"]');await pg.waitForSelector('.cm-proximos');
  // abrir a ação, situação e criar solicitações
  await pg.click('.cm-item:has-text("Semana do Livro")');await pg.waitForSelector('#plForm');
