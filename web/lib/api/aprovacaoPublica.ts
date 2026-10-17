@@ -10,6 +10,7 @@ import { registrarNotificacao } from '../notificacoes';
 import { audit, getRow, logStatus, modifyRow } from '../records';
 import { addDays, fail, fmtDate, now, Row, strv } from '../util';
 import { json } from './handlers';
+import { exigirPortalAtivo } from '../portal';
 
 const AGUARDA = 'AGUARDANDO APROVAÇÃO DO SOLICITANTE';
 const arquivosDe = (r: Row) => String(r.arquivosEntrega ?? '').split('|').map((x) => x.replace(/\\/g, '/').trim()).filter(Boolean);
@@ -22,6 +23,7 @@ async function linkValido(c: Ctx, token: string): Promise<{ link: Row; sol: Row;
   await rateCheck('apr:' + c.ip, 40);
   const link = token.length >= 32 ? await q1('SELECT * FROM approval_links WHERE token_hash=?', [sha256(token)]) : null;
   const mod = link && ehPost(link.solicitacao) ? 'conteudos' : 'solicitacoes';
+  if (link && mod === 'solicitacoes') await exigirPortalAtivo(); // link de demanda é acesso externo do Portal; o de post (direção) segue valendo
   const sol = link ? await getRow(mod, link.solicitacao) : null;
   if (!link || !sol || link.usado_em || link.expira_em < now()) {
     await rateFail('apr:' + c.ip);
@@ -47,6 +49,7 @@ export async function aprovacaoPublicaRoute(c: Ctx) {
       await audit(String(u.codigo), 'link-aprovacao', 'conteudos', id);
       return json({ url: `${publicUrl(c.url.origin)}/aprovar.html?t=${token}`, expiraEm: now(addDays(new Date(), dias)), dias });
     }
+    await exigirPortalAtivo();
     const sol = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
     if (String(sol.status).toUpperCase() !== AGUARDA) fail(409, 'O link só pode ser criado quando a entrega está aguardando aprovação.');
     if (!arquivosDe(sol).length && !strv(sol.entregaMensagem).trim()) fail(409, 'Anexe a entrega (ou escreva a mensagem de entrega) antes de gerar o link.');

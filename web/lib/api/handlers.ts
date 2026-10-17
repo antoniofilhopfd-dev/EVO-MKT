@@ -26,6 +26,8 @@ import { relatoriosRoute } from './relatorios';
 import { calendarioPublicoRoute } from './calendarioPublico';
 import { gestaoAnunciosRoute } from './gestaoAnuncios';
 import { solicitacoesRoute } from './solicitacoes';
+import { portalRoute } from './portal';
+import { exigirPortalAtivo } from '../portal';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
@@ -39,8 +41,13 @@ const asUser = (u: Row) => ({ code: u.codigo, name: u.nome, role: u.role, label:
 const portalOut = (u: Row, segs: unknown) => ({ id: u.codigo, codigo: u.codigo, nome: u.nome, perfil: u.perfil, segmentos: segs, ativo: true });
 const upper = (v: unknown) => strv(v).trim().toUpperCase();
 
+/** Rotas usadas só por quem está fora (Coordenações). As de administração do Portal (/portal/users, /manager/notices) continuam internas. */
+const PORTAL_EXTERNO = ['/portal/login', '/portal/password', '/portal/requests', '/portal/upload', '/portal/file', '/portal/comments', '/portal/timeline', '/portal/notices'];
+
 export async function route(c: Ctx): Promise<Out> {
   const { method, path } = c;
+  // Portal das Coordenações suspenso (padrão): nenhuma rota externa dele responde, nem para quem tem código ou sessão antiga.
+  if (PORTAL_EXTERNO.includes(path)) await exigirPortalAtivo();
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
 
   switch (true) {
@@ -52,6 +59,8 @@ export async function route(c: Ctx): Promise<Out> {
       return gestaoAnunciosRoute(c);
     case path.startsWith('/solicitacoes/'):
       return solicitacoesRoute(c);
+    case path === '/portal/pagina' || path === '/admin/portal':
+      return portalRoute(c);
     case path.startsWith('/reports/'):
       return relatoriosRoute(c);
     case path.startsWith('/content/'):

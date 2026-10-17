@@ -4,7 +4,7 @@ const SL_ETAPAS=[['PENDENTE','Pendente'],['EM_ANDAMENTO','Em andamento'],['EM_AP
 const SL_ROT=Object.fromEntries(SL_ETAPAS);
 const SL_PRIO_ORD={URGENTE:0,ALTA:1,'MÉDIA':2,BAIXA:3};
 const SL_EQUIPE=[['PENDENTE','EM_ANDAMENTO'],['EM_ANDAMENTO','EM_APROVACAO'],['EM_ANDAMENTO','CONCLUIDO']];
-let sl={rows:[],opc:{segmentos:[],responsaveis:[],solicitantes:[],prioridades:[]},eu:{nome:'',role:'',codigo:''},hoje:'',vista:'kanban',f:{q:'',resp:'',seg:'',etapa:'',prazo:''},ord:'prazo',dir:1,verConcluidas:false};
+let sl={rows:[],opc:{segmentos:[],responsaveis:[],solicitantes:[],prioridades:[]},eu:{nome:'',role:'',codigo:''},hoje:'',portalAtivo:false,vista:'kanban',f:{q:'',resp:'',seg:'',etapa:'',prazo:''},ord:'prazo',dir:1,verConcluidas:false};
 const slGerente=()=>sl.eu.role==='manager';
 const slDono=r=>String(r.responsavel||'').trim()!==''&&String(r.responsavel).trim().toLowerCase()===String(sl.eu.nome).trim().toLowerCase();
 const slJson=(b)=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
@@ -80,7 +80,7 @@ function slLista(rows){
 function slOpts(lista,sel,vazio,extras=[]){return `<option value="">${vazio}</option>${extras.map(([v,l])=>`<option value="${v}" ${sel===v?'selected':''}>${l}</option>`).join('')}${lista.map(x=>`<option value="${attr(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}`}
 async function slCarrega(){
  const d=await api('/solicitacoes/painel');
- sl.rows=d.rows||[];sl.opc=d.opcoes||sl.opc;sl.eu=d.eu||sl.eu;sl.hoje=d.hoje||today();
+ sl.rows=d.rows||[];sl.opc=d.opcoes||sl.opc;sl.eu=d.eu||sl.eu;sl.hoje=d.hoje||today();sl.portalAtivo=!!d.portalAtivo;
 }
 function slDesenha(){
  const box=$('#slRaiz');if(!box)return;
@@ -143,12 +143,12 @@ async function renderRequests(){
  sl.vista=pref('slVista','kanban');
  $('#content').innerHTML=`<div class="sl-head"><div><small>SOLICITAÇÕES</small><h1>Solicitações</h1><p>Pedidos de todos os segmentos em um só lugar: cadastre, distribua, acompanhe o andamento e aprove só quando precisar.</p></div>
   <div class="sl-head-acoes"><div class="sl-vista" role="group" aria-label="Visualização"><button type="button" data-vista="kanban" aria-pressed="${sl.vista==='kanban'}">Kanban</button><button type="button" data-vista="lista" aria-pressed="${sl.vista==='lista'}">Lista</button></div><button class="btn" id="slNova">+ Nova solicitação</button></div></div>
-  <div class="sl-mais"><button type="button" class="softbtn" id="slCsv">Exportar CSV do mês</button><button type="button" class="softbtn" id="slPdf">Relatório do mês (PDF)</button><button type="button" class="softbtn" id="slPortal">Abrir Portal do solicitante</button></div><div id="slRaiz"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
+  <div class="sl-mais"><button type="button" class="softbtn" id="slCsv">Exportar CSV do mês</button><button type="button" class="softbtn" id="slPdf">Relatório do mês (PDF)</button></div><div id="slRaiz"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
  $('#slNova').onclick=()=>slNova();
  const mesEscolhido=()=>{const m=prompt('Mês do relatório (AAAA-MM):',pref('requestReportMonth',today().slice(0,7)));if(!m)return null;if(!/^\d{4}-\d{2}$/.test(m.trim())){toast('Use o formato AAAA-MM','warn');return null}setPref('requestReportMonth',m.trim());return m.trim()};
  $('#slCsv').onclick=()=>{const m=mesEscolhido();if(m)exportRequestMonthlyCSV(sl.rows,m)};
  $('#slPdf').onclick=()=>{const m=mesEscolhido();if(m)printRequestMonthlyReport(sl.rows,m)};
- $('#slPortal').onclick=()=>window.open('/solicitante.html','_blank','noopener');
+
  document.querySelectorAll('[data-vista]').forEach(b=>b.onclick=()=>{sl.vista=b.dataset.vista;setPref('slVista',sl.vista);document.querySelectorAll('[data-vista]').forEach(x=>x.setAttribute('aria-pressed',x===b));slDesenha()});
  try{await slCarrega()}catch(e){$('#slRaiz').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar</strong><p>${esc(e.message)}</p></div>`;return}
  slDesenha();
@@ -200,7 +200,7 @@ async function slAbrir(id){
   <div class="sl-chips"><span class="sl-etapa e-${r.etapa}">${esc(SL_ROT[r.etapa])}</span>${slChips(r)}${r.origem==='PORTAL_SOLICITANTE'?'<span class="sl-chip">Veio do Portal</span>':''}</div>
   <div class="sl-acoes-det">
    ${dest.length?`<label>Mover para <select class="control" id="dMover"><option value="">Escolher…</option>${dest.map(e=>`<option value="${e}">${esc(SL_ROT[e])}</option>`).join('')}</select></label>`:''}
-   ${(slGerente()||slDono(r))&&r.origem==='PORTAL_SOLICITANTE'&&['PENDENTE','EM_ANDAMENTO'].includes(r.etapa)&&!r.aguardandoSolicitante?'<button type="button" class="softbtn" id="dPedirInfo">Pedir informação ao solicitante</button>':''}
+   ${(slGerente()||slDono(r))&&sl.portalAtivo&&r.origem==='PORTAL_SOLICITANTE'&&['PENDENTE','EM_ANDAMENTO'].includes(r.etapa)&&!r.aguardandoSolicitante?'<button type="button" class="softbtn" id="dPedirInfo">Pedir informação ao solicitante</button>':''}
    ${(slGerente()||slDono(r))&&r.etapa!=='CONCLUIDO'?'<button type="button" class="softbtn" id="dEntrega">Anexar entrega final</button>':''}
    ${slGerente()&&r.etapa!=='CONCLUIDO'?'<button type="button" class="softbtn" id="dCancelar">Cancelar solicitação</button>':''}
   </div>

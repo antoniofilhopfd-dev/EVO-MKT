@@ -5,7 +5,7 @@ set -u
 HERE=$(cd "$(dirname "$0")" && pwd); WEB=$(cd "$HERE/.." && pwd); T="$HERE"
 D=${EVO_TEST_DIR:-/tmp/evo-web-test}; mkdir -p "$D"; PORT=${PORT:-8080}
 FALHOU=''
-SUITES=${*:-api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui ui2 ui3 ui4 ui5 ui6 ui7 ui8 ui9 ui10 studio gestao gestaoui gerenciador gerenciadorui campanha campanhaui igtrafego contas contasui trafegoui contraste seguranca-estatica seguranca xss migracoes solicitacoes responsive}; rc=0
+SUITES=${*:-api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui ui2 ui3 ui4 ui5 ui6 ui7 ui8 ui9 ui10 studio gestao gestaoui gerenciador gerenciadorui campanha campanhaui igtrafego contas contasui trafegoui contraste seguranca-estatica seguranca xss migracoes solicitacoes portal responsive}; rc=0
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 || { (mysqld_safe --user=mysql >/dev/null 2>&1 &); for i in $(seq 30); do mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 && break; sleep 1; done; }
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "CREATE USER IF NOT EXISTS 'evo'@'127.0.0.1' IDENTIFIED BY 'evopass'; GRANT ALL ON *.* TO 'evo'@'127.0.0.1';" 2>/dev/null
 (cd "$WEB" && npm run build >"$D/build.log" 2>&1) || { echo "build falhou (ver $D/build.log)"; exit 2; }
@@ -32,6 +32,8 @@ for suite in $SUITES; do
   (cd "$WEB" && exec npx next start -p $PORT >"$D/next.log" 2>&1) & 
   for i in $(seq 40); do curl -fsS "http://127.0.0.1:$PORT/api/heartbeat" >/dev/null 2>&1 && break; sleep 0.5; done
   curl -fsS "http://127.0.0.1:$PORT/api/setup?key=$SETUP_KEY" > "$D/install.out"
+  # O Portal das Coordenações é desligado por padrão; as suítes antigas que o exercitam rodam com ele ligado. A suíte "portal" testa o padrão desligado.
+  [ "$suite" = "portal" ] || mariadb -uroot -S /run/mysqld/mysqld.sock evowebtest -e "REPLACE INTO integration_settings(k,v) VALUES('portal_ativo','1');"
   # registro "importado" que a suíte api espera (TAR-0007 com acentos), como no teste da versão PHP
   [ "$suite" = "api" ] && mariadb --default-character-set=utf8mb4 -uroot -S /run/mysqld/mysqld.sock evowebtest -e "
     INSERT INTO used_ids(id) VALUES('TAR-0007'); INSERT INTO id_counters(modulo,n) VALUES('tarefas',7);

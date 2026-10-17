@@ -15,6 +15,16 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ['mysql2', 'bcryptjs', 'nodemailer'],
+  // As páginas do Portal das Coordenações só saem pelo servidor, que confere se o Portal está ligado (padrão: desligado).
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/solicitante.html', destination: '/api/portal/pagina?f=solicitante.html' },
+        { source: '/portal.js', destination: '/api/portal/pagina?f=portal.js' },
+        { source: '/manifest-portal.webmanifest', destination: '/api/portal/pagina?f=manifest-portal.webmanifest' },
+      ],
+    };
+  },
   async headers() {
     return [
       {

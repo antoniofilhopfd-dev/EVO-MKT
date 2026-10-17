@@ -1,3 +1,4 @@
+import { portalAtivo } from './portal';
 import { randomInt } from 'node:crypto';
 import { Ctx, setCookie } from './ctx';
 import { q, q1, run } from './db';
@@ -43,7 +44,8 @@ export function sessionTokenFromCookie(c: Ctx): string {
   return raw ? unsignValue(raw) : '';
 }
 export const internalUser = (c: Ctx) => sessionFor(sessionTokenFromCookie(c), 'int');
-export const portalUser = (c: Ctx) => sessionFor(c.header('x-portal-token'), 'por');
+/** Com o Portal suspenso ninguém é reconhecido como solicitante, mesmo com sessão ou código válidos. */
+export const portalUser = async (c: Ctx) => ((await portalAtivo()) ? sessionFor(c.header('x-portal-token'), 'por') : null);
 export async function requireInternal(c: Ctx): Promise<Row> {
   return (await internalUser(c)) ?? fail(401, 'Sessão expirada. Entre novamente.');
 }

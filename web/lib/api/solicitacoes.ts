@@ -7,6 +7,7 @@ import { registrarNotificacao } from '../notificacoes';
 import { audit, getRow, insertRow, listRows, modifyRow, notifyAssignment, updateRow } from '../records';
 import { fail, fmtDate, HttpError, lower, now, Row, strv } from '../util';
 import { json } from './handlers';
+import { portalAtivo } from '../portal';
 
 /**
  * Tela única "Solicitações": 4 etapas (Pendente, Em andamento, Em aprovação, Concluído) sobre os 9 status internos.
@@ -63,7 +64,7 @@ export async function solicitacoesRoute(c: Ctx): Promise<Response> {
   if (path === '/solicitacoes/painel' && method === 'GET') {
     const rows = await listRows('solicitacoes');
     const hoje = fmtDate(new Date());
-    return json({ rows: rows.map((r) => enriquecer(r, hoje)), opcoes: await opcoes(rows), eu: { nome: u.nome, role: u.role, codigo: u.codigo }, hoje });
+    return json({ rows: rows.map((r) => enriquecer(r, hoje)), opcoes: await opcoes(rows), eu: { nome: u.nome, role: u.role, codigo: u.codigo }, hoje, portalAtivo: await portalAtivo() });
   }
 
   if (path === '/solicitacoes/nova' && method === 'POST') {
@@ -188,6 +189,7 @@ export async function solicitacoesRoute(c: Ctx): Promise<Response> {
     const id = strv(b.id);
     const cur = (await getRow('solicitacoes', id)) ?? fail(404, 'Solicitação não encontrada.');
     if (!gerente && !ehDono(u, cur)) fail(403, 'Só a Gerente ou o responsável pode pedir informações ao solicitante.');
+    if (!(await portalAtivo())) fail(409, 'O Portal está suspenso: o solicitante não consegue responder por lá. Combine direto com ele e registre num comentário.');
     if (strv(cur.origem) !== 'PORTAL_SOLICITANTE') fail(409, 'Só solicitações vindas do Portal têm solicitante para responder.');
     const msg = strv(b.mensagem).trim();
     if (msg.length < 3) fail(400, 'Escreva o que você precisa saber.');

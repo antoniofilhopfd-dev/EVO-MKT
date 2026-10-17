@@ -8,6 +8,7 @@ async function renderAdministration(){
   const tabs=[['acessos','Acessos'],['integracoes','Integrações'],['avisos','Avisos do Portal'],['auditoria','Auditoria'],['backups','Backups']];
   $('#content').innerHTML=`<div class="dashboard-head"><div><small>SISTEMA</small><h1>Administração</h1><p>Acessos da equipe e do Portal, avisos, auditoria e cópias de segurança.</p></div></div><div class="view-switch admin-tabs">${tabs.map(([k,l])=>`<button data-tab="${k}" class="${adminTab===k?'active':''}">${l}</button>`).join('')}</div><div id="adminBody"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   $$('.admin-tabs [data-tab]').forEach(b=>b.onclick=()=>{adminTab=b.dataset.tab;renderAdministration()});
+  adminPortalFaixa();
   const body=$('#adminBody');
   try{
     if(adminTab==='acessos'){
@@ -105,6 +106,20 @@ async function renderAdministration(){
       $('#bkNow').onclick=async()=>{try{const r=await adminApi('/backup',{completo:$('#bkFull').checked});toast('Backup criado: '+r.file);renderAdministration()}catch(e){toast(e.message,'bad')}};
     }
   }catch(e){body.innerHTML=`<div class="error-state"><h2>Não foi possível carregar</h2><p>${esc(e.message)}</p></div>`}
+}
+/* Faixa do Portal das Coordenações: suspenso por padrão; a Gerência pode reativar (ou suspender de novo) sem perder nada. */
+async function adminPortalFaixa(){
+  const head=$('#content .dashboard-head');if(!head)return;
+  let d;try{d=await api('/admin/portal')}catch{return}
+  const f=document.createElement('section');f.className='card portal-faixa';f.id='portalFaixa';
+  f.innerHTML=`<div class="card-title"><div><small>PORTAL DAS COORDENAÇÕES</small><h3>${d.ativo?'Ligado':'Suspenso temporariamente'}</h3></div><button type="button" class="${d.ativo?'softbtn':'btn'}" id="portalToggle">${d.ativo?'Suspender o Portal':'Reativar o Portal'}</button></div>
+   <p class="kpi-note">${d.ativo?'As Coordenações podem entrar e abrir pedidos.':'Ninguém de fora entra: páginas, login, pedidos e links de aprovação de demandas estão bloqueados. Pedidos de WhatsApp ou presenciais são cadastrados em Solicitações.'} Estão guardados ${d.codigos} código(s) de acesso e ${d.solicitacoesDoPortal} solicitação(ões) vindas do Portal; nada é apagado ao suspender ou reativar.</p>`;
+  head.insertAdjacentElement('afterend',f);
+  $('#portalToggle',f).onclick=async()=>{
+    const ligar=!d.ativo;
+    if(!confirm(ligar?'Reativar o Portal das Coordenações? Elas voltarão a entrar com os códigos de acesso guardados.':'Suspender o Portal? Quem estiver logado sai agora e os códigos ficam guardados.'))return;
+    try{await api('/admin/portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ativo:ligar,confirmar:ligar?'REATIVAR':undefined})});toast(ligar?'Portal reativado':'Portal suspenso');renderAdministration()}catch(e){toast(e.message,'warn')}
+  };
 }
 function openPortalNotices(){adminTab='avisos';go('administracao')}
 function openFinalDeliveryUpload(id){
