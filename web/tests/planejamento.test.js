@@ -77,7 +77,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  [s,r]=await call('POST','/solicitacoes/nova',{titulo:'Pedido avulso de teste'});const AV=r;
  [s,r]=await call('POST','/planejamento/vincular',{id:CAMP.id,tipo:'solicitacao',alvoId:AV.id});t('vincular solicitação existente',s===200&&r.solicitacoes.some(x=>x.id===AV.id));
  [s]=await call('POST','/planejamento/vincular',{id:EQP.id,tipo:'solicitacao',alvoId:AV.id});t('uma solicitação só pode estar em uma ação (409)',s===409);
- [s]=await call('POST','/planejamento/vincular',{id:CAMP.id,tipo:'solicitacao',alvoId:SOLS[0].id},M);t('quem não é dono do pedido não vincula (403)',s===403||s===409);
+ [s]=await call('POST','/planejamento/vincular',{id:CAMP.id,tipo:'solicitacao',alvoId:SOLS[1].id},M);t('quem não é dono do pedido não vincula (403)',s===403);
  [s,r]=await call('POST','/planejamento/vincular',{id:CAMP.id,tipo:'solicitacao',alvoId:AV.id,desvincular:true});t('desvincular (a solicitação continua existindo)',s===200&&!r.solicitacoes.some(x=>x.id===AV.id)&&(await call('GET','/data?module=solicitacoes&id='+AV.id))[0]===200);
 
  // ---- Conteúdos: a produção continua em Conteúdos ----
@@ -128,9 +128,9 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const entra=async(cod,w=1440,h=1000)=>{const pg=await (await b.newContext({viewport:{width:w,height:h}})).newPage();pg.on('pageerror',e=>errs.push(e.message));pg.on('dialog',d=>d.accept());await pg.goto(BASE+'/');await pg.fill('#internalCode',cod);await pg.fill('#internalPass',senha[cod]);await pg.click('#internalLoginBtn');await pg.waitForSelector('#nav .navitem');await pg.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:20000}).catch(()=>{});await pg.waitForTimeout(800);return pg};
  const pg=await entra('NAT-3301');
  // menu
- const itens=await pg.$$eval('#nav .navitem',e=>e.map(x=>x.innerText.trim()));
+ const itens=await pg.$$eval('#nav .navitem .navlabel',e=>e.map(x=>x.textContent.trim()));
  t('menu reorganizado (Gerência): 15 itens na ordem pedida',itens.join('|')==='Dashboard|Solicitações|Planejamento|Calendários|Conteúdos|Campanhas|Instagram|Tráfego Pago|Relatórios|Arquivos|Equipe|Configurações|Usuários e permissões|Integrações|Backup e segurança',itens.join('|'));
- t('menu agrupado: Visão geral, Organização, Marketing, Gestão e Administração',(await pg.$$eval('#nav .navgroup',e=>e.map(x=>x.innerText.trim()))).join('|')==='Visão geral|Organização|Marketing|Gestão|Administração');
+ t('menu agrupado: Visão geral, Organização, Marketing, Gestão e Administração',(await pg.$$eval('#nav .navgroup',e=>e.map(x=>x.textContent.trim()))).join('|')==='Visão geral|Organização|Marketing|Gestão|Administração');
  await pg.click('#nav [data-area="admin-integracoes"]');await pg.waitForSelector('.admin-tabs');t('os itens de Administração abrem a aba certa (Integrações)',/Integrações/.test(await pg.$eval('.admin-tabs .active',e=>e.textContent)));
  await pg.click('#nav [data-area="admin-backup"]');await pg.waitForTimeout(500);t('Backup e segurança abre Backups',/Backups/.test(await pg.$eval('.admin-tabs .active',e=>e.textContent)));
  await pg.click('#nav [data-area="admin-usuarios"]');await pg.waitForTimeout(500);t('Usuários e permissões abre Acessos',/Acessos/.test(await pg.$eval('.admin-tabs .active',e=>e.textContent)));
@@ -139,7 +139,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await pg.evaluate(()=>go('projetos'));await pg.waitForSelector('.cm-cabecalho');t('o link antigo de Projetos abre o Planejamento',/Planejamento/.test(await pg.$eval('#content h1',e=>e.textContent)));
  await pg.evaluate(()=>go('agenda'));await pg.waitForSelector('.cm-mes');t('o link antigo de Agenda abre o Calendário de Marketing',/Calendário de Marketing/.test(await pg.$eval('#content h1',e=>e.textContent)));
  // página de Planejamento
- await pg.evaluate(()=>go('planejamento'));await pg.waitForSelector('.pl-faixa');await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
+ await pg.evaluate(()=>go('planejamento'));await pg.waitForSelector('.pl-faixa',{timeout:15000}).catch(async()=>{console.log('DEBUG conteúdo:',(await pg.$eval('#content',e=>e.innerText)).slice(0,400),'| erros:',errs.join(' || '))});await pg.waitForSelector('.pl-faixa');await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
  t('visões Mês, Semana e Lista; botão "+ Nova ação"',(await pg.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Mês,Semana,Lista'&&/Nova ação/.test(await pg.$eval('#cmNovo',e=>e.textContent)));
  t('resumo: previstas, em execução, finalizadas, próximas do prazo e atrasadas (contagens reais)',(await pg.$$eval('.pl-faixa button',e=>e.length))===5);
  let lst=await pg.$eval('.cm-proximos',e=>e.innerText);t('a lista mostra as ações vivas e esconde as arquivadas',/Divulgação da Feira/.test(lst)&&/Homenagem aos professores/.test(lst)&&/Projeto antigo em risco/.test(lst)&&!/Projeto antigo arquivado/.test(lst),lst.slice(0,300));
@@ -190,7 +190,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await pg.click('[data-db-sol="PENDENTE"]');await pg.waitForSelector('.sl-board');t('clicar num indicador abre Solicitações já filtrada',(await pg.inputValue('#slEtapa'))==='PENDENTE');
  // equipe
  const pe=await entra('MON-3303');
- const ie=await pe.$$eval('#nav .navitem',e=>e.map(x=>x.innerText.trim()));
+ const ie=await pe.$$eval('#nav .navitem .navlabel',e=>e.map(x=>x.textContent.trim()));
  t('equipe vê o menu sem Administração e sem Configurações',!ie.includes('Configurações')&&!ie.includes('Integrações')&&!ie.includes('Usuários e permissões')&&ie.includes('Planejamento')&&ie.includes('Calendários')&&ie.includes('Solicitações'),ie.join('|'));
  await pe.evaluate(()=>go('planejamento'));await pe.waitForSelector('.pl-faixa');await pe.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
  await pe.click('.cm-item:has-text("Homenagem aos professores")');await pe.waitForSelector('#plForm');t('equipe consulta ação de outra pessoa em modo leitura (sem Salvar/Excluir)',await pe.$('#pSalvar')===null&&await pe.$('#plExc')===null&&await pe.$eval('#pTitulo',e=>e.disabled));
