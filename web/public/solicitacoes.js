@@ -238,7 +238,7 @@ async function slAbrir(id){
    await api('/solicitacoes/editar',slJson(campos));
    const novoResp=$('#dResp',o.el).value;
    if(slGerente()&&novoResp&&novoResp!==(r.responsavel||''))await api('/solicitacoes/distribuir',slJson({id,responsavel:novoResp}));
-   toast('Alterações salvas');await reabre();
+   toast('Alterações salvas');o.close();invalidate('solicitacoes');await slCarrega();slDesenha();
   }catch(e){err.textContent=e.message;btn.disabled=false}
  };
  $('#dComAdd',o.el).onclick=async()=>{const t=$('#dComNovo',o.el).value;if(!t.trim())return toast('Escreva o comentário','warn');try{await api('/comments',slJson({module:'solicitacoes',id,texto:t,interno:!($('#dComPub',o.el)?.checked)}));await reabre()}catch(e){toast(e.message,'warn')}};

@@ -48,7 +48,9 @@ const dia=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
  [s,r]=await call('POST','/solicitacoes/mover',{id:A1.id,etapa:'EM_ANDAMENTO',motivo:'Faltou o logo'},G);t('a Gerente reabre com motivo',s===200&&r.status==='EM EXECUÇÃO');
  // com aprovação
  [s,r]=await call('POST','/solicitacoes/mover',{id:A2.id,etapa:'CONCLUIDO'},G);t('pendente com responsável + exige aprovação: concluir direto é recusado',s===409&&/exige aprovação/.test(r.error),r);
- [s,r]=await call('POST','/solicitacoes/mover',{id:A2.id,etapa:'EM_APROVACAO',mensagem:'Pode conferir'},E);t('o responsável envia para aprovação direto de Pendente (passa por Em andamento)',s===200&&r.status==='AGUARDANDO APROVAÇÃO DO SOLICITANTE'&&r.aprovacaoSolicitante==='PENDENTE'&&r.retornoSolicitante==='Pode conferir',r);
+ [s]=await call('POST','/solicitacoes/mover',{id:A2.id,etapa:'EM_APROVACAO'},E);t('a equipe não pula etapa (Pendente → Em aprovação)',s===403);
+ await call('POST','/solicitacoes/mover',{id:A2.id,etapa:'EM_ANDAMENTO'},E);
+ [s,r]=await call('POST','/solicitacoes/mover',{id:A2.id,etapa:'EM_APROVACAO',mensagem:'Pode conferir'},E);t('o responsável envia para aprovação',s===200&&r.status==='AGUARDANDO APROVAÇÃO DO SOLICITANTE'&&r.aprovacaoSolicitante==='PENDENTE'&&r.retornoSolicitante==='Pode conferir',r);
  [s]=await call('POST','/solicitacoes/mover',{id:A2.id,etapa:'CONCLUIDO'},E);t('a equipe não aprova a própria entrega',s===403);
  [s,r]=await call('POST','/solicitacoes/mover',{id:A2.id,etapa:'CONCLUIDO'},G);t('a Gerente aprova e conclui',s===200&&r.status==='CONCLUÍDA'&&r.aprovacaoSolicitante==='APROVADO'&&r.aprovadoPor==='Natália Mello',r);
  // sem responsável
@@ -61,7 +63,7 @@ const dia=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
  [s]=await call('POST','/solicitacoes/mover',{id:A3.id,etapa:'CANCELADA',motivo:'quero cancelar'},E);t('a equipe não cancela',s===403);
  // histórico
  const tl=(await call('GET','/timeline?module=solicitacoes&id='+A2.id))[1].rows;
- t('o histórico registra cada passagem (inclui Em andamento no caminho)',tl.some(z=>/EM EXECUÇÃO/.test(z.texto))&&tl.some(z=>/AGUARDANDO APROVAÇÃO/.test(z.texto))&&tl.some(z=>/CONCLUÍDA/.test(z.texto)),tl.map(z=>z.texto));
+ t('o histórico registra cada passagem (início, aprovação e conclusão)',tl.some(z=>/EM EXECUÇÃO/.test(z.texto))&&tl.some(z=>/AGUARDANDO APROVAÇÃO/.test(z.texto))&&tl.some(z=>/CONCLUÍDA/.test(z.texto)),tl.map(z=>z.texto));
  // comentários
  [s]=await call('POST','/comments',{module:'solicitacoes',id:A1.id,texto:'Ajustei o logo.'},E);const cm=(await call('GET','/comments?module=solicitacoes&id='+A1.id))[1].rows;
  t('comentário interno fica na solicitação',s===200&&cm.some(z=>z.texto==='Ajustei o logo.'&&z.interno===1));

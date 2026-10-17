@@ -35,11 +35,11 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dResp');await G.selectOption('#dResp','Antônio Filho');await G.click('#dSalvar');await G.waitForTimeout(1200);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);
  t('Gerente distribui: DISTRIBUÍDA com responsável',sol.status==='DISTRIBUÍDA'&&sol.responsavel==='Antônio Filho'&&sol.triagemStatus==='DISTRIBUÍDA');
- await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`[data-sl-mover="${sol.id}"][data-para="EM_ANDAMENTO"]`);await G.click(`[data-sl-mover="${sol.id}"][data-para="EM_ANDAMENTO"]`);await G.waitForTimeout(900);
+ await G.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove());go('solicitacoes')});await G.waitForSelector(`[data-sl-mover="${sol.id}"][data-para="EM_ANDAMENTO"]`);await G.click(`[data-sl-mover="${sol.id}"][data-para="EM_ANDAMENTO"]`);await G.waitForTimeout(900);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Iniciar: EM EXECUÇÃO',sol.status==='EM EXECUÇÃO');
 
  // ========== 3) pede ajuste → solicitante responde ==========
- await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`[data-sl-abrir="${sol.id}"]`);await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dPedirInfo');
+ await G.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove());go('solicitacoes')});await G.waitForSelector(`[data-sl-abrir="${sol.id}"]`);await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dPedirInfo');
  G.removeAllListeners('dialog');G.once('dialog',d=>d.accept('Qual horário do evento?'));await G.click('#dPedirInfo');await G.waitForTimeout(900);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Gerente pede informação ao solicitante',sol.status==='AGUARDANDO SOLICITANTE'&&sol.triagemStatus==='DEVOLVIDA PARA AJUSTES');
  await P.click('[data-tab="list"]').catch(()=>{});await P.evaluate(()=>renderList());await P.waitForSelector('.send-reply',{timeout:5000});
@@ -48,7 +48,7 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  await A(G,'/data?module=solicitacoes&id='+sol.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'EM EXECUÇÃO',triagemStatus:'DISTRIBUÍDA'})});
 
  // ========== 4) entrega: arquivo final + envio para aprovação ==========
- await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`[data-sl-abrir="${sol.id}"]`);await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dEntrega');
+ await G.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove());go('solicitacoes')});await G.waitForSelector(`[data-sl-abrir="${sol.id}"]`);await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dEntrega');
  await G.click('#dEntrega');await G.waitForSelector('#delFiles');await G.setInputFiles('#delFiles','/tmp/evo-final.png');await G.click('#delSend');await G.waitForTimeout(1200);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Entrega: arquivo final salvo em /ENTREGA/',/\/ENTREGA\/.+final/.test(sol.arquivosEntrega||''));
  await G.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove());go('solicitacoes')});await G.waitForSelector(`[data-sl-mover="${sol.id}"][data-para="EM_APROVACAO"]`);
