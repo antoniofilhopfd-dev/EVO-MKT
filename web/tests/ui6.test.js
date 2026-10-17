@@ -28,7 +28,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  const own=await p.evaluate(async()=>fetch('/api/admin/users/delete',{method:'POST',headers:{'Content-Type':'application/json','X-EVO':'1'},body:JSON.stringify({tipo:'interno',codigo:'NAT-3301'})}).then(async x=>[x.status,(await x.json()).error]));
  t('não permite excluir a própria ficha',own[0]===400,own);
  // dois gerentes: Antônio Filho vira Gerente
- await p.click('[data-role="ANT-3302|manager"]');await p.waitForTimeout(900);
+ await p.selectOption('[data-nivel="ANT-3302"]','manager');await p.waitForTimeout(900);
  const A=await (await b.newContext()).newPage();A.on('dialog',d=>d.accept('Ant26x'));await A.goto(BASE+'/');await A.fill('#internalCode','ANT-3302');await A.fill('#internalPass',pw('ANT-3302'));await A.click('#internalLoginBtn');await A.waitForSelector('#nav .navitem');
  t('Antônio Filho agora é Gerente e vê a Administração',(await A.$$eval('#nav .navitem',e=>e.map(x=>x.dataset.page))).includes('administracao'));
  t('a tabela mostra os dois gerentes',((await p.$eval('#adminBody',e=>e.innerText)).match(/Gerente de Marketing/g)||[]).length>=2);

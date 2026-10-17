@@ -8,11 +8,11 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.goto(BASE+'/');await p.fill('#internalCode','NAT-3301');await p.fill('#internalPass',pw('NAT-3301'));await p.click('#internalLoginBtn');await p.waitForSelector('.db-topo');ans='Subtarefa criada pela tela';
  const api=(m,u,body)=>p.evaluate(async([m,u,body])=>api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}),[m,u,body]);
  const nav=await p.$$eval('#nav .navitem .navlabel',e=>e.map(x=>x.innerText.trim()));
- t('menu lateral: 15 itens em 5 grupos, sem itens decorativos',nav.length===15&&nav[0]==='Dashboard'&&nav[6]==='Instagram'&&nav[14]==='Backup e segurança',nav.join('|'));
- const areas={calendarios:['Marketing','Escolar','Datas Comemorativas'],planejamento:['Planejamento','Tarefas internas','Eventos'],conteudo:['Conteúdos','Ideias','Planejamento Editorial','Aprovações','Templates'],instagramarea:['Estúdio','Métricas','Desempenho'],trafego:['Tráfego','Gerenciador'],relatorios:['Relatórios','Fechamento Mensal']};
- const pag={calendarios:'calendario',planejamento:'planejamento',instagramarea:'studio',conteudo:'conteudos',trafego:'trafego',relatorios:'relatorios'};
+ t('menu lateral: 9 módulos, sem itens decorativos',nav.length===9&&nav[0]==='Dashboard'&&nav[3]==='Instagram'&&nav[8]==='Configurações',nav.join('|'));
+ const areas={planejamento:['Ações','Solicitações'],instagramarea:['Estúdio','Conteúdos','Aprovações','Métricas'],trafego:['Tráfego','Gerenciador'],relatorios:['Relatórios','Fechamento mensal']};
+ const pag={planejamento:'planejamento',instagramarea:'studio',trafego:'trafego',relatorios:'relatorios'};
  for(const [k,esperado] of Object.entries(areas)){await p.evaluate(x=>go(x),pag[k]);await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText.trim()));t(`seções de ${k}: ${esperado.join(', ')}`,esperado.every(x=>sub.includes(x)),sub.join('|'))}
- await p.click('#subtabs .subtab:nth-child(2)');await p.waitForTimeout(600);t('clicar numa seção troca de tela e marca a seção ativa',await p.$eval('#subtabs .subtab.active',e=>e.innerText)==='Fechamento Mensal');
+ await p.click('#subtabs .subtab:nth-child(2)');await p.waitForTimeout(600);t('clicar numa seção troca de tela e marca a seção ativa',await p.$eval('#subtabs .subtab.active',e=>e.innerText)==='Fechamento mensal');
  // ficha da tarefa
  const tid=(await api('POST','/data?module=tarefas',{titulo:'Tarefa para a ficha',status:'NOVO',responsavel:'Natália Mello'})).id;
  await p.evaluate(x=>go('tarefas'),0);await p.waitForTimeout(800);

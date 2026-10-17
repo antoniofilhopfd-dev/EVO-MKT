@@ -14,9 +14,9 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await post('conteudos',{titulo:'Post da feira',publicacaoEm:ds+'T10:00',status:'PROGRAMADO'});
  await post('campanhas',{titulo:'Matrículas 2027',dataInicio:ds,status:'PLANEJAMENTO'});
  const nav=await p.$$eval('#nav .navitem',e=>e.map(x=>x.innerText.replace(/\s+/g,' ').trim()));
- t('menu lateral reorganizado (Organização, Marketing, Gestão, Administração)',nav.length===15&&['Dashboard','Solicitações','Planejamento','Calendários','Conteúdos','Campanhas','Instagram','Tráfego Pago','Relatórios','Arquivos','Equipe','Configurações','Usuários e permissões','Integrações','Backup e segurança'].every((x,i)=>nav[i].includes(x)),nav.join('|'));
- await p.evaluate(()=>go('calendario'));await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText));
- t('Calendários: Marketing, Escolar e Datas Comemorativas (sem "Calendário de Eventos")',sub.length===3&&sub.some(x=>/Marketing/.test(x))&&sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Datas/.test(x))&&!sub.some(x=>/Eventos/.test(x)),sub.join('|'));
+ t('menu lateral enxuto: os 9 módulos aprovados',nav.length===9&&['Dashboard','Planejamento','Calendário','Instagram','Tráfego Pago','Arquivos','Relatórios','Equipe','Configurações'].every((x,i)=>nav[i].includes(x)),nav.join('|'));
+ await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-tipo');const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText));
+ t('Calendário único: categorias Escolar, Datas e Compromissos, sem "Calendário de Eventos" nem subabas',sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Datas/.test(x))&&sub.some(x=>/Compromissos/.test(x))&&!sub.some(x=>/Eventos/.test(x))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
  // Calendário de Marketing (geral): compromissos, reuniões, publicações e prazos de solicitações; sem tarefas/campanhas/eventos
  await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-mes');
  let up=await p.$eval('#cmRaiz',e=>e.innerText);

@@ -160,3 +160,4 @@ header{height:var(--topo)!important;padding:0 24px!important;border-bottom:1px s
  .cm-busca{max-width:none;flex:1 1 100%;margin-left:0}
  .cm-barra{gap:6px}
 }
+@media(max-width:760px){.settings-grid{grid-template-columns:minmax(0,1fr)!important}.setting-row{flex-wrap:wrap;gap:8px}}

@@ -88,12 +88,15 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const errs=[];
  const entra=async(cod,w=1440,h=1000)=>{const p=await (await b.newContext({viewport:{width:w,height:h}})).newPage();p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());await p.goto(BASE+'/');await p.fill('#internalCode',cod);await p.fill('#internalPass',senha[cod]);await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');await p.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:20000}).catch(()=>{});await p.waitForTimeout(800);return p};
  const p=await entra('NAT-3301');
- await p.evaluate(()=>go('agenda'));await p.waitForSelector('#subtabs .subtab');
- const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText.trim()));
- t('Calendários: Escolar ao lado do de Marketing e das Datas Comemorativas',sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Marketing/.test(x))&&sub.some(x=>/Datas/.test(x)),sub.join('|'));
- await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
- t('título "Calendário Escolar" e botão "+ Novo evento"',/Calendário Escolar/.test(await p.$eval('#content h1',e=>e.textContent))&&/Novo evento/.test(await p.$eval('#cmNovo',e=>e.textContent)));
- t('visões Mês, Semana e Próximos (sem Dia)',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Mês,Semana,Próximos');
+ const mesVista=async(pg=p)=>{await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pg.$('.cm-mes'))){await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes')}};
+ const abre=async(pg=p)=>pg.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));
+ const novoEsc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="esc"]');await pg.waitForSelector('#escForm')};
+ await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-tipo');
+ const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText.trim()));
+ t('Calendário único: Escolar ao lado de Compromissos e Datas (sem subabas)',sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Compromissos/.test(x))&&sub.some(x=>/Datas/.test(x))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
+ await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-semana, .cm-mes');await mesVista();
+ t('Calendário único aberto já filtrado em Escolar (um botão "+ Novo")',(await p.$$eval('.cm-tipo.off',e=>e.length))===7&&/Novo/.test(await p.$eval('#cmNovo',e=>e.textContent)));
+ t('visões Semana, Mês, Dia, Lista e Ano',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
  // eventos de arrastar sintéticos: exercitam os mesmos tratadores (dragstart/dragover/drop) sem depender do gesto do mouse
  const soltar=(txt,data)=>p.evaluate(([txt,data])=>{const s=[...document.querySelectorAll('.cm-item')].find(x=>x.textContent.includes(txt)),d=document.querySelector(`.cm-dia[data-date="${data}"]`),dt=new DataTransfer();s.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));s.dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}))},[txt,data]);
  const irA=async()=>{await p.fill('#cmIr',dia(10));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(250)};
@@ -105,13 +108,13 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  t('evento de vários dias aparece em cada dia do período (3 células)',(await p.$$eval('.cm-item:has-text("Excursão ao museu")',e=>e.length))>=3);
  await irA();
  // filtros
- await p.selectOption('#cmExtra','MEDIO');await p.waitForTimeout(200);txt=await p.$eval('#cmRaiz',e=>e.innerText);
+ await abre();await p.selectOption('#cmExtra3','MEDIO');await p.waitForTimeout(200);txt=await p.$eval('#cmRaiz',e=>e.innerText);
  t('filtro por segmento (Ensino Médio): tira o do Fundamental, mantém "Toda a escola"',!/Feira de Ciências/.test(txt)&&/Prova bimestral/.test(txt));
- await p.selectOption('#cmExtra','');await p.waitForTimeout(150);
- await p.click('[data-tipo="PROVA"]');await p.waitForTimeout(150);t('filtro por tipo esconde as provas',!/Prova bimestral/.test(await p.$eval('#cmRaiz',e=>e.innerText)));await p.click('[data-tipo="PROVA"]');await p.waitForTimeout(150);
+ await abre();await p.selectOption('#cmExtra3','');await p.waitForTimeout(150);
+ await p.click('[data-tipo="ESCOLAR"]');await p.waitForTimeout(150);t('a categoria Escolar esconde os eventos escolares',!/Prova bimestral/.test(await p.$eval('#cmRaiz',e=>e.innerText)));await p.click('[data-tipo="ESCOLAR"]');await p.waitForTimeout(150);
  await p.fill('#cmBusca','feira');await p.waitForTimeout(250);txt=await p.$eval('#cmRaiz',e=>e.innerText);t('pesquisa pelo título',/Feira de Ciências/.test(txt)&&!/Prova bimestral/.test(txt));await p.fill('#cmBusca','');await p.waitForTimeout(250);
  // criar pelo botão e pelo dia
- await p.click('#cmNovo');await p.waitForSelector('#escForm');
+ await novoEsc();
  const campos=await p.$eval('#escForm',e=>e.innerText);t('formulário: Título, Data, Horários, Tipo, Segmentos, Local e Descrição',['Título','Data','Horário inicial','Horário final','Tipo de evento','Local','Segmentos','Descrição'].every(x=>campos.includes(x)),campos);
  t('"Toda a escola" já vem marcado',await p.isChecked('[data-seg="TODOS"]'));
  await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.fill('#eFim',dia(13));await p.selectOption('#eTipo','ESPORTIVA');await p.check('[data-seg="FUND2"]');
@@ -119,10 +122,10 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.check('[data-seg="MEDIO"]');await p.fill('#eLocal','Ginásio');await p.click('#eSalvar');await p.waitForSelector('#escForm',{state:'detached'});
  const tor=(await lista()).find(x=>x.titulo==='Torneio de vôlei');
  t('criado pela tela, em dois dias e dois segmentos',tor&&tor.dataFim===dia(13)&&tor.segmentos==='FUND2|MEDIO'&&tor.local==='Ginásio',tor);
- await p.click(`.cm-num[data-novo="${dia(11)}"]`);await p.waitForSelector('#escForm');t('clicar no dia preenche a data',(await p.inputValue('#eData'))===dia(11));
+ await p.click(`.cm-num[data-novo="${dia(11)}"]`);await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="esc"]');await p.waitForSelector('#escForm');t('clicar no dia preenche a data',(await p.inputValue('#eData'))===dia(11));
  await p.fill('#eTitulo','ab');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});t('erros do servidor aparecem no formulário',/título/i.test(await p.textContent('#eErro')));await p.click('#escForm [data-close]');
  // duplicado na tela
- await p.click('#cmNovo');await p.waitForSelector('#escForm');await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});
+ await novoEsc();await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});
  t('evento repetido é barrado na tela',/já está cadastrado/.test(await p.textContent('#eErro')),await p.textContent('#eErro'));await p.click('#escForm [data-close]');
  // editar, reagendar por arrastar, excluir
  await p.click('.cm-item:has-text("Torneio de vôlei")');await p.waitForSelector('#escForm');t('abrir o evento mostra os dados',(await p.inputValue('#eTitulo'))==='Torneio de vôlei'&&(await p.inputValue('#eLocal'))==='Ginásio');
@@ -147,19 +150,19 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.click('[data-modo="month"]');await p.waitForSelector('.cm-mes');
 
  // ---- equipe: só consulta e pede apoio ----
- const pe=await entra('MON-3303');await pe.evaluate(()=>go('calescolar'));await pe.waitForSelector('.cm-mes');await pe.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
- t('equipe vê o calendário, sem "+ Novo evento"',await pe.$('#cmNovo')===null&&/Feira de Ciências/.test(await pe.$eval('#cmRaiz',e=>e.innerText)));
+ const pe=await entra('MON-3303');await pe.evaluate(()=>go('calescolar'));await pe.waitForSelector('.cm-semana, .cm-mes');await mesVista(pe);
+ await pe.click('#cmNovo');await pe.waitForSelector('.cal-escolha');t('equipe vê o calendário e não pode criar evento escolar',!(await pe.$('.cal-escolha [data-n="esc"]'))&&/Feira de Ciências/.test(await pe.$eval('#cmRaiz',e=>e.innerText)));await pe.click('.admin-box [data-close]');
  t('equipe não arrasta eventos',await pe.$eval('.cm-item',e=>!e.hasAttribute('draggable')));
  await pe.click('.cm-item:has-text("Feira de Ciências")');await pe.waitForSelector('#escForm');
  t('equipe vê os detalhes em modo leitura (sem Salvar/Excluir) e pode pedir apoio',await pe.$('#eSalvar')===null&&await pe.$('#eExcluir')===null&&await pe.$('[data-pedir="arte"]')!==null&&await pe.$eval('#eTitulo',e=>e.disabled));
  await pe.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
 
  // ---- celular ----
- const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('calescolar'));await pc.waitForSelector('.cm-mes');await pc.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
+ const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('calescolar'));await pc.waitForSelector('.cm-semana, .cm-mes');await mesVista(pc);
  t('celular: sem rolagem horizontal (mês)',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await pc.click('[data-modo="list"]');await pc.waitForSelector('.cm-proximos');t('celular: lista de próximos eventos sem estourar a tela',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await pc.click('[data-modo="week"]');await pc.waitForSelector('.cm-semana');t('celular: semana sem estourar a tela',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
- await pc.click('#cmNovo');await pc.waitForSelector('#escForm');t('celular: o formulário cabe na tela',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+ await novoEsc(pc);t('celular: o formulário cabe na tela',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  t('sem erros de JavaScript',errs.length===0,errs.join(' | '));
  console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -15,7 +15,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const p=await entra('NAT-3301');
  const api=(m,u,body)=>p.evaluate(async([m,u,body])=>{try{return await api(u,{method:m,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})}catch(e){return {erro:e.message}}},[m,u,body]);
  const lista=async m=>(await api('GET','/data?module='+m)).rows;
- const vai=async()=>{await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-mes, .cm-semana, .cm-diaVista');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));};
+ const vai=async()=>{await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-mes, .cm-semana, .cm-diaVista');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await p.$('.cm-mes'))){await p.click('[data-modo="month"]');await p.waitForSelector('.cm-mes')}};
 
  // ---- dados de teste (existentes e novos) ----
  const D0=dia(0),D1=dia(1),D2=dia(2),D3=dia(3);
@@ -35,9 +35,9 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  let txt=await p.$eval('#cmRaiz',e=>e.innerText);
  t('mostra reunião, compromisso antigo, gravação (agenda), publicação e prazo de solicitação',['Reunião de pais','Lembrete antigo','Gravação do vídeo','Post da feira','Cartaz da feira'].every(x=>txt.includes(x)),txt);
  t('não mostra tarefas, campanhas nem solicitações já concluídas',!/Tarefa que não aparece|Campanha que não aparece|Pedido já entregue/.test(txt));
- t('o título é "Calendário de Marketing"',/Calendário de Marketing/.test(await p.$eval('#content h1',e=>e.textContent)));
+ t('o título é "Calendário" (único, sem subabas)',/^Calendário$/.test((await p.$eval('#content h1',e=>e.textContent)).trim())&&(await p.$$('#subtabs .subtab')).length===0);
  t('o prazo da solicitação usa o registro original (um só cadastro)',(await lista('solicitacoes')).length===antes.sol&&(await p.$$eval('.cm-item.t-PRAZO',e=>e.length))===1);
- t('tipos têm classe/cor própria e o filtro mostra os 7 tipos',(await p.$$eval('.cm-tipo',e=>e.length))===7&&await p.$('.cm-item.t-REUNIAO')!==null&&await p.$('.cm-item.t-COBERTURA')!==null&&await p.$('.cm-item.t-PUBLICACAO')!==null);
+ t('tipos têm classe/cor própria e o filtro mostra os 8 tipos',(await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.length))===8&&await p.$('.cm-item.t-COMPROMISSO')!==null&&await p.$('.cm-item.t-COBERTURA')!==null&&await p.$('.cm-item.t-PUBLICACAO')!==null);
  t('o compromisso antigo (Lembrete) continua visível como Compromisso',await p.$('.cm-item.t-COMPROMISSO')!==null);
 
  // ---- visualizações e navegação ----
@@ -55,10 +55,10 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.click('#cmHoje');await p.click('[data-modo="month"]');await p.waitForSelector('.cm-mes');
 
  // ---- filtros ----
- await p.click('[data-tipo="REUNIAO"]');await p.waitForTimeout(150);t('filtro por tipo esconde Reunião',!/Reunião de pais/.test(await p.$eval('#cmRaiz',e=>e.innerText))&&/Post da feira/.test(await p.$eval('#cmRaiz',e=>e.innerText)));
- await p.click('[data-tipo="REUNIAO"]');await p.waitForTimeout(150);
- await p.selectOption('#cmResp','Antônio Filho');await p.waitForTimeout(150);txt=await p.$eval('#cmRaiz',e=>e.innerText);t('filtro por responsável mostra só os dele',/Cartaz da feira/.test(txt)&&!/Reunião de pais/.test(txt));
- await p.selectOption('#cmResp','');await p.waitForTimeout(150);
+ await p.click('[data-tipo="COMPROMISSO"]');await p.waitForTimeout(150);t('filtro por tipo esconde Compromissos (inclui Reunião)',!/Reunião de pais/.test(await p.$eval('#cmRaiz',e=>e.innerText))&&/Post da feira/.test(await p.$eval('#cmRaiz',e=>e.innerText)));
+ await p.click('[data-tipo="COMPROMISSO"]');await p.waitForTimeout(150);
+ await p.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));await p.selectOption('#cmResp','Antônio Filho');await p.waitForTimeout(150);txt=await p.$eval('#cmRaiz',e=>e.innerText);t('filtro por responsável mostra só os dele',/Cartaz da feira/.test(txt)&&!/Reunião de pais/.test(txt));
+ await p.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));await p.selectOption('#cmResp','');await p.waitForTimeout(150);
 
  // ---- criar: botão, número do dia, espaço livre ----
  await p.click('#cmNovo');await p.waitForSelector('#cmForm');

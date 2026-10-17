@@ -24,10 +24,9 @@ async function calCarregar(ano){
  }
  if(esc_.status==='fulfilled')esc_.value.itens.forEach(i=>itens.push({...i,origem:'esc',tipoOrigem:i.tipo,tipo:'ESCOLAR'}));
  if(dc.status==='fulfilled')dc.value.itens.forEach(i=>{
-  const r=i.raw;if(r.status!=='confirmada')return; // pendentes de validação ficam só no cadastro de datas
-  const feriado=DC.grupoFeriados.includes(r.categoria);
-  if(!feriado&&r.relevante!=='SIM')return; // o calendário mostra o que a equipe marcou como relevante
-  itens.push({...i,origem:'dc',tipoOrigem:i.tipo,tipo:feriado?'FERIADO':'DATA',editavel:false});
+  const r=i.raw,feriado=DC.grupoFeriados.includes(r.categoria);
+  // todas as datas do ano entram; o filtro "Datas comemorativas" decide o que aparece (padrão: confirmadas que são feriado ou foram marcadas como relevantes)
+  itens.push({...i,titulo:r.status==='pendente'?`${i.titulo} (pendente)`:i.titulo,origem:'dc',tipoOrigem:i.tipo,tipo:feriado?'FERIADO':'DATA',editavel:false});
  });
  CAL_EU=eu;
  return {itens:itens.map(calEncurta),opcoes,eu,podeEditar:true,falhas:[mkt,esc_,dc].filter(x=>x.status==='rejected').length};
@@ -68,7 +67,14 @@ const CAL_UNICO=CalMotor.criar({
  chave:'calendario',tituloPagina:'Calendário',eyebrow:'CALENDÁRIO',rotuloNovo:'+ Novo',
  descricao:'Tudo o que tem data no marketing e no colégio, em um só lugar. Clique em um dia para criar; arraste para reagendar.',
  tipos:CAL_TIPOS,carregar:calCarregar,novo:calNovo,abrir:calAbrir,mover:calMover,porAno:true,
- modos:[['week','Semana'],['month','Mês'],['day','Dia'],['list','Lista']],modoPadrao:'week',busca:true,filtrosCompactos:true,
+ modos:[['week','Semana'],['month','Mês'],['day','Dia'],['list','Lista'],['year','Ano']],modoPadrao:'week',listaEscopo:'ano',busca:true,filtrosCompactos:true,
+ filtrosExtras:[
+  {chave:'grupo',vazio:'Todas as datas comemorativas',opcoes:()=>[['feriados','Só feriados'],['educacionais','Só datas educacionais']],testa:(i,v)=>!v||i.origem!=='dc'||(v==='feriados'?DC.grupoFeriados.includes(i.raw.categoria):i.raw.categoria==='EDUCACIONAL')},
+  {chave:'validacao',vazio:'Datas confirmadas',opcoes:()=>[['pendentes','Pendentes de validação'],['todas','Todas (inclui pendentes e não relevantes)']],
+   testa:(i,v)=>i.origem!=='dc'||(v==='todas'?true:v==='pendentes'?i.raw.status==='pendente':i.raw.status==='confirmada'&&(DC.grupoFeriados.includes(i.raw.categoria)||i.raw.relevante==='SIM'))},
+  {chave:'segmento',vazio:'Todos os segmentos (escolar)',opcoes:()=>(ESC_OPC.segmentos||[]).map(([k,l])=>[k,l]),testa:(i,v)=>!v||i.origem!=='esc'||i.segmentos.includes(v)||i.segmentos.includes('TODOS')},
+ ],
+ alternancias:[{chave:'relevantes',rotulo:'Só datas relevantes',testa:i=>i.origem!=='dc'||i.raw.relevante==='SIM'}],
  detalhe:i=>i.origem==='esc'?escSegTxt(i.raw):i.origem==='dc'?i.raw.regra:CAL_ROTULO_ORIGEM[i.origem]||'',
  classeDia:lista=>lista.some(i=>i.tipo==='FERIADO')?'feriado':'',
 });

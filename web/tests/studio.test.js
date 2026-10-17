@@ -75,8 +75,8 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('"Salvar sem mudar a etapa" preserva o status',novo.status==='PROGRAMADO'&&novo.cta==='Novo CTA',novo);
  // ---- área Instagram no menu + desempenho por publicação
  await p.evaluate(()=>go('studio'));await p.waitForSelector('.st-week');
- t('menu tem a área Instagram com Estúdio, Métricas, Desempenho e Ranking',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&subs.join()==='Estúdio,Métricas,Desempenho,Ranking'}));
- t('a área Conteúdo não tem mais Instagram nem Estúdio',await p.evaluate(()=>{const a=AREAS.find(x=>x.k==='conteudo');return !a.pages.includes('instagram')&&!a.pages.includes('studio')}));
+ t('menu tem a área Instagram com Estúdio, Conteúdos, Aprovações, Métricas e Mais (Desempenho, Ranking)',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&['Estúdio','Conteúdos','Aprovações','Métricas'].every((x,i)=>subs[i]===x)&&/Mais/.test(subs[4]||'')}));
+ t('a área Instagram reúne Estúdio, Conteúdos, Métricas, Desempenho e Ranking (não existe mais a área Conteúdo)',await p.evaluate(()=>{const a=AREAS.find(x=>x.k==='instagramarea');return !AREAS.some(x=>x.k==='conteudo')&&['studio','conteudos','instagram','igposts','igranking'].every(k=>a.pages.includes(k))}));
  await p.evaluate(()=>go('igposts'));await p.waitForFunction(()=>/DESEMPENHO/.test(document.querySelector('.dashboard-head')?.innerText||''));
  t('sem Instagram sincronizado mostra aviso claro',/Nenhuma publicação lida ainda/.test(await p.$eval('#content',e=>e.innerText)));
  await api('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});let sy=await api('POST','/integrations/instagram/sync',{});
