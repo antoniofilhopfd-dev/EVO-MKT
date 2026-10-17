@@ -16,7 +16,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  const nav=await p.$$eval('#nav .navitem',e=>e.map(x=>x.innerText.replace(/\s+/g,' ').trim()));
  t('menu lateral tem as 9 áreas (com Instagram)',nav.length===9&&['Visão geral','Solicitações','Planejamento','Conteúdo','Instagram','Tráfego','Relatórios','Arquivos e equipe','Administração'].every((x,i)=>nav[i].includes(x)),nav.join('|'));
  await p.evaluate(()=>go('agenda'));await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText));
- t('Planejamento tem um só "Calendário" nas seções (sem "Calendário de Eventos")',sub.filter(x=>/Calendário/.test(x)).length===1&&!sub.some(x=>/Calendário de Eventos/.test(x))&&sub.includes('Tarefas')&&sub.includes('Projetos'),sub.join('|'));
+ t('Planejamento tem o Calendário de Marketing e o Calendário Escolar (sem "Calendário de Eventos")',sub.filter(x=>/Calendário/.test(x)).length===2&&sub.some(x=>/Calendário de Marketing/.test(x))&&sub.some(x=>/Calendário Escolar/.test(x))&&!sub.some(x=>/Calendário de Eventos/.test(x))&&sub.includes('Tarefas')&&sub.includes('Projetos'),sub.join('|'));
  // Calendário de Marketing (geral): compromissos, reuniões, publicações e prazos de solicitações; sem tarefas/campanhas/eventos
  await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-mes');
  let up=await p.$eval('#cmRaiz',e=>e.innerText);

@@ -94,12 +94,14 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
  t('título "Calendário Escolar" e botão "+ Novo evento"',/Calendário Escolar/.test(await p.$eval('#content h1',e=>e.textContent))&&/Novo evento/.test(await p.$eval('#cmNovo',e=>e.textContent)));
  t('visões Mês, Semana e Próximos (sem Dia)',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Mês,Semana,Próximos');
+ const irA=async()=>{await p.fill('#cmIr',dia(10));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(250)};
+ await irA();
  let txt=await p.$eval('#cmRaiz',e=>e.innerText);
  t('mostra os eventos cadastrados (e não os do Marketing)',/Feira de Ciências 2026/.test(txt)&&!/Reunião geral/.test(txt));
  // vários dias aparecem em cada dia do período
- await p.click('#cmIr').catch(()=>{});await p.fill('#cmIr',dia(30));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(250);
+ await p.fill('#cmIr',dia(30));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(250);
  t('evento de vários dias aparece em cada dia do período (3 células)',(await p.$$eval('.cm-item:has-text("Excursão ao museu")',e=>e.length))>=3);
- await p.click('#cmHoje');await p.waitForTimeout(200);
+ await irA();
  // filtros
  await p.selectOption('#cmExtra','MEDIO');await p.waitForTimeout(200);txt=await p.$eval('#cmRaiz',e=>e.innerText);
  t('filtro por segmento (Ensino Médio): tira o do Fundamental, mantém "Toda a escola"',!/Feira de Ciências/.test(txt)&&/Prova bimestral/.test(txt));
@@ -115,7 +117,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.check('[data-seg="MEDIO"]');await p.fill('#eLocal','Ginásio');await p.click('#eSalvar');await p.waitForSelector('#escForm',{state:'detached'});
  const tor=(await lista()).find(x=>x.titulo==='Torneio de vôlei');
  t('criado pela tela, em dois dias e dois segmentos',tor&&tor.dataFim===dia(13)&&tor.segmentos==='FUND2|MEDIO'&&tor.local==='Ginásio',tor);
- await p.click(`.cm-num[data-novo="${dia(2)}"]`);await p.waitForSelector('#escForm');t('clicar no dia preenche a data',(await p.inputValue('#eData'))===dia(2));
+ await p.click(`.cm-num[data-novo="${dia(11)}"]`);await p.waitForSelector('#escForm');t('clicar no dia preenche a data',(await p.inputValue('#eData'))===dia(11));
  await p.fill('#eTitulo','ab');await p.click('#eSalvar');t('erros do servidor aparecem no formulário',/título/i.test(await p.textContent('#eErro')));await p.click('#escForm [data-close]');
  // duplicado na tela
  await p.click('#cmNovo');await p.waitForSelector('#escForm');await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');
