@@ -30,7 +30,7 @@ async function calCarregar(ano){
   itens.push({...i,origem:'dc',tipoOrigem:i.tipo,tipo:feriado?'FERIADO':'DATA',editavel:false});
  });
  CAL_EU=eu;
- return {itens,opcoes,eu,podeEditar:true,falhas:[mkt,esc_,dc].filter(x=>x.status==='rejected').length};
+ return {itens:itens.map(calEncurta),opcoes,eu,podeEditar:true,falhas:[mkt,esc_,dc].filter(x=>x.status==='rejected').length};
 }
 function calAbrir(it){
  if(it.origem==='esc')return escAbrir(it);
@@ -62,6 +62,8 @@ function calNovo(data){
   }catch(e){toast(e.message,'warn')}
  });
 }
+/** Ação ou evento muito longo aparece só no primeiro dia (e na lista); repetir em todos os dias poluiria o calendário. */
+const calEncurta=i=>{if(i.fim&&(CalMotor.dataDe(i.fim)-CalMotor.dataDe(i.data))/86400000>6)return {...i,fim:'',periodo:i.data+'→'+i.fim};return i};
 const CAL_UNICO=CalMotor.criar({
  chave:'calendario',tituloPagina:'Calendário',eyebrow:'CALENDÁRIO',rotuloNovo:'+ Novo',
  descricao:'Tudo o que tem data no marketing e no colégio, em um só lugar. Clique em um dia para criar; arraste para reagendar.',

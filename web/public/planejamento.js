@@ -142,7 +142,7 @@ const PL_CAL=CalMotor.criar({
  chave:'planejamento',tituloPagina:'Planejamento',eyebrow:'ORGANIZAÇÃO',rotuloNovo:'+ Nova ação',
  descricao:'O que o marketing pretende realizar. Os pedidos a executar ficam em Solicitações; aqui você vê o andamento deles por ação.',
  tipos:PL_CATS,carregar:plCarregar,novo:d=>plModal(null,d),abrir:it=>plModal(it.raw),mover:(it,d)=>plPost('/planejamento/mover',{id:it.id,data:d}),
- modos:[['month','Mês'],['week','Semana'],['list','Lista']],modoPadrao:'list',listaEscopo:'tudo',busca:true,
+ modos:[['month','Mês'],['week','Semana'],['list','Lista']],modoPadrao:'list',listaEscopo:'tudo',busca:true,filtrosCompactos:true,
  filtrosExtras:[
   {chave:'situacao',vazio:'Todas as situações',opcoes:()=>PL_SIT,testa:(i,v)=>!v||i.raw.situacao===v},
   {chave:'segmento',vazio:'Todos os segmentos',opcoes:()=>PL.opc.segmentos.map(s=>[s,s==='Geral'?'Toda a escola':s]),testa:(i,v)=>!v||i.raw.segmento===v||i.raw.segmento==='Geral'},

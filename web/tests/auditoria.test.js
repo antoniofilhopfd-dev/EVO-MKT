@@ -10,8 +10,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  for(const c of Object.keys(senha)){let r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:c,senha:pw(c)})});const ck=cookie(r);await fetch(B+'/auth/password',{method:'POST',headers:{...J,Cookie:ck},body:JSON.stringify({atual:pw(c),nova:senha[c]})});r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:c,senha:senha[c]})});H[c]={...J,Cookie:cookie(r)}}
  const G=H['NAT-3301'],E=H['ANT-3302'],M=H['MON-3303'];
  const req=async(m,u,b,h=G,raw)=>{const x=await fetch(B+u,{method:m,headers:h,body:raw!==undefined?raw:b?JSON.stringify(b):undefined});let j=null;const tx=await x.text();try{j=JSON.parse(tx)}catch{}return [x.status,j,tx]};
- const ROTAS_GET=['/planejamento/painel','/escolar/painel','/datacom/painel','/solicitacoes/painel','/dashboard/resumo'];
- const ROTAS_POST=['/planejamento/salvar','/planejamento/situacao','/planejamento/mover','/planejamento/duplicar','/planejamento/arquivar','/planejamento/excluir','/planejamento/solicitar','/planejamento/vincular','/planejamento/conteudo','/escolar/salvar','/escolar/mover','/escolar/excluir','/escolar/solicitar','/datacom/salvar','/datacom/excluir','/datacom/relevancia','/datacom/categoria','/datacom/solicitar','/datacom/planejar','/solicitacoes/nova','/solicitacoes/editar','/solicitacoes/distribuir','/solicitacoes/mover','/solicitacoes/pedir-info','/admin/portal'];
+ const ROTAS_GET=['/admin/lgpd/exportar','/planejamento/painel','/escolar/painel','/datacom/painel','/solicitacoes/painel','/dashboard/resumo'];
+ const ROTAS_POST=['/planejamento/salvar','/planejamento/situacao','/planejamento/mover','/planejamento/duplicar','/planejamento/arquivar','/planejamento/excluir','/planejamento/solicitar','/planejamento/vincular','/planejamento/conteudo','/escolar/salvar','/escolar/mover','/escolar/excluir','/escolar/solicitar','/datacom/salvar','/datacom/excluir','/datacom/relevancia','/datacom/categoria','/datacom/solicitar','/datacom/planejar','/solicitacoes/nova','/solicitacoes/editar','/solicitacoes/distribuir','/solicitacoes/mover','/solicitacoes/pedir-info','/admin/portal','/admin/lgpd/anonimizar'];
 
  // 1) autenticação: nenhuma rota nova responde sem sessão
  let semSessao=true;const falhas=[];
@@ -61,11 +61,10 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  const abrir=async(pagina,sel)=>{await pg.evaluate(x=>go(x),pagina);await pg.waitForSelector(sel);await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading, #content .loading'),null,{timeout:15000}).catch(()=>{});await pg.waitForTimeout(500)};
  await abrir('planejamento','.pl-faixa');await pg.click('.cm-item:has-text("P ")').catch(()=>{});await pg.waitForTimeout(400);
  await pg.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(e=>e.remove()));
- await abrir('calescolar','.cm-mes');await pg.click('.cm-item:has-text("E ")').catch(()=>{});await pg.waitForTimeout(400);await pg.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(e=>e.remove()));
- await abrir('datacom','.cm-mes');await pg.click('[data-modo="list"]');await pg.waitForSelector('.cm-proximos');await pg.click('.cm-item:has-text("D ")').catch(()=>{});await pg.waitForTimeout(400);await pg.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(e=>e.remove()));
- await abrir('calendario','.cm-mes');await pg.click('.cm-item:has-text("C ")').catch(()=>{});await pg.waitForTimeout(400);await pg.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(e=>e.remove()));
+ await abrir('calendario','.cm-semana, .cm-mes, .cm-proximos');await pg.click('[data-modo="list"]');await pg.waitForSelector('.cm-proximos');
+ for(const pre of ['E ','D ','C ','P ']){await pg.click(`.cm-item:has-text("${pre}")`).catch(()=>{});await pg.waitForTimeout(400);await pg.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(e=>e.remove()))}
  await abrir('solicitacoes','.sl-board');await pg.click('[data-sl-abrir]').catch(()=>{});await pg.waitForTimeout(400);
- await abrir('hoje','.db-kpis');
+ await abrir('hoje','.db-stats');
  t('HTML dentro dos textos nunca executa (Planejamento, Escolar, Datas, Marketing, Solicitações e Dashboard)',(await pg.evaluate(()=>window.__xss))===undefined&&dialogos===0&&errs.length===0,[dialogos,errs]);
  t('e aparece como texto, não como elemento',(await pg.$$eval('img[src="x"]',e=>e.length))===0);
  console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);

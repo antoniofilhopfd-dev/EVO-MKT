@@ -31,6 +31,7 @@ import { escolarRoute } from './escolar';
 import { datacomRoute } from './datacom';
 import { planejamentoRoute } from './planejamento';
 import { dashboardRoute } from './dashboard';
+import { lgpdRoute } from './lgpd';
 import { exigirPortalAtivo } from '../portal';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
@@ -74,6 +75,8 @@ export async function route(c: Ctx): Promise<Out> {
       return datacomRoute(c);
     case path.startsWith('/planejamento/'):
       return planejamentoRoute(c);
+    case path.startsWith('/admin/lgpd/'):
+      return lgpdRoute(c);
     case path.startsWith('/dashboard/'):
       return dashboardRoute(c);
     case path.startsWith('/portal/pagina/') || path === '/admin/portal':

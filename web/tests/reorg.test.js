@@ -39,6 +39,18 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  [s,j]=await req('POST','/admin/users/role',{codigo:gcod,perfil:'manager'});t('Administrador volta a Gerente (há outro Administrador)',s===200);
  [s,j]=await req('GET','/admin/users');const lista=j||[];t('a lista de usuários informa o nível de cada ficha',lista.some(x=>x.codigo==='NAT-3301'&&x.nivel==='admin')&&lista.some(x=>x.codigo===gcod&&x.nivel==='manager')&&lista.some(x=>x.codigo==='ANT-3302'&&x.nivel==='team'),lista.map(x=>x.codigo+':'+x.nivel));
 
+ // ---------- LGPD ----------
+ [s,j]=await req('GET','/admin/lgpd/exportar?tipo=interno&codigo=ANT-3302');t('Administrador exporta os dados de uma pessoa (ficha, registros, comentários e operações)',s===200&&j.ficha.codigo==='ANT-3302'&&Array.isArray(j.registros)&&Array.isArray(j.comentarios)&&Array.isArray(j.operacoes)&&!JSON.stringify(j).includes('pass_hash'),[s,Object.keys(j||{})]);
+ r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:gcod,senha:'Ger26ab'})});const G3={...J,Cookie:cookie(r)};
+ [s]=await req('GET','/admin/lgpd/exportar?tipo=interno&codigo=ANT-3302',null,G3);t('Gerente e Equipe não exportam dados de ninguém (403)',s===403&&(await req('GET','/admin/lgpd/exportar?tipo=interno&codigo=ANT-3302',null,E))[0]===403);
+ [s]=await req('POST','/admin/lgpd/anonimizar',{tipo:'interno',codigo:'MON-3303'});t('anonimizar exige confirmação explícita (400)',s===400);
+ [s]=await req('POST','/admin/lgpd/anonimizar',{tipo:'interno',codigo:'NAT-3301',confirmar:'ANONIMIZAR'});t('o Administrador não anonimiza a própria ficha (400)',s===400);
+ [s]=await req('POST','/admin/lgpd/anonimizar',{tipo:'interno',codigo:'MON-3303',confirmar:'ANONIMIZAR'});
+ const ul=(await req('GET','/admin/users'))[1].find(x=>x.codigo==='MON-3303');
+ r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:'MON-3303',senha:'Mon26ab'})});
+ t('anonimizar: nome removido, ficha inativa e sem acesso, ficha preservada',s===200&&/Pessoa removida/.test(ul.nome)&&ul.ativo===false&&r.status>=400,[s,ul,r.status]);
+ const au=(await req('GET','/admin/audit'))[1];t('exportar e anonimizar ficam no registro de operações',JSON.stringify(au).includes('lgpd-exportar')&&JSON.stringify(au).includes('lgpd-anonimizar'));
+
  // ---------- interface ----------
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});const errs=[];
  const entra=async(cod,sen,w=1440,h=1000)=>{const p=await (await b.newContext({viewport:{width:w,height:h}})).newPage();p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());await p.goto(BASE+'/');await p.fill('#internalCode',cod);await p.fill('#internalPass',sen);await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');await p.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:20000}).catch(()=>{});await p.waitForTimeout(800);return p};

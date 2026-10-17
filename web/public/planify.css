@@ -129,3 +129,34 @@ header{height:var(--topo)!important;padding:0 24px!important;border-bottom:1px s
 .module-hero h2{font-size:20px;margin:0}
 .kpis{gap:8px}.kpi{box-shadow:none!important;border-radius:12px}
 .settings-grid{gap:12px}
+
+/* ---- detalhes: capitalização natural, filtros de módulo recolhidos, faixas compactas ---- */
+.cm-periodo{text-transform:none!important}.cm-periodo::first-letter{text-transform:uppercase}
+.db-topo small{text-transform:none!important}.db-topo small::first-letter{text-transform:uppercase}
+.module-toolbar{background:transparent;border:0;padding:0;box-shadow:none;margin:0 0 10px}
+.module-toolbar .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.module-toolbar .table-search{max-width:260px;border-radius:999px;min-height:34px}
+.module-toolbar .cm-maisfiltros-corpo{min-width:260px}
+.module-toolbar .cm-maisfiltros-corpo select{width:100%}
+.flowchips{display:none!important}
+.pipeline,.mini-kanban,.approval-lanes{display:flex!important;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.pipeline>div,.mini-kanban>.kanban-col,.approval-lanes>div{display:flex;align-items:baseline;gap:8px;flex-direction:row!important;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;box-shadow:none;border-top:1px solid var(--line)!important;min-width:0}
+.pipeline>div strong,.mini-kanban strong,.approval-lanes strong{font-size:16px;color:var(--brand);order:-1}
+.pipeline>div span,.mini-kanban span,.approval-lanes b{font-size:12px;font-weight:600;color:var(--ink-2)}
+.pl-faixa button{flex-direction:row!important}
+.cm-ir,.cm-ano-sel{font-size:12px}.cm-ir input,.cm-ano-sel{min-height:30px;padding:2px 8px;border-radius:999px}
+.dashboard-head h1,.module-hero h2{text-transform:none}
+
+/* ---- solicitações: cabeçalho e contadores enxutos ---- */
+.sl-head{justify-content:flex-end;margin-bottom:8px}
+.sl-head small,.sl-head p{display:none}
+.sl-head h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sl-kpis{display:flex!important;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.sl-kpi{flex-direction:row!important;align-items:baseline;gap:8px!important;padding:5px 14px!important;border-radius:999px!important}
+.sl-kpi strong{font-size:17px!important}.sl-kpi small{font-size:12px}
+
+@media(max-width:760px){
+ header{height:auto!important;min-height:var(--topo)!important;padding:8px 12px!important;flex-wrap:wrap}
+ .cm-busca{max-width:none;flex:1 1 100%;margin-left:0}
+ .cm-barra{gap:6px}
+}
