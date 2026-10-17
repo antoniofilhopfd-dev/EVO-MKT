@@ -75,7 +75,7 @@ const sql=q=>execFileSync('mariadb',['--default-character-set=utf8mb4','-uroot',
  const semG=JSON.parse(JSON.stringify(dump));semG.tabelas.users.forEach(u=>{u.role='team'});
  semG.manifesto.users={linhas:semG.tabelas.users.length,sha256:sha(semG.tabelas.users)};semG.sha256_total=sha(semG.manifesto);
  const nomeSg='evo_backup_20260101_000003_semgerente.json.gz';sql(`INSERT INTO backups(nome,criado_em,conteudo) VALUES('${nomeSg}','2026-01-01T00:00:03-03:00',UNHEX('${hex(semG)}'))`);
- [s,rs]=await call('POST','/backup/restore',{file:nomeSg});t('backup sem Gerente ativa: restauração recusada',s===400&&/Gerente/.test(JSON.stringify(rs)),rs);
+ [s,rs]=await call('POST','/backup/restore',{file:nomeSg});t('backup sem Administrador ativo: restauração recusada',s===400&&/Administrador/.test(JSON.stringify(rs)),rs);
  // ---- formato antigo (1) é aceito na validação, com aviso ----
  const v1={versao:'4.x',em:'2025-01-01',records:[],headers:[],counters:[],used_ids:[],notices:[]};
  const nomeV1='evo_backup_20250101_000000_antigo.json.gz';sql(`INSERT INTO backups(nome,criado_em,conteudo) VALUES('${nomeV1}','2025-01-01T00:00:00-03:00',UNHEX('${hex(v1)}'))`);
