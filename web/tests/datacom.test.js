@@ -117,8 +117,8 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('cria ação no Planejamento (Projeto) com a referência à data, sem copiar a comemoração',s===201&&/^PRJ-/.test(r.id)&&r.status==='PLANEJAMENTO'&&r.dataComemorativaId==='dia-do-professor'&&r.dataComemorativaData===DP26&&r.prazo===DP26&&(await call('GET','/data?module=datacom'))[1].rows.length===5,r);
  [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);t('ação repetida é barrada (409)',s===409);
  [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Outra',responsavel:'Monique Vilante'},E);t('a equipe não atribui a outra pessoa (403)',s===403);
- const pv=(await painel(2026)).itens.find(x=>x.id==='dia-do-professor');
- t('a data mostra os vínculos (ação planejada) só na ocorrência do ano certo',pv.vinculos.planejamento.length===1&&pv.vinculos.planejamento[0].id===PL.id&&(await painel(2027)).itens.find(x=>x.id==='dia-do-professor'&&x.data.startsWith('2027')).vinculos.planejamento.length===0);
+ const pv=(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data===DP26);
+ t('a data mostra os vínculos (ação planejada) só na ocorrência do ano certo',pv.vinculos.planejamento.length===1&&pv.vinculos.planejamento[0].id===PL.id&&(await painel(2027)).itens.find(x=>x.id==='dia-do-professor'&&x.data.startsWith('2027')).vinculos.planejamento.length===0&&(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data.startsWith('2025')).vinculos.planejamento.length===0);
  t('natal mostra as 2 solicitações',(await painel(2026)).itens.find(x=>x.id==='natal'&&x.data===NATAL26).vinculos.solicitacoes.length===2);
 
  // ============ INTERFACE ============
@@ -163,11 +163,11 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  // criar ação no Planejamento e solicitação pela tela
  await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove())});
  await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');
- await p.click('.cm-item:has-text("Dia da Mulher")');await p.waitForSelector('#dcPlanejar');
+ await p.click('.cm-item:has-text("Internacional da Mulher")');await p.waitForSelector('#dcPlanejar');
  await p.click('#dcPlanejar');await p.waitForSelector('#dcAc');t('ação no Planejamento já vem com o texto sugerido e o prazo da data',/Ação para Dia Internacional da Mulher/.test(await p.inputValue('#aTexto'))&&(await p.inputValue('#aPrazo')).endsWith('-03-08'));
  await p.fill('#aTexto','Campanha de março');await p.click('#aOk');await p.waitForSelector('#dcAc',{state:'detached'});await p.waitForTimeout(500);
  const pj=(await call('GET','/data?module=projetos'))[1].rows.find(x=>x.titulo==='Campanha de março');t('criada pela tela, com a referência',pj&&pj.dataComemorativaId==='dia-da-mulher');
- await p.click('.cm-item:has-text("Dia da Mulher")').catch(async()=>{await p.click('[data-modo="list"]')});await p.waitForSelector('.dc-det');
+ await p.click('.cm-item:has-text("Internacional da Mulher")').catch(async()=>{await p.click('[data-modo="list"]')});await p.waitForSelector('.dc-det');
  t('o detalhe passa a listar a ação criada',/Campanha de março/.test(await p.$eval('.dc-vinc',e=>e.innerText)));
  await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove())});
  // nova data pela tela
