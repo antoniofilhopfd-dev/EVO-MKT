@@ -186,7 +186,9 @@ function slNova(){
 }
 
 /* ---------- Detalhe: dados, comentários, anexos e histórico dentro da solicitação ---------- */
-async function slAbrir(id){
+/** Abre a solicitação a partir de outra tela (ex.: Calendário), sempre com dados atuais. */
+async function slAbrirExterno(id,aoFechar){try{await slCarrega()}catch(e){return toast(e.message,'warn')}slAbrir(id,aoFechar)}
+async function slAbrir(id,aoFechar){
  const r=sl.rows.find(x=>x.id===id);if(!r)return;
  const pode=(slGerente()||slDono(r))&&r.etapa!=='CONCLUIDO';
  let com=[],hist=[];
@@ -222,8 +224,8 @@ async function slAbrir(id){
   <section><h4>Anexos</h4><div id="dArqs">${arqs.map(a=>`<div class="tb-item"><a href="${attr(link(a.p))}" target="_blank" rel="noopener">${esc(a.p.split('/').pop())}</a> <small>${a.t}</small></div>`).join('')||'<small>Nenhum anexo.</small>'}</div>
    ${slGerente()||slDono(r)||r.criadoPor===sl.eu.codigo?'<div class="tb-add"><input class="control" type="file" id="dArq" multiple aria-label="Adicionar anexos"><button type="button" class="softbtn" id="dArqAdd">Anexar</button></div>':''}</section>
   <section><h4>Histórico</h4><div class="demand-timeline">${hist.map(h=>`<div><i></i><span><small>${esc(String(h.quando||'').replace('T',' ').slice(0,16))} · ${esc(h.ator||'')}</small><b>${esc(h.texto||h.tipo||'')}</b>${h.motivo?`<em>${esc(h.motivo)}</em>`:''}</span></div>`).join('')||'<small>Sem histórico.</small>'}</div></section>
-  <div class="actions"><button type="button" class="btn soft" data-close>Fechar</button></div></div>`);
- const reabre=async()=>{o.close();invalidate('solicitacoes');await slCarrega();slDesenha();slAbrir(id)};
+  <div class="actions"><button type="button" class="btn soft" data-close>Fechar</button></div></div>`,aoFechar);
+ const reabre=async()=>{o.close();invalidate('solicitacoes');await slCarrega();slDesenha();slAbrir(id,aoFechar)};
  const err=$('#dErro',o.el);
  $('#dMover',o.el)&&($('#dMover',o.el).onchange=async e=>{if(!e.target.value)return;if(await slMover(id,e.target.value))reabre();else e.target.value=''});
  $('#dPedirInfo',o.el)&&($('#dPedirInfo',o.el).onclick=async()=>{const m=prompt('O que você precisa saber do solicitante?');if(!m||m.trim().length<3)return;try{await api('/solicitacoes/pedir-info',slJson({id,mensagem:m.trim()}));toast('Pedido enviado ao solicitante');await reabre()}catch(e){toast(e.message,'warn')}});

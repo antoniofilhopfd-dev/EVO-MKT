@@ -17,15 +17,15 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  t('menu lateral tem as 9 áreas (com Instagram)',nav.length===9&&['Visão geral','Solicitações','Planejamento','Conteúdo','Instagram','Tráfego','Relatórios','Arquivos e equipe','Administração'].every((x,i)=>nav[i].includes(x)),nav.join('|'));
  await p.evaluate(()=>go('agenda'));await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText));
  t('Planejamento tem um só "Calendário" nas seções (sem "Calendário de Eventos")',sub.filter(x=>/Calendário/.test(x)).length===1&&!sub.some(x=>/Calendário de Eventos/.test(x))&&sub.includes('Tarefas')&&sub.includes('Projetos'),sub.join('|'));
- // geral com filtros
- await p.evaluate(()=>go('calendario'));await p.waitForSelector('.upcoming-panel');
- let up=await p.$eval('.upcoming-panel',e=>e.innerText);
- t('Calendário geral mostra tarefa, conteúdo, campanha, evento e reunião',['Arte do cartaz','Post da feira','Matrículas 2027','Feira de Ciências','Reunião de pais'].every(x=>up.includes(x)),up);
- await p.click('[data-calf="tarefas"]');await p.waitForTimeout(500);up=await p.$eval('.upcoming-panel',e=>e.innerText);
- t('desmarcar "Tarefas" some com as tarefas e mantém o resto',!/Arte do cartaz/.test(up)&&/Feira de Ciências/.test(up),up);
- await p.click('[data-calf="tarefas"]');await p.waitForTimeout(400);
- await p.click('#calNew');await p.waitForSelector('#recordForm');
- t('"+ Novo compromisso" abre o formulário com Tipo/Início/Fim',/Tipo[\s\S]*Início[\s\S]*Fim/.test(await p.$eval('#formFields',e=>e.innerText)));await p.evaluate(()=>closeModal());
+ // Calendário de Marketing (geral): compromissos, reuniões, publicações e prazos de solicitações; sem tarefas/campanhas/eventos
+ await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-mes');
+ let up=await p.$eval('#cmRaiz',e=>e.innerText);
+ t('Calendário de Marketing mostra a reunião e a publicação, e deixa tarefas, campanhas e eventos nos seus módulos',/Reunião de pais/.test(up)&&/Post da feira/.test(up)&&!/Arte do cartaz/.test(up)&&!/Matrículas 2027/.test(up)&&!/Feira de Ciências/.test(up),up);
+ await p.click('[data-tipo="PUBLICACAO"]');await p.waitForTimeout(300);up=await p.$eval('#cmRaiz',e=>e.innerText);
+ t('desmarcar "Publicação" esconde as publicações e mantém a reunião',!/Post da feira/.test(up)&&/Reunião de pais/.test(up),up);
+ await p.click('[data-tipo="PUBLICACAO"]');await p.waitForTimeout(300);
+ await p.click('#cmNovo');await p.waitForSelector('#cmForm');
+ t('"+ Novo evento" abre o formulário simples (Título, Data, Horário, Tipo, Responsável, Observações)',/Título[\s\S]*Data[\s\S]*Horário[\s\S]*Tipo[\s\S]*Responsável[\s\S]*Observações/.test(await p.$eval('#cmForm',e=>e.innerText)));await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(e=>e.remove()));
  // sub-aba Calendário em cada módulo
  const casos=[['tarefas','Arte do cartaz',['Feira de Ciências','Post da feira','Matrículas 2027']],['conteudos','Post da feira',['Arte do cartaz','Feira de Ciências']],['eventos','Feira de Ciências',['Arte do cartaz','Post da feira']],['campanhas','Matrículas 2027',['Arte do cartaz','Feira de Ciências']]];
  for(const [m,tem,naoTem] of casos){

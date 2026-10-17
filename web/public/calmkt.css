@@ -1,0 +1,59 @@
+/* Calendário de Marketing (motor CalMotor): visual limpo, cores discretas por tipo */
+.cm-cabecalho{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+.cm-cabecalho h1{margin:2px 0 4px}.cm-cabecalho p{margin:0;color:var(--muted,#6B6F80);max-width:62ch}
+.cm-barra{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cm-nav{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cm-nav .softbtn{min-height:38px;min-width:38px}
+.cm-periodo{margin:0 6px;font-size:18px;text-transform:capitalize}
+.cm-ir input{border:1px solid var(--border,#E2E4EC);border-radius:9px;padding:6px 8px;background:#fff;min-height:38px;font:inherit;color:inherit}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.cm-filtros{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px}
+.cm-tipos{display:flex;flex-wrap:wrap;gap:6px}
+.cm-tipo{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--border,#E2E4EC);background:#fff;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;color:#3b4054;min-height:32px}
+.cm-tipo.off{opacity:.45;text-decoration:line-through}
+.cm-resp{max-width:230px;min-height:36px}
+/* tipos: fundo suave, borda lateral e glifo (a cor nunca é a única pista) */
+.t-REUNIAO{--c:#5b7fd6;--bg:#e8efff;--tx:#1c3a8a}.t-COBERTURA{--c:#8b6ad6;--bg:#f1eaff;--tx:#4a2f93}.t-COMPROMISSO{--c:#8a93a8;--bg:#eef0f4;--tx:#3b4054}
+.t-INTERNA{--c:#4aa886;--bg:#e4f4ee;--tx:#1d6a4f}.t-PUBLICACAO{--c:#f0953a;--bg:#fff0e1;--tx:#8a4a00}.t-PRAZO{--c:#d9645b;--bg:#fdeaea;--tx:#962f28}
+.cm-tipo .cm-g{color:var(--c);font-style:normal}
+.cm-item{display:flex;gap:5px;align-items:center;width:100%;min-width:0;text-align:left;border:0;border-left:3px solid var(--c);background:var(--bg);color:var(--tx);border-radius:6px;padding:3px 6px;font-size:12px;cursor:pointer;margin:2px 0;overflow:hidden}
+.cm-item[draggable="true"]{cursor:grab}.cm-item.arrastando{opacity:.4}.cm-item.feito{opacity:.6}.cm-item.feito .cm-t{text-decoration:line-through}
+.cm-item.atrasada{border-left-color:#c0392b;box-shadow:inset 0 0 0 1px #e9b3ae}
+.cm-item:focus-visible,.cm-num:focus-visible,.cm-tipo:focus-visible{outline:2px solid var(--orange,#FF7800);outline-offset:1px}
+.cm-g{font-style:normal;font-size:11px;flex:none}.cm-h{font-weight:800;flex:none;font-size:11px}.cm-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+/* mês */
+.cm-mes{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cm-cab{font-size:11px;font-weight:800;color:var(--muted,#6B6F80);text-align:center;padding:2px 0}
+.cm-dia{background:#fff;border:1px solid var(--border,#E2E4EC);border-radius:10px;min-height:108px;padding:4px;min-width:0;overflow:hidden;cursor:cell;position:relative}
+.cm-dia.fora{background:#fafbfd}.cm-dia.fora .cm-num{opacity:.45}.cm-dia.hoje{border-color:var(--blue,#063996);box-shadow:inset 0 0 0 1px var(--blue,#063996)}
+.cm-dia.sobre,.cm-col.sobre,.cm-diaVista.sobre{background:#eef3ff;border-color:var(--blue,#063996)}
+.cm-num{border:0;background:transparent;font-weight:800;font-size:12px;cursor:pointer;border-radius:50%;width:26px;height:26px;color:#2b2d3a}
+.cm-dia.hoje .cm-num,.cm-col.hoje .cm-num{background:var(--blue,#063996);color:#fff}
+.cm-mais{border:0;background:transparent;color:var(--blue,#063996);font-size:11px;font-weight:800;cursor:pointer;padding:2px 4px}
+.cm-pontos{display:none}
+/* semana */
+.cm-semana{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.cm-col{background:#fff;border:1px solid var(--border,#E2E4EC);border-radius:12px;padding:8px;min-height:180px;min-width:0;cursor:cell}
+.cm-col.hoje{border-color:var(--blue,#063996)}.cm-colcab{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.cm-colcab b{font-size:12px;color:var(--muted,#6B6F80)}
+.cm-vazio{color:#a0a5b5;font-size:12px}
+/* dia */
+.cm-diaVista{background:#fff;border:1px solid var(--border,#E2E4EC);border-radius:14px;padding:12px;min-height:220px;cursor:cell}
+.cm-linha{display:grid;grid-template-columns:84px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid #f0f1f6}
+.cm-hora{font-weight:800;font-size:12px;color:var(--muted,#6B6F80)}.cm-linha small{color:var(--muted,#6B6F80)}
+.cm-livre{display:grid;gap:4px;text-align:center;color:var(--muted,#6B6F80);padding:40px 0}
+/* formulário */
+.cm-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.cm-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:800;color:#545b6d;min-width:0}
+.cm-form .wide{grid-column:1/-1}.cm-form .control{width:100%}
+.cm-form .actions{display:flex;gap:8px;align-items:center;justify-content:flex-end}.cm-esp{flex:1}
+.cm-erro{color:var(--red,#C0392B);font-weight:700}
+.cm-form .danger-soft{background:#fdeee9;color:#a52f2f}
+@media(max-width:1000px){.cm-semana{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:719px){
+ .cm-semana{grid-template-columns:minmax(0,1fr)}
+ .cm-dia{min-height:58px}.cm-dia .cm-lista,.cm-dia .cm-mais{display:none}
+ .cm-pontos{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}.cm-pontos i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+ .cm-linha{grid-template-columns:64px minmax(0,1fr)}.cm-linha small{grid-column:2}
+ .cm-form{grid-template-columns:minmax(0,1fr)}.cm-resp{max-width:none;width:100%}
+ .cm-periodo{font-size:16px}
+}
