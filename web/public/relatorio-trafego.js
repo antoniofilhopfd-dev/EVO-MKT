@@ -64,7 +64,7 @@ function desenhar(){if(ultimo)$('#rel').innerHTML=html(ultimo,$('#sub').value,$(
 {
   const q=new URLSearchParams(location.search),[di,df]=semanaPadrao();
   $('#de').value=/^\d{4}-\d\d-\d\d$/.test(q.get('de')||'')?q.get('de'):di;$('#ate').value=/^\d{4}-\d\d-\d\d$/.test(q.get('ate')||'')?q.get('ate'):df;
-  $('#sub').value=`Colégio Evolução | Campanhas de Captação ${new Date().getFullYear()}`;
+  $('#sub').value=`Colégio Evolução | Campanhas de Tráfego Pago ${new Date().getFullYear()}`;
   $('#atualiza').onclick=carregar;$('#imprime').onclick=()=>window.print();
   $('#sub').oninput=desenhar;$('#obs').oninput=desenhar;
   carregar();

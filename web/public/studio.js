@@ -458,15 +458,15 @@ async function renderIgRanking(){
 }
 
 
-// ---------- Tráfego: regras automáticas, relatório semanal por e-mail, custo por matrícula ----------
+// ---------- Tráfego: regras automáticas e relatório semanal por e-mail ----------
 async function painelExtrasAnuncios(){
   if(false)return;
   const host=$('#content');if(!host||state.page!=='trafego')return;
   let d;try{d=await api('/ads/extras')}catch{return}
   if(state.page!=='trafego'||$('#extrasAds'))return;
-  const r=d.regras,mt=d.matriculas||[];
+  const r=d.regras;
   const box=document.createElement('section');box.className='card';box.id='extrasAds';
-  box.innerHTML=`<div class="card-title"><div><small>RECURSOS OPCIONAIS</small><h3>${d.gestao?'Regras, relatório automático e custo por matrícula':'Relatório automático e custo por matrícula'}</h3></div></div>
+  box.innerHTML=`<div class="card-title"><div><small>RECURSOS OPCIONAIS</small><h3>${d.gestao?'Regras e relatório automático':'Relatório automático'}</h3></div></div>
   ${d.gestao?`<details open><summary><b>Regras automáticas</b> <span class="badge ${r.ativa?'ok':''}">${r.ativa?'Ligadas':'Desligadas'}</span></summary>
    <p class="kpi-note">O sistema olha os anúncios ativos a cada hora e avisa (notificação e e-mail) ou pausa o que cumprir a regra. Só mexe em anúncios ativos e registra tudo no histórico.</p>
    <label class="check-row"><input type="checkbox" id="rgAtiva" ${r.ativa?'checked':''}> Ligar as regras automáticas</label>
@@ -480,17 +480,13 @@ async function painelExtrasAnuncios(){
    <p class="kpi-note">Toda segunda-feira o sistema envia ao e-mail de avisos um resumo da semana anterior (investimento, alcance, conversas e custo por campanha) com o link do relatório em PDF. Precisa do e-mail de avisos configurado e do cron de sincronização.</p>
    <div class="st-acoes"><label class="check-row"><input type="checkbox" id="rsAtivo" ${d.relatorioSemanal?'checked':''}> Enviar toda segunda-feira</label><button class="softbtn" id="rsAgora" type="button">Enviar um agora (teste)</button></div>
   </details>
-  <details><summary><b>Custo por matrícula</b></summary>
-   <p class="kpi-note">Informe quantas matrículas vieram em cada mês; o sistema divide pelo investimento em anúncios.</p>
-   <div class="tablewrap"><table class="datatable"><thead><tr><th>Mês</th><th>Investimento</th><th>Matrículas</th><th>Custo por matrícula</th></tr></thead><tbody>${[...mt].reverse().map(m=>`<tr><td>${esc(m.mes.slice(5)+'/'+m.mes.slice(0,4))}</td><td>${esc(gaBrl(m.gasto))}</td><td><input type="number" min="0" class="mt-in" data-mes="${attr(m.mes)}" value="${m.matriculas===null?'':m.matriculas}" style="width:90px"></td><td>${m.custo===null?'—':esc(gaBrl(m.custo))}</td></tr>`).join('')||'<tr><td colspan="4">Sem dados de investimento ainda.</td></tr>'}</tbody></table></div>
-  </details>`;
+`;
   const ref=$('#metaAdsBox');if(ref)ref.before(box);else host.appendChild(box);
   const regra=()=>({ativa:$('#rgAtiva',box).checked,gastoSemResultado:Number($('#rgGasto',box).value),dias:Number($('#rgDias',box).value),custoMax:Number($('#rgCusto',box).value),acao:$('#rgAcao',box).value});
   if($('#rgSalva',box)){$('#rgSalva',box).onclick=async()=>{const b=regra();if(b.ativa&&b.acao==='PAUSAR'&&!confirm('Com "Pausar", o sistema pausa sozinho os anúncios que cumprirem a regra. Continuar?'))return;try{await gaPost('/ads/regras',b);toast('Regras salvas');go('trafego')}catch(e){toast(e.message,'warn')}};
   $('#rgSim',box).onclick=async()=>{const o=$('#rgOut',box);o.textContent='Lendo a conta…';try{await gaPost('/ads/regras',regra());const x=await gaPost('/ads/regras/simular');o.innerHTML=x.achados.length?`<ul class="gi-lista">${x.achados.map(a=>`<li><b>${esc(a.anuncio)}</b> (${esc(a.campanha)}): ${esc(a.motivo)}</li>`).join('')}</ul>`:'<p class="kpi-note">Nenhum anúncio ativo cumpre a regra agora.</p>'}catch(e){o.textContent='';toast(e.message,'warn')}}}
   $('#rsAtivo',box).onchange=async e=>{try{await gaPost('/ads/relatorio-semanal',{ativo:e.target.checked});toast(e.target.checked?'Relatório semanal ligado':'Relatório semanal desligado')}catch(x){toast(x.message,'warn')}};
   $('#rsAgora',box).onclick=async()=>{try{await gaPost('/ads/relatorio-semanal',{enviarAgora:true});toast('E-mail enviado (se o e-mail de avisos estiver configurado)')}catch(e){toast(e.message,'warn')}};
-  box.querySelectorAll('.mt-in').forEach(i=>i.onchange=async()=>{if(i.value==='')return;try{await gaPost('/ads/matriculas',{mes:i.dataset.mes,matriculas:Number(i.value)});toast('Salvo');go('trafego')}catch(e){toast(e.message,'warn')}});
 }
 
 

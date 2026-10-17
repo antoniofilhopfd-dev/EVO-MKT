@@ -201,3 +201,13 @@ Verificada pela suíte `auditoria`: todas as rotas novas exigem login (401); esc
 
 ## Desempenho
 Medido com 16.000 registros (5.000 solicitações, 5.000 tarefas, 3.000 conteúdos, 3.000 projetos): a pior resposta foi o painel de Planejamento, com cerca de 0,5 s; as demais ficaram abaixo de 0,12 s. Por isso **não foi implementada paginação no servidor** (suíte `desempenho`; revisar se o volume passar de dezenas de milhares de registros).
+
+## Seis módulos (v5.17.0)
+
+- Menu: Dashboard, Calendário, Instagram, Tráfego Pago, Arquivos e Configurações. As telas antigas saíram da navegação; os dados continuam no banco e no backup.
+- Perfis: **Administrador** (acesso total, inclui Usuários, Integrações, Segurança e Backup) e **Equipe de Marketing** (operação). A migração 021 converte quem era Gerente sem permissão de administração em Equipe; sempre existe ao menos um Administrador ativo.
+- Arquivos: biblioteca em `BIBLIOTECA/<pasta>/`; renomear e mover não alteram a referência; arquivos em uso por publicações/criativos não podem ser excluídos.
+- Tráfego Pago: seções Visão Geral, Gerenciador de Anúncios, Criativos, Públicos, Análises, Orçamentos, Alertas, Relatórios e Histórico. Preferências (colunas, filtros, visões, layout) são salvas por usuário. Não há CRM: só conversas, custo por conversa e leads como métrica oficial da Meta.
+- Implantação: a migração 021 roda no build (prebuild). Push na `main` aciona o deploy da Hostinger — só com autorização.
+- Dependem de credenciais reais da Meta (não validadas aqui): escrita em lote, quebras por posicionamento, públicos personalizados, séries diárias e saúde da integração.
+- Matriz completa: `docs/AUDITORIA_17-10.md`.
