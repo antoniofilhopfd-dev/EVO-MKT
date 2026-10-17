@@ -47,7 +47,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  t('sem segmento escolhido vale "Toda a escola"',s===201&&r.segmentos==='TODOS',r);
  [s,r]=await call('POST','/escolar/salvar',base);t('evento duplicado (mesmo título, data e segmentos) é recusado (409)',s===409&&/já está cadastrado/.test(r.error),[s,r]);
  [s]=await call('POST','/escolar/salvar',{...base,segmentos:['INFANTIL']});t('mesmo título e data em outro segmento é permitido',s===201);
- [s,r]=await call('POST','/escolar/salvar',{...base,id:FEIRA.id,titulo:'Feira de Ciências 2026',horaInicio:'09:00',horaFim:'12:00'});
+ [s,r]=await call('POST','/escolar/salvar',{...base,id:FEIRA.id,titulo:'Feira de Ciências 2026',horaInicio:'09:00',horaFim:'12:00',local:'Pátio central',descricao:'Stands das turmas'});
  t('edita mantendo o mesmo id',s===200&&r.id===FEIRA.id&&r.titulo==='Feira de Ciências 2026'&&r.horaInicio==='09:00',r);
  [s]=await call('POST','/escolar/salvar',{...base,id:'ESC-9999'});t('editar um id inexistente dá 404',s===404);
 
@@ -118,14 +118,14 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const tor=(await lista()).find(x=>x.titulo==='Torneio de vôlei');
  t('criado pela tela, em dois dias e dois segmentos',tor&&tor.dataFim===dia(13)&&tor.segmentos==='FUND2|MEDIO'&&tor.local==='Ginásio',tor);
  await p.click(`.cm-num[data-novo="${dia(11)}"]`);await p.waitForSelector('#escForm');t('clicar no dia preenche a data',(await p.inputValue('#eData'))===dia(11));
- await p.fill('#eTitulo','ab');await p.click('#eSalvar');t('erros do servidor aparecem no formulário',/título/i.test(await p.textContent('#eErro')));await p.click('#escForm [data-close]');
+ await p.fill('#eTitulo','ab');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});t('erros do servidor aparecem no formulário',/título/i.test(await p.textContent('#eErro')));await p.click('#escForm [data-close]');
  // duplicado na tela
- await p.click('#cmNovo');await p.waitForSelector('#escForm');await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');
- t('evento repetido é barrado na tela',/já está cadastrado/.test(await p.textContent('#eErro')));await p.click('#escForm [data-close]');
+ await p.click('#cmNovo');await p.waitForSelector('#escForm');await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});
+ t('evento repetido é barrado na tela',/já está cadastrado/.test(await p.textContent('#eErro')),await p.textContent('#eErro'));await p.click('#escForm [data-close]');
  // editar, reagendar por arrastar, excluir
  await p.click('.cm-item:has-text("Torneio de vôlei")');await p.waitForSelector('#escForm');t('abrir o evento mostra os dados',(await p.inputValue('#eTitulo'))==='Torneio de vôlei'&&(await p.inputValue('#eLocal'))==='Ginásio');
  await p.fill('#eTitulo','Torneio de vôlei (final)');await p.click('#eSalvar');await p.waitForSelector('#escForm',{state:'detached'});t('editar pela tela',(await lista()).some(x=>x.titulo==='Torneio de vôlei (final)'));
- await p.dragAndDrop('.cm-item:has-text("Prova bimestral")',`.cm-dia[data-date="${dia(8)}"]`);await p.waitForTimeout(900);t('arrastar reagenda o evento',(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio===dia(8));
+ await p.dragAndDrop('.cm-item:has-text("Prova bimestral")',`.cm-dia[data-date="${dia(8)}"]`);await p.waitForTimeout(1200);t('arrastar reagenda o evento',(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio===dia(8),[await p.textContent('#toast'),(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio,dia(8),dia(10)]);
  await p.click('.cm-item:has-text("Prova bimestral")');await p.waitForSelector('#eExcluir');
  p.removeAllListeners('dialog');p.once('dialog',d=>d.dismiss());await p.click('#eExcluir');await p.waitForTimeout(400);t('cancelar a confirmação não exclui',(await lista()).some(x=>x.titulo==='Prova bimestral'));
  p.removeAllListeners('dialog');p.once('dialog',d=>d.accept());await p.click('#eExcluir');await p.waitForSelector('#escForm',{state:'detached'});await p.waitForTimeout(400);t('confirmar exclui',!(await lista()).some(x=>x.titulo==='Prova bimestral'));p.on('dialog',d=>d.accept());
