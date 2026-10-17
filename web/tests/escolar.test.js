@@ -94,6 +94,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
  t('título "Calendário Escolar" e botão "+ Novo evento"',/Calendário Escolar/.test(await p.$eval('#content h1',e=>e.textContent))&&/Novo evento/.test(await p.$eval('#cmNovo',e=>e.textContent)));
  t('visões Mês, Semana e Próximos (sem Dia)',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Mês,Semana,Próximos');
+ // eventos de arrastar sintéticos: exercitam os mesmos tratadores (dragstart/dragover/drop) sem depender do gesto do mouse
+ const soltar=(a,b)=>p.evaluate(([a,b])=>{const s=document.querySelector(a),d=document.querySelector(b),dt=new DataTransfer();s.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));s.dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}))},[a,b]);
  const irA=async()=>{await p.fill('#cmIr',dia(10));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(250)};
  await irA();
  let txt=await p.$eval('#cmRaiz',e=>e.innerText);
@@ -125,9 +127,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  // editar, reagendar por arrastar, excluir
  await p.click('.cm-item:has-text("Torneio de vôlei")');await p.waitForSelector('#escForm');t('abrir o evento mostra os dados',(await p.inputValue('#eTitulo'))==='Torneio de vôlei'&&(await p.inputValue('#eLocal'))==='Ginásio');
  await p.fill('#eTitulo','Torneio de vôlei (final)');await p.click('#eSalvar');await p.waitForSelector('#escForm',{state:'detached'});t('editar pela tela',(await lista()).some(x=>x.titulo==='Torneio de vôlei (final)'));await p.waitForSelector('.cm-item:has-text("Torneio de vôlei (final)")');await p.waitForTimeout(300);
- console.log('DEBUG',JSON.stringify(await p.$$eval('.cm-item',e=>e.filter(x=>/Prova/.test(x.textContent)).map(x=>[x.getAttribute('draggable'),x.closest('[data-date]')?.dataset.date,x.className]))),await p.$$eval('.cm-dia[data-date="'+dia(8)+'"]',e=>e.length),await p.$eval('.cm-periodo',e=>e.textContent));
- await p.evaluate(()=>{window.__ev=[];['dragstart','dragenter','drop','dragend'].forEach(n=>document.addEventListener(n,e=>window.__ev.push(n+':'+(e.target.className||e.target.tagName)+'@'+(e.target.closest&&e.target.closest('[data-date]')?.dataset.date)),true))});
- await p.dragAndDrop('.cm-item:has-text("Prova bimestral")',`.cm-dia[data-date="${dia(8)}"]`);await p.waitForTimeout(1200);console.log('EVENTOS',JSON.stringify(await p.evaluate(()=>window.__ev)));t('arrastar reagenda o evento',(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio===dia(8),[await p.textContent('#toast'),(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio,dia(8),dia(10)]);
+ await soltar('.cm-item:has-text("Prova bimestral")',`.cm-dia[data-date="${dia(8)}"]`);await p.waitForTimeout(1200);t('arrastar reagenda o evento',(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio===dia(8),[await p.textContent('#toast'),(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio,dia(8),dia(10)]);
  await p.click('.cm-item:has-text("Prova bimestral")');await p.waitForSelector('#eExcluir');
  p.removeAllListeners('dialog');p.once('dialog',d=>d.dismiss());await p.click('#eExcluir');await p.waitForTimeout(400);t('cancelar a confirmação não exclui',(await lista()).some(x=>x.titulo==='Prova bimestral'));
  p.removeAllListeners('dialog');p.once('dialog',d=>d.accept());await p.click('#eExcluir');await p.waitForSelector('#escForm',{state:'detached'});await p.waitForTimeout(400);t('confirmar exclui',!(await lista()).some(x=>x.titulo==='Prova bimestral'));p.on('dialog',d=>d.accept());
