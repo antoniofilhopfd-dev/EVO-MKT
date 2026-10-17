@@ -585,7 +585,7 @@ async function recoverRoute(c: Ctx): Promise<Response> {
   const u = await q1('SELECT codigo,nome,role FROM users WHERE codigo=?', [cod]);
   if (!u) return text('Ficha não encontrada: ' + cod + '\n', 404);
   if (c.qs('perfil') === 'manager' && u.role !== 'manager') {
-    await run("UPDATE users SET role='manager',label='Gerente de Marketing' WHERE codigo=?", [cod]);
+    await run("UPDATE users SET role='manager',admin=1,label='Administrador' WHERE codigo=?", [cod]);
   }
   await run('UPDATE users SET ativo=1 WHERE codigo=?', [cod]);
   await run('DELETE FROM login_attempts');
