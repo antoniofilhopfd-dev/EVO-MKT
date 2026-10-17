@@ -67,7 +67,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  let nova=(await lista('calendario')).find(x=>x.titulo==='Cobertura da gincana');
  t('criado com título, data, horário, tipo, responsável e observações',nova&&nova.dataInicio===D0&&nova.inicioEm===D0+'T09:30'&&nova.tipoItem==='Cobertura foto/vídeo'&&nova.responsavel==='Monique Vilante'&&nova.descricao==='Levar o tripé'&&nova.diaInteiro==='Não',nova);
  await p.waitForSelector('.cm-item:has-text("Cobertura da gincana")');
- await p.click(`.cm-num[data-novo="${D2}"]`);await p.waitForSelector('#cmForm');t('clicar no número do dia preenche a data clicada',(await p.inputValue('#fData'))===D2);
+ await p.click(`.cm-num[data-novo="${D2}"]`);await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="mkt"]');await p.waitForSelector('#cmForm');t('clicar no número do dia preenche a data clicada',(await p.inputValue('#fData'))===D2);
  await p.fill('#fTitulo','Alinhamento sem hora');await p.click('#fSalvar');await p.waitForSelector('#cmForm',{state:'detached'});
  nova=(await lista('calendario')).find(x=>x.titulo==='Alinhamento sem hora');
  t('horário é opcional (dia inteiro) e o tipo padrão vale',nova&&nova.diaInteiro==='Sim'&&nova.dataInicio===D2&&nova.tipoItem==='Reunião',nova);

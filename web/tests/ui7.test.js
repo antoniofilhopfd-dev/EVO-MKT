@@ -24,7 +24,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.click('[data-tipo="PUBLICACAO"]');await p.waitForTimeout(300);up=await p.$eval('#cmRaiz',e=>e.innerText);
  t('desmarcar "Publicação" esconde as publicações e mantém a reunião',!/Post da feira/.test(up)&&/Reunião de pais/.test(up),up);
  await p.click('[data-tipo="PUBLICACAO"]');await p.waitForTimeout(300);
- await p.click('#cmNovo');await p.waitForSelector('#cmForm');
+ await p.click('#cmNovo');await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="mkt"]');await p.waitForSelector('#cmForm');
  t('"+ Novo evento" abre o formulário simples (Título, Data, Horário, Tipo, Responsável, Observações)',/Título[\s\S]*Data[\s\S]*Horário[\s\S]*Tipo[\s\S]*Responsável[\s\S]*Observações/.test(await p.$eval('#cmForm',e=>e.innerText)));await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(e=>e.remove()));
  // sub-aba Calendário em cada módulo
  const casos=[['tarefas','Arte do cartaz',['Feira de Ciências','Post da feira','Matrículas 2027']],['conteudos','Post da feira',['Arte do cartaz','Feira de Ciências']],['eventos','Feira de Ciências',['Arte do cartaz','Post da feira']],['campanhas','Matrículas 2027',['Arte do cartaz','Feira de Ciências']]];

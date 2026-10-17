@@ -178,8 +178,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  t('duplicar pela tela (próximo ano, sem vínculos)',(await acoes()).filter(x=>x.titulo==='Semana do Livro').length===2);
  await pg.waitForSelector('.cm-proximos');
  // calendário de marketing mostra a ação marcada
- await pg.evaluate(()=>go('calendario'));await pg.waitForSelector('.cm-mes');await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));await pg.waitForTimeout(300);
- t('o Calendário de Marketing mostra a ação marcada (tipo Ação planejada), sem cópia',(await pg.$$eval('.cm-item.t-PLANO',e=>e.length))>=1&&(await acoes()).filter(x=>x.titulo==='Semana do Livro'&&x.dataInicio===dia(2)).length===1);
+ await pg.evaluate(()=>go('calendario'));await pg.waitForSelector('.cm-semana, .cm-mes');await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pg.$('.cm-mes'))){await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes')}await pg.waitForTimeout(300);
+ t('o Calendário único mostra a ação planejada (tipo Ação planejada), sem cópia',(await pg.$$eval('.cm-item.t-PLANO',e=>e.length))>=1&&(await acoes()).filter(x=>x.titulo==='Semana do Livro'&&x.dataInicio===dia(2)).length===1);
  // Dashboard
  await pg.evaluate(()=>go('hoje'));await pg.waitForSelector('.db-kpis');
  const dd=(await call('GET','/dashboard/resumo'))[1];
