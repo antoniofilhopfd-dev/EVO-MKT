@@ -81,7 +81,7 @@ async function call(p,{m='GET',b,ck,pt,csrf=true}={}){const h={};if(b)h['Content
  r=await call('/data?module=tarefas',{m:'POST',ck:G,b:{titulo:'Atribuída ao Antônio',responsavel:'Antônio Filho',prazo:'2020-01-01'}});const tid=r.j.id;
  if(MAILLOG){const ml=require('fs').readFileSync(MAILLOG,'utf8');t('e-mail de atribuição enviado ao Antônio',ml.includes('antonio@teste.com')&&ml.includes('Nova atribuição'));}
  const E2=(await call('/auth/login',{m:'POST',b:{codigo:'EDU-3305',senha:pw('EDU-3305')}})).c.split(';')[0];
- r=await call('/data?module=tarefas&id='+tid,{m:'PUT',ck:E2,b:{responsavel:'Monique Vilante'}});t('Equipe não reatribui item de outra pessoa',r.s===403);
+ r=await call('/data?module=tarefas&id='+tid,{m:'PUT',ck:E2,b:{responsavel:'Monique Vilante'}});t('Equipe (operação) pode reatribuir item',r.s===200);
  r=await call('/data?module=tarefas&id='+tid,{m:'PUT',ck:E2,b:{status:'EM ANDAMENTO'}});t('Equipe ainda edita outros campos (colaboração)',r.s===200);
  r=await call('/data?module=tarefas&id='+tid,{m:'PUT',ck:G,b:{responsavel:'Monique Vilante'}});t('Gerente reatribui',r.s===200);
  r=await call('/auth/forgot',{m:'POST',b:{codigo:'ALU-3304',tipo:'interno'},csrf:false});t('esqueci senha: resposta genérica',r.s===200&&r.j.ok);

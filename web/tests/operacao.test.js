@@ -79,7 +79,7 @@ const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
  // ---- indicadores ----
  const Q='/indicadores?de=2026-09-01&ate=2026-09-30&tipo=Reels';
  [s,r]=await call('GET',Q);const ind=id=>(r.indicadores||[]).find(x=>x.id===id);
- t('indicadores: só Gerência (Equipe 403)',(await call('GET',Q,null,E))[0]===403);
+ t('indicadores: a Equipe acessa (200)',(await call('GET',Q,null,E))[0]===200);
  t('indicadores: concluídas no período = 2, com lista de origem',s===200&&ind('concluidas').valor===2&&ind('concluidas').ids.includes(c)&&ind('concluidas').ids.includes(d),r);
  t('indicadores: cumprimento do SLA = 50% (1 de 2) e tempo médio calculado',ind('cumprimentoSla').valor===50&&ind('cumprimentoSla').detalhe==='1 de 2'&&ind('tempoAtendimento').valor===(5+10)/2,[ind('cumprimentoSla'),ind('tempoAtendimento')]);
  t('indicadores: SLA pausado lista a demanda pausada',ind('slaPausado').ids.includes(e));

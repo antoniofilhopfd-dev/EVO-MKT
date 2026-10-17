@@ -15,7 +15,7 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  const rows=async mod=>(await call('/data?module='+mod,{ck:G})).j.rows;
  const put=(mod,id,b)=>call('/data?module='+mod+'&id='+id,{m:'PUT',ck:G,b});
  // ---------- configuração e segurança ----------
- r=await call('/integrations/status',{ck:E});t('Equipe não vê integrações',r.s===403);
+ r=await call('/integrations/status',{ck:E});t('Equipe vê só o status das integrações, sem credenciais',r.s===200&&!/META_SECRET|G_SECRET/.test(JSON.stringify(r.j||'')));
  r=await call('/integrations/meta/connect',{ck:G,manual:true});t('conectar sem App ID/Secret é recusado',r.s===400);
  r=await call('/integrations/settings',{m:'POST',ck:G,b:{meta_app_id:'APPID',meta_app_secret:'META_SECRET',g_client_id:'GID.apps.test',g_client_secret:'G_SECRET'}});t('salva credenciais',r.s===200);
  r=await call('/integrations/status',{ck:G});const raw=JSON.stringify(r.j);

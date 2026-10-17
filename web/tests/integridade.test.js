@@ -38,7 +38,7 @@ const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
  t('rotas públicas continuam públicas: heartbeat e modo de acesso',await st('GET','/heartbeat',{})===200&&await st('GET','/auth/mode',{})===200);
 
  // ---- 4) Equipe não usa funções da Gerência ----
- const prot=[['GET','/admin/users'],['GET','/admin/audit'],['GET','/backup/list'],['GET','/backup/log'],['POST','/backup'],['POST','/backup/restore'],['POST','/admin/mode'],['POST','/admin/users/create'],['POST','/admin/users/delete'],['POST','/admin/users/code'],['POST','/admin/import'],['GET','/integrations/status'],['POST','/integrations/settings'],['GET','/portal/users']];
+ const prot=[['GET','/admin/users'],['GET','/admin/audit'],['GET','/backup/list'],['GET','/backup/log'],['POST','/backup'],['POST','/backup/restore'],['POST','/admin/mode'],['POST','/admin/users/create'],['POST','/admin/users/delete'],['POST','/admin/users/code'],['POST','/admin/import'],['POST','/integrations/settings'],['GET','/portal/users']];
  const eq=[];for(const [m,u] of prot){const s=await st(m,u,E,m==='POST'?{}:undefined);if(s!==403)eq.push([m,u,s])}
  t('Equipe recebe 403 em todas as rotas de Gerência',eq.length===0,eq);
 

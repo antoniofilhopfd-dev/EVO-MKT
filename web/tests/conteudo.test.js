@@ -17,7 +17,7 @@ const sql=q=>execFileSync('mariadb',['--default-character-set=utf8mb4','-uroot',
  let [s,r]=await call('POST','/content/decision',{id:b.id,decisao:'AJUSTES SOLICITADOS',comentario:''},E);t('pedir ajustes sem descrever é recusado (400)',s===400);
  [s]=await call('POST','/content/decision',{id:a.id,decisao:'APROVADO'});t('decisão só vale para conteúdo em REVISÃO (409)',s===409);
  const c3=await mk({titulo:'Outro revisor',status:'REVISÃO',revisor:'Fulano de Tal'});
- [s]=await call('POST','/content/decision',{id:c3.id,decisao:'APROVADO'},E);t('quem não é o revisor nem a Gerência não decide (403)',s===403);
+ [s]=await call('POST','/content/decision',{id:c3.id,decisao:'APROVADO'},E);t('a Equipe de Marketing decide a revisão (revisão simples, 200)',s===200);
  [s,r]=await call('POST','/content/decision',{id:b.id,decisao:'AJUSTES SOLICITADOS',comentario:'Trocar a thumbnail'},E);
  let row=(await call('GET','/data?module=conteudos&id='+b.id))[1];
  t('o revisor indicado pede ajustes: volta para PRODUÇÃO e registra quem e por quê',s===200&&row.status==='PRODUÇÃO'&&row.aprovadoPor==='Antônio Filho'&&row.aprovacaoDecisao==='AJUSTES SOLICITADOS');

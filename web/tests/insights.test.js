@@ -16,7 +16,7 @@ const sql=q=>execFileSync('mariadb',['--default-character-set=utf8mb4','-uroot',
  const seg=n=>r.saude.find(x=>x.segmento===n);
  t('saúde: segmento com SLA vencido tem nota menor e lista os registros',s===200&&seg('Médio').score<seg('Infantil').score&&seg('Médio').ids.length===2&&/SLA vencido/.test(seg('Médio').sinais.join(' ')),r.saude);
  t('saúde: segmento sem alertas fica em 100',seg('Infantil').score===100);
- t('insights: só Gerência (Equipe 403)',(await call('GET','/insights',null,E))[0]===403);
+ t('insights: a Equipe acessa (200)',(await call('GET','/insights',null,E))[0]===200);
  // horários: sem amostra mínima não inventa
  t('melhores horários: com poucas publicações não calcula (sem inventar)',r.horarios.melhor===null&&r.horarios.minimo===8);
  const ins=(i,ts,l,c)=>sql(`INSERT INTO ig_posts(media_id,publicado_em,tipo,legenda,curtidas,comentarios,permalink,atualizado_em) VALUES('p${i}','${ts}','FEED','post ${i}',${l},${c},'https://i/p${i}','x')`);

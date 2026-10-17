@@ -38,7 +38,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s]=await call('GET','/reports/overview?de=2026-12&ate=2026-01');t('período invertido: 400',s===400);
  [s,r]=await call('POST','/reports/save',{de:mes,ate:mes});const rels=(await call('GET','/data?module=relatorios'))[1].rows;
  t('salvar relatório guarda cópia fiel no histórico (módulo Relatórios)',s===200&&rels.some(x=>x.id===r.id&&x.tipoRelatorio==='Painel integrado'&&JSON.parse(x.snapshot).trafego.meta.moedas[0].moeda==='BRL'));
- t('salvar relatório é só da Gerência (403 Equipe)',(await call('POST','/reports/save',{},E))[0]===403);
+ t('Equipe acessa salvar relatório (não é mais 403)',(await call('POST','/reports/save',{},E))[0]!==403);
  t('relatórios exigem sessão',[401,403].includes((await call('GET','/reports/overview',null,{}))[0]));
 
  // ---- alertas objetivos (limites visíveis, só com dados suficientes) e mudança de status ----
@@ -74,7 +74,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('anúncios do mês com gasto, resultados e status; o reprovado traz o motivo da Meta',r.anuncios.length===3&&a1&&a1.resultados===30&&a1.gasto===600&&a3&&/DISAPPROVED/.test(a3.status)&&/acima do permitido/.test(a3.problema),r.anuncios);
  [,r]=await call('GET','/traffic/snapshots');
  t('alertas: anúncio com problema (crítico, com o motivo) e teto de gasto da conta a 95%',!!r.alertas.find(a=>a.regra==='Anúncio com problema'&&a.severidade==='critico'&&/acima do permitido/.test(a.mensagem))&&!!r.alertas.find(a=>a.regra==='Teto de gasto da conta perto do fim'&&/95%/.test(a.mensagem)),r.alertas.map(a=>a.regra));
- [s]=await call('POST','/integrations/ads/orcamento',{valor:1000},E);t('Equipe não define orçamento (403)',s===403);
+ [s]=await call('POST','/integrations/ads/orcamento',{valor:1000},E);t('Equipe define o orçamento mensal local (200)',s===200);[s]=await call('POST','/integrations/ads/orcamento',{valor:0});
  [s]=await call('POST','/integrations/ads/orcamento',{valor:-5});t('orçamento negativo é recusado (400)',s===400);
  [,r]=await call('GET','/traffic/painel');t('sem orçamento definido não há projeção',r.pacing===null&&r.orcamentoMensal===0);
  [s]=await call('POST','/integrations/ads/orcamento',{valor:1000});[,r]=await call('GET','/traffic/painel');
@@ -99,7 +99,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const ra1=r.anuncios.find(x=>x.nome==='Vídeo depoimento'),ra2=r.anuncios.find(x=>x.nome==='Carrossel valores'),ra3=r.anuncios.find(x=>x.nome==='Cartaz antigo');
  t('anúncios ordenados por gasto, com status em português e foto só se for https',r.anuncios[0].nome==='Carrossel valores'&&ra1.status==='Ativo'&&ra1.foto==='https://scontent.fbcdn.net/a1.jpg'&&ra2.foto===''&&ra3.status==='Reprovado',r.anuncios.map(a=>[a.nome,a.status,a.foto]));
  t('total dos anúncios soma as linhas',Math.abs(r.totalAnuncios.investimento-1384.56)<0.01,r.totalAnuncios);
- [s]=await call('GET',`/traffic/semanal?de=${f(ini)}&ate=${f(hj)}`,null,E);t('relatório semanal é só da Gerência (403 Equipe)',s===403);
+ [s]=await call('GET',`/traffic/semanal?de=${f(ini)}&ate=${f(hj)}`,null,E);t('relatório semanal é operação: a Equipe acessa (200)',s===200);
  [s]=await call('GET','/traffic/semanal?de=2026-10-10&ate=2026-10-01');t('período invertido é recusado (400)',s===400);
  [s]=await call('GET','/traffic/semanal?de=2026-01-01&ate=2026-06-30');t('período maior que 31 dias é recusado (400)',s===400);
  [s]=await call('GET','/traffic/semanal?de=abc&ate=2026-10-01');t('data inválida é recusada (400)',s===400);
