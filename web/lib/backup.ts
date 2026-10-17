@@ -28,6 +28,8 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   record_checklist: { cols: ['id', 'modulo', 'registro', 'texto', 'feito', 'ordem', 'atualizado_em'], restore: 'replace', opt: true },
   ads_snapshots: { cols: ['id', 'conta', 'campanha_id', 'campanha', 'periodo', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'conversas', 'inicio', 'moeda', 'status', 'objetivo', 'orcamento_diario', 'atualizado_em'], restore: 'replace', opt: true },
   ig_seguidores: { cols: ['conta', 'dia', 'seguidores', 'seguindo', 'midias', 'atualizado_em'], restore: 'replace', opt: true },
+  datacom_ajustes: { cols: ['catalogo_id', 'relevante', 'observacoes', 'atualizado_em', 'atualizado_por'], restore: 'replace', opt: true },
+  datacom_categorias: { cols: ['codigo', 'nome', 'criado_em', 'criado_por'], restore: 'replace', opt: true },
   ads_ids: { cols: ['meta_id', 'nivel', 'codigo', 'criado_em'], restore: 'replace', opt: true },
   ads_vinculos: { cols: ['ad_id', 'conteudo_id', 'quem', 'quando'], restore: 'replace', opt: true },
   ads_diario: { cols: ['conta', 'dia', 'gasto', 'impressoes', 'cliques', 'resultados', 'conversas', 'moeda', 'atualizado_em'], restore: 'replace', opt: true },

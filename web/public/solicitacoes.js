@@ -51,6 +51,7 @@ const slChips=r=>[
  r.aguardandoSolicitante?'<span class="sl-chip warn">Aguardando solicitante</span>':'',
  r.exigeAprovacao==='1'&&r.etapa!=='CONCLUIDO'?'<span class="sl-chip">Exige aprovação</span>':'',
  r.eventoEscolarId?'<span class="sl-chip" title="Pedido criado a partir de um evento do Calendário Escolar">Evento escolar</span>':'',
+ r.dataComemorativaId?'<span class="sl-chip" title="Pedido criado a partir de uma data comemorativa">Data comemorativa</span>':'',
  r.prioridade==='URGENTE'||r.prioridade==='ALTA'?`<span class="sl-chip ${r.prioridade==='URGENTE'?'bad':'warn'}">${esc(r.prioridade==='URGENTE'?'Urgente':'Alta')}</span>`:''
 ].join('');
 function slCard(r){
@@ -202,6 +203,7 @@ async function slAbrir(id,aoFechar){
   <h3>${esc(r.titulo)} <small>${esc(r.id)}</small></h3>
   <div class="sl-chips"><span class="sl-etapa e-${r.etapa}">${esc(SL_ROT[r.etapa])}</span>${slChips(r)}${r.origem==='PORTAL_SOLICITANTE'?'<span class="sl-chip">Veio do Portal</span>':''}</div>
   ${r.eventoEscolarId?`<p class="kpi-note">Evento escolar: <b>${esc(r.eventoEscolarTitulo||r.eventoEscolarId)}</b>${r.eventoEscolarData?` · ${esc(fmtDate(r.eventoEscolarData))}`:''}</p>`:''}
+  ${r.dataComemorativaId?`<p class="kpi-note">Data comemorativa: <b>${esc(r.dataComemorativaNome||r.dataComemorativaId)}</b>${r.dataComemorativaData?` · ${esc(fmtDate(r.dataComemorativaData))}`:''}</p>`:''}
   <div class="sl-acoes-det">
    ${dest.length?`<label>Mover para <select class="control" id="dMover"><option value="">Escolher…</option>${dest.map(e=>`<option value="${e}">${esc(SL_ROT[e])}</option>`).join('')}</select></label>`:''}
    ${(slGerente()||slDono(r))&&sl.portalAtivo&&r.origem==='PORTAL_SOLICITANTE'&&['PENDENTE','EM_ANDAMENTO'].includes(r.etapa)&&!r.aguardandoSolicitante?'<button type="button" class="softbtn" id="dPedirInfo">Pedir informação ao solicitante</button>':''}

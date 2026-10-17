@@ -57,3 +57,19 @@
  .cm-form{grid-template-columns:minmax(0,1fr)}.cm-resp{max-width:none;width:100%}
  .cm-periodo{font-size:16px}
 }
+/* visão anual, alternâncias e seletor de ano (motor comum) */
+.cm-ano-sel{min-height:38px;width:auto}
+.cm-toggle{border:1px solid var(--border,#E2E4EC);background:#fff;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;color:#3b4054;min-height:32px}
+.cm-toggle.on{background:var(--blue,#063996);border-color:var(--blue,#063996);color:#fff}
+.cm-ano{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cm-mini{background:#fff;border:1px solid var(--border,#E2E4EC);border-radius:12px;padding:8px;min-width:0}
+.cm-mini-t{border:0;background:transparent;font-weight:800;text-transform:capitalize;cursor:pointer;color:var(--blue,#063996);padding:2px 4px;font-size:14px}
+.cm-mini-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;margin-top:4px;text-align:center}
+.cm-mh{font-style:normal;font-size:10px;color:var(--muted,#6B6F80);font-weight:800}
+.cm-md{font-size:11px;min-height:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;border:0;background:transparent;color:#3b4054;padding:0}
+.cm-md.tem{cursor:pointer;background:#f3f6ff}.cm-md.tem b{font-weight:800}.cm-md.tem span{display:flex;gap:2px;height:5px}.cm-md.tem span i{width:5px;height:5px;border-radius:50%;background:var(--c)}
+.cm-md.hoje{outline:2px solid var(--orange,#FF7800);outline-offset:-1px}
+.cm-md.feriado b,.cm-dia.feriado .cm-num,.cm-col.feriado .cm-num{color:#b3261e}.cm-md.feriado{background:#fdeeee}
+.cm-dia.feriado{background:#fffafa;border-color:#f1c9c5}
+@media(max-width:1100px){.cm-ano{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:719px){.cm-ano{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-md{min-height:22px;font-size:10px}.cm-ano-sel{min-width:90px}}

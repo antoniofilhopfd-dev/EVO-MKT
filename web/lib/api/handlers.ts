@@ -28,6 +28,7 @@ import { gestaoAnunciosRoute } from './gestaoAnuncios';
 import { solicitacoesRoute } from './solicitacoes';
 import { portalRoute } from './portal';
 import { escolarRoute } from './escolar';
+import { datacomRoute } from './datacom';
 import { exigirPortalAtivo } from '../portal';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
@@ -62,6 +63,8 @@ export async function route(c: Ctx): Promise<Out> {
       return solicitacoesRoute(c);
     case path.startsWith('/escolar/'):
       return escolarRoute(c);
+    case path.startsWith('/datacom/'):
+      return datacomRoute(c);
     case path.startsWith('/portal/pagina/') || path === '/admin/portal':
       return portalRoute(c);
     case path.startsWith('/reports/'):
@@ -650,6 +653,7 @@ async function dataRoute(c: Ctx): Promise<Response> {
   if (u.role !== 'manager' && !TEAM_WRITE.includes(mod) && mod !== 'lixeira') fail(403, 'Seu perfil não pode alterar este módulo.');
   if (u.role !== 'manager' && mod === 'lixeira' && method === 'DELETE') fail(403, 'Exclusão permanente apenas para a Gerente.');
   if (mod === 'calescolar' && (method === 'POST' || method === 'PUT')) fail(400, 'O Calendário Escolar é editado pela própria tela (com validação de datas, segmentos e duplicidade).');
+  if (mod === 'datacom' && (method === 'POST' || method === 'PUT')) fail(400, 'As Datas Comemorativas são editadas pela própria tela (com validação das regras e de duplicidade).');
   await autoBackupIfDue();
   if (method === 'POST') {
     const novo = await insertRow(mod, await c.body(), u.codigo);

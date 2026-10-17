@@ -1,0 +1,18 @@
+/* Datas Comemorativas: cores discretas por categoria (a cor nunca é a única pista: há glifo e nome) */
+.t-FERIADO_NACIONAL{--c:#c0392b;--bg:#fdeaea;--tx:#8a2a22}.t-FERIADO_ESTADUAL_PB{--c:#d9821f;--bg:#fff0dc;--tx:#7a4a00}.t-FERIADO_MUNICIPAL_JP{--c:#8b5fc7;--bg:#f1eaff;--tx:#4a2f93}
+.t-EDUCACIONAL{--c:#3f6fd1;--bg:#e8efff;--tx:#1c3a8a}.t-CULTURAL{--c:#c2559a;--bg:#fbe9f4;--tx:#7d2a62}.t-RELIGIOSA{--c:#b08a1a;--bg:#f8f0d4;--tx:#6a5200}
+.t-PROFISSIONAL{--c:#5f7690;--bg:#e8eef4;--tx:#33495e}.t-AMBIENTAL{--c:#3f9d55;--bg:#e6f5e9;--tx:#1f6a33}.t-SAUDE{--c:#2f9d8a;--bg:#e2f4f0;--tx:#17695b}.t-INSTITUCIONAL{--c:#1c3a8a;--bg:#e6ebf7;--tx:#14275f}
+.dc-c0{--c:#6b7bd1;--bg:#eceefb;--tx:#34408f}.dc-c1{--c:#d1668a;--bg:#fbe9f0;--tx:#8a2c4d}.dc-c2{--c:#4aa886;--bg:#e4f4ee;--tx:#1d6a4f}
+.dc-c3{--c:#c79a2b;--bg:#faf1d9;--tx:#6a5200}.dc-c4{--c:#5aa0c7;--bg:#e6f2f8;--tx:#1f5b7c}.dc-c5{--c:#9a7bd1;--bg:#f2edfb;--tx:#4a3a8a}
+.dc-det{display:flex;flex-direction:column;gap:10px;max-height:80vh;overflow:auto}.dc-det h3{margin:0}.dc-det h4{margin:8px 0 4px}
+.dc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.dc-chip{border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;background:var(--bg,#f1f3f7);color:var(--tx,#3b4054);border:1px solid transparent}
+.dc-chip.pend{background:#fff1e4;color:#9a5200;border-color:#f2c48f}.dc-chip.ok{background:#eaf7f0;color:#17653e}.dc-chip.rel{background:#fff8d6;color:#6a5200}
+.dc-dl{display:grid;grid-template-columns:96px minmax(0,1fr);gap:4px 10px;margin:0}.dc-dl dt{color:var(--muted,#6B6F80);font-weight:800;font-size:12px}.dc-dl dd{margin:0;overflow-wrap:anywhere}
+.dc-aviso{background:#fff8e8;border:1px solid #ffe0a5;color:#895a00;border-radius:10px;padding:8px 10px;margin:0;font-size:13px}
+.dc-seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}.dc-seg button{border:1px solid var(--border,#E2E4EC);background:#fff;border-radius:999px;padding:6px 12px;font-weight:700;cursor:pointer;min-height:34px}
+.dc-seg button.on{background:var(--blue,#063996);color:#fff;border-color:var(--blue,#063996)}
+.dc-obs{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:800;color:#545b6d;margin:6px 0}
+.dc-acoes,.dc-vinc{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.cm-regra{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.cm-regra[hidden]{display:none}
+@media(max-width:719px){.cm-regra{grid-template-columns:minmax(0,1fr)}.dc-dl{grid-template-columns:minmax(0,1fr)}}

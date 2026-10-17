@@ -20,7 +20,7 @@ async function call(p,{m='GET',b,ck,pt,csrf=true}={}){const h={};if(b)h['Content
  r=await call('/data?module=tarefas',{ck:G});t('headers dinâmicos incluem custom',r.j.headers.includes('custom'));
  r=await call('/search?q=importada',{ck:G});t('busca',r.s===200&&r.j.length===1&&r.j[0].module==='tarefas');
  r=await call('/backup',{m:'POST',ck:G});t('backup',r.s===200&&/evo_backup/.test(r.j.file));
- r=await call('/health',{ck:G});t('health',r.s===200&&r.j.modules.length===20);
+ r=await call('/health',{ck:G});t('health',r.s===200&&r.j.modules.length===21);
  r=await call('/auth/login',{m:'POST',b:{codigo:'ANT-3302',senha:pw('ANT-3302')}});const E=r.c.split(';')[0];
  r=await call('/data?module=equipe',{m:'POST',ck:E,b:{titulo:'x'}});t('equipe não grava em Equipe',r.s===403);
  r=await call('/backup',{m:'POST',ck:E});t('equipe não faz backup',r.s===403);
