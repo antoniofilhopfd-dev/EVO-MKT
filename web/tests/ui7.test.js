@@ -14,9 +14,9 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await post('conteudos',{titulo:'Post da feira',publicacaoEm:ds+'T10:00',status:'PROGRAMADO'});
  await post('campanhas',{titulo:'Matrículas 2027',dataInicio:ds,status:'PLANEJAMENTO'});
  const nav=await p.$$eval('#nav .navitem',e=>e.map(x=>x.innerText.replace(/\s+/g,' ').trim()));
- t('menu lateral tem as 9 áreas (com Instagram)',nav.length===9&&['Visão geral','Solicitações','Planejamento','Conteúdo','Instagram','Tráfego','Relatórios','Arquivos e equipe','Administração'].every((x,i)=>nav[i].includes(x)),nav.join('|'));
- await p.evaluate(()=>go('agenda'));await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText));
- t('Planejamento tem o Calendário de Marketing e o Calendário Escolar (sem "Calendário de Eventos")',sub.filter(x=>/Calendário/.test(x)).length===2&&sub.some(x=>/Calendário de Marketing/.test(x))&&sub.some(x=>/Calendário Escolar/.test(x))&&!sub.some(x=>/Calendário de Eventos/.test(x))&&sub.includes('Tarefas')&&sub.includes('Projetos'),sub.join('|'));
+ t('menu lateral reorganizado (Organização, Marketing, Gestão, Administração)',nav.length===15&&['Dashboard','Solicitações','Planejamento','Calendários','Conteúdos','Campanhas','Instagram','Tráfego Pago','Relatórios','Arquivos','Equipe','Configurações','Usuários e permissões','Integrações','Backup e segurança'].every((x,i)=>nav[i].includes(x)),nav.join('|'));
+ await p.evaluate(()=>go('calendario'));await p.waitForSelector('#subtabs .subtab');const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText));
+ t('Calendários: Marketing, Escolar e Datas Comemorativas (sem "Calendário de Eventos")',sub.length===3&&sub.some(x=>/Marketing/.test(x))&&sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Datas/.test(x))&&!sub.some(x=>/Eventos/.test(x)),sub.join('|'));
  // Calendário de Marketing (geral): compromissos, reuniões, publicações e prazos de solicitações; sem tarefas/campanhas/eventos
  await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-mes');
  let up=await p.$eval('#cmRaiz',e=>e.innerText);
