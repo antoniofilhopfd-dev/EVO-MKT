@@ -17,7 +17,7 @@ const plSitRot=k=>(PL_SIT.find(s=>s[0]===k)||[,k])[1];
 
 async function plCarregar(){
  const d=await api('/planejamento/painel');
- PL=d;
+ PL={...d,opc:d.opcoes};
  const itens=d.acoes.map(a=>({uid:'pl:'+a.id,id:a.id,modulo:'planejamento',titulo:a.titulo,data:a.dataInicio||a.dataFim||'',fim:a.dataFim&&a.dataFim>a.dataInicio?a.dataFim:'',hora:'',tipo:a.categoria,responsavel:a.responsavel,editavel:a.editavel&&!!a.dataInicio,feito:a.situacao==='FINALIZADO',atrasada:a.atrasada,raw:a}));
  return {itens,opcoes:{responsaveis:d.opcoes.responsaveis},eu:d.eu,podeEditar:true};
 }
