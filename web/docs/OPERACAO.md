@@ -175,3 +175,29 @@ Verificada pela suíte `auditoria`: todas as rotas novas exigem login (401); esc
 2. Faça backup antes (Administração → Backup e segurança).
 3. Pendências de configuração (não são código): cron `publicar` a cada 10 min; trocar segredos que passaram pelo chat; conferir o deploy; fornecer o calendário oficial do Colégio.
 4. O Portal só volta com o interruptor em Administração, com confirmação explícita.
+
+## Reorganização final (v5.16.0): nove módulos
+- **Menu**: Dashboard · Planejamento · Calendário · Instagram · Tráfego Pago · Arquivos · Relatórios · Equipe · Configurações. Nada foi excluído: o que saiu do menu continua acessível dentro de um desses módulos e os links antigos redirecionam.
+- **Planejamento** (abas *Ações* e *Solicitações*; menu *Mais*: Tarefas internas, Eventos, Campanhas). Projetos viraram Ações (mesmo armazenamento). As campanhas internas de Planejamento **não** são as campanhas de anúncios, que continuam em Tráfego Pago.
+- **Calendário único**: compromissos, reuniões, coberturas, publicações, prazos de solicitações, ações planejadas, eventos escolares, datas comemorativas e feriados, com filtros por categoria e visão semanal por padrão (também Mês, Dia e Lista). Cada item abre o formulário da sua origem e reagendar altera o registro original; nada é copiado. Datas ainda pendentes de validação ficam só no cadastro de datas; entram no calendário as confirmadas e marcadas como relevantes. Eventos ou ações com mais de 7 dias aparecem só no primeiro dia.
+- **Instagram**: abas *Estúdio*, *Conteúdos*, *Aprovações*, *Métricas*; menu *Mais*: Editorial, Ideias, Templates, Desempenho, Ranking. Conteúdos é o mesmo registro de antes (nenhum cadastro duplicado com o Calendário).
+- **Tráfego Pago**: sem alterações de módulo (Tráfego e Gerenciador).
+- **Arquivos**: Biblioteca, Entregas e Anexos (anexos das solicitações, lidos direto do registro, sem duplicar armazenamento).
+- **Relatórios**: o cartão "Fechamento mensal" duplicado foi retirado; o Fechamento mensal completo é a segunda aba.
+- **Configurações**: *Perfil e preferências* (todos) e *Administração* (só Administrador: acessos, integrações, avisos, auditoria, backups).
+
+## Perfis: Administrador, Gerente e Equipe
+- A migração 020 cria `users.admin`. **Todas as Gerentes que já existiam viram Administradoras**, então nada deixa de funcionar. Novas fichas podem ser criadas como Gerente (sem administração).
+- **Administrador**: tudo, incluindo usuários e perfis, códigos de acesso, integrações (conectar/desconectar Meta e Google, tokens, contas), backup/restauração, auditoria, importação, integridade, interruptor do Portal, modo de login e LGPD.
+- **Gerente**: opera todos os módulos (distribui solicitações, edita Calendário Escolar e Datas, vê Equipe, Relatórios, status das integrações e pode sincronizar), mas não administra o sistema.
+- **Equipe**: vê e edita só o que é dela.
+- Sempre precisa existir ao menos um Administrador ativo (não pode ser rebaixado, desativado, excluído nem anonimizado). Backups antigos (sem a coluna) restauram com as Gerentes daquela época como Administradoras.
+- O modo de login (senha ou código) não foi alterado e o Portal das Coordenações continua suspenso.
+
+## LGPD (o que se aplica)
+- **Exportar dados** de uma pessoa (Administração → Acessos): ficha (sem senha/código), registros em que aparece, comentários e operações, em JSON.
+- **Anonimizar**: remove nome e acesso, desativa a ficha e limpa o e-mail na Equipe, preservando o histórico, que continua apontando para o código da ficha. Pede confirmação e fica no registro de operações. Não existe exclusão de registros operacionais por regra de preservação de dados.
+- **Retenção**: sessões e tentativas de login expiram sozinhas; a auditoria e o histórico são mantidos. Prazos formais de retenção por tipo de dado dependem de decisão do Colégio (encarregado/DPO); o sistema ainda não apaga nada por prazo.
+
+## Desempenho
+Medido com 16.000 registros (5.000 solicitações, 5.000 tarefas, 3.000 conteúdos, 3.000 projetos): a pior resposta foi o painel de Planejamento, com cerca de 0,5 s; as demais ficaram abaixo de 0,12 s. Por isso **não foi implementada paginação no servidor** (suíte `desempenho`; revisar se o volume passar de dezenas de milhares de registros).
