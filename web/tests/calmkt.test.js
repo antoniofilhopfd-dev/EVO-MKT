@@ -71,7 +71,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.fill('#fTitulo','Alinhamento sem hora');await p.click('#fSalvar');await p.waitForSelector('#cmForm',{state:'detached'});
  nova=(await lista('calendario')).find(x=>x.titulo==='Alinhamento sem hora');
  t('horário é opcional (dia inteiro) e o tipo padrão vale',nova&&nova.diaInteiro==='Sim'&&nova.dataInicio===D2&&nova.tipoItem==='Reunião',nova);
- await p.click(`.cm-dia[data-date="${D3}"]`,{position:{x:8,y:70}});await p.waitForSelector('#cmForm');t('clicar no espaço livre do dia cria nele',(await p.inputValue('#fData'))===D3);
+ await p.click(`.cm-dia[data-date="${D3}"]`,{position:{x:8,y:70}});await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="mkt"]');await p.waitForSelector('#cmForm');t('clicar no espaço livre do dia cria nele',(await p.inputValue('#fData'))===D3);
  await p.click('#cmForm [data-close]');await p.waitForSelector('#cmForm',{state:'detached'});
  await p.click('#fSalvar').catch(()=>{});
  await p.click('[data-modo="week"]');await p.waitForSelector('.cm-semana');

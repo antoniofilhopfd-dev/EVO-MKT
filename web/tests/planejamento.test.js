@@ -181,11 +181,11 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await pg.evaluate(()=>go('calendario'));await pg.waitForSelector('.cm-semana, .cm-mes');await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pg.$('.cm-mes'))){await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes')}await pg.waitForTimeout(300);
  t('o Calendário único mostra a ação planejada (tipo Ação planejada), sem cópia',(await pg.$$eval('.cm-item.t-PLANO',e=>e.length))>=1&&(await acoes()).filter(x=>x.titulo==='Semana do Livro'&&x.dataInicio===dia(2)).length===1);
  // Dashboard
- await pg.evaluate(()=>go('hoje'));await pg.waitForSelector('.db-kpis');
+ await pg.evaluate(()=>go('hoje'));await pg.waitForSelector('.db-stats');
  const dd=(await call('GET','/dashboard/resumo'))[1];
- const kv=await pg.$$eval('.db-kpi',e=>e.map(x=>x.querySelector('b').textContent));
+ const kv=await pg.$$eval('.db-stat',e=>e.map(x=>x.querySelector('b').textContent));
  t('Dashboard: contagens iguais às reais (pendentes, em andamento, em aprovação, atrasadas)',kv.join()===[dd.solicitacoes.pendentes,dd.solicitacoes.emAndamento,dd.solicitacoes.emAprovacao,dd.solicitacoes.atrasadas].join(),[kv,dd.solicitacoes]);
- t('Dashboard: blocos de compromissos, eventos escolares, ações da semana e entregas recentes',['Próximos compromissos','Próximos eventos escolares','Ações planejadas para a semana','Entregas recentes'].every(x=>true)&&(await pg.$$eval('.db-bloco h2',e=>e.map(x=>x.textContent))).join('|').includes('Ações planejadas para a semana'));
+ t('Dashboard enxuto: Próximos dias (compromissos, publicações e eventos escolares juntos) e Ações da semana, sem cartões repetidos',(await pg.$$eval('.db-bloco h2',e=>e.map(x=>x.textContent))).join('|')==='Próximos dias|Ações da semana');
  t('Dashboard: a ação da semana aparece',/Semana do Livro|Projeto antigo em risco/.test(await pg.$eval('.db-grade',e=>e.innerText)));
  await pg.click('[data-db-sol="PENDENTE"]');await pg.waitForSelector('.sl-board');t('clicar num indicador abre Solicitações já filtrada',(await pg.inputValue('#slEtapa'))==='PENDENTE');
  // equipe
@@ -196,7 +196,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await pe.click('.cm-item:has-text("Homenagem aos professores")');await pe.waitForSelector('#plForm');t('equipe consulta ação de outra pessoa em modo leitura (sem Salvar/Excluir)',await pe.$('#pSalvar')===null&&await pe.$('#plExc')===null&&await pe.$eval('#pTitulo',e=>e.disabled));
  // celular
  const pc=await entra('NAT-3301',390,800);const cabe=()=>pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1);
- for(const [pagina,sel] of [['hoje','.db-kpis'],['planejamento','.pl-faixa']]){await pc.evaluate(x=>go(x),pagina);await pc.waitForSelector(sel);await pc.waitForTimeout(600);t(`celular: ${pagina} sem rolagem horizontal`,await cabe())}
+ for(const [pagina,sel] of [['hoje','.db-stats'],['planejamento','.pl-faixa']]){await pc.evaluate(x=>go(x),pagina);await pc.waitForSelector(sel);await pc.waitForTimeout(600);t(`celular: ${pagina} sem rolagem horizontal`,await cabe())}
  await pc.click('[data-modo="month"]');await pc.waitForSelector('.cm-mes');t('celular: Planejamento mensal cabe na tela',await cabe());
  await pc.click('#cmNovo');await pc.waitForSelector('#plForm');t('celular: o formulário cabe na tela',await cabe());
  t('sem erros de JavaScript',errs.length===0,errs.join(' | '));
