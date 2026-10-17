@@ -80,7 +80,7 @@ function slLista(rows){
 function slOpts(lista,sel,vazio,extras=[]){return `<option value="">${vazio}</option>${extras.map(([v,l])=>`<option value="${v}" ${sel===v?'selected':''}>${l}</option>`).join('')}${lista.map(x=>`<option value="${attr(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}`}
 async function slCarrega(){
  const d=await api('/solicitacoes/painel');
- sl.rows=d.rows||[];sl.opc=d.opcoes||sl.opc;sl.eu=d.eu||sl.eu;sl.hoje=d.hoje||today();sl.portalAtivo=!!d.portalAtivo;
+ sl.rows=d.rows||[];state.rows=sl.rows;sl.opc=d.opcoes||sl.opc;sl.eu=d.eu||sl.eu;sl.hoje=d.hoje||today();sl.portalAtivo=!!d.portalAtivo;
 }
 function slDesenha(){
  const box=$('#slRaiz');if(!box)return;
