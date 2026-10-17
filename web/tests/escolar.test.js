@@ -90,7 +90,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const p=await entra('NAT-3301');
  await p.evaluate(()=>go('agenda'));await p.waitForSelector('#subtabs .subtab');
  const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText.trim()));
- t('Planejamento ganhou "Calendário Escolar" ao lado do de Marketing',sub.some(x=>/Calendário Escolar/.test(x))&&sub.some(x=>/Calendário de Marketing/.test(x)),sub.join('|'));
+ t('Calendários: Escolar ao lado do de Marketing e das Datas Comemorativas',sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Marketing/.test(x))&&sub.some(x=>/Datas/.test(x)),sub.join('|'));
  await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
  t('título "Calendário Escolar" e botão "+ Novo evento"',/Calendário Escolar/.test(await p.$eval('#content h1',e=>e.textContent))&&/Novo evento/.test(await p.$eval('#cmNovo',e=>e.textContent)));
  t('visões Mês, Semana e Próximos (sem Dia)',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Mês,Semana,Próximos');
