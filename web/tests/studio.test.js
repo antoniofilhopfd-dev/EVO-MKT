@@ -77,14 +77,14 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.evaluate(()=>go('studio'));await p.waitForSelector('.st-week');
  t('menu tem a área Instagram com Estúdio, Conteúdos, Aprovações, Métricas e Mais (Desempenho, Ranking)',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&['Estúdio','Conteúdos','Aprovações','Métricas'].every((x,i)=>subs[i]===x)&&/Mais/.test(subs[4]||'')}));
  t('a área Instagram reúne Estúdio, Conteúdos, Métricas, Desempenho e Ranking (não existe mais a área Conteúdo)',await p.evaluate(()=>{const a=AREAS.find(x=>x.k==='instagramarea');return !AREAS.some(x=>x.k==='conteudo')&&['studio','conteudos','instagram','igposts','igranking'].every(k=>a.pages.includes(k))}));
- await p.evaluate(()=>go('igposts'));await p.waitForFunction(()=>/DESEMPENHO/.test(document.querySelector('.dashboard-head')?.innerText||''));
+ await p.evaluate(()=>go('igposts'));await p.waitForFunction(()=>/DESEMPENHO/.test(document.querySelector('.dashboard-head')?.textContent||''));
  t('sem Instagram sincronizado mostra aviso claro',/Nenhuma publicação lida ainda/.test(await p.$eval('#content',e=>e.innerText)));
  await api('POST','/integrations/meta/token',{token:'GOOD_TOKEN'});let sy=await api('POST','/integrations/instagram/sync',{});
  let ps=await api('GET','/instagram/posts');const m2=(ps.rows||[]).find(x=>x.id==='m2');
  t('sincronização grava alcance, salvos e compartilhamentos por publicação',m2&&m2.alcance===20000&&m2.salvos===80&&m2.compartilhamentos===40&&m2.interacoes===900+55+80+40,[sy,m2]);
  t('engajamento = interações ÷ alcance',m2&&m2.engajamento===Math.round((m2.interacoes/20000)*1000)/10,m2);
  t('só endereços https viram miniatura',(ps.rows||[]).every(x=>!x.miniatura||/^https:\/\//.test(x.miniatura))&&(ps.rows||[]).find(x=>x.id==='m1').miniatura.includes('cdninstagram'));
- await p.evaluate(()=>go('igranking'));await p.waitForFunction(()=>/RANKING/.test(document.querySelector('.dashboard-head')?.innerText||''));await p.waitForSelector('[data-rk="visao"]');
+ await p.evaluate(()=>go('igranking'));await p.waitForFunction(()=>/RANKING/.test(document.querySelector('.dashboard-head')?.textContent||''));await p.waitForSelector('[data-rk="visao"]');
  t('ranking do mês: 1º lugar é o post com mais interações do mês',/Bastidores da feira/.test(await p.$eval('.datatable tbody tr:first-child',e=>e.textContent))||(await p.$$('.datatable')).length>=2);
  t('ranking tem relatório mensal em PDF, histórico e seguidores manuais (Gerência)',!!(await p.$('a[href^="/relatorio-instagram.html"]'))&&!!(await p.$('#rkHist'))&&!!(await p.$('#rkSegManual')));
  t('ranking mostra seguidores por mês e por ano',/Por mês/.test(await p.$eval('#content',e=>e.innerText))&&/Por ano/.test(await p.$eval('#content',e=>e.innerText)));

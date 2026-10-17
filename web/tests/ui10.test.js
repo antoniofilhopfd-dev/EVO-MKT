@@ -33,7 +33,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.click('#cDecidir');await p.waitForSelector('[data-d="APROVADO"]');await p.click('[data-d="APROVADO"]');await p.waitForTimeout(800);
  t('aprovar pela tela muda o conteúdo para APROVADO',(await api('GET','/data?module=conteudos&id='+cid)).status==='APROVADO');
  // telas
- await p.evaluate(()=>go('conteudos'));await p.waitForSelector('#canalFilter');t('Conteúdos tem filtros de canal e de estado de publicação',!!(await p.$('#estadoFilter')));
+ await p.evaluate(()=>go('conteudos'));await p.waitForSelector('#canalFilter',{state:'attached'});await p.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));t('Conteúdos tem filtros de canal e de estado de publicação',!!(await p.$('#estadoFilter')));
  await p.evaluate(()=>go('aprovacoes'));await p.waitForSelector('#filaUnica');t('Aprovações reúne conteúdos e entregas numa fila só',/Conteúdos em revisão/.test(await p.$eval('#filaUnica',e=>e.innerText)));
  await p.evaluate(()=>go('relatorios'));await p.waitForSelector('#painelInt h4');await p.waitForTimeout(800);
  const rel=await p.$eval('#painelInt',e=>e.innerText);t('Relatórios: painel integrado separa redes, tráfego, operação e institucional, com fonte e data',/1\. Redes sociais/.test(rel)&&/2\. Tráfego pago/.test(rel)&&/3\. Indicadores operacionais/.test(rel)&&/4\. Indicadores institucionais/.test(rel)&&/fonte:/.test(rel)&&/Gerado em/.test(rel),rel.slice(0,300));

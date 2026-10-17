@@ -61,7 +61,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));await p.selectOption('#cmResp','');await p.waitForTimeout(150);
 
  // ---- criar: botão, número do dia, espaço livre ----
- await p.click('#cmNovo');await p.waitForSelector('#cmForm');
+ await p.click('#cmNovo');await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="mkt"]');await p.waitForSelector('#cmForm');
  t('"+ Novo evento": a data já vem preenchida',(await p.inputValue('#fData'))===D0);
  await p.fill('#fTitulo','Cobertura da gincana');await p.fill('#fHora','09:30');await p.selectOption('#fTipo','COBERTURA');await p.selectOption('#fResp','Monique Vilante');await p.fill('#fObs','Levar o tripé');await p.click('#fSalvar');await p.waitForSelector('#cmForm',{state:'detached'});
  let nova=(await lista('calendario')).find(x=>x.titulo==='Cobertura da gincana');
@@ -77,7 +77,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.click('[data-modo="week"]');await p.waitForSelector('.cm-semana');
  await p.click(`.cm-col[data-date="${D0}"]`,{position:{x:6,y:150}});await p.waitForSelector('#cmForm');t('na Semana, clicar no espaço livre também cria',(await p.inputValue('#fData'))===D0);
  await p.click('#cmForm [data-close]');await p.click('[data-modo="month"]');await p.waitForSelector('.cm-mes');
- await p.click('#cmNovo');await p.waitForSelector('#cmForm');await p.click('#fSalvar');t('o formulário exige título',/título/i.test(await p.textContent('#fErro')));await p.click('#cmForm [data-close]');
+ await p.click('#cmNovo');await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="mkt"]');await p.waitForSelector('#cmForm');await p.click('#fSalvar');t('o formulário exige título',/título/i.test(await p.textContent('#fErro')));await p.click('#cmForm [data-close]');
 
  // ---- editar / reagendar pelo formulário ----
  await p.click('.cm-item:has-text("Cobertura da gincana")');await p.waitForSelector('#cmForm');

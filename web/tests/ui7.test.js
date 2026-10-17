@@ -18,7 +18,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-tipo');const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText));
  t('Calendário único: categorias Escolar, Datas e Compromissos, sem "Calendário de Eventos" nem subabas',sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Datas/.test(x))&&sub.some(x=>/Compromissos/.test(x))&&!sub.some(x=>/Eventos/.test(x))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
  // Calendário de Marketing (geral): compromissos, reuniões, publicações e prazos de solicitações; sem tarefas/campanhas/eventos
- await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-mes');
+ await p.evaluate(()=>go('calendario'));await p.waitForSelector('.cm-semana, .cm-mes');if(!(await p.$('.cm-mes'))){await p.click('[data-modo="month"]');await p.waitForSelector('.cm-mes')}
  let up=await p.$eval('#cmRaiz',e=>e.innerText);
  t('Calendário de Marketing mostra a reunião e a publicação, e deixa tarefas, campanhas e eventos nos seus módulos',/Reunião de pais/.test(up)&&/Post da feira/.test(up)&&!/Arte do cartaz/.test(up)&&!/Matrículas 2027/.test(up)&&!/Feira de Ciências/.test(up),up);
  await p.click('[data-tipo="PUBLICACAO"]');await p.waitForTimeout(300);up=await p.$eval('#cmRaiz',e=>e.innerText);
