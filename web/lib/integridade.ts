@@ -5,9 +5,9 @@ import { Row } from './util';
 /** Campo de vínculo → módulo ao qual ele aponta. */
 export const VINCULOS: Record<string, string> = {
   solicitacaoId: 'solicitacoes', campanhaId: 'campanhas', projetoId: 'projetos', eventoId: 'eventos',
-  conteudoId: 'conteudos', tarefaPaiId: 'tarefas', dependeDe: 'tarefas',
+  conteudoId: 'conteudos', tarefaPaiId: 'tarefas', dependeDe: 'tarefas', planejamentoId: 'projetos', eventoEscolarId: 'calescolar',
 };
-const MODULOS_COM_VINCULO = ['tarefas', 'projetos', 'conteudos', 'aprovacoes', 'eventos', 'campanhas', 'arquivos', 'configuracoes'];
+const MODULOS_COM_VINCULO = ['tarefas', 'projetos', 'conteudos', 'aprovacoes', 'eventos', 'campanhas', 'arquivos', 'configuracoes', 'solicitacoes'];
 
 export interface Achado { tipo: string; modulo: string; registro: string; detalhe: string }
 

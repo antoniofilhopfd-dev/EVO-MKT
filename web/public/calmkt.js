@@ -31,10 +31,11 @@ const CalMotor=(()=>{
   const cls=k=>tipo(k).classe||('t-'+k);
   const semanaIni=d=>{const x=new Date(d);x.setDate(x.getDate()-x.getDay());return isoDate(x)};
   const listaAno=()=>cfg.listaEscopo==='ano';
+  const listaTudo=()=>cfg.listaEscopo==='tudo';
   const rotuloPeriodo=()=>{
    const f=o=>new Intl.DateTimeFormat('pt-BR',o).format;
    if(est.modo==='year'||(est.modo==='list'&&listaAno()))return String(est.data.getFullYear());
-   if(est.modo==='list')return 'Próximos eventos';
+   if(est.modo==='list')return listaTudo()?'Todas as ações':'Próximos eventos';
    if(est.modo==='month')return f({month:'long',year:'numeric'})(est.data);
    if(est.modo==='day')return f({weekday:'long',day:'2-digit',month:'long',year:'numeric'})(est.data);
    const ini=dataDe(semanaIni(est.data));const fim=new Date(ini);fim.setDate(ini.getDate()+6);
@@ -81,12 +82,12 @@ const CalMotor=(()=>{
   /* lista de próximos eventos: do dia de hoje em diante (padrão) ou todos os do ano escolhido, agrupada por mês */
   function lista(itens){
    const hoje=hojeIso(),y=String(est.data.getFullYear());
-   let base=listaAno()?itens.filter(x=>x.data.slice(0,4)===y&&(!est.mes||x.data.slice(5,7)===est.mes)):itens.filter(x=>(x.fim||x.data)>=hoje);
-   const prox=ordena(base).slice(0,300);
+   let base=listaTudo()?itens:listaAno()?itens.filter(x=>x.data.slice(0,4)===y&&(!est.mes||x.data.slice(5,7)===est.mes)):itens.filter(x=>(x.fim||x.data)>=hoje);
+   const prox=ordena(base).slice(0,500);
    if(!prox.length)return `<div class="cm-livre"><strong>${listaAno()?'Nada neste filtro':'Nenhum evento à frente'}</strong><span>Ajuste os filtros${est.podeEditar?' ou cadastre uma nova data':''}.</span></div>`;
-   const grupos=[];prox.forEach(i=>{const m=(!listaAno()&&i.data<hoje?hoje:i.data).slice(0,7);let g=grupos.find(x=>x.m===m);if(!g)grupos.push(g={m,l:[]});g.l.push(i)});
-   const nomeMes=m=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(dataDe(m+'-01'));
-   return `<div class="cm-proximos">${grupos.map(g=>`<section><h3>${esc(nomeMes(g.m))}</h3>${g.l.map(i=>`<div class="cm-prox-linha"><span class="cm-quando">${fmtCurto(i.data)}${i.fim?' – '+fmtCurto(i.fim):''}${i.hora?'<br>'+esc(i.hora):''}</span>${item(i,i.data)}<small>${esc(tipo(i.tipo).rotulo)}${cfg.detalhe?' · '+esc(cfg.detalhe(i)):''}</small></div>`).join('')}</section>`).join('')}</div>`;
+   const grupos=[];prox.forEach(i=>{const m=i.data?(!listaAno()&&!listaTudo()&&i.data<hoje?hoje:i.data).slice(0,7):'sem';let g=grupos.find(x=>x.m===m);if(!g)grupos.push(g={m,l:[]});g.l.push(i)});
+   const nomeMes=m=>m==='sem'?'Sem data':new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(dataDe(m+'-01'));
+   return `<div class="cm-proximos">${grupos.map(g=>`<section><h3>${esc(nomeMes(g.m))}</h3>${g.l.map(i=>`<div class="cm-prox-linha"><span class="cm-quando">${i.data?fmtCurto(i.data):'—'}${i.fim?' – '+fmtCurto(i.fim):''}${i.hora?'<br>'+esc(i.hora):''}</span>${item(i,i.data)}<small>${esc(tipo(i.tipo).rotulo)}${cfg.detalhe?' · '+esc(cfg.detalhe(i)):''}</small></div>`).join('')}</section>`).join('')}</div>`;
   }
 
   async function desenhar(){
@@ -97,7 +98,7 @@ const CalMotor=(()=>{
    const nav=semNav
     ?`<div class="cm-nav"><h2 class="cm-periodo" aria-live="polite">${esc(rotuloPeriodo())}</h2></div>`
     :`<div class="cm-nav"><button type="button" class="softbtn" id="cmPrev" aria-label="Período anterior">‹</button><button type="button" class="softbtn" id="cmHoje">Hoje</button><button type="button" class="softbtn" id="cmNext" aria-label="Próximo período">›</button><h2 class="cm-periodo" aria-live="polite">${esc(rotuloPeriodo())}</h2>${cfg.porAno?`<select class="control cm-ano-sel" id="cmAno" aria-label="Ano">${anos.map(a=>`<option value="${a}" ${a===est.data.getFullYear()?'selected':''}>${a}</option>`).join('')}</select>`:''}<label class="cm-ir"><span class="sr-only">Ir para a data</span><input type="date" id="cmIr" value="${isoDate(est.data)}" aria-label="Ir para a data"></label></div>`;
-   alvo.innerHTML=`<div class="cm-barra">${nav}
+   alvo.innerHTML=`${cfg.faixa?cfg.faixa(est.itens.filter(i=>!est.ocultos.has(i.tipo)),itens):''}<div class="cm-barra">${nav}
      <div class="view-switch" role="group" aria-label="Visualização">${modos.map(([k,l])=>`<button type="button" data-modo="${k}" class="${est.modo===k?'active':''}" aria-pressed="${est.modo===k}">${l}</button>`).join('')}</div></div>
      <div class="cm-filtros"><div class="cm-tipos" role="group" aria-label="Tipos">${est.tipos.map(t=>`<button type="button" class="cm-tipo ${t.classe||'t-'+t.k}${est.ocultos.has(t.k)?' off':''}" data-tipo="${t.k}" aria-pressed="${!est.ocultos.has(t.k)}"><i class="cm-g" aria-hidden="true">${t.glifo}</i>${esc(t.rotulo)}</button>`).join('')}</div>
       ${extrasDef.map((f,ix)=>`<select class="control cm-resp" id="cmExtra${ix?ix+1:''}" data-extra="${f.chave}" aria-label="${attr(f.vazio)}"><option value="">${esc(f.vazio)}</option>${f.opcoes().map(([v,l])=>`<option value="${attr(v)}" ${(est.extras[f.chave]||'')===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`).join('')}
@@ -108,6 +109,7 @@ const CalMotor=(()=>{
      ${est.modo==='month'?mes(itens):est.modo==='week'?semana(itens):est.modo==='list'?lista(itens):est.modo==='year'?ano(itens):dia(itens)}`;
    if(!est.podeEditar)$('#cmNovo')?.remove();
    ligar(alvo,itens);
+   cfg.aoDesenhar&&cfg.aoDesenhar(alvo);
   }
   function ligar(alvo,itens){
    const muda=async f=>{f();salva(cfg.chave+'.modo',est.modo);if(cfg.porAno&&est.data.getFullYear()!==anoCarregado)await recarregar();else desenhar()};
@@ -156,7 +158,8 @@ const CalMotor=(()=>{
    $('#cmNovo').onclick=()=>cfg.novo(est.modo==='month'&&(est.data.getMonth()!==new Date().getMonth()||est.data.getFullYear()!==new Date().getFullYear())?isoDate(new Date(est.data.getFullYear(),est.data.getMonth(),1)):isoDate(est.modo==='day'||est.modo==='week'?est.data:new Date()));
    try{await recarregar()}catch(e){$('#cmRaiz').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar o calendário</strong><p>${esc(e.message)}</p></div>`}
   }
-  return {render,recarregar};
+  const definirFiltro=(chave,valor)=>{if(chave==='modo'){est.modo=valor;salva(cfg.chave+'.modo',valor)}else{est.extras[chave]=valor;salva(cfg.chave+'.extras',est.extras)}desenhar()};
+  return {render,recarregar,definirFiltro};
  }
  return {criar,fmtCurto,dataDe};
 })();
@@ -169,6 +172,7 @@ const CAL_MKT_TIPOS=[
  {k:'INTERNA',rotulo:'Atividade interna',glifo:'⚙'},
  {k:'PUBLICACAO',rotulo:'Publicação',glifo:'✎'},
  {k:'PRAZO',rotulo:'Prazo de solicitação',glifo:'⚑'},
+ {k:'PLANO',rotulo:'Ação planejada',glifo:'◆'},
 ];
 /** Tipos que a equipe escolhe ao cadastrar (publicações e prazos vêm dos próprios registros). */
 const CAL_MKT_TIPOS_FORM=[['REUNIAO','Reunião'],['COBERTURA','Cobertura foto/vídeo'],['COMPROMISSO','Compromisso'],['INTERNA','Atividade interna']];
@@ -188,7 +192,7 @@ function calMktDataHora(r){
  return [data,hora];
 }
 async function calMktCarregar(){
- const [cal,age,con,pn]=await Promise.all([getRows('calendario',true),getRows('agenda',true),getRows('conteudos',true),api('/solicitacoes/painel')]);
+ const [cal,age,con,pn,pl]=await Promise.all([getRows('calendario',true),getRows('agenda',true),getRows('conteudos',true),api('/solicitacoes/painel'),api('/planejamento/painel')]);
  const eu=pn.eu||{nome:'',role:''},gerente=eu.role==='manager';
  const dono=r=>String(r.responsavel||'').trim()!==''&&String(r.responsavel).trim().toLowerCase()===String(eu.nome).trim().toLowerCase();
  const itens=[];
@@ -204,6 +208,11 @@ async function calMktCarregar(){
   if(r.etapa==='CONCLUIDO'||!r.prazoEfetivo)return;
   itens.push({uid:'solicitacoes:'+r.id,id:r.id,modulo:'solicitacoes',titulo:r.titulo,data:r.prazoEfetivo,hora:'',tipo:'PRAZO',responsavel:r.responsavel||'',editavel:gerente||dono(r),atrasada:!!r.atrasada,raw:r});
  });
+ // ações de Planejamento que a equipe marcou para aparecer aqui: é o mesmo registro (nenhuma cópia); mexer nele reflete nos dois lugares
+ (pl.acoes||[]).forEach(a=>{
+  if(!a.calendarioMkt||!a.dataInicio||a.arquivada)return;
+  itens.push({uid:'planejamento:'+a.id,id:a.id,modulo:'planejamento',titulo:a.titulo,data:a.dataInicio,fim:a.dataFim&&a.dataFim>a.dataInicio?a.dataFim:'',hora:'',tipo:'PLANO',responsavel:a.responsavel||'',editavel:a.editavel,feito:a.situacao==='FINALIZADO',atrasada:a.atrasada,raw:a});
+ });
  return {itens,opcoes:pn.opcoes,eu};
 }
 /** Reagendar mantém o horário; para eventos de mais de um dia, mantém também a duração. */
@@ -216,12 +225,14 @@ function calMktNovaData(it,nova){
  return patch;
 }
 async function calMktMover(it,nova){
+ if(it.modulo==='planejamento'){await api('/planejamento/mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:it.id,data:nova})});invalidate('projetos');return}
  if(it.modulo==='solicitacoes'){await api('/solicitacoes/editar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:it.id,prazo:nova})});invalidate('solicitacoes');return}
  await api(`/data?module=${it.modulo}&id=${encodeURIComponent(it.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(calMktNovaData(it,nova))});
  invalidate(it.modulo);
 }
 function calMktAbrir(it){
  if(it.modulo==='solicitacoes')return slAbrirExterno(it.id,()=>CAL_MKT.recarregar());
+ if(it.modulo==='planejamento')return plAbrirPorId(it.id,()=>CAL_MKT.recarregar());
  if(it.modulo==='conteudos'){state.module='conteudos';return openModal(it.raw)}
  calMktForm(it);
 }

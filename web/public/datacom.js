@@ -42,7 +42,7 @@ async function dcAbrir(it){
  f.querySelectorAll('[data-rel]').forEach(b=>b.onclick=async()=>{try{await dcPost('/datacom/relevancia',{id:r.id,relevante:b.dataset.rel});o.close();toast('Relevância atualizada');await recarrega()}catch(e){toast(e.message,'warn')}});
  $('#dcObsSalvar',f).onclick=async()=>{try{await dcPost('/datacom/relevancia',{id:r.id,relevante:r.relevanteAjustado||r.origem==='personalizada'?r.relevante:'',observacoes:$('#dcObs',f).value});toast('Observações salvas');await recarrega()}catch(e){toast(e.message,'warn')}};
  f.querySelectorAll('[data-sol]').forEach(b=>b.onclick=()=>{o.close();slAbrirExterno(b.dataset.sol,()=>DC_CAL.recarregar())});
- f.querySelectorAll('[data-plan]').forEach(b=>b.onclick=async()=>{try{const p=await api('/data?module=projetos&id='+encodeURIComponent(b.dataset.plan));o.close();state.module='projetos';openModal(p)}catch(e){toast(e.message,'warn')}});
+ f.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>{o.close();plAbrirPorId(b.dataset.plan,()=>DC_CAL.recarregar())});
  $('#dcPlanejar',f).onclick=()=>dcAcao(r,'planejar',equipe,gerente,o);
  $('#dcSolicitar',f).onclick=()=>dcAcao(r,'solicitar',equipe,gerente,o);
  $('#dcEditar',f)&&($('#dcEditar',f).onclick=()=>{o.close();dcForm(r)});

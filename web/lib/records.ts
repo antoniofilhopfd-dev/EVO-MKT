@@ -71,9 +71,18 @@ export async function getRow(mod: string, id: string): Promise<Row | null> {
   const r = await q1<{ data: string }>('SELECT data FROM records WHERE modulo=? AND id=?', [mod, id]);
   return r ? JSON.parse(r.data) : null;
 }
+/** Vínculos entre módulos: o registro apontado precisa existir (integridade referencial na aplicação, já que os dados ficam em JSON). */
+const VINCULOS_VALIDADOS: Record<string, string> = { planejamentoId: 'projetos', eventoEscolarId: 'calescolar' };
+export async function validarVinculosGenericos(patch: Row): Promise<void> {
+  for (const [campo, alvo] of Object.entries(VINCULOS_VALIDADOS)) {
+    const v = strv(patch[campo]).trim();
+    if (v && !(await getRow(alvo, v))) fail(400, `Vínculo inválido: ${campo} "${v}" não existe.`);
+  }
+}
 export async function insertRow(mod: string, input: Row, ator: string): Promise<Row> {
   const clean = cleanInput(input);
   delete clean.id;
+  await validarVinculosGenericos(clean);
   if (mod === 'tarefas') await validarVinculosTarefa('', clean);
   const id = await newId(mod);
   const t = now();
@@ -116,6 +125,7 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
   for (const k of ['id', 'criadoEm', 'criadoPor', 'atualizadoPor']) delete patch[k];
   const motivoInformado = strv(patch.motivoTransicao);
   delete patch.motivoTransicao;
+  await validarVinculosGenericos(patch);
   let prev: Row = {};
   const nw = await modifyRow(mod, id, async (cur, c) => {
     prev = cur;

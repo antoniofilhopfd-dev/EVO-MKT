@@ -29,6 +29,8 @@ import { solicitacoesRoute } from './solicitacoes';
 import { portalRoute } from './portal';
 import { escolarRoute } from './escolar';
 import { datacomRoute } from './datacom';
+import { planejamentoRoute } from './planejamento';
+import { dashboardRoute } from './dashboard';
 import { exigirPortalAtivo } from '../portal';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
@@ -65,6 +67,10 @@ export async function route(c: Ctx): Promise<Out> {
       return escolarRoute(c);
     case path.startsWith('/datacom/'):
       return datacomRoute(c);
+    case path.startsWith('/planejamento/'):
+      return planejamentoRoute(c);
+    case path.startsWith('/dashboard/'):
+      return dashboardRoute(c);
     case path.startsWith('/portal/pagina/') || path === '/admin/portal':
       return portalRoute(c);
     case path.startsWith('/reports/'):
@@ -668,6 +674,10 @@ async function dataRoute(c: Ctx): Promise<Response> {
       const dono = String(antes.responsavel ?? '').trim();
       const novoResp = strv(patch.responsavel).trim();
       if (dono && lower(dono) !== lower(u.nome) && novoResp !== dono) fail(403, 'Só a Gerente ou o responsável atual pode reatribuir este item.');
+    }
+    if (mod === 'projetos' && u.role !== 'manager') {
+      const dono = String(antes.responsavel ?? '').trim();
+      if (String(antes.criadoPor ?? '') !== String(u.codigo) && (dono === '' || lower(dono) !== lower(u.nome))) fail(403, 'Só a Gerência, o responsável ou quem criou a ação pode alterá-la.');
     }
     if (mod === 'solicitacoes' && u.role !== 'manager') {
       const dono = String(antes.responsavel ?? '').trim();

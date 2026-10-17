@@ -50,8 +50,9 @@ const slChips=r=>[
  r.cancelada?'<span class="sl-chip">Cancelada</span>':'',
  r.aguardandoSolicitante?'<span class="sl-chip warn">Aguardando solicitante</span>':'',
  r.exigeAprovacao==='1'&&r.etapa!=='CONCLUIDO'?'<span class="sl-chip">Exige aprovação</span>':'',
- r.eventoEscolarId?'<span class="sl-chip" title="Pedido criado a partir de um evento do Calendário Escolar">Evento escolar</span>':'',
+ (r.eventoEscolarId||r.eventoEscolarTitulo)?'<span class="sl-chip" title="Pedido criado a partir de um evento do Calendário Escolar">Evento escolar</span>':'',
  r.dataComemorativaId?'<span class="sl-chip" title="Pedido criado a partir de uma data comemorativa">Data comemorativa</span>':'',
+ r.planejamentoId?'<span class="sl-chip" title="Faz parte de uma ação do Planejamento">Planejamento</span>':'',
  r.prioridade==='URGENTE'||r.prioridade==='ALTA'?`<span class="sl-chip ${r.prioridade==='URGENTE'?'bad':'warn'}">${esc(r.prioridade==='URGENTE'?'Urgente':'Alta')}</span>`:''
 ].join('');
 function slCard(r){
@@ -202,8 +203,9 @@ async function slAbrir(id,aoFechar){
  const o=adminOverlay(`<div class="sl-det">
   <h3>${esc(r.titulo)} <small>${esc(r.id)}</small></h3>
   <div class="sl-chips"><span class="sl-etapa e-${r.etapa}">${esc(SL_ROT[r.etapa])}</span>${slChips(r)}${r.origem==='PORTAL_SOLICITANTE'?'<span class="sl-chip">Veio do Portal</span>':''}</div>
-  ${r.eventoEscolarId?`<p class="kpi-note">Evento escolar: <b>${esc(r.eventoEscolarTitulo||r.eventoEscolarId)}</b>${r.eventoEscolarData?` · ${esc(fmtDate(r.eventoEscolarData))}`:''}</p>`:''}
+  ${(r.eventoEscolarId||r.eventoEscolarTitulo)?`<p class="kpi-note">Evento escolar: <b>${esc(r.eventoEscolarTitulo||r.eventoEscolarId)}</b>${r.eventoEscolarData?` · ${esc(fmtDate(r.eventoEscolarData))}`:''}</p>`:''}
   ${r.dataComemorativaId?`<p class="kpi-note">Data comemorativa: <b>${esc(r.dataComemorativaNome||r.dataComemorativaId)}</b>${r.dataComemorativaData?` · ${esc(fmtDate(r.dataComemorativaData))}`:''}</p>`:''}
+  ${r.planejamentoId?`<p class="kpi-note">Ação do Planejamento: <b>${esc(r.planejamentoId)}</b> <button type="button" class="softbtn" id="dIrPlano">Ver ação</button></p>`:''}
   <div class="sl-acoes-det">
    ${dest.length?`<label>Mover para <select class="control" id="dMover"><option value="">Escolher…</option>${dest.map(e=>`<option value="${e}">${esc(SL_ROT[e])}</option>`).join('')}</select></label>`:''}
    ${(slGerente()||slDono(r))&&sl.portalAtivo&&r.origem==='PORTAL_SOLICITANTE'&&['PENDENTE','EM_ANDAMENTO'].includes(r.etapa)&&!r.aguardandoSolicitante?'<button type="button" class="softbtn" id="dPedirInfo">Pedir informação ao solicitante</button>':''}
@@ -233,6 +235,7 @@ async function slAbrir(id,aoFechar){
  const err=$('#dErro',o.el);
  $('#dMover',o.el)&&($('#dMover',o.el).onchange=async e=>{if(!e.target.value)return;if(await slMover(id,e.target.value))reabre();else e.target.value=''});
  $('#dPedirInfo',o.el)&&($('#dPedirInfo',o.el).onclick=async()=>{const m=prompt('O que você precisa saber do solicitante?');if(!m||m.trim().length<3)return;try{await api('/solicitacoes/pedir-info',slJson({id,mensagem:m.trim()}));toast('Pedido enviado ao solicitante');await reabre()}catch(e){toast(e.message,'warn')}});
+ $('#dIrPlano',o.el)&&($('#dIrPlano',o.el).onclick=()=>{o.close();go('planejamento')});
  $('#dEntrega',o.el)&&($('#dEntrega',o.el).onclick=()=>openFinalDeliveryUpload(id));
  $('#dCancelar',o.el)&&($('#dCancelar',o.el).onclick=async()=>{const m=prompt('Motivo do cancelamento (ficará no histórico):');if(!m||m.trim().length<3)return;if(await slMover(id,'CANCELADA',m.trim()))o.close()});
  $('#dForm',o.el).onsubmit=async ev=>{

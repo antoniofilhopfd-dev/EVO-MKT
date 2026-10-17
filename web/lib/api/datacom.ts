@@ -215,7 +215,7 @@ export async function datacomRoute(c: Ctx): Promise<Response> {
       if (strv(p.dataComemorativaId) === item.id && strv(p.dataComemorativaData) === item.data && lower(strv(p.titulo)) === lower(acao)) fail(409, `Essa ação já está no Planejamento (${p.id}).`);
     }
     const novo = await insertRow('projetos', {
-      titulo: acao, status: 'PLANEJAMENTO', prioridade: 'MÉDIA', responsavel: resp, prazo, dataInicio: prazo,
+      titulo: acao, status: 'PLANEJAMENTO', prioridade: 'MÉDIA', responsavel: resp, prazo, dataInicio: prazo, categoriaPlano: ['CAMPANHAS', 'CONTEUDOS', 'EVENTOS', 'PROJETOS', 'INSTITUCIONAL'].includes(strv(b.categoria).toUpperCase()) ? strv(b.categoria).toUpperCase() : 'CONTEUDOS', segmento: 'Geral',
       descricao: `Ação planejada a partir da data comemorativa "${item.nome}" (${brData(item.data)}).` + (strv(b.observacao).trim() ? `\n${strv(b.observacao).trim()}` : ''),
       origem: 'DATA_COMEMORATIVA', dataComemorativaId: item.id, dataComemorativaNome: item.nome, dataComemorativaData: item.data,
     }, u.codigo);

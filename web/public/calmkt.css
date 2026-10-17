@@ -14,7 +14,7 @@
 .cm-resp{max-width:230px;min-height:36px}
 /* tipos: fundo suave, borda lateral e glifo (a cor nunca é a única pista) */
 .t-REUNIAO{--c:#5b7fd6;--bg:#e8efff;--tx:#1c3a8a}.t-COBERTURA{--c:#8b6ad6;--bg:#f1eaff;--tx:#4a2f93}.t-COMPROMISSO{--c:#8a93a8;--bg:#eef0f4;--tx:#3b4054}
-.t-INTERNA{--c:#4aa886;--bg:#e4f4ee;--tx:#1d6a4f}.t-PUBLICACAO{--c:#f0953a;--bg:#fff0e1;--tx:#8a4a00}.t-PRAZO{--c:#d9645b;--bg:#fdeaea;--tx:#962f28}
+.t-INTERNA{--c:#4aa886;--bg:#e4f4ee;--tx:#1d6a4f}.t-PUBLICACAO{--c:#f0953a;--bg:#fff0e1;--tx:#8a4a00}.t-PRAZO{--c:#d9645b;--bg:#fdeaea;--tx:#962f28}.t-PLANO{--c:#793A8C;--bg:#f3e9f6;--tx:#52215f}
 .cm-tipo .cm-g{color:var(--c);font-style:normal}
 .cm-item{display:flex;gap:5px;align-items:center;width:100%;min-width:0;text-align:left;border:0;border-left:3px solid var(--c);background:var(--bg);color:var(--tx);border-radius:6px;padding:3px 6px;font-size:12px;cursor:pointer;margin:2px 0;overflow:hidden}
 .cm-item[draggable="true"]{cursor:grab}.cm-item.arrastando{opacity:.4}.cm-item.feito{opacity:.6}.cm-item.feito .cm-t{text-decoration:line-through}

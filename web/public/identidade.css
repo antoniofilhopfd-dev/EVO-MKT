@@ -1,0 +1,8 @@
+/* Identidade visual do Colégio Evolução: ajustes finais sobre o design system (design.css). Paleta: #063996, #FF7800, #00275F, #00A1F3, #FAB900, #793A8C, #FFFFFF */
+.navgroup{color:#c9d6f5;font-weight:700;letter-spacing:.1em;margin:16px 12px 6px}
+#nav .navgroup:first-child{margin-top:6px}
+.btn.danger-soft{background:var(--bad-bg,#FBEAE8);color:var(--bad,#B3261E);border:1px solid #f1c9c5}
+.btn.danger-soft:hover{background:#f7d9d6}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.cm-esp{flex:1}
+.empty-rich,.empty{border:1px dashed var(--line,#DDE1EA);background:#fff;border-radius:var(--r-md,12px)}

@@ -80,11 +80,12 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
 
   if (path === '/escolar/painel' && method === 'GET') {
+    const acoes = (await listRows('projetos')).filter((p) => strv(p.eventoEscolarId));
     const sols = (await listRows('solicitacoes')).filter((s) => strv(s.eventoEscolarId));
     const vinc: Record<string, Row[]> = {};
     for (const s of sols) (vinc[String(s.eventoEscolarId)] ??= []).push({ id: s.id, titulo: s.titulo, acao: s.eventoEscolarAcao, status: s.status });
     return json({
-      rows: (await listRows('calescolar')).map((e) => ({ ...e, solicitacoes: vinc[String(e.id)] ?? [] })),
+      rows: (await listRows('calescolar')).map((e) => ({ ...e, solicitacoes: vinc[String(e.id)] ?? [], acoes: acoes.filter((p) => strv(p.eventoEscolarId) === String(e.id)).map((p) => ({ id: p.id, titulo: p.titulo, status: p.status })) })),
       opcoes: { segmentos: SEGMENTOS_ESCOLARES, tipos: TIPOS_ESCOLARES, acoes: Object.entries(ACOES).map(([k, v]) => [k, v.rotulo]) },
       eu: { nome: u.nome, role: u.role }, podeEditar: u.role === 'manager', hoje: fmtDate(new Date()),
     });
@@ -123,9 +124,14 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
   if (path === '/escolar/excluir' && method === 'POST') {
     await requireManager(c);
     const id = strv((await c.body()).id);
-    if (!(await getRow('calescolar', id))) fail(404, 'Evento não encontrado.');
+    const r0 = (await getRow('calescolar', id)) ?? fail(404, 'Evento não encontrado.');
+    // as ações de Planejamento e as solicitações ligadas a este evento continuam; só perdem o vínculo (guardam título e data para histórico)
+    let soltos = 0;
+    for (const mod of ['projetos', 'solicitacoes']) {
+      for (const x of await listRows(mod)) if (strv(x.eventoEscolarId) === id) { await modifyRow(mod, String(x.id), (y) => ({ ...y, eventoEscolarId: '', eventoEscolarTitulo: strv(y.eventoEscolarTitulo) || strv(r0.titulo), eventoEscolarData: strv(y.eventoEscolarData) || strv(r0.dataInicio), atualizadoEm: now() })); soltos++; }
+    }
     await trashRow('calescolar', id, u.codigo); // vai para a Lixeira, de onde pode ser restaurado
-    return json({ ok: true });
+    return json({ ok: true, vinculosDesfeitos: soltos });
   }
 
   // Pedido opcional ao Marketing a partir de um evento: nunca é automático e fica ligado ao evento de origem.
