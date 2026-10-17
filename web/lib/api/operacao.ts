@@ -6,7 +6,7 @@ import { melhoresHorarios, proximasDatas, rankingConteudos, saudePorSegmento } f
 import { listarNotificacoes } from '../notificacoes';
 import { run } from '../db';
 import { q, q1 } from '../db';
-import { allowedSegment, requireInternal, requireManager, requirePortal } from '../auth';
+import { allowedSegment, requireInternal, requireAdmin, requireManager, requirePortal } from '../auth';
 import { fluxoPublico, FINAL_SOLICITACAO } from '../fluxo';
 import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
@@ -103,7 +103,7 @@ export async function operacaoRoute(c: Ctx) {
     return json({ opcoes });
   }
   if (path === '/admin/integridade') {
-    await requireManager(c);
+    await requireAdmin(c);
     return json(await verificarIntegridade());
   }
   if (path === '/insights') {

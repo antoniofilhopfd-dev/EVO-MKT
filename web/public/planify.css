@@ -1,0 +1,131 @@
+/* Redesign geral (referência: planejadores leves como o Planify; sem copiar marca nem layout).
+   Menu lateral compacto, cabeçalho discreto, área de trabalho ampla, filtros recolhidos, poucos cartões e sombras.
+   Camada final: reaproveita os tokens do design system (design.css) e a paleta do Colégio Evolução. */
+:root{--rail:212px;--topo:56px}
+
+/* ---- menu lateral compacto ---- */
+#sidebar{width:var(--rail);background:var(--brand-dark)}
+main{margin-left:var(--rail);width:calc(100% - var(--rail))}
+.brand{padding:16px 16px 10px!important;min-height:0!important}
+.brand-logo{width:128px!important;min-width:0!important}
+.brand-sub{display:none!important}
+#nav{padding:6px 10px;display:flex;flex-direction:column;gap:2px}
+.navitem{padding:9px 11px;font-size:14px;font-weight:600;color:#d7e1fb;border-radius:10px;margin:0;gap:12px}
+.navitem:hover{background:rgba(255,255,255,.08);color:#fff}
+.navitem.active{background:#fff;color:var(--brand-dark);box-shadow:none}
+.navitem.active .navico{color:var(--accent);opacity:1}
+.navico{font-size:15px;width:20px}
+.sidefoot{border-top:0;padding:10px 16px;opacity:.8}
+.sidebar-collapsed #sidebar{width:68px}.sidebar-collapsed main{margin-left:68px;width:calc(100% - 68px)}
+.sidebar-collapsed .navitem{justify-content:center;padding:10px 0}
+
+/* ---- cabeçalho discreto ---- */
+header{height:var(--topo)!important;padding:0 24px!important;border-bottom:1px solid var(--line)!important;gap:14px!important}
+.crumb strong{font-size:16px;font-weight:700;color:var(--ink)}
+.crumb small,#pageSub{display:none!important}
+.search input{min-height:34px;font-size:13px}
+#backupBtn{display:none!important}
+.topactions .btn{min-height:34px;padding:0 14px}
+.notify-btn{min-width:34px;min-height:34px}
+
+/* ---- seções da área: pílulas em vez de abas sublinhadas ---- */
+.subtabs{top:var(--topo)!important;padding:10px 24px 8px!important;border-bottom:0!important;background:var(--page);gap:6px!important;align-items:center}
+.subtab{border:0!important;border-radius:999px!important;padding:6px 14px!important;font-size:13px;font-weight:600;color:var(--ink-2);background:transparent;min-height:32px}
+.subtab:hover{background:var(--line-2);color:var(--ink)}
+.subtab.active{background:var(--brand)!important;color:#fff!important}
+.submais{position:relative}
+.submenu{position:absolute;z-index:40;top:calc(100% + 6px);left:0;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-2);padding:6px;display:flex;flex-direction:column}
+.submenu[hidden]{display:none}
+.submenu button{border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:8px;font-weight:600;color:var(--ink-2);cursor:pointer;font-size:13px}
+.submenu button:hover{background:var(--brand-bg);color:var(--brand)}
+.submenu button.active{color:var(--brand);background:var(--brand-bg)}
+
+/* ---- área de trabalho ampla ---- */
+#content{padding:12px 24px 40px!important;max-width:none!important}
+.dashboard-head{margin-bottom:12px}
+.dashboard-head h1,.cm-cabecalho h1{font-size:20px}
+.dashboard-head small{display:none}
+.card,.db-bloco,.pl-faixa button{box-shadow:none!important;border-radius:14px}
+.module-hero{box-shadow:none!important;padding:14px 16px!important}
+
+/* ---- calendário e planejamento ---- */
+.cm-cabecalho{justify-content:flex-end;margin:0 0 8px}
+.cm-sub{display:none}
+.cm-barra{margin-bottom:6px}
+.cm-periodo{font-size:20px;font-weight:700;color:var(--ink)}
+.cm-nav .softbtn{border:0;background:var(--line-2);border-radius:999px;min-height:34px}
+.view-switch{background:var(--line-2);border-radius:999px;padding:3px;display:inline-flex;gap:2px;border:0}
+.view-switch button{border:0;background:transparent;border-radius:999px;padding:5px 14px;font-weight:600;font-size:13px;color:var(--ink-2);min-height:30px;cursor:pointer}
+.view-switch button.active{background:#fff;color:var(--brand);box-shadow:var(--sh-1)}
+.cm-filtros{gap:8px 10px;margin-bottom:10px}
+.cm-tipo{padding:3px 10px;min-height:28px;font-size:12px;font-weight:600;border-color:transparent;background:var(--line-2)}
+.cm-tipo:not(.off){background:var(--bg,var(--line-2));color:var(--tx,var(--ink-2))}
+.cm-todos{background:transparent!important;color:var(--brand)!important;text-decoration:underline}
+.cm-maisfiltros{position:relative}
+.cm-maisfiltros summary{list-style:none;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:600;color:var(--ink-2);min-height:28px;display:inline-flex;align-items:center;gap:6px}
+.cm-maisfiltros summary::-webkit-details-marker{display:none}
+.cm-maisfiltros summary b{background:var(--accent);color:#fff;border-radius:999px;padding:0 7px;font-size:11px}
+.cm-maisfiltros-corpo{position:absolute;z-index:30;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-2);padding:10px;display:grid;gap:8px;min-width:240px}
+.cm-maisfiltros[open] .cm-maisfiltros-corpo .cm-resp{max-width:none;width:100%}
+.cm-busca{max-width:220px;min-height:30px;margin-left:auto;border-radius:999px;padding:4px 12px;font-size:13px}
+/* semana: o visual principal */
+.cm-semana{gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+.cm-col{border:0;border-right:1px solid var(--line-2);border-radius:0;min-height:62vh;padding:10px 8px;background:#fff}
+.cm-col:last-child{border-right:0}
+.cm-col.hoje{background:#F7FAFF;border-color:var(--line-2);box-shadow:inset 0 3px 0 var(--accent)}
+.cm-colcab{margin-bottom:10px}
+.cm-colcab b{text-transform:uppercase;letter-spacing:.06em;font-size:11px;color:var(--ink-3)}
+.cm-col .cm-num{font-size:15px;width:30px;height:30px}
+.cm-col .cm-item{padding:6px 8px;border-radius:8px;border-left-width:4px;font-size:12.5px;margin:4px 0;white-space:normal}
+.cm-col .cm-item .cm-t{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.cm-col.feriado{background:#FFF8EE}
+.cm-dia{border-radius:8px;border-color:var(--line-2)}
+.cm-dia.feriado{background:#FFF8EE}
+.cm-proximos section h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+/* tipos do Calendário único */
+.t-ESCOLAR{--c:#00A1F3;--bg:#E6F4FD;--tx:#00497A}.t-DATA{--c:#FAB900;--bg:#FFF4D6;--tx:#6B4A00}.t-FERIADO{--c:#FF7800;--bg:#FFEBD9;--tx:#8A3F00}
+.cal-escolha{display:grid;gap:8px;margin:12px 0}.cal-escolha .softbtn{text-align:left;padding:12px 14px}
+
+/* ---- planejamento ---- */
+.pl-faixa{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.pl-faixa button{display:flex;gap:8px;align-items:baseline;padding:6px 12px;min-height:0;background:#fff;border:1px solid var(--line)}
+.pl-faixa b{font-size:18px;color:var(--brand)}.pl-faixa span{font-size:12px;color:var(--ink-3);font-weight:600}
+
+/* ---- dashboard enxuto ---- */
+.db-topo{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px}
+.db-topo small{color:var(--ink-3);text-transform:capitalize}.db-topo h1{margin:0;font-size:24px}
+.db-stats{display:flex;flex-wrap:wrap;gap:0;background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.db-stat{flex:1 1 140px;display:flex;align-items:baseline;gap:10px;border:0;border-right:1px solid var(--line-2);background:transparent;padding:14px 18px;cursor:pointer;text-align:left}
+.db-stat:last-child{border-right:0}.db-stat:hover{background:var(--brand-bg)}
+.db-stat b{font-size:28px;line-height:1;color:var(--brand)}.db-stat span{font-size:13px;font-weight:600;color:var(--ink-3)}
+.db-stat.alerta b{color:var(--bad)}
+.db-alerta{display:flex;flex-direction:column;gap:2px;background:var(--bad-bg);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.db-alerta>b{color:var(--bad);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.db-alerta button{border:0;background:transparent;text-align:left;padding:4px 0;font-weight:600;color:var(--ink);cursor:pointer}
+.db-alerta small{color:var(--ink-2);font-weight:400}
+.db-grade{grid-template-columns:3fr 2fr;gap:12px}
+.db-bloco{padding:14px 16px}
+.db-lista button{flex-direction:row;gap:14px;align-items:flex-start;padding:9px 2px}
+.db-dia{flex:0 0 52px;font-weight:700;font-size:13px;color:var(--brand);display:flex;flex-direction:column}
+.db-dia i{font-style:normal;font-weight:500;color:var(--ink-3);font-size:11px}
+.db-tit{display:flex;flex-direction:column;gap:2px;min-width:0}
+.db-tag{align-self:flex-start;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;background:var(--line-2);color:var(--ink-2)}
+.db-tag.p{background:#FFEBD9;color:#8A3F00}.db-tag.e{background:#E6F4FD;color:#00497A}.db-tag.c{background:var(--brand-bg);color:var(--brand)}
+@media(max-width:900px){.db-grade{grid-template-columns:minmax(0,1fr)}.db-stat{flex-basis:50%}}
+
+/* ---- telas pequenas ---- */
+@media(max-width:1000px){
+ main{margin-left:0;width:100%}
+ header{padding:0 12px!important}
+ .subtabs{padding:8px 12px!important;top:auto!important;position:static!important}
+ #content{padding:10px 12px 32px!important}
+ .cm-semana{grid-template-columns:minmax(0,1fr)}.cm-col{min-height:0;border-right:0;border-bottom:1px solid var(--line-2)}
+ .submenu{left:auto;right:0}
+}
+
+/* ---- cabeçalhos de módulo enxutos (sem cartões de resumo nem favoritos) ---- */
+.module-hero{background:transparent!important;border:0!important;padding:0 0 6px!important}
+.module-hero .module-metrics,.module-hero .favorite-btn,.module-intro>small,.module-intro p,.module-hero .hero-actions p{display:none!important}
+.module-hero h2{font-size:20px;margin:0}
+.kpis{gap:8px}.kpi{box-shadow:none!important;border-radius:12px}
+.settings-grid{gap:12px}

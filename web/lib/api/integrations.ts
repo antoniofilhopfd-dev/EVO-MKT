@@ -1,6 +1,6 @@
 import { Ctx } from '../ctx';
 import { q, q1, run } from '../db';
-import { requireInternal, requireManager, stepUp } from '../auth';
+import { requireInternal, requireAdmin, requireManager, stepUp } from '../auth';
 import { audit, getRow, listRows, MODULES } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
@@ -109,7 +109,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       });
     }
     case path === '/integrations/settings' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const input = await c.body();
       await stepUp(u, input);
       for (const k of ['meta_app_id', 'meta_app_secret', 'g_client_id', 'g_client_secret']) if (input[k] !== undefined && strv(input[k]).trim() !== '') await setSetting(k, strv(input[k]).trim());
@@ -122,15 +122,15 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/integrations/meta/connect': {
-      await requireManager(c);
+      await requireAdmin(c);
       return redirect(await metaConnectUrl());
     }
     case path === '/integrations/google/connect': {
-      await requireManager(c);
+      await requireAdmin(c);
       try { return redirect(await gConnectUrl()); } catch (e: any) { return fail(400, e.message); }
     }
     case path === '/integrations/meta/token' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const input = await c.body();
       await stepUp(u, input);
       const tok = strv(input.token).trim();
@@ -146,7 +146,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/integrations/ads/config' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const b = await c.body();
       if ('ativar' in b) await setSetting('meta_ads_ativar', b.ativar ? '1' : '0');
       for (const [k, cfg] of [['ctrMin', 'ads_ctr_min'], ['frequenciaMax', 'ads_freq_max'], ['gastoSemResultado', 'ads_gasto_sem_resultado'], ['impressoesMin', 'ads_impr_min']] as const) {
@@ -156,11 +156,11 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/integrations/ads/accounts': {
-      await requireManager(c);
+      await requireAdmin(c);
       try { return json({ contas: await listarContasAds() }); } catch (e: any) { return fail(502, e.message); }
     }
     case path === '/integrations/ads/account' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const b = await c.body();
       const contas: ContaAds[] = JSON.parse((await setting('meta_ads_contas')) || '[]');
       const alvo = contas.find((x) => x.id === strv(b.conta)) ?? fail(400, 'Conta de anúncios não encontrada. Atualize a lista.');
@@ -207,7 +207,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ alertas: await alertasTrafego(), limites: await limitesAlerta(), rows: await adsSnapshots(c.qs('periodo') || undefined), ultimaSync: await setting('meta_ads_ultima_sync'), conta: await setting('meta_ads_conta'), fonte: 'Meta Ads (leitura)' });
     }
     case path === '/integrations/meta/account' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const input = await c.body();
       const contas: MetaConta[] = JSON.parse((await setting('meta_contas')) || '[]');
       if (Array.isArray(input.ocultar)) {
@@ -229,14 +229,14 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/integrations/meta/disconnect' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       await stepUp(u, await c.body());
       for (const k of ['meta_token', 'meta_token_expira', 'ig_user_id', 'ig_username', 'meta_page_name', 'meta_contas', 'meta_perm_faltando', 'meta_token_invalido', 'meta_ads_conta', 'meta_ads_contas', 'meta_ads_ultima_sync']) await setSetting(k, '');
       await audit(u.codigo, 'instagram-desconectado');
       return json({ ok: true });
     }
     case path === '/integrations/google/disconnect' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       await stepUp(u, await c.body());
       for (const k of ['g_refresh_token', 'g_access_token', 'g_access_expira', 'g_email']) await setSetting(k, '');
       await audit(u.codigo, 'google-desconectado');
@@ -295,7 +295,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       try { return json({ rows: await gCalendarList() }); } catch (e: any) { return bad('google', e); }
     }
     case path === '/integrations/google/calendar/choose' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const input = await c.body();
       await stepUp(u, input);
       try { await gCalendarChoose(strv(input.id)); } catch (e: any) { return bad('google', e); }
@@ -303,7 +303,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/integrations/google/calendar/limpar-importados' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const n = await gLimparImportados();
       await audit(u.codigo, 'agenda-google-limpar-importados');
       return json({ ok: true, removidos: n });

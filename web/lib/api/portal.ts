@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Ctx } from '../ctx';
 import { q1 } from '../db';
-import { requireManager } from '../auth';
+import { requireAdmin } from '../auth';
 import { audit } from '../records';
 import { intLog } from '../settings';
 import { definirPortal, MSG_PORTAL_OFF, portalAtivo } from '../portal';
@@ -43,7 +43,7 @@ export async function portalRoute(c: Ctx): Promise<Response> {
   }
   // interruptor (somente a Gerência / Administração)
   if (rota === '/admin/portal') {
-    const u = await requireManager(c);
+    const u = await requireAdmin(c);
     if (method === 'POST') {
       const b = await c.body();
       const quer = b.ativo === true || b.ativo === '1' || b.ativo === 'true';

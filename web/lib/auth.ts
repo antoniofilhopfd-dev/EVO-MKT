@@ -29,7 +29,7 @@ async function sessionFor(tok: string, tipo: 'int' | 'por'): Promise<Row | null>
   if (!tok) return null;
   const s = await q1('SELECT * FROM sessions WHERE token_hash=? AND tipo=? AND expira>?', [sha256(tok), tipo, nowSec()]);
   if (!s) return null;
-  if (tipo === 'int') return (await q1('SELECT codigo,nome,role,label,must_change FROM users WHERE codigo=? AND ativo=1', [s.codigo])) ?? null;
+  if (tipo === 'int') return (await q1('SELECT codigo,nome,role,label,admin,must_change FROM users WHERE codigo=? AND ativo=1', [s.codigo])) ?? null;
   const u = await q1('SELECT codigo,nome,perfil,segmentos,must_change FROM portal_users WHERE codigo=? AND ativo=1', [s.codigo]);
   if (!u) return null;
   u.segmentos = JSON.parse(u.segmentos);
@@ -52,6 +52,12 @@ export async function requireInternal(c: Ctx): Promise<Row> {
 export async function requireManager(c: Ctx): Promise<Row> {
   const u = await requireInternal(c);
   if (u.role !== 'manager') fail(403, 'Ação disponível apenas para a Gerente.');
+  return u;
+}
+/** Administração do sistema (usuários, integrações, backup, auditoria, Portal): só quem tem a marca de Administrador. */
+export async function requireAdmin(c: Ctx): Promise<Row> {
+  const u = await requireManager(c);
+  if (!Number(u.admin)) fail(403, 'Ação disponível apenas para o Administrador.');
   return u;
 }
 export async function requirePortal(c: Ctx): Promise<Row> {

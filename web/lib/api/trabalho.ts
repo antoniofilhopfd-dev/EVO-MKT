@@ -1,6 +1,6 @@
 import { Ctx } from '../ctx';
 import { q, run } from '../db';
-import { allowedSegment, requireInternal, requireManager, requirePortal } from '../auth';
+import { allowedSegment, requireInternal, requireAdmin, requireManager, requirePortal } from '../auth';
 import { MODULES, getRow, TEAM_WRITE, audit } from '../records';
 import { adicionarComentario, checklist, checklistItem, comentarios, novoIdChecklistOrdem } from '../trabalho';
 import { setSetting, setting } from '../settings';
@@ -80,7 +80,7 @@ export async function trabalhoRoute(c: Ctx) {
   }
   // ----- automações (liga/desliga) -----
   if (path === '/admin/automacoes') {
-    await requireManager(c);
+    await requireAdmin(c);
     if (method === 'POST') {
       const b = await c.body();
       for (const k of ['auto_tarefa_solicitacao', 'auto_recorrencia']) if (k in b) await setSetting(k, b[k] ? '1' : '0');

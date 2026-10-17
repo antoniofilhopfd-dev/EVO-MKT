@@ -38,6 +38,12 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   }
   compromissos.sort((a, b) => String(a.data + (a.hora || '')).localeCompare(String(b.data + (b.hora || ''))));
 
+  // publicações programadas para os próximos 7 dias (o registro é o de Conteúdos; nada é copiado)
+  const publicacoes = (await listRows('conteudos'))
+    .filter((r) => { const d = strv(r.publicacaoEm).slice(0, 10); return d >= hoje && d <= limite && !/PUBLICADO|ARQUIV/i.test(strv(r.status)); })
+    .sort((a, b) => strv(a.publicacaoEm).localeCompare(strv(b.publicacaoEm))).slice(0, 8)
+    .map((r) => ({ id: r.id, titulo: r.titulo, data: strv(r.publicacaoEm).slice(0, 10), hora: strv(r.publicacaoEm).slice(11, 16), canal: strv(r.canal), formato: strv(r.formato), status: strv(r.status) }));
+
   const eventos = (await listRows('calescolar')).filter((e) => strv(e.dataFim || e.dataInicio) >= hoje).sort((a, b) => strv(a.dataInicio).localeCompare(strv(b.dataInicio))).slice(0, 5)
     .map((e) => ({ id: e.id, titulo: e.titulo, data: e.dataInicio, fim: e.dataFim, horaInicio: e.horaInicio ?? '', local: e.local ?? '' }));
 
@@ -54,6 +60,6 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   return json({
     hoje, semana: { ini: semIni, fim: semFim }, eu: { nome: u.nome, role: u.role },
     solicitacoes: { pendentes: cont('PENDENTE'), emAndamento: cont('EM_ANDAMENTO'), emAprovacao: cont('EM_APROVACAO'), atrasadas: atrasadas.length, listaAtrasadas: atrasadas.sort((a, b) => prazoEfetivo(a).localeCompare(prazoEfetivo(b))).slice(0, 5).map(resumoSol) },
-    compromissos: compromissos.slice(0, 8), eventosEscolares: eventos, acoesDaSemana: acoes, entregasRecentes: entregas,
+    compromissos: compromissos.slice(0, 8), publicacoes, eventosEscolares: eventos, acoesDaSemana: acoes, entregasRecentes: entregas,
   });
 }

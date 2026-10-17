@@ -90,6 +90,7 @@ const CalMotor=(()=>{
    return `<div class="cm-proximos">${grupos.map(g=>`<section><h3>${esc(nomeMes(g.m))}</h3>${g.l.map(i=>`<div class="cm-prox-linha"><span class="cm-quando">${i.data?fmtCurto(i.data):'—'}${i.fim?' – '+fmtCurto(i.fim):''}${i.hora?'<br>'+esc(i.hora):''}</span>${item(i,i.data)}<small>${esc(tipo(i.tipo).rotulo)}${cfg.detalhe?' · '+esc(cfg.detalhe(i)):''}</small></div>`).join('')}</section>`).join('')}</div>`;
   }
 
+  const filtrosAtivos=()=>Object.values(est.extras).filter(Boolean).length+(est.resp?1:0)+Object.values(est.tog).filter(Boolean).length;
   async function desenhar(){
    const alvo=$('#cmRaiz');if(!alvo)return;
    const itens=visiveis();
@@ -100,11 +101,13 @@ const CalMotor=(()=>{
     :`<div class="cm-nav"><button type="button" class="softbtn" id="cmPrev" aria-label="Período anterior">‹</button><button type="button" class="softbtn" id="cmHoje">Hoje</button><button type="button" class="softbtn" id="cmNext" aria-label="Próximo período">›</button><h2 class="cm-periodo" aria-live="polite">${esc(rotuloPeriodo())}</h2>${cfg.porAno?`<select class="control cm-ano-sel" id="cmAno" aria-label="Ano">${anos.map(a=>`<option value="${a}" ${a===est.data.getFullYear()?'selected':''}>${a}</option>`).join('')}</select>`:''}<label class="cm-ir"><span class="sr-only">Ir para a data</span><input type="date" id="cmIr" value="${isoDate(est.data)}" aria-label="Ir para a data"></label></div>`;
    alvo.innerHTML=`${cfg.faixa?cfg.faixa(est.itens.filter(i=>!est.ocultos.has(i.tipo)),itens):''}<div class="cm-barra">${nav}
      <div class="view-switch" role="group" aria-label="Visualização">${modos.map(([k,l])=>`<button type="button" data-modo="${k}" class="${est.modo===k?'active':''}" aria-pressed="${est.modo===k}">${l}</button>`).join('')}</div></div>
-     <div class="cm-filtros"><div class="cm-tipos" role="group" aria-label="Tipos">${est.tipos.map(t=>`<button type="button" class="cm-tipo ${t.classe||'t-'+t.k}${est.ocultos.has(t.k)?' off':''}" data-tipo="${t.k}" aria-pressed="${!est.ocultos.has(t.k)}"><i class="cm-g" aria-hidden="true">${t.glifo}</i>${esc(t.rotulo)}</button>`).join('')}</div>
+     <div class="cm-filtros"><div class="cm-tipos" role="group" aria-label="Tipos">${est.tipos.map(t=>`<button type="button" class="cm-tipo ${t.classe||'t-'+t.k}${est.ocultos.has(t.k)?' off':''}" data-tipo="${t.k}" aria-pressed="${!est.ocultos.has(t.k)}"><i class="cm-g" aria-hidden="true">${t.glifo}</i>${esc(t.rotulo)}</button>`).join('')}${est.ocultos.size?'<button type="button" class="cm-tipo cm-todos" id="cmTodos">Ver tudo</button>':''}</div>
+      ${cfg.filtrosCompactos?`<details class="cm-maisfiltros"${filtrosAtivos()?' open':''}><summary>Filtros${filtrosAtivos()?` <b>${filtrosAtivos()}</b>`:''}</summary><div class="cm-maisfiltros-corpo">`:''}
       ${extrasDef.map((f,ix)=>`<select class="control cm-resp" id="cmExtra${ix?ix+1:''}" data-extra="${f.chave}" aria-label="${attr(f.vazio)}"><option value="">${esc(f.vazio)}</option>${f.opcoes().map(([v,l])=>`<option value="${attr(v)}" ${(est.extras[f.chave]||'')===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`).join('')}
       ${cfg.filtroResponsavel===false?'':`<select class="control cm-resp" id="cmResp" aria-label="Filtrar por responsável"><option value="">Todos os responsáveis</option><option value="__eu" ${est.resp==='__eu'?'selected':''}>Meus</option>${est.opcoes.responsaveis.map(n=>`<option value="${attr(n)}" ${est.resp===n?'selected':''}>${esc(n)}</option>`).join('')}</select>`}
       ${est.modo==='list'&&listaAno()?`<select class="control cm-resp" id="cmMes" aria-label="Mês"><option value="">Todos os meses</option>${MESES.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}" ${est.mes===String(i+1).padStart(2,'0')?'selected':''}>${m[0].toUpperCase()+m.slice(1)}</option>`).join('')}</select>`:''}
       ${alternDef.map(t=>`<button type="button" class="cm-toggle${est.tog[t.chave]?' on':''}" data-tog="${t.chave}" aria-pressed="${!!est.tog[t.chave]}">${esc(t.rotulo)}</button>`).join('')}
+      ${cfg.filtrosCompactos?'</div></details>':''}
       ${cfg.busca?`<input type="search" class="control cm-busca" id="cmBusca" placeholder="Pesquisar pelo nome" aria-label="Pesquisar pelo nome" value="${attr(est.busca)}">`:''}</div>
      ${est.modo==='month'?mes(itens):est.modo==='week'?semana(itens):est.modo==='list'?lista(itens):est.modo==='year'?ano(itens):dia(itens)}`;
    if(!est.podeEditar)$('#cmNovo')?.remove();
@@ -122,6 +125,7 @@ const CalMotor=(()=>{
    $('#cmMes')&&($('#cmMes').onchange=e=>{est.mes=e.target.value;desenhar()});
    alvo.querySelectorAll('[data-modo]').forEach(b=>b.onclick=()=>muda(()=>{est.modo=b.dataset.modo}));
    alvo.querySelectorAll('[data-ir]').forEach(b=>b.onclick=()=>muda(()=>{est.data=dataDe(b.dataset.ir);est.modo='month'}));
+   $('#cmTodos')&&($('#cmTodos').onclick=()=>{est.ocultos.clear();salva(cfg.chave+'.ocultos',[]);desenhar()});
    alvo.querySelectorAll('[data-tipo]').forEach(b=>b.onclick=()=>{const k=b.dataset.tipo;est.ocultos.has(k)?est.ocultos.delete(k):est.ocultos.add(k);salva(cfg.chave+'.ocultos',[...est.ocultos]);desenhar()});
    alvo.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{est.tog[b.dataset.tog]=!est.tog[b.dataset.tog];salva(cfg.chave+'.tog',est.tog);desenhar()});
    $('#cmResp')&&($('#cmResp').onchange=e=>{est.resp=e.target.value;salva(cfg.chave+'.resp',est.resp);desenhar()});
@@ -149,19 +153,23 @@ const CalMotor=(()=>{
    });
   }
   async function recarregar(){
+   // com o Calendário único aberto, os formulários dos três calendários antigos atualizam a tela única
+   if(api_.redirecionar&&['marketing','escolar','datacom'].includes(cfg.chave))return api_.redirecionar();
    anoCarregado=est.data.getFullYear();
    const r=await cfg.carregar(anoCarregado);est.itens=r.itens;est.opcoes=r.opcoes||est.opcoes;est.eu=r.eu||est.eu;if(r.tipos)est.tipos=r.tipos;est.podeEditar=r.podeEditar!==false;desenhar();
   }
   async function render(){
    setTitle(cfg.tituloPagina,rotuloPeriodo());
-   $('#content').innerHTML=`<div class="cm-cabecalho"><div><small>${esc(cfg.eyebrow)}</small><h1>${esc(cfg.tituloPagina)}</h1><p>${esc(cfg.descricao)}</p></div><button class="btn" id="cmNovo">${esc(cfg.rotuloNovo||'+ Novo evento')}</button></div><div id="cmRaiz"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
+   $('#content').innerHTML=`<div class="cm-cabecalho"><h1 class="sr-only">${esc(cfg.tituloPagina)}</h1><p class="cm-sub" id="cmSub">${esc(cfg.descricao)}</p><button class="btn" id="cmNovo">${esc(cfg.rotuloNovo||'+ Novo evento')}</button></div><div id="cmRaiz"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
    $('#cmNovo').onclick=()=>cfg.novo(est.modo==='month'&&(est.data.getMonth()!==new Date().getMonth()||est.data.getFullYear()!==new Date().getFullYear())?isoDate(new Date(est.data.getFullYear(),est.data.getMonth(),1)):isoDate(est.modo==='day'||est.modo==='week'?est.data:new Date()));
    try{await recarregar()}catch(e){$('#cmRaiz').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar o calendário</strong><p>${esc(e.message)}</p></div>`}
   }
   const definirFiltro=(chave,valor)=>{if(chave==='modo'){est.modo=valor;salva(cfg.chave+'.modo',valor)}else{est.extras[chave]=valor;salva(cfg.chave+'.extras',est.extras)}desenhar()};
-  return {render,recarregar,definirFiltro};
+  const mostrarSo=ks=>{est.ocultos=new Set(ks?est.tipos.map(t=>t.k).filter(k=>!ks.includes(k)):[]);salva(cfg.chave+'.ocultos',[...est.ocultos])};
+  return {render,recarregar,definirFiltro,mostrarSo,estado:est};
  }
- return {criar,fmtCurto,dataDe};
+ const api_={criar,fmtCurto,dataDe,redirecionar:null};
+ return api_;
 })();
 
 /* ---------- 2) Configuração do Calendário de Marketing ---------- */
@@ -210,7 +218,7 @@ async function calMktCarregar(){
  });
  // ações de Planejamento que a equipe marcou para aparecer aqui: é o mesmo registro (nenhuma cópia); mexer nele reflete nos dois lugares
  (pl.acoes||[]).forEach(a=>{
-  if(!a.calendarioMkt||!a.dataInicio||a.arquivada)return;
+  if(!a.dataInicio||a.arquivada)return;
   itens.push({uid:'planejamento:'+a.id,id:a.id,modulo:'planejamento',titulo:a.titulo,data:a.dataInicio,fim:a.dataFim&&a.dataFim>a.dataInicio?a.dataFim:'',hora:'',tipo:'PLANO',responsavel:a.responsavel||'',editavel:a.editavel,feito:a.situacao==='FINALIZADO',atrasada:a.atrasada,raw:a});
  });
  return {itens,opcoes:pn.opcoes,eu};

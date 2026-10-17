@@ -5,7 +5,7 @@ import { q, q1, run } from '../db';
 import { genPassword, hashPassword, randHex, sha256, strongPassword, verifyPassword } from '../crypto';
 import {
   allowedSegment, checkCsrf, codeLoginFail, codeLoginGuard, internalUser, issueAccessCode, loginMode, portalUser, rateCheck,
-  rateFail, registerDevice, requireInternal, requireManager, requirePortal, sessionTokenFromCookie, setSessionCookie, startSession, stepUp, validCodeFormat,
+  rateFail, registerDevice, requireAdmin, requireInternal, requireManager, requirePortal, sessionTokenFromCookie, setSessionCookie, startSession, stepUp, validCodeFormat,
 } from '../auth';
 import { accessHmac, decryptSecret, encryptSecret } from '../crypto';
 import { notifyMail } from '../mail';
@@ -41,8 +41,13 @@ export const json = (data: unknown, status = 200, headers: Record<string, string
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
 
 type Out = Response;
-const asUser = (u: Row) => ({ code: u.codigo, name: u.nome, role: u.role, label: u.label });
+const asUser = (u: Row) => ({ code: u.codigo, name: u.nome, role: u.role, label: u.label, admin: u.role === 'manager' && !!Number(u.admin), perfil: u.role !== 'manager' ? 'Equipe' : Number(u.admin) ? 'Administrador' : 'Gerente' });
 const portalOut = (u: Row, segs: unknown) => ({ id: u.codigo, codigo: u.codigo, nome: u.nome, perfil: u.perfil, segmentos: segs, ativo: true });
+/** Perfis internos: 'admin' (Administrador), 'manager' (Gerente), 'team' (Equipe). */
+const nivelDe = (r: Row) => (r.role !== 'manager' ? 'team' : Number(r.admin) ? 'admin' : 'manager');
+const nivelEntrada = (v: unknown) => (v === 'admin' ? 'admin' : v === 'manager' ? 'manager' : 'team');
+const LABEL_NIVEL: Record<string, string> = { admin: 'Administrador', manager: 'Gerente de Marketing', team: 'Equipe de Marketing' };
+const adminsAtivos = async () => Number((await q1("SELECT COUNT(*) c FROM users WHERE role='manager' AND admin=1 AND ativo=1"))?.c);
 const upper = (v: unknown) => strv(v).trim().toUpperCase();
 
 /** Rotas usadas só por quem está fora (Coordenações). As de administração do Portal (/portal/users, /manager/notices) continuam internas. */
@@ -156,7 +161,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ ok: true });
     }
     case path === '/admin/reset-password' && method === 'POST': {
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const input = await c.body();
       await stepUp(m, input);
       const tab = tabOf(strv(input.tipo));
@@ -195,7 +200,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json(res);
     }
     case path === '/backup' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const input = await c.body();
       let f: string;
       try {
@@ -207,25 +212,25 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ ok: true, file: f });
     }
     case path === '/backup/validate': {
-      await requireManager(c);
+      await requireAdmin(c);
       return json(await validateBackup(c.qs('file')));
     }
     case path === '/backup/restore' && method === 'POST': {
       // Restaura um backup (valida, guarda um backup de segurança antes e aplica tudo em uma transação).
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const input = await c.body();
       return json({ ok: true, ...(await restoreBackup(strv(input.file), u.codigo)) });
     }
     case path === '/backup/log': {
-      await requireManager(c);
+      await requireAdmin(c);
       return json(await backupLog(30));
     }
     case path === '/backup/list': {
-      await requireManager(c);
+      await requireAdmin(c);
       return json((await q('SELECT nome FROM backups ORDER BY nome DESC')).map((r) => r.nome));
     }
     case path === '/backup/download': {
-      await requireManager(c);
+      await requireAdmin(c);
       const f = c.qs('file').split('/').pop() || '';
       if (!/^evo_backup_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]+\.json\.gz$/.test(f)) fail(400, 'Arquivo inválido.');
       const r = await q1('SELECT conteudo FROM backups WHERE nome=?', [f]);
@@ -233,7 +238,7 @@ export async function route(c: Ctx): Promise<Out> {
       return new Response(new Uint8Array(r.conteudo as Buffer), { headers: { 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${f}"`, 'Cache-Control': 'no-store' } });
     }
     case path === '/portal/users': {
-      await requireManager(c);
+      await requireAdmin(c);
       const o = (await q('SELECT codigo,nome,perfil,segmentos,ativo FROM portal_users ORDER BY nome')).map((r) => ({ ...r, segmentos: JSON.parse(r.segmentos), id: r.codigo, ativo: !!r.ativo }));
       return json(o);
     }
@@ -301,16 +306,16 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ ok: true });
     }
     case path === '/admin/users': {
-      await requireManager(c);
+      await requireAdmin(c);
       const o: Row[] = [];
-      for (const r of await q('SELECT codigo,nome,role,label,ativo,must_change,acesso_enc FROM users ORDER BY codigo'))
-        o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, role: r.role, perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome), acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
+      for (const r of await q('SELECT codigo,nome,role,label,admin,ativo,must_change,acesso_enc FROM users ORDER BY codigo'))
+        o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, role: r.role, nivel: nivelDe(r), perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome), acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       for (const r of await q('SELECT codigo,nome,perfil,segmentos,ativo,must_change,acesso_enc FROM portal_users ORDER BY codigo'))
         o.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, perfil: JSON.parse(r.segmentos).join(', '), ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: '', acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       return json(o);
     }
     case path === '/admin/user-active' && method === 'POST': {
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const input = await c.body();
       await stepUp(m, input);
       const tipo = strv(input.tipo);
@@ -318,6 +323,10 @@ export async function route(c: Ctx): Promise<Out> {
       const cod = upper(input.codigo);
       const on = input.ativo ? 1 : 0;
       if (tipo === 'interno' && cod === m.codigo && !on) fail(400, 'Você não pode desativar o próprio acesso.');
+      if (tipo === 'interno' && !on) {
+        const alvoU = await q1('SELECT role,admin FROM users WHERE codigo=?', [cod]);
+        if (alvoU && nivelDe(alvoU) === 'admin' && (await adminsAtivos()) <= 1) fail(400, 'Precisa existir ao menos um Administrador ativo.');
+      }
       if (!(await q1(`SELECT 1 FROM ${tab} WHERE codigo=?`, [cod]))) fail(404, 'Usuário não encontrado.');
       await run(`UPDATE ${tab} SET ativo=? WHERE codigo=?`, [on, cod]);
       if (!on) await run('DELETE FROM sessions WHERE codigo=?', [cod]);
@@ -325,7 +334,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ ok: true });
     }
     case path === '/admin/users/create' && method === 'POST': {
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const input = await c.body();
       await stepUp(m, input);
       const tipo = strv(input.tipo);
@@ -341,8 +350,8 @@ export async function route(c: Ctx): Promise<Out> {
       while (await q1('SELECT 1 FROM users WHERE codigo=? UNION SELECT 1 FROM portal_users WHERE codigo=?', [codigo, codigo])) codigo = `${sigla}-${++n}`;
       const senha = genPassword();
       if (tipo === 'interno') {
-        const role = input.perfil === 'manager' ? 'manager' : 'team';
-        await run('INSERT INTO users(codigo,nome,role,label,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [codigo, nome, role, role === 'manager' ? 'Gerente de Marketing' : 'Equipe de Marketing', hashPassword(senha)]);
+        const nivel = nivelEntrada(input.perfil);
+        await run('INSERT INTO users(codigo,nome,role,label,admin,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,?,1,1)', [codigo, nome, nivel === 'team' ? 'team' : 'manager', LABEL_NIVEL[nivel], nivel === 'admin' ? 1 : 0, hashPassword(senha)]);
         await seedEquipe(m.codigo);
       } else {
         const segs = strv(input.segmentos).split(',').map((x) => x.trim()).filter(Boolean);
@@ -360,23 +369,23 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ tipo, codigo, nome, modo, acesso }, 201);
     }
     case path === '/admin/users/role' && method === 'POST': {
-      // Muda o perfil de uma ficha da equipe: Gerente (acesso total) ou Equipe. Pode haver mais de uma Gerente.
-      const m = await requireManager(c);
+      // Muda o perfil de uma ficha da equipe: Administrador, Gerente ou Equipe. Sempre precisa existir ao menos um Administrador ativo.
+      const m = await requireAdmin(c);
       const input = await c.body();
       await stepUp(m, input);
       const cod = upper(input.codigo);
-      const role = input.perfil === 'manager' ? 'manager' : 'team';
-      const alvo = await q1('SELECT codigo,role FROM users WHERE codigo=?', [cod]);
+      const nivel = nivelEntrada(input.perfil);
+      const alvo = await q1('SELECT codigo,role,admin FROM users WHERE codigo=?', [cod]);
       if (!alvo) fail(404, 'Ficha não encontrada.');
-      if (alvo.role === 'manager' && role === 'team' && Number((await q1("SELECT COUNT(*) c FROM users WHERE role='manager' AND ativo=1"))?.c) <= 1) fail(400, 'Precisa existir ao menos uma Gerente ativa.');
-      await run('UPDATE users SET role=?,label=? WHERE codigo=?', [role, role === 'manager' ? 'Gerente de Marketing' : 'Equipe de Marketing', cod]);
+      if (nivelDe(alvo) === 'admin' && nivel !== 'admin' && (await adminsAtivos()) <= 1) fail(400, 'Precisa existir ao menos um Administrador ativo.');
+      await run('UPDATE users SET role=?,label=?,admin=? WHERE codigo=?', [nivel === 'team' ? 'team' : 'manager', LABEL_NIVEL[nivel], nivel === 'admin' ? 1 : 0, cod]);
       await run('DELETE FROM sessions WHERE codigo=? AND codigo<>?', [cod, m.codigo]); // quem mudou de perfil entra de novo
-      await audit(m.codigo, `perfil:${cod}:${role}`);
-      return json({ ok: true, perfil: role });
+      await audit(m.codigo, `perfil:${cod}:${nivel}`);
+      return json({ ok: true, perfil: nivel });
     }
     case path === '/admin/users/code' && method === 'POST': {
       // A Gerente escolhe o código de acesso de uma ficha (4 a 10 letras/números, único).
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const input = await c.body();
       await stepUp(m, input);
       const tab = tabOf(strv(input.tipo));
@@ -396,16 +405,16 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ ok: true, acesso: novo });
     }
     case path === '/admin/users/delete' && method === 'POST': {
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const input = await c.body();
       await stepUp(m, input);
       const tipo = strv(input.tipo);
       const tab = tabOf(tipo);
       const cod = upper(input.codigo);
-      const alvo = await q1(`SELECT codigo${tipo === 'interno' ? ',role' : ''} FROM ${tab} WHERE codigo=?`, [cod]);
+      const alvo = await q1(`SELECT codigo${tipo === 'interno' ? ',role,admin' : ''} FROM ${tab} WHERE codigo=?`, [cod]);
       if (!alvo) fail(404, 'Ficha não encontrada.');
       if (tipo === 'interno' && cod === m.codigo) fail(400, 'Você não pode excluir a própria ficha.');
-      if (tipo === 'interno' && alvo.role === 'manager' && Number((await q1("SELECT COUNT(*) c FROM users WHERE role='manager' AND ativo=1"))?.c) <= 1) fail(400, 'Não é possível excluir a única Gerente ativa.');
+      if (tipo === 'interno' && nivelDe(alvo) === 'admin' && (await adminsAtivos()) <= 1) fail(400, 'Não é possível excluir o único Administrador ativo.');
       await run(`DELETE FROM ${tab} WHERE codigo=?`, [cod]);
       await run('DELETE FROM sessions WHERE codigo=?', [cod]);
       await run('DELETE FROM trusted_devices WHERE codigo=?', [cod]);
@@ -415,7 +424,7 @@ export async function route(c: Ctx): Promise<Out> {
     case path === '/auth/mode':
       return json({ modo: await loginMode() });
     case path === '/admin/mode' && method === 'POST': {
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const input = await c.body();
       const novo = input.modo === 'codigo' ? 'codigo' : input.modo === 'senha' ? 'senha' : fail(400, 'Modo inválido.');
       const codes: Row[] = [];
@@ -433,7 +442,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ modo: novo, codigos: codes });
     }
     case path === '/admin/codes' && method === 'POST': {
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const out: Row[] = [];
       for (const [tab, tipo] of [['users', 'interno'], ['portal_users', 'portal']] as const)
         for (const r of await q(`SELECT codigo,nome,acesso_enc FROM ${tab} WHERE ativo=1 ORDER BY codigo`))
@@ -443,7 +452,7 @@ export async function route(c: Ctx): Promise<Out> {
     }
     case path === '/admin/import' && method === 'POST': {
       // Importa planilhas EVO_MKT_<MODULO>.xlsx (sistema antigo). Não sobrescreve nada: IDs já usados são ignorados.
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       const form = await c.req.formData();
       await stepUp(m, { senhaAdmin: form.get('senhaAdmin') ?? undefined });
       const res: Row = {};
@@ -456,7 +465,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ importados: res });
     }
     case path === '/admin/seed-equipe' && method === 'POST': {
-      const m = await requireManager(c);
+      const m = await requireAdmin(c);
       return json({ criados: await seedEquipe(m.codigo) });
     }
     case path === '/auth/forgot' && method === 'POST': {
@@ -473,7 +482,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ ok: true, mensagem: 'Se o código existir, a Gerente foi avisada e vai gerar uma senha temporária para você.' });
     }
     case path === '/admin/audit': {
-      await requireManager(c);
+      await requireAdmin(c);
       const lim = Math.min(500, Math.max(10, parseInt(c.qs('limit'), 10) || 100));
       return json(await q('SELECT quando,ator,acao,modulo,registro,ip FROM audit_log ORDER BY id DESC LIMIT ' + lim));
     }
@@ -607,7 +616,7 @@ async function setupRoute(c: Ctx): Promise<Response> {
   for (const [cod, nome, role, label] of internos) {
     if (await q1('SELECT 1 FROM users WHERE codigo=?', [cod])) continue;
     const p = genPassword();
-    await run('INSERT INTO users(codigo,nome,role,label,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [cod, nome, role, label, hashPassword(p)]);
+    await run('INSERT INTO users(codigo,nome,role,label,admin,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,?,1,1)', [cod, nome, role, label, role === 'manager' ? 1 : 0, hashPassword(p)]);
     pw.push(` - interno ${cod} (${nome}): ${p}`);
   }
   const portal: [string, string, string, string[]][] = [['INF-2601', 'Coordenação Infantil', 'COORDENACAO', ['Infantil']], ['INI-2602', 'Coordenação Anos Iniciais', 'COORDENACAO', ['Anos Iniciais']], ['FIN-2603', 'Coordenação Anos Finais', 'COORDENACAO', ['Anos Finais']], ['MED-2604', 'Coordenação Ensino Médio', 'COORDENACAO', ['Ensino Médio']], ['AUZ-2605', 'Auzilair', 'COORDENACAO_ATENDIMENTO_GRAFICA', ['Infantil', 'Gráfica Infantil']]];

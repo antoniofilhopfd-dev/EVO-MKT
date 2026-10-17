@@ -15,7 +15,7 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   id_counters: { cols: ['modulo', 'n'], restore: 'counters' },
   used_ids: { cols: ['id'], restore: 'ignore' },
   notices: { cols: ['id', 'data'], restore: 'replace' },
-  users: { cols: ['codigo', 'nome', 'role', 'label', 'pass_hash', 'must_change', 'ativo', 'acesso_hmac', 'acesso_enc'], restore: 'replace' },
+  users: { cols: ['codigo', 'nome', 'role', 'label', 'admin', 'pass_hash', 'must_change', 'ativo', 'acesso_hmac', 'acesso_enc'], restore: 'replace' },
   portal_users: { cols: ['codigo', 'nome', 'perfil', 'segmentos', 'pass_hash', 'must_change', 'ativo', 'acesso_hmac', 'acesso_enc'], restore: 'replace' },
   integration_settings: { cols: ['k', 'v'], restore: 'replace' },
   google_event_map: { cols: ['modulo', 'id', 'event_id', 'hash'], restore: 'replace' },
@@ -151,7 +151,7 @@ export function validateBuffer(gz: Buffer): Validation {
     if (!man[t] || man[t].linhas !== rows.length) out.erros.push(`Tabela "${t}": contagem não confere.`);
     else if (man[t].sha256 !== sha(rows)) out.erros.push(`Tabela "${t}": conteúdo não confere (hash).`);
   }
-  if (!Array.isArray(tabelas.users) || !tabelas.users.some((u) => u.role === 'manager' && Number(u.ativo) === 1)) out.erros.push('O backup não tem nenhuma Gerente ativa; restaurar deixaria o sistema sem acesso.');
+  if (!Array.isArray(tabelas.users) || !tabelas.users.some((u) => u.role === 'manager' && Number(u.ativo) === 1 && (u.admin === undefined || Number(u.admin) === 1))) out.erros.push('O backup não tem nenhum Administrador ativo; restaurar deixaria o sistema sem acesso.');
   if (dump.anexosIncompletos) out.avisos.push('Anexos acima do limite do backup: não foram incluídos (use o dump do banco para eles).');
   if (!dump.completo) out.avisos.push('Backup sem anexos: arquivos enviados não são alterados na restauração.');
   out.ok = out.erros.length === 0;
@@ -202,7 +202,8 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
       for (const [t, spec] of Object.entries(TABLES)) {
         const rows = T[t];
         if (!Array.isArray(rows) || spec.restore === 'info') continue;
-        const data = rows.map((r) => spec.cols.map((k) => (r[k] === undefined ? null : r[k])));
+        // backups anteriores à separação Administrador × Gerente não têm "admin": toda Gerente daquela época vira Administradora
+        const data = rows.map((r) => spec.cols.map((k) => (k === 'admin' && t === 'users' && r.admin === undefined ? (r.role === 'manager' ? 1 : 0) : r[k] === undefined ? null : r[k])));
         if (spec.restore === 'replace') {
           await c.query(`DELETE FROM ${t}`);
           await insertChunks(c, t, spec.cols, data);

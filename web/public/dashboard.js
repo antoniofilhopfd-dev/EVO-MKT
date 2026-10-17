@@ -1,4 +1,4 @@
-/* Dashboard: o que importa hoje, com dados reais. Não é um gerenciador de tarefas: cada linha leva ao módulo dono do registro. */
+/* Dashboard: o que importa agora, com dados reais. Não é um gerenciador de tarefas: cada linha leva ao módulo dono do registro. */
 async function renderToday(){
  let d;
  try{d=await api('/dashboard/resumo')}catch(e){$('#content').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar o painel</strong><p>${esc(e.message)}</p></div>`;return}
@@ -6,17 +6,20 @@ async function renderToday(){
  const hojeTxt=new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'2-digit',month:'long'}).format(new Date(d.hoje+'T12:00:00'));
  const nome=String(d.eu.nome||'').split(' ')[0];
  const s=d.solicitacoes;
- const kpi=(l,v,etapa,cls='')=>`<button type="button" class="db-kpi ${cls}" data-db-sol="${etapa}"><b>${v}</b><span>${l}</span></button>`;
- const vazio=t=>`<p class="db-vazio">${esc(t)}</p>`;
- const lista=(itens,fn,vz)=>itens.length?`<ul class="db-lista">${itens.map(fn).join('')}</ul>`:vazio(vz);
- $('#content').innerHTML=`<div class="today-banner db-topo"><div><small>${esc(hojeTxt)}</small><h1>Olá, ${esc(nome)}</h1><p>O que está em andamento no marketing e o que vem pela frente.</p></div><button class="btn" id="dbNova">+ Nova solicitação</button></div>
-  <div class="db-kpis" role="group" aria-label="Solicitações">${kpi('Pendentes',s.pendentes,'PENDENTE')}${kpi('Em andamento',s.emAndamento,'EM_ANDAMENTO')}${kpi('Em aprovação',s.emAprovacao,'EM_APROVACAO')}${kpi('Atrasadas',s.atrasadas,'ATRASADAS',s.atrasadas?'alerta':'')}</div>
-  ${s.listaAtrasadas.length?`<section class="db-bloco alerta"><h2>Solicitações atrasadas</h2>${lista(s.listaAtrasadas,x=>`<li><button type="button" data-db-abrir-sol="${attr(x.id)}"><b>${esc(x.titulo)}</b><small>${esc(x.responsavel||'sem responsável')} · prazo ${esc(fd(x.prazo))}</small></button></li>`,'')}</section>`:''}
+ const stat=(l,v,etapa,cls='')=>`<button type="button" class="db-stat ${cls}" data-db-sol="${etapa}"><b>${v}</b><span>${l}</span></button>`;
+ // próximos dias: compromissos, publicações e eventos escolares numa lista só, em ordem de data
+ const prox=[
+  ...d.compromissos.map(x=>({data:x.data,hora:x.hora,titulo:x.titulo,tag:x.tipo||'Compromisso',cls:'c',ir:'calendario'})),
+  ...(d.publicacoes||[]).map(x=>({data:x.data,hora:x.hora,titulo:x.titulo,tag:'Publicação'+(x.canal?' · '+x.canal:''),cls:'p',ir:'conteudos'})),
+  ...d.eventosEscolares.map(x=>({data:x.data,hora:x.horaInicio||'',titulo:x.titulo,tag:'Evento escolar',cls:'e',ir:'calendario'})),
+ ].sort((a,b)=>(a.data+(a.hora||'')).localeCompare(b.data+(b.hora||''))).slice(0,9);
+ const atras=s.listaAtrasadas.slice(0,3);
+ $('#content').innerHTML=`<div class="db-topo"><div><small>${esc(hojeTxt)}</small><h1>Olá, ${esc(nome)}</h1></div><button class="btn" id="dbNova">+ Nova solicitação</button></div>
+  <div class="db-stats" role="group" aria-label="Solicitações">${stat('Pendentes',s.pendentes,'PENDENTE')}${stat('Em andamento',s.emAndamento,'EM_ANDAMENTO')}${stat('Em aprovação',s.emAprovacao,'EM_APROVACAO')}${stat('Atrasadas',s.atrasadas,'ATRASADAS',s.atrasadas?'alerta':'')}</div>
+  ${atras.length?`<div class="db-alerta" role="alert"><b>Atenção</b>${atras.map(x=>`<button type="button" data-db-abrir-sol="${attr(x.id)}">${esc(x.titulo)} <small>${esc(x.responsavel||'sem responsável')} · prazo ${esc(fd(x.prazo))}</small></button>`).join('')}</div>`:''}
   <div class="db-grade">
-   <section class="db-bloco"><h2>Próximos compromissos</h2><p class="db-sub">Próximos 7 dias · Calendário de Marketing</p>${lista(d.compromissos,x=>`<li><button type="button" data-db-ir="calendario"><b>${esc(x.titulo)}</b><small>${esc(fd(x.data))}${x.hora?' · '+esc(x.hora):''} · ${esc(x.tipo)}</small></button></li>`,'Nenhum compromisso nos próximos 7 dias.')}</section>
-   <section class="db-bloco"><h2>Próximos eventos escolares</h2><p class="db-sub">Calendário Escolar</p>${lista(d.eventosEscolares,x=>`<li><button type="button" data-db-ir="calescolar"><b>${esc(x.titulo)}</b><small>${esc(fd(x.data))}${x.fim&&x.fim!==x.data?' a '+esc(fd(x.fim)):''}${x.horaInicio?' · '+esc(x.horaInicio):''}${x.local?' · '+esc(x.local):''}</small></button></li>`,'Nenhum evento escolar cadastrado à frente.')}</section>
-   <section class="db-bloco"><h2>Ações planejadas para a semana</h2><p class="db-sub">${esc(fd(d.semana.ini))} a ${esc(fd(d.semana.fim))} · Planejamento</p>${lista(d.acoesDaSemana,x=>`<li><button type="button" data-db-acao="${attr(x.id)}"><b>${esc(x.titulo)}</b><small>${esc(fd(x.dataInicio))}${x.dataFim!==x.dataInicio?' a '+esc(fd(x.dataFim)):''} · ${x.situacao==='EXECUCAO'?'Em execução':'Planejado'}${x.responsavel?' · '+esc(x.responsavel):''}</small></button></li>`,'Nenhuma ação planejada para esta semana.')}</section>
-   <section class="db-bloco"><h2>Entregas recentes</h2><p class="db-sub">Solicitações concluídas nos últimos 14 dias</p>${lista(d.entregasRecentes,x=>`<li><button type="button" data-db-abrir-sol="${attr(x.id)}"><b>${esc(x.titulo)}</b><small>${esc(fd(x.quando))}${x.responsavel?' · '+esc(x.responsavel):''}</small></button></li>`,'Nenhuma entrega concluída nos últimos 14 dias.')}</section>
+   <section class="db-bloco"><h2>Próximos dias</h2>${prox.length?`<ul class="db-lista">${prox.map(x=>`<li><button type="button" data-db-ir="${x.ir}"><span class="db-dia">${esc(fd(x.data))}${x.hora?`<i>${esc(x.hora)}</i>`:''}</span><span class="db-tit"><b>${esc(x.titulo)}</b><small class="db-tag ${x.cls}">${esc(x.tag)}</small></span></button></li>`).join('')}</ul>`:'<p class="db-vazio">Nada marcado para os próximos 7 dias.</p>'}</section>
+   <section class="db-bloco"><h2>Ações da semana</h2>${d.acoesDaSemana.length?`<ul class="db-lista">${d.acoesDaSemana.map(x=>`<li><button type="button" data-db-acao="${attr(x.id)}"><span class="db-dia">${esc(fd(x.dataInicio))}</span><span class="db-tit"><b>${esc(x.titulo)}</b><small>${esc(x.responsavel||'sem responsável')}</small></span></button></li>`).join('')}</ul>`:'<p class="db-vazio">Nenhuma ação planejada para esta semana.</p>'}</section>
   </div>`;
  $('#dbNova').onclick=()=>go('solicitacoes').then(()=>slNova());
  $$('[data-db-sol]').forEach(b=>b.onclick=()=>{const e=b.dataset.dbSol;sl.f={q:'',resp:'',seg:'',etapa:e==='ATRASADAS'?'':e,prazo:e==='ATRASADAS'?'atrasadas':''};go('solicitacoes')});
