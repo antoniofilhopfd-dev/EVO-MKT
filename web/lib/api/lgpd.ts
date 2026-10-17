@@ -43,7 +43,7 @@ export async function lgpdRoute(c: Ctx): Promise<Response> {
     const cod = strv(input.codigo).trim().toUpperCase();
     const tipo = input.tipo === 'portal' ? 'portal' : 'interno';
     const tab = tipo === 'portal' ? 'portal_users' : 'users';
-    const alvo = await q1(`SELECT codigo,nome${tipo === 'interno' ? ',role,admin,ativo' : ''} FROM ${tab} WHERE codigo=?`, [cod]);
+    const alvo = await q1(`SELECT * FROM ${tab} WHERE codigo=?`, [cod]);
     if (!alvo) fail(404, 'Ficha não encontrada.');
     if (tipo === 'interno' && cod === m.codigo) fail(400, 'Você não pode anonimizar a própria ficha.');
     if (tipo === 'interno' && alvo.role === 'manager' && Number(alvo.admin) && Number(alvo.ativo)

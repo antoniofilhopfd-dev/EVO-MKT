@@ -414,7 +414,7 @@ export async function route(c: Ctx): Promise<Out> {
       const tipo = strv(input.tipo);
       const tab = tabOf(tipo);
       const cod = upper(input.codigo);
-      const alvo = await q1(`SELECT codigo${tipo === 'interno' ? ',role,admin' : ''} FROM ${tab} WHERE codigo=?`, [cod]);
+      const alvo = await q1(`SELECT * FROM ${tab} WHERE codigo=?`, [cod]);
       if (!alvo) fail(404, 'Ficha não encontrada.');
       if (tipo === 'interno' && cod === m.codigo) fail(400, 'Você não pode excluir a própria ficha.');
       if (tipo === 'interno' && nivelDe(alvo) === 'admin' && (await adminsAtivos()) <= 1) fail(400, 'Não é possível excluir o único Administrador ativo.');
