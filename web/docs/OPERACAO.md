@@ -158,3 +158,20 @@ Código: o motor comum (`CalMotor`, em `public/calmkt.js`) serve aos calendário
 **Verificação.** Cada item do catálogo traz a **fonte e a base legal** conferidas (ver a tela de detalhe). O que não foi confirmado fica **pendente de validação** e não aparece como oficial nem permite criar ações (hoje: 8/12 Imaculada Conceição e 24/6 São João em João Pessoa). Carnaval e Corpus Christi aparecem como **ponto facultativo**, não como feriado.
 
 **Uso.** Visões Mês, Ano e Lista; filtros por categoria, mês, ano, Feriados, Datas educacionais, pendentes e "Somente datas relevantes"; pesquisa pelo nome. Ao abrir uma data: marcar relevância/observações, **Criar ação no Planejamento** (cria um Projeto em PLANEJAMENTO com a referência `dataComemorativaId/Nome/Data`) e **Criar solicitação** (usa o fluxo de Solicitações; guarda a mesma referência). Nenhuma publicação ou ação é criada automaticamente.
+
+## Planejamento, Dashboard e menu (v5.15.0)
+- **Planejamento** (menu Organização) mostra "o que o marketing pretende realizar": ações com título, objetivo, segmento, categoria (Campanhas, Conteúdos, Eventos, Projetos, Ações institucionais), datas, responsável e observações. Visões mensal, semanal e lista; filtros por segmento, responsável, categoria, período e busca; situações Planejado / Em execução / Finalizado; duplicar (recorrentes), arquivar e excluir (Lixeira).
+- O acompanhamento é calculado só pelas solicitações vinculadas (contagens reais, sem percentuais inventados). A produção continua em **Solicitações**; Planejamento não duplica dados, apenas aponta para elas.
+- Vínculos opcionais, guardados na própria ação ou no registro filho, sem cópias: solicitações (uma ou várias), evento do Calendário Escolar, data comemorativa e conteúdo. Editar a ação não altera o evento/data original. Nada é criado automaticamente.
+- Armazenamento: reaproveita `projetos` (projetos antigos aparecem como ações; nada foi apagado ou migrado destrutivamente). Tarefas internas e Eventos ficam como abas dentro de Planejamento; Agenda abre no Calendário de Marketing.
+- **Dashboard** (Visão geral): solicitações pendentes/em andamento/atrasadas, compromissos dos próximos 7 dias, próximos eventos escolares, ações da semana e entregas recentes — tudo de dados reais.
+- **Menu**: Visão geral · Organização (Solicitações, Planejamento, Calendários) · Marketing · Gestão · Administração (Configurações, Usuários e permissões, Integrações, Backup e segurança). Telas antigas continuam acessíveis (redirecionamentos), nenhum registro ficou inacessível.
+
+## Segurança (revisão da v5.15.0)
+Verificada pela suíte `auditoria`: todas as rotas novas exigem login (401); escritas sem `X-EVO` são recusadas (403); equipe não executa ações de Gerência/Administração (403); JSON inválido, corpo/campo gigante e texto com SQL/HTML tratados sem 500 e sem execução; criar/reagendar/arquivar/excluir ficam no registro de operações; Portal das Coordenações segue suspenso (503). Consultas usam parâmetros; credenciais nunca são devolvidas pela API.
+
+## Implantação na Hostinger
+1. `main` aciona o build automático (pasta raiz `web`, Node 22). A migração 019 roda sozinha no primeiro start; nenhuma migração já aplicada foi alterada.
+2. Faça backup antes (Administração → Backup e segurança).
+3. Pendências de configuração (não são código): cron `publicar` a cada 10 min; trocar segredos que passaram pelo chat; conferir o deploy; fornecer o calendário oficial do Colégio.
+4. O Portal só volta com o interruptor em Administração, com confirmação explícita.
