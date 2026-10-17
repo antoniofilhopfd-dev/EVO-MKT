@@ -87,12 +87,12 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
     return json({
       rows: (await listRows('calescolar')).map((e) => ({ ...e, solicitacoes: vinc[String(e.id)] ?? [], acoes: acoes.filter((p) => strv(p.eventoEscolarId) === String(e.id)).map((p) => ({ id: p.id, titulo: p.titulo, status: p.status })) })),
       opcoes: { segmentos: SEGMENTOS_ESCOLARES, tipos: TIPOS_ESCOLARES, acoes: Object.entries(ACOES).map(([k, v]) => [k, v.rotulo]) },
-      eu: { nome: u.nome, role: u.role }, podeEditar: u.role === 'manager', hoje: fmtDate(new Date()),
+      eu: { nome: u.nome, role: u.role }, podeEditar: true, hoje: fmtDate(new Date()),
     });
   }
 
   if (path === '/escolar/salvar' && method === 'POST') {
-    await requireManager(c);
+    await requireInternal(c);
     const b = await c.body();
     const dados = validarEvento(b);
     const id = strv(b.id).trim();
@@ -108,7 +108,7 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
   }
 
   if (path === '/escolar/mover' && method === 'POST') {
-    await requireManager(c);
+    await requireInternal(c);
     const b = await c.body();
     const id = strv(b.id), data = strv(b.data).trim();
     const cur = (await getRow('calescolar', id)) ?? fail(404, 'Evento não encontrado.');
@@ -122,7 +122,7 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
   }
 
   if (path === '/escolar/excluir' && method === 'POST') {
-    await requireManager(c);
+    await requireInternal(c);
     const id = strv((await c.body()).id);
     const r0 = (await getRow('calescolar', id)) ?? fail(404, 'Evento não encontrado.');
     // as ações de Planejamento e as solicitações ligadas a este evento continuam; só perdem o vínculo (guardam título e data para histórico)

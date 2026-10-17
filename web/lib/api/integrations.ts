@@ -45,7 +45,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       }
     }
     case path === '/integrations/status': {
-      await requireManager(c);
+      await requireInternal(c);
       const exp = parseInt(await setting('meta_token_expira', '0'), 10) || 0;
       return json({
         instagram: {
@@ -70,7 +70,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       });
     }
     case path === '/integrations/prontidao': {
-      await requireManager(c);
+      await requireInternal(c);
       const origin = publicUrl(c.url.origin);
       type Item = { id: string; ok: boolean; nivel: 'erro' | 'aviso'; titulo: string; como: string };
       const it: Item[] = [];
@@ -169,11 +169,11 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/integrations/ads/sync' && method === 'POST': {
-      await requireManager(c);
+      await requireInternal(c);
       try { return json({ linhas: await adsSync() }); } catch (e: any) { await intLog('instagram', 'erro', 'Meta Ads: ' + e.message); return fail(502, e.message); }
     }
     case path === '/integrations/ads/orcamento' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireInternal(c);
       const v = Number((await c.body()).valor);
       if (!Number.isFinite(v) || v < 0 || v > 100_000_000) fail(400, 'Informe um valor válido (0 remove o orçamento).');
       await setSetting('ads_orcamento_mensal', v > 0 ? String(v) : '');
@@ -181,7 +181,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/traffic/semanal': {
-      await requireManager(c);
+      await requireInternal(c);
       const ymd = (v: string) => (/^\d{4}-\d\d-\d\d$/.test(v) && !isNaN(new Date(v + 'T12:00:00').getTime()) ? v : '');
       const de = ymd(c.qs('de')), ate = ymd(c.qs('ate'));
       if (!de || !ate) fail(400, 'Informe as datas (de e ate) no formato AAAA-MM-DD.');
@@ -243,7 +243,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true });
     }
     case path === '/integrations/instagram/sync' && method === 'POST': {
-      await requireManager(c);
+      await requireInternal(c);
       try { await metaRefreshIfNeeded(); const meses = Math.min(24, Math.max(2, Math.floor(Number(((await c.body().catch(() => ({}))) as Row).meses) || 2))); return json({ periodos: await igSync(meses) }); } catch (e: any) { return bad('instagram', e); }
     }
     case path === '/integrations/instagram/queue': {
@@ -291,7 +291,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       }
     }
     case path === '/integrations/google/calendars' && method === 'GET': {
-      await requireManager(c);
+      await requireInternal(c);
       try { return json({ rows: await gCalendarList() }); } catch (e: any) { return bad('google', e); }
     }
     case path === '/integrations/google/calendar/choose' && method === 'POST': {
@@ -309,15 +309,15 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ ok: true, removidos: n });
     }
     case path === '/integrations/google/calendar/sync' && method === 'POST': {
-      await requireManager(c);
+      await requireInternal(c);
       try { return json(await gCalendarSync()); } catch (e: any) { return bad('google', e); }
     }
     case path === '/integrations/google/sheets/export' && method === 'POST': {
-      await requireManager(c);
+      await requireInternal(c);
       try { return json({ abas: await gSheetsExport(), url: await setting('g_sheet_url') }); } catch (e: any) { return bad('google', e); }
     }
     case path === '/integrations/google/drive/send-entregas' && method === 'POST': {
-      await requireManager(c);
+      await requireInternal(c);
       let n = 0;
       try {
         for (const r of await listRows('solicitacoes')) if (r.arquivosEntrega) n += await gDriveSendEntregas(r.id);
@@ -325,7 +325,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       return json({ arquivos: n });
     }
     case path === '/integrations/log': {
-      await requireManager(c);
+      await requireInternal(c);
       return json(await q('SELECT quando,servico,nivel,msg FROM integration_log ORDER BY id DESC LIMIT 40'));
     }
     default:

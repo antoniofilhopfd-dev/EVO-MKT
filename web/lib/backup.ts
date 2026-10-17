@@ -36,9 +36,10 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   ads_anuncios: { cols: ['conta', 'anuncio_id', 'periodo', 'anuncio', 'campanha', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'conversas', 'inicio', 'moeda', 'status', 'problema', 'ativo', 'atualizado_em'], restore: 'replace', opt: true },
   ads_lancamentos: { cols: ['id', 'chave', 'quem', 'quando', 'tipo', 'referencia', 'titulo', 'objetivo', 'orcamento_dia', 'dias', 'inicio', 'fim', 'compromisso', 'moeda', 'publico', 'campanha_id', 'conjunto_id', 'anuncio_id', 'estado', 'erro', 'atualizado_em'], restore: 'replace', opt: true },
   ads_acoes: { cols: ['id', 'quando', 'quem', 'nivel', 'objeto_id', 'nome', 'acao', 'antes', 'depois', 'resultado', 'erro'], restore: 'replace', opt: true },
+  user_prefs: { cols: ['codigo', 'chave', 'valor', 'atualizado'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };
-const FILES_TABLE = { name: 'arquivos', cols: ['caminho', 'mime', 'tamanho', 'conteudo', 'criado_em'] };
+const FILES_TABLE = { name: 'arquivos', cols: ['caminho', 'mime', 'tamanho', 'conteudo', 'criado_em', 'nome', 'pasta'] };
 const MAX_FILES_BYTES = 60 * 1024 * 1024; // anexos no backup "completo": limite de segurança
 
 const sha = (o: unknown) => createHash('sha256').update(JSON.stringify(o)).digest('hex');
@@ -219,7 +220,7 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
       }
       if (Array.isArray(T[FILES_TABLE.name])) {
         for (const r of T[FILES_TABLE.name]) {
-          await c.query('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime),tamanho=VALUES(tamanho),conteudo=VALUES(conteudo)', [r.caminho, r.mime, r.tamanho, Buffer.from(r.conteudo, 'base64'), r.criado_em]);
+          await c.query('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em,nome,pasta) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime),tamanho=VALUES(tamanho),conteudo=VALUES(conteudo),nome=VALUES(nome),pasta=VALUES(pasta)', [r.caminho, r.mime, r.tamanho, Buffer.from(r.conteudo, 'base64'), r.criado_em, r.nome ?? null, r.pasta ?? '']);
         }
         restaurado[FILES_TABLE.name] = T[FILES_TABLE.name].length;
       }

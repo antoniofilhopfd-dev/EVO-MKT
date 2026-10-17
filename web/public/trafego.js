@@ -74,7 +74,7 @@ function tfTabelaCampanhas(){
   return `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${tfTh('nome','Campanha',tfOrdC,'data-ordc')}${tfTh('status','Status',tfOrdC,'data-ordc')}${tfTh('inicio','Início',tfOrdC,'data-ordc')}${tfTh('gasto','Gasto',tfOrdC,'data-ordc')}${tfTh('conversas','Conversas iniciadas',tfOrdC,'data-ordc')}${tfTh('custo','Custo/conversa',tfOrdC,'data-ordc')}${tfTh('resultados','Resultados',tfOrdC,'data-ordc')}</tr></thead><tbody>${l.map(r=>`<tr><td><b>${esc(r.campanha)}</b></td><td>${tfStatusHtml(r.status)}</td><td>${esc(tfInicioTxt(r.inicio))}</td><td>${esc(tfBrl(r.gasto,r.moeda))}</td><td>${tfN(r.conversas)}</td><td>${Number(r.conversas)?esc(tfBrl(Number(r.gasto)/Number(r.conversas),r.moeda)):'—'}</td><td>${tfN(r.resultados)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function tfOrcamento(){
-  const pc=tfDados.pacing,gerente=internalSession?.role==='manager';
+  const pc=tfDados.pacing,gerente=true;
   if(!pc)return `<div class="tf-meter vazio"><small>Orçamento do mês</small><p>Defina quanto pretende investir no mês para acompanhar o ritmo e a projeção.</p>${gerente?'<button class="softbtn" id="tfOrc" type="button">Definir orçamento do mês</button>':''}</div>`;
   const pct=pc.gasto/pc.orcamento*100,proj=pc.projecao/pc.orcamento*100,cl=pct>=100?'perigo':(pct>=85||proj>110)?'alerta':'';
   const txt=proj>100?`No ritmo atual, o mês fecha em ${tfBrl(pc.projecao,pc.moeda)}, acima do orçamento.`:`No ritmo atual, o mês fecha em ${tfBrl(pc.projecao,pc.moeda)}, dentro do orçamento.`;
@@ -89,7 +89,7 @@ function tfAlertas(){
 function tfTabelaDiaria(){const d=tfDados.diario.slice(-tfDias);return `<details class="tf-tabela"><summary>Ver como tabela</summary><div class="tablewrap"><table class="datatable"><thead><tr><th>Dia</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>Resultados</th></tr></thead><tbody>${[...d].reverse().map(x=>`<tr><td>${esc(fmtDate(String(x.dia).slice(0,10)))}</td><td>${esc(tfBrl(x.gasto))}</td><td>${tfN(x.impressoes)}</td><td>${tfN(x.cliques)}</td><td>${tfN(x.resultados)}</td></tr>`).join('')}</tbody></table></div></details>`}
 
 function tfDesenha(){
-  const d=tfDados,m=d.mes,a=d.mesAnterior,gerente=internalSession?.role==='manager',sa=d.saude;
+  const d=tfDados,m=d.mes,a=d.mesAnterior,gerente=true,sa=d.saude;
   const cpr=x=>x.resultados?x.gasto/x.resultados:0,ctr=x=>x.impressoes?x.cliques/x.impressoes*100:0;
   const dia=d.diario.slice(-14),mk=(k)=>dia.map(x=>Number(x[k])||0),ctrD=dia.map(x=>x.impressoes?x.cliques/x.impressoes*100:0),cprD=dia.map(x=>x.resultados?x.gasto/x.resultados:0);
   const rotAnt=tfMes(d.anterior).split(' de ')[0];

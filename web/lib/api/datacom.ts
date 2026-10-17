@@ -38,7 +38,7 @@ function camposDaRegra(r: Regra): Row {
 
 interface Item { uid: string; id: string; origem: 'catalogo' | 'personalizada'; nome: string; categoria: string; data: string; fim?: string; regra: string; movel: boolean; relevante: 'SIM' | 'NAO'; relevanteAjustado: boolean; status: 'confirmada' | 'pendente'; fonte: string; baseLegal: string; descricao: string; observacoes: string; repeteAnual: boolean; editavel: boolean; regraDados?: Row; vinculos: { solicitacoes: Row[]; planejamento: Row[] } }
 
-async function ocorrencias(anoBase: number, u: Row): Promise<Item[]> {
+export async function ocorrencias(anoBase: number, u: Row): Promise<Item[]> {
   const ajustes = new Map((await q('SELECT catalogo_id,relevante,observacoes FROM datacom_ajustes')).map((r) => [String(r.catalogo_id), r]));
   const sols = (await listRows('solicitacoes')).filter((s) => strv(s.dataComemorativaId));
   const projs = (await listRows('projetos')).filter((s) => strv(s.dataComemorativaId));
@@ -61,7 +61,7 @@ async function ocorrencias(anoBase: number, u: Row): Promise<Item[]> {
     const regra = regraDoRegistro(r);
     if (!regra) continue;
     const repete = strv(r.repeteAnual) !== 'NAO';
-    const dono = u.role === 'manager' || strv(r.criadoPor) === String(u.codigo);
+    const dono = true;
     for (const y of anos) {
       if (!repete && Number(r.ano) !== y) continue;
       const oc = ocorrencia(regra, y);
@@ -119,7 +119,7 @@ export async function datacomRoute(c: Ctx): Promise<Response> {
     const dados = await validarPersonalizada(b, id);
     if (!id) return json(await insertRow('datacom', dados, u.codigo), 201);
     const cur = (await getRow('datacom', id)) ?? fail(404, 'Data não encontrada.');
-    if (u.role !== 'manager' && strv(cur.criadoPor) !== String(u.codigo)) fail(403, 'Só a Gerência ou quem cadastrou a data pode alterá-la.');
+    
     const nw = await modifyRow('datacom', id, (r) => ({ ...r, ...dados, atualizadoEm: now(), atualizadoPor: u.codigo }));
     await audit(String(u.codigo), 'editar', 'datacom', id);
     return json(nw);
@@ -128,7 +128,7 @@ export async function datacomRoute(c: Ctx): Promise<Response> {
   if (path === '/datacom/excluir' && method === 'POST') {
     const id = strv((await c.body()).id);
     const cur = (await getRow('datacom', id)) ?? fail(404, 'Só datas cadastradas pela equipe podem ser excluídas (as do catálogo não).');
-    if (u.role !== 'manager' && strv(cur.criadoPor) !== String(u.codigo)) fail(403, 'Só a Gerência ou quem cadastrou a data pode excluí-la.');
+    
     await trashRow('datacom', id, u.codigo); // Lixeira: pode ser restaurada
     return json({ ok: true });
   }
@@ -210,7 +210,7 @@ export async function datacomRoute(c: Ctx): Promise<Response> {
     const prazo = strv(b.prazo).trim() || item.data;
     if (!dataValida(prazo)) fail(400, 'Prazo inválido.');
     const resp = strv(b.responsavel).trim();
-    if (resp && u.role !== 'manager' && lower(resp) !== lower(String(u.nome))) fail(403, 'Só a Gerente atribui a outra pessoa.');
+    
     for (const p of await listRows('projetos')) {
       if (strv(p.dataComemorativaId) === item.id && strv(p.dataComemorativaData) === item.data && lower(strv(p.titulo)) === lower(acao)) fail(409, `Essa ação já está no Planejamento (${p.id}).`);
     }

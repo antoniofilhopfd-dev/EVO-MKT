@@ -11,7 +11,7 @@ const GM_ESTADO={ACTIVE:['Ativo','ok'],PAUSED:['Pausado',''],PENDING_REVIEW:['Em
 function gmIntervalo(p){const h=new Date();h.setHours(12,0,0,0);const f=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);if(p==='hoje')return [f(h),f(h)];if(p==='mes')return [f(new Date(h.getFullYear(),h.getMonth(),1,12)),f(h)];const n=Number(p)||7,i=new Date(h);i.setDate(h.getDate()-(n-1));return [f(i),f(h)]}
 
 async function renderGerenciador(){
-  if(internalSession?.role!=='manager')return go('minhaarea');
+  if(false)return go('minhaarea');
   await adsCarregaModo();
   if(!gmPeriodo.de){[gmPeriodo.de,gmPeriodo.ate]=gmIntervalo(gmPeriodo.p)}
   $('#content').innerHTML='<div class="loading"><span></span><b>Lendo a conta na Meta…</b></div>';
@@ -250,7 +250,7 @@ async function gmDetalhes(id){
   const loc=[...(p.cidades||[]).map(c=>`${esc(c.nome)}${c.raioKm?` (+${c.raioKm} km)`:''}`),...(p.regioes||[]).map(esc),...(p.paises||[]).map(esc)].join(', ');
   const idade=p.idadeMin||p.idadeMax?`${p.idadeMin||'—'} a ${p.idadeMax||'—'} anos`:'';
   const metr=`<tr><th>Gasto</th><td>${esc(gmBrl(o.gasto))}</td></tr>${lin('Impressões',gmN(o.impressoes))}${lin('Alcance',gmN(o.alcance))}${lin('Frequência',gmDec(o.frequencia))}${lin('Cliques',gmN(o.cliques))}${lin('CTR',gmPct(o.ctr))}${lin('CPC',o.cliques?esc(gmBrl(o.cpc)):'—')}${lin('CPM',o.impressoes?esc(gmBrl(o.cpm)):'—')}${lin('Conversas',gmN(o.conversas))}${lin('Custo por conversa',esc(gmMoeda(o.custoConversa)))}${lin('Leads',gmN(o.leads))}${lin('CPL',esc(gmMoeda(o.cpl)))}${lin('Resultados ('+esc(o.rotuloResultado||'')+')',gmN(o.resultados))}${lin('Custo por resultado',esc(gmMoeda(o.custoResultado)))}`;
-  let conteudos=[];if(nivel==='anuncio'&&internalSession?.role==='manager'){try{conteudos=(await getRows('conteudos')).rows||[]}catch{}}
+  let conteudos=[];if(nivel==='anuncio'&&true){try{conteudos=(await getRows('conteudos')).rows||[]}catch{}}
   const vinc=nivel==='anuncio'?`<h4>Vínculo com Conteúdo</h4><p class="kpi-note">Liga o anúncio a um Conteúdo do EVO MKT (produção orgânica → mídia paga). Não altera nada na Meta.</p><div class="st-row"><label>Conteúdo<select id="gdConteudo"><option value="">(nenhum)</option>${conteudos.map(c=>`<option value="${attr(c.id)}" ${o.conteudo&&o.conteudo.id===c.id?'selected':''}>${esc((c.titulo||c.id).slice(0,70))}</option>`).join('')}${o.conteudo&&!conteudos.some(c=>c.id===o.conteudo.id)?`<option value="${attr(o.conteudo.id)}" selected>${esc(o.conteudo.titulo||o.conteudo.id)}</option>`:''}</select></label><button class="softbtn" id="gdVinc" type="button">Salvar vínculo</button></div>`:'';
   const ov=adminOverlay(`<h3>${esc(o.nome)}</h3><p class="kpi-note">${nivel==='campanha'?'Campanha':nivel==='conjunto'?'Conjunto de anúncios':'Anúncio'} · código EVO <b>${esc(o.codigo||'')}</b> · ID na Meta <b>${esc(o.id)}</b></p>
    ${o.foto?`<img class="gm-foto" alt="" referrerpolicy="no-referrer" src="${attr(o.foto)}" style="width:96px;height:auto;border-radius:10px">`:''}

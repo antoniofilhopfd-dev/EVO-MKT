@@ -107,7 +107,7 @@ export async function operacaoRoute(c: Ctx) {
     return json(await verificarIntegridade());
   }
   if (path === '/insights') {
-    await requireManager(c);
+    await requireInternal(c);
     return json({ saude: await saudePorSegmento(), datas: proximasDatas(90), horarios: await melhoresHorarios(await igContaValida(c.qs('conta'))), ranking: await rankingConteudos(8, await igContaValida(c.qs('conta'))) });
   }
   if (path === '/studio/modelos') {
@@ -130,7 +130,7 @@ export async function operacaoRoute(c: Ctx) {
     return json({ ok: true, modelos: limpos });
   }
   if (path === '/instagram/seguidores/manual' && c.method === 'POST') {
-    const u = await requireManager(c);
+    const u = await requireInternal(c);
     const b = await c.body();
     const conta = await igContaValida(String(b.conta ?? '')), mes = String(b.mes ?? '').trim(), n = Math.floor(Number(b.seguidores));
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) fail(400, 'Informe o mês no formato AAAA-MM.');
@@ -146,7 +146,7 @@ export async function operacaoRoute(c: Ctx) {
     return json({ ok: true });
   }
   if (path === '/instagram/relatorio') {
-    await requireManager(c);
+    await requireInternal(c);
     const lp = localParts(new Date());
     const mes = /^\d{4}-\d{2}$/.test(c.qs('mes')) ? c.qs('mes') : `${lp.y}-${String(lp.m).padStart(2, '0')}`;
     const [y, m] = mes.split('-').map(Number);
@@ -267,7 +267,7 @@ export async function operacaoRoute(c: Ctx) {
     return json({ rows: proximasDatas(Number(c.qs('dias')) || 90) });
   }
   if (path === '/indicadores') {
-    await requireManager(c);
+    await requireInternal(c);
     return json(await indicadores(c));
   }
   return fail(404, 'Rota não encontrada.');

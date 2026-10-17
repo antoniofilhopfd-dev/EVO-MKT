@@ -1,10 +1,11 @@
 import { Ctx } from '../ctx';
-import { requireManager } from '../auth';
+import { requireInternal } from '../auth';
 import { audit } from '../records';
 import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { metaConnected } from '../integrations/meta';
-import { cfgRegras, enviarRelatorioSemanal, excluirRascunho, listarMatriculas, rascunhos, rodarRegras, salvarMatriculas, salvarRascunho, salvarRegras } from '../integrations/metaadsExtras';
+import { cfgRegras, enviarRelatorioSemanal, excluirRascunho, rascunhos, rodarRegras, salvarRascunho, salvarRegras } from '../integrations/metaadsExtras';
+import { avaliarLimitesGasto, publicosConta, quebra, salvarLimitesGasto, saudeMeta, serieObjeto } from '../integrations/metaadsAnalise';
 import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, whatsOk, numWhats, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
 import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel, vincularConteudo } from '../integrations/metaadsGerenciador';
 import { addDays, fmtDate } from '../util';
@@ -19,7 +20,7 @@ const faixa = (v: unknown, min: number, max: number, nome: string) => { const n 
 
 export async function gestaoAnunciosRoute(c: Ctx) {
   const { path, method } = c;
-  const u = await requireManager(c);
+  const u = await requireInternal(c);
   // Modo do Tráfego: por padrão SOMENTE LEITURA (métricas). Criar/editar/pausar anúncios só com a chave ligada em Administração → Integrações.
   const completo = (await setting('trafego_gestao')) === '1';
   if (path === '/ads/modo') {
@@ -86,11 +87,11 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     const ymd = (v: string) => (/^\d{4}-\d\d-\d\d$/.test(v) ? v : '');
     const ate = ymd(c.qs('ate')) || fmtDate(new Date()), de = ymd(c.qs('de')) || fmtDate(addDays(new Date(), -6));
     if (de > ate) fail(400, 'A data inicial é depois da final.');
-    if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 93) fail(400, 'O período vai até 93 dias.');
+    if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 400) fail(400, 'O período vai até 400 dias.');
     try { return json(await arvore(de, ate, c.qs('arquivados') === '1')); } catch (e: any) { return fail(502, e.message); }
   }
   if (path === '/ads/extras' && method === 'GET') {
-    return json({ gestao: completo, regras: await cfgRegras(), relatorioSemanal: (await setting('ads_relatorio_semanal')) === '1', matriculas: await listarMatriculas(), rascunhos: await rascunhos() });
+    return json({ gestao: completo, regras: await cfgRegras(), relatorioSemanal: (await setting('ads_relatorio_semanal')) === '1', rascunhos: await rascunhos() });
   }
   if (path === '/ads/regras' && method === 'POST') {
     const b = await c.body();
@@ -107,11 +108,6 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     if (b.enviarAgora === true) { try { await enviarRelatorioSemanal(true); } catch (e: any) { return fail(502, e.message); } }
     return json({ ok: true, ativo: (await setting('ads_relatorio_semanal')) === '1' });
   }
-  if (path === '/ads/matriculas' && method === 'POST') {
-    const b = await c.body();
-    try { await salvarMatriculas(strv(b.mes), Number(b.matriculas)); } catch (e: any) { return fail(400, e.message); }
-    return json({ ok: true, matriculas: await listarMatriculas() });
-  }
   if (path === '/ads/rascunhos' && method === 'POST') {
     const b = await c.body();
     if (strv(b.excluir)) { await excluirRascunho(strv(b.excluir)); return json({ ok: true, rascunhos: await rascunhos() }); }
@@ -124,6 +120,22 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     return json({ ok: true });
   }
   if (path === '/ads/acoes' && method === 'GET') return json({ rows: await acoesRecentes() });
+  // ---- análises (somente leitura) ----
+  const ymd = (v: string) => (/^\d{4}-\d\d-\d\d$/.test(v) ? v : '');
+  if (path === '/ads/serie' && method === 'GET') {
+    try { return json({ rows: await serieObjeto(c.qs('id'), ymd(c.qs('de')), ymd(c.qs('ate'))) }); } catch (e: any) { return fail(/Meta|conta/.test(e.message) ? 502 : 400, e.message); }
+  }
+  if (path === '/ads/quebra' && method === 'GET') {
+    try { return json({ rows: await quebra(c.qs('por'), ymd(c.qs('de')), ymd(c.qs('ate'))) }); } catch (e: any) { return fail(/Meta|conta/.test(e.message) ? 502 : 400, e.message); }
+  }
+  if (path === '/ads/publicos' && method === 'GET') {
+    try { return json({ rows: await publicosConta() }); } catch (e: any) { return fail(502, e.message); }
+  }
+  if (path === '/ads/saude' && method === 'GET') return json(await saudeMeta());
+  if (path === '/ads/limites' && method === 'GET') return json({ rows: await avaliarLimitesGasto(false) });
+  if (path === '/ads/limites' && method === 'POST') {
+    try { const r = await salvarLimitesGasto((await c.body()).rows); await audit(String(u.codigo), 'ads-limites', 'ads', String(r.length)); return json({ ok: true, rows: await avaliarLimitesGasto(false) }); } catch (e: any) { return fail(400, e.message); }
+  }
   if (path === '/ads/editar' && method === 'POST') {
     const b = await c.body();
     try {

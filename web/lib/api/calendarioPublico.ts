@@ -1,5 +1,5 @@
 import { Ctx } from '../ctx';
-import { rateCheck, rateFail, requireManager } from '../auth';
+import { rateCheck, rateFail, requireInternal } from '../auth';
 import { randHex, sha256 } from '../crypto';
 import { publicUrl } from '../integrations/http';
 import { audit, listRows } from '../records';
@@ -16,7 +16,7 @@ const VISIVEIS = /^(REVISÃO|APROVADO|PROGRAMADO|PUBLICADO)$/i;
 export async function calendarioPublicoRoute(c: Ctx) {
   const { path, method } = c;
   if (path === '/manager/calendario-link') {
-    const u = await requireManager(c);
+    const u = await requireInternal(c);
     if (method === 'GET') {
       const exp = await setting('cal_share_exp');
       return json({ ativo: !!(await setting('cal_share_hash')) && exp > now(), expiraEm: exp });

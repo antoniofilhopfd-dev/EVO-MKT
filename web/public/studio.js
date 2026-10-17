@@ -7,7 +7,7 @@ const ST_ICONE={Feed:'▦',Stories:'◔',Reels:'▶',Carrossel:'❏','Vídeo':'�
 const ST_DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 // ---------- várias contas de Instagram ----------
 let adsCompleto=false;
-async function adsCarregaModo(){try{adsCompleto=internalSession?.role==='manager'?!!(await api('/ads/modo')).gestao:false}catch{adsCompleto=false}}
+async function adsCarregaModo(){try{adsCompleto=true?!!(await api('/ads/modo')).gestao:false}catch{adsCompleto=false}}
 let igConta=(()=>{try{return localStorage.getItem('evo.igConta')||''}catch{return ''}})(),igContas=[],igPrincipal='';
 const igQ=(pre='?')=>igConta?`${pre}conta=${encodeURIComponent(igConta)}`:'';
 async function igCarregaContas(){try{const d=await api('/instagram/contas');igContas=d.contas||[];igPrincipal=d.principal||'';if(!igConta||!igContas.some(c=>c.ig===igConta))igConta=igPrincipal||(igContas[0]&&igContas[0].ig)||''}catch{igContas=[]}igTopo()}
@@ -61,7 +61,7 @@ function desenharStudio(){
   const h=studioCache.horarios;
   const dica=h?.melhor?`<b>${esc(h.melhor.dia)}</b> às <b>${h.melhor.hora}h</b> tem a melhor média de interações (confiança ${esc(h.melhor.confianca)}, ${h.amostra} posts analisados).${h.porFormato&&Object.keys(h.porFormato).length?`<br><small>Por formato: ${Object.entries(h.porFormato).map(([k,v])=>`${esc(IG_TIPO[k]||k)}: ${esc(v.dia)} ${v.hora}h`).join(' · ')}</small>`:''}`:(h?`Ainda há poucos posts sincronizados para sugerir horário (${h.amostra} de ${h.minimo}).`:'Conecte o Instagram para ver o melhor horário.');
   const fmtSem=`${fmtDate(stIso(ini))} a ${fmtDate(stIso(fim))}`;
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>ESTÚDIO DE PUBLICAÇÕES</small><h1>Quem publica o quê, e quando</h1><p>Arraste os posts entre os dias para reagendar. Nada é publicado sozinho sem você marcar e aprovar.</p></div><div class="st-head-btns">${igSeletor()}${internalSession?.role==='manager'?'<button class="softbtn" id="stCompartilha">Compartilhar calendário</button>':''}<button class="btn" id="stNovo">+ Novo post</button></div></div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>ESTÚDIO DE PUBLICAÇÕES</small><h1>Quem publica o quê, e quando</h1><p>Arraste os posts entre os dias para reagendar. Nada é publicado sozinho sem você marcar e aprovar.</p></div><div class="st-head-btns">${igSeletor()}${true?'<button class="softbtn" id="stCompartilha">Compartilhar calendário</button>':''}<button class="btn" id="stNovo">+ Novo post</button></div></div>
   <div class="kpis st-kpis"><div class="kpi"><small>Rascunhos</small><strong>${cont('PRODUÇÃO')+cont('BRIEFING')+cont('IDEIA')}</strong></div><div class="kpi orange"><small>Em aprovação</small><strong>${cont('REVISÃO')}</strong></div><div class="kpi"><small>Aprovados</small><strong>${cont('APROVADO')}</strong></div><div class="kpi green"><small>Agendados (14 dias)</small><strong>${prox14}</strong></div><div class="kpi"><small>Publicados no mês</small><strong>${pubMes}</strong></div></div>
   <div class="card st-tip"><span>◷</span><div>${dica}</div></div>
   <div class="st-toolbar"><div class="st-nav"><button class="softbtn" id="stPrev" aria-label="Semana anterior">‹</button><b>${fmtSem}</b><button class="softbtn" id="stNext" aria-label="Próxima semana">›</button><button class="softbtn" id="stHoje">Hoje</button></div><div class="st-filtros">${sel('perfil',[...new Set([...(SELECTS.perfil||[]),...rows.map(r=>r.perfil).filter(Boolean)])],studioFiltro.perfil)}${sel('status',Object.keys(ST_ROTULO),studioFiltro.status)}${sel('formato',SELECTS.formato||[],studioFiltro.formato)}</div></div>
@@ -113,11 +113,12 @@ async function studioCompositor(row,dataIni=''){
    <div class="st-row"><label>Data e hora<input id="sfQuando" type="datetime-local" value="${attr(r.publicacaoEm||(dataIni?dataIni+'T09:00':''))}"></label><label>Revisor<input id="sfRevisor" value="${attr(r.revisor||'')}" placeholder="Quem aprova"></label></div>
    ${sug?`<div class="st-sug"><span>Melhor momento nos seus dados: <b>${esc(h.dia)} às ${h.hora}h</b></span><button type="button" class="softbtn" id="sfSug">Usar</button></div>`:''}
    <label>Mídia (JPEG ou vídeo MP4/MOV; para Carrossel selecione de 2 a 20 arquivos de uma vez)${(()=>{let n=0;try{n=JSON.parse(r.midiasInstagram||'[]').length}catch{}return n>1?` <small>— ${n} itens já anexados; enviar novos substitui todos</small>`:''})()} <input id="sfArq" type="file" multiple accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
+   <div class="st-biblio"><button type="button" class="softbtn" id="sfBiblio">Escolher da biblioteca de Arquivos</button><small id="sfBiblioInfo" class="kpi-note"></small></div>
    <label class="check-row"><input type="checkbox" id="sfIG" ${(edit?/SIM/i.test(r.publicarInstagram||''):true)?'checked':''}> Publicar no Instagram automaticamente na data e hora marcadas (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
    <div class="st-row"><label>Colab com<select id="sfColabSel"></select></label><label id="sfColabOutroL" hidden>Outro perfil (@usuário; até 3, separados por vírgula)<input id="sfColab" maxlength="120" value="${attr(r.colaboradores||'')}" placeholder="@perfil"></label></div>
    <p class="kpi-note">Publica como colaboração: o post aparece nos dois perfis depois que o convidado aceitar o convite no Instagram. Vale para Feed e Reels.</p>
    <label class="check-row"><input type="checkbox" id="sfTagCom" ${/SIM/i.test(r.hashtagsComentario||'')?'checked':''}> Colocar as hashtags no primeiro comentário (legenda mais limpa)</label>
-   <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="softbtn" type="button" data-s="RASCUNHO">Salvar rascunho</button><button class="softbtn" type="button" data-s="APROVACAO">Enviar para aprovação</button><button class="btn" type="button" data-s="AGENDADO">Agendar</button>${edit?'<button class="softbtn" type="button" data-s="MANTER">Salvar sem mudar a etapa</button>':''}${jaPublicado?'':'<button class="btn accent" type="button" data-s="PUBLICAR">Publicar agora no Instagram</button>'}</div>
+   <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button>${edit?'<button class="softbtn" type="button" id="sfDup" title="Cria uma cópia como rascunho, sem data e sem publicar">Duplicar</button>':''}<button class="softbtn" type="button" data-s="RASCUNHO">Salvar rascunho</button><button class="softbtn" type="button" data-s="APROVACAO">Enviar para aprovação</button><button class="btn" type="button" data-s="AGENDADO">Agendar</button>${edit?'<button class="softbtn" type="button" data-s="MANTER">Salvar sem mudar a etapa</button>':''}${jaPublicado?'':'<button class="btn accent" type="button" data-s="PUBLICAR">Publicar agora no Instagram</button>'}</div>
    ${edit&&/REVIS/i.test(r.status||'')?'<div class="st-linkbox"><button class="softbtn" type="button" id="sfLink">Gerar link para a direção aprovar</button><small class="kpi-note">Salve as alterações antes. A pessoa abre o link sem login, vê o post e aprova ou pede ajustes.</small><div id="sfLinkBox"></div></div>':''}
    ${jaPublicado?`<p class="kpi-note">Já publicado${urlSegura(r.instagramLink)?` — <a href="${attr(urlSegura(r.instagramLink))}" target="_blank" rel="noopener">ver no Instagram</a>`:''}.</p>`:''}
    ${edit?`<p class="kpi-note">Etapa atual: <b>${esc(ST_ROTULO[String(r.status||'').toUpperCase()]||r.status||'—')}</b></p>`:''}</form>
@@ -152,6 +153,20 @@ async function studioCompositor(row,dataIni=''){
     g('sfGSalvar').onclick=async()=>{const tags=(g('sfTags').value.match(/#[\p{L}\p{N}_]+/gu)||[]);if(!tags.length)return toast('Escreva as hashtags primeiro','warn');const nome=(prompt('Nome do grupo (ex.: Matrículas)')||'').trim();if(!nome)return;grupos=[...grupos.filter(x=>x.nome.toLowerCase()!==nome.toLowerCase()),{nome,tags}];await stSalvaGrupos(grupos);desenhaGrupos();toast('Grupo salvo')};
   };
   ['sfLegenda','sfTags','sfCta','sfPerfil','sfFormato','sfQuando'].forEach(i=>{g(i).oninput=pv;g(i).onchange=pv});
+  g('sfDup')&&(g('sfDup').onclick=async()=>{
+    const campos=['titulo','legenda','hashtags','formato','perfil','canal','segmento','responsavel','midiaInstagram','midiasInstagram'];const copia={status:'PRODUÇÃO',publicarInstagram:'NÃO'};
+    campos.forEach(k=>{if(r[k]!==undefined&&r[k]!=='')copia[k]=r[k]});copia.titulo=(r.titulo||'Post')+' (cópia)';
+    try{const n=await api('/data?module=conteudos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(copia)});invalidate('conteudos');o.close();toast('Cópia criada como rascunho');studioCompositor(n)}catch(e){toast(e.message,'bad')}
+  });
+  g('sfBiblio').onclick=async()=>{
+    const cam=await arquivosEscolher({tipos:['imagem','video'],multi:true});if(!cam.length)return;
+    const dt=new DataTransfer(),ruins=[];
+    try{for(const c of cam){const ext=(c.split('.').pop()||'').toLowerCase();if(!['jpg','jpeg','mp4','mov'].includes(ext)){ruins.push(c.split('/').pop());continue}const r=await fetch(API+'/file?path='+encodeURIComponent(c),{credentials:'same-origin'});if(!r.ok)throw new Error('Não foi possível ler '+c.split('/').pop());const b=await r.blob();dt.items.add(new File([b],c.split('/').pop(),{type:b.type||(ext==='mp4'?'video/mp4':ext==='mov'?'video/quicktime':'image/jpeg')}))}}
+    catch(e){return toast(e.message,'bad')}
+    if(ruins.length)toast('O Instagram aceita só JPEG, MP4 ou MOV. Ignorado(s): '+ruins.join(', '),'warn');
+    if(!dt.files.length)return;
+    g('sfArq').files=dt.files;g('sfArq').dispatchEvent(new Event('change'));g('sfBiblioInfo').textContent=`${dt.files.length} arquivo(s) da biblioteca selecionado(s).`;
+  };
   g('sfArq').onchange=()=>{const fs=[...g('sfArq').files];arqs=fs.map(f=>({url:URL.createObjectURL(f),video:/video/.test(f.type||'')}));arquivoUrl=arqs[0]?arqs[0].url:'';slide=0;pv()};
   if(g('sfSug'))g('sfSug').onclick=()=>{g('sfQuando').value=sug;pv()};
   // Colab: menu com os outros perfis do Colégio (muda conforme a conta que publica) e opção de outro perfil
@@ -196,7 +211,7 @@ async function studioCompositor(row,dataIni=''){
     if(leg.length>2200)return toast('A legenda passou de 2.200 caracteres','warn');
     if(stContaTags(g('sfTags').value)+stContaTags(leg)>30)return toast('O Instagram aceita no máximo 30 hashtags','warn');
     if(tipo==='AGENDADO'&&!quando)return toast('Escolha a data e a hora para agendar','warn');
-    const gerente=internalSession?.role==='manager',liberado=/^(APROVADO|PROGRAMADO)$/i.test(r.status||'');
+    const gerente=true,liberado=/^(APROVADO|PROGRAMADO)$/i.test(r.status||'');
     if(tipo==='AGENDADO'&&!gerente&&!liberado)return toast('Só agenda depois de aprovado. Use "Enviar para aprovação".','warn');
     if(g('sfFormato').value==='Carrossel'&&g('sfArq').files.length===1)return toast('O carrossel precisa de 2 a 20 mídias: selecione todas de uma vez.','warn');
     if(tipo==='PUBLICAR'){
@@ -247,9 +262,9 @@ function desenharIgPosts(){
   const melhor=[...rows].sort(IG_ORDEM.interacoes[1])[0];
   const sel=(k,opts,cur)=>`<select data-igf="${k}">${opts.map(([v,l])=>`<option value="${attr(v)}" ${String(cur)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${ST_ICONE[tipoDe(r)]||'◇'}<br>${esc(tipoDe(r))}</span>`};
-  const card=r=>{const l=urlSegura(r.link),dt=String(r.quando).slice(0,10);return `<article class="ig-card"><${l?`a href="${attr(l)}" target="_blank" rel="noopener"`:'div'} class="ig-thumb" title="Abrir no Instagram">${mini(r)}</${l?'a':'div'}><div class="ig-body"><div class="ig-meta"><b>${esc(tipoDe(r))}</b><span>${dt?fmtDate(dt):''}</span></div>${internalSession?.role==='manager'&&adsCompleto?`<button class="softbtn ig-imp" data-imp="${attr(r.id)}">Impulsionar</button>`:''}<p>${esc(r.legenda||'(sem legenda)')}</p><dl><div><dt>Curtidas</dt><dd>${igNum(r.curtidas)}</dd></div><div><dt>Comentários</dt><dd>${igNum(r.comentarios)}</dd></div><div><dt>Salvos</dt><dd>${igNum(r.salvos)}</dd></div><div><dt>Compart.</dt><dd>${igNum(r.compartilhamentos)}</dd></div><div><dt>Alcance</dt><dd>${r.alcance===null?'—':igNum(r.alcance)}</dd></div><div><dt>Engajamento</dt><dd>${r.engajamento===null?'—':String(r.engajamento).replace('.',',')+'%'}</dd></div></dl></div></article>`};
+  const card=r=>{const l=urlSegura(r.link),dt=String(r.quando).slice(0,10);return `<article class="ig-card"><${l?`a href="${attr(l)}" target="_blank" rel="noopener"`:'div'} class="ig-thumb" title="Abrir no Instagram">${mini(r)}</${l?'a':'div'}><div class="ig-body"><div class="ig-meta"><b>${esc(tipoDe(r))}</b><span>${dt?fmtDate(dt):''}</span></div>${true&&adsCompleto?`<button class="softbtn ig-imp" data-imp="${attr(r.id)}">Impulsionar</button>`:''}<p>${esc(r.legenda||'(sem legenda)')}</p><dl><div><dt>Curtidas</dt><dd>${igNum(r.curtidas)}</dd></div><div><dt>Comentários</dt><dd>${igNum(r.comentarios)}</dd></div><div><dt>Salvos</dt><dd>${igNum(r.salvos)}</dd></div><div><dt>Compart.</dt><dd>${igNum(r.compartilhamentos)}</dd></div><div><dt>Alcance</dt><dd>${r.alcance===null?'—':igNum(r.alcance)}</dd></div><div><dt>Engajamento</dt><dd>${r.engajamento===null?'—':String(r.engajamento).replace('.',',')+'%'}</dd></div></dl></div></article>`};
   const vazio=!todos.length;
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · DESEMPENHO</small><h1>O que funcionou em cada publicação</h1><p>${igDados.ultimaSync?`Última leitura da Meta: ${fmtDateTime(igDados.ultimaSync)}.`:'Ainda não houve leitura da Meta.'} Alcance, salvamentos e compartilhamentos vêm das 30 publicações mais recentes.</p></div>${internalSession?.role==='manager'?'<button class="btn" id="igAtualiza">Atualizar agora</button>':''}</div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · DESEMPENHO</small><h1>O que funcionou em cada publicação</h1><p>${igDados.ultimaSync?`Última leitura da Meta: ${fmtDateTime(igDados.ultimaSync)}.`:'Ainda não houve leitura da Meta.'} Alcance, salvamentos e compartilhamentos vêm das 30 publicações mais recentes.</p></div>${true?'<button class="btn" id="igAtualiza">Atualizar agora</button>':''}</div>
   ${vazio?`<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram em Administração → Integrações e clique em “Atualizar agora”.</span></div>`:`
   <div class="st-toolbar"><div class="st-filtros">${igSeletor()}${sel('periodo',[['30','Últimos 30 dias'],['90','Últimos 90 dias'],['365','Último ano'],['tudo','Tudo']],igFiltro.periodo)}${sel('tipo',[['','Todos os formatos'],...tipos.map(t=>[t,t])],igFiltro.tipo)}${sel('ordem',Object.entries(IG_ORDEM).map(([k,v])=>[k,v[0]]),igFiltro.ordem)}</div><span class="kpi-note">${rows.length} publicação(ões)</span></div>
   <div class="ig-resumo">${porTipo.map(x=>`<div class="card ig-tipo"><small>${esc(x.t.toUpperCase())} · ${x.n} POST(S)</small><div class="ig-nums"><div><strong>${x.inter===null?'—':igNum(x.inter)}</strong><span>interações em média</span></div><div><strong>${x.alc===null?'—':igNum(x.alc)}</strong><span>alcance médio</span></div><div><strong>${x.eng===null?'—':String(x.eng).replace('.',',')+'%'}</strong><span>engajamento médio</span></div></div></div>`).join('')||''}</div>
@@ -307,7 +322,7 @@ async function painelTrafegoExtra(){
   const brl=(v,m)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:m||d.mes.moeda||'BRL'});
   const n0=v=>Number(v||0).toLocaleString('pt-BR');
   const delta=(a,b,inverso=false)=>{if(!b)return '';const p=Math.round((a-b)/b*100);if(!p)return '<small class="delta">= mês anterior</small>';const bom=inverso?p<0:p>0;return `<small class="delta ${bom?'up':'down'}">${p>0?'+':''}${p}% vs mês anterior</small>`};
-  const m=d.mes,a=d.mesAnterior,gerente=internalSession?.role==='manager';
+  const m=d.mes,a=d.mesAnterior,gerente=true;
   const cpr=x=>x.resultados?x.gasto/x.resultados:null,ctr=x=>x.impressoes?x.cliques/x.impressoes*100:null;
   const kp=(l,v,dl)=>`<div class="kpi"><small>${esc(l)}</small><strong>${v}</strong>${dl}</div>`;
   const sa=d.saude;
@@ -341,7 +356,7 @@ const GA_EST={ATIVO:['Ativo','ok'],PAUSADO:['Pausado',''],ERRO:['Erro','bad'],CR
 const gaPost=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
 const gaBrl=(v,m)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:m||'BRL'});
 async function painelGestaoAnuncios(){
-  if(internalSession?.role!=='manager'||!adsCompleto)return;
+  if(false||!adsCompleto)return;
   const host=$('#content');if(!host||state.page!=='trafego')return;
   let d;try{d=await api('/ads/gestao')}catch{return}
   if(state.page!=='trafego')return;
@@ -430,7 +445,7 @@ async function renderIgRanking(){
   const mini=r=>{const u=urlSegura(r.miniatura);return u?`<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${attr(u)}">`:`<span>${esc(IG_TIPO[r.tipo]||r.tipo||'')}</span>`};
   const nv=v=>v===null||v===undefined?'—':igNum(v);
   const linha=(r,i)=>{const l=urlSegura(r.link);const tx=esc(rkCorta(r.legenda));return `<tr><td><b>${i+1}º</b></td><td class="rk-thumb">${mini(r)}</td><td>${l?`<a class="rk-link" href="${attr(l)}" target="_blank" rel="noopener">${tx}</a>`:tx}<br><small>${esc(IG_TIPO[r.tipo]||r.tipo||'')} · ${esc(fmtDate(String(r.quando).slice(0,10)))}</small></td><td>${nv(r.alcance)}</td><td>${nv(r.curtidas)}</td><td>${nv(r.comentarios)}</td><td>${nv(r.salvos)}</td><td>${nv(r.compartilhamentos)}</td><td><b>${nv(r.interacoes)}</b></td><td>${r.engajamento===null?'—':r.engajamento+'%'}</td></tr>`};
-  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Métricas por mês e por ano${igContas.length>1?` <small>· @${esc((igContas.find(c=>c.ig===igConta)||{}).usuario||'')}</small>`:''}</h1><p>Alcance, interações, seguidores e posts de cada período, com o ranking das publicações. ${sg.atual!==null?`Seguidores hoje: <b>${igNum(sg.atual)}</b>.`:''}</p></div><div class="head-actions"><button class="softbtn" id="rkHist">Carregar histórico (12 meses)</button>${internalSession?.role==='manager'?` <a class="btn" href="/relatorio-instagram.html${rkFiltro.visao==='mes'&&/^\d{4}-\d{2}$/.test(rkFiltro.periodo)?'?mes='+rkFiltro.periodo:''}" target="_blank" rel="noopener">Relatório mensal (PDF)</a> <button class="softbtn" id="rkSegManual">Informar seguidores de um mês</button>`:''}</div></div>
+  $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · RANKING</small><h1>Métricas por mês e por ano${igContas.length>1?` <small>· @${esc((igContas.find(c=>c.ig===igConta)||{}).usuario||'')}</small>`:''}</h1><p>Alcance, interações, seguidores e posts de cada período, com o ranking das publicações. ${sg.atual!==null?`Seguidores hoje: <b>${igNum(sg.atual)}</b>.`:''}</p></div><div class="head-actions"><button class="softbtn" id="rkHist">Carregar histórico (12 meses)</button>${true?` <a class="btn" href="/relatorio-instagram.html${rkFiltro.visao==='mes'&&/^\d{4}-\d{2}$/.test(rkFiltro.periodo)?'?mes='+rkFiltro.periodo:''}" target="_blank" rel="noopener">Relatório mensal (PDF)</a> <button class="softbtn" id="rkSegManual">Informar seguidores de um mês</button>`:''}</div></div>
   <div class="card"><div class="st-toolbar"><div class="st-filtros"><select data-rk="visao"><option value="mes" ${rkFiltro.visao==='mes'?'selected':''}>Por mês</option><option value="ano" ${rkFiltro.visao==='ano'?'selected':''}>Por ano</option></select></div></div>
   ${tab}
   <p class="kpi-note">Alcance, visualizações e visitas somam os meses carregados (no ano, pessoas alcançadas em meses diferentes podem se repetir). Seguidores: a Meta não informa o passado; o sistema guarda uma foto por sincronização${sg.primeiroRegistro?` desde ${esc(fmtDate(String(sg.primeiroRegistro).slice(0,10)))}`:''}, então meses anteriores ficam "—" até a primeira foto. "Carregar histórico" busca até 12 meses de métricas.</p></div>
@@ -445,7 +460,7 @@ async function renderIgRanking(){
 
 // ---------- Tráfego: regras automáticas, relatório semanal por e-mail, custo por matrícula ----------
 async function painelExtrasAnuncios(){
-  if(internalSession?.role!=='manager')return;
+  if(false)return;
   const host=$('#content');if(!host||state.page!=='trafego')return;
   let d;try{d=await api('/ads/extras')}catch{return}
   if(state.page!=='trafego'||$('#extrasAds'))return;

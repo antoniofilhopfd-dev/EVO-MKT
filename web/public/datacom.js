@@ -34,17 +34,10 @@ async function dcAbrir(it){
   ${pend?'<p class="dc-aviso" role="note">Esta data ainda não foi confirmada em fonte oficial; por isso não é tratada como feriado e não permite criar ações. Valide-a antes de usar.</p>':''}
   <section><h4>Relevância para o marketing</h4><div class="dc-seg" role="group" aria-label="Relevância"><button type="button" data-rel="SIM" class="${r.relevante==='SIM'?'on':''}" aria-pressed="${r.relevante==='SIM'}">Relevante</button><button type="button" data-rel="NAO" class="${r.relevante==='NAO'?'on':''}" aria-pressed="${r.relevante==='NAO'}">Não relevante</button>${r.origem==='catalogo'&&r.relevanteAjustado?'<button type="button" data-rel="">Voltar ao padrão</button>':''}</div>
    <label class="dc-obs">Observações da equipe<textarea class="control" id="dcObs" rows="2" maxlength="1000">${esc(r.observacoes||'')}</textarea></label><button type="button" class="softbtn" id="dcObsSalvar">Salvar observações</button></section>
-  <section><h4>Ações a partir desta data</h4><p class="kpi-note">Opcional. Nada é criado sozinho, e a data comemorativa não é copiada.</p>
-   <div class="dc-acoes"><button type="button" class="softbtn" id="dcPlanejar" ${pend?'disabled':''}>Criar ação no Planejamento</button><button type="button" class="softbtn" id="dcSolicitar" ${pend?'disabled':''}>Criar solicitação</button></div>
-   ${vp.length||vs.length?`<div class="dc-vinc">${vp.map(p=>`<button type="button" class="softbtn" data-plan="${attr(p.id)}">Ação ${esc(p.id)} · ${esc(p.titulo)}</button>`).join('')}${vs.map(s=>`<button type="button" class="softbtn" data-sol="${attr(s.id)}">${esc(s.id)} · ${esc(s.titulo)}</button>`).join('')}</div>`:''}</section>
   <div class="actions">${r.origem==='personalizada'&&r.editavel?'<button type="button" class="btn soft" id="dcEditar">Editar</button><button type="button" class="btn danger-soft" id="dcExcluir">Excluir</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Fechar</button></div></div>`);
  const f=o.el,recarrega=async()=>{await DC_CAL.recarregar()};
  f.querySelectorAll('[data-rel]').forEach(b=>b.onclick=async()=>{try{await dcPost('/datacom/relevancia',{id:r.id,relevante:b.dataset.rel});o.close();toast('Relevância atualizada');await recarrega()}catch(e){toast(e.message,'warn')}});
  $('#dcObsSalvar',f).onclick=async()=>{try{await dcPost('/datacom/relevancia',{id:r.id,relevante:r.relevanteAjustado||r.origem==='personalizada'?r.relevante:'',observacoes:$('#dcObs',f).value});toast('Observações salvas');await recarrega()}catch(e){toast(e.message,'warn')}};
- f.querySelectorAll('[data-sol]').forEach(b=>b.onclick=()=>{o.close();slAbrirExterno(b.dataset.sol,()=>DC_CAL.recarregar())});
- f.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>{o.close();plAbrirPorId(b.dataset.plan,()=>DC_CAL.recarregar())});
- $('#dcPlanejar',f).onclick=()=>dcAcao(r,'planejar',equipe,gerente,o);
- $('#dcSolicitar',f).onclick=()=>dcAcao(r,'solicitar',equipe,gerente,o);
  $('#dcEditar',f)&&($('#dcEditar',f).onclick=()=>{o.close();dcForm(r)});
  $('#dcExcluir',f)&&($('#dcExcluir',f).onclick=async()=>{
   if(!confirm(`Excluir "${r.nome}"? Ela vai para a Lixeira e pode ser restaurada. Ações e solicitações já criadas continuam.`))return;

@@ -32,6 +32,8 @@ import { datacomRoute } from './datacom';
 import { planejamentoRoute } from './planejamento';
 import { dashboardRoute } from './dashboard';
 import { lgpdRoute } from './lgpd';
+import { arquivosRoute } from './arquivos';
+import { prefsRoute } from './prefs';
 import { exigirPortalAtivo } from '../portal';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
@@ -46,7 +48,7 @@ const asUser = (u: Row) => ({ code: u.codigo, name: u.nome, role: u.role, label:
 const portalOut = (u: Row, segs: unknown) => ({ id: u.codigo, codigo: u.codigo, nome: u.nome, perfil: u.perfil, segmentos: segs, ativo: true });
 /** Perfis internos: 'admin' (Administrador), 'manager' (Gerente), 'team' (Equipe). */
 const nivelDe = (r: Row) => (r.role !== 'manager' ? 'team' : Number(r.admin) ? 'admin' : 'manager');
-const nivelEntrada = (v: unknown) => (v === 'admin' ? 'admin' : v === 'manager' ? 'manager' : 'team');
+const nivelEntrada = (v: unknown) => (v === 'admin' ? 'admin' : 'team');
 const LABEL_NIVEL: Record<string, string> = { admin: 'Administrador', manager: 'Gerente de Marketing', team: 'Equipe de Marketing' };
 const adminsAtivos = async () => Number((await q1("SELECT COUNT(*) c FROM users WHERE role='manager' AND admin=1 AND ativo=1"))?.c);
 const upper = (v: unknown) => strv(v).trim().toUpperCase();
@@ -77,6 +79,10 @@ export async function route(c: Ctx): Promise<Out> {
       return planejamentoRoute(c);
     case path.startsWith('/admin/lgpd/'):
       return lgpdRoute(c);
+    case path.startsWith('/arquivos/'):
+      return arquivosRoute(c);
+    case path === '/prefs':
+      return prefsRoute(c);
     case path.startsWith('/dashboard/'):
       return dashboardRoute(c);
     case path.startsWith('/portal/pagina/') || path === '/admin/portal':
@@ -191,7 +197,7 @@ export async function route(c: Ctx): Promise<Out> {
       if (!term) return json([]);
       const res: Row[] = [];
       outer: for (const m of Object.keys(MODULES)) {
-        if (m === 'configuracoes' && u.role !== 'manager') continue;
+        if (m === 'configuracoes' && !Number(u.admin)) continue;
         if (m === 'lixeira') continue; // itens excluídos não aparecem na busca global
         for (const r of await listRows(m)) {
           if (lower(Object.values(r).join(' ')).includes(term)) {
@@ -262,7 +268,7 @@ export async function route(c: Ctx): Promise<Out> {
     }
     case path === '/file': {
       await requireInternal(c);
-      return serveFile(c.qs('path'), null, ['ANEXOS/SOLICITACOES/', 'ANEXOS/CONTEUDOS/']); // mídias dos posts também (prévia no Estúdio)
+      return serveFile(c.qs('path'), null, ['ANEXOS/SOLICITACOES/', 'ANEXOS/CONTEUDOS/', 'BIBLIOTECA/']); // mídias dos posts também (prévia no Estúdio)
     }
 
     // ---------- Integrações (Instagram / Google) ----------
@@ -490,7 +496,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json(await q('SELECT quando,ator,acao,modulo,registro,ip FROM audit_log ORDER BY id DESC LIMIT ' + lim));
     }
     case path === '/manager/notices/remove' && method === 'POST': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       const id = strv((await c.body()).id);
       await run('DELETE FROM notices WHERE id=?', [id]);
       await audit(u.codigo, 'aviso-removido', '', id);
@@ -511,7 +517,7 @@ export async function route(c: Ctx): Promise<Out> {
       return json({ rows: o });
     }
     case path === '/manager/notices': {
-      const u = await requireManager(c);
+      const u = await requireAdmin(c);
       if (method === 'GET') return json({ rows: (await q('SELECT data FROM notices')).map((r) => JSON.parse(r.data)) });
       const input = cleanInput(await c.body());
       const id = input.id ?? 'AVI-' + randHex(6);
@@ -663,13 +669,13 @@ async function dataRoute(c: Ctx): Promise<Response> {
   if (portal && !(await internalUser(c))) return portalRestrictedUpdate(c, portal, mod, id);
   const u = await requireInternal(c);
   if (!(mod in MODULES)) fail(404, 'Módulo desconhecido.');
-  if (mod === 'configuracoes' && u.role !== 'manager') fail(403, 'Configurações são restritas à Gerente.');
+  if (mod === 'configuracoes' && !Number(u.admin)) fail(403, 'As informações da instituição são restritas ao Administrador.');
   if (method === 'GET') {
     if (id) return json((await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.'));
     return json({ headers: await headersOf(mod), rows: await listRows(mod) });
   }
-  if (u.role !== 'manager' && !TEAM_WRITE.includes(mod) && mod !== 'lixeira') fail(403, 'Seu perfil não pode alterar este módulo.');
-  if (u.role !== 'manager' && mod === 'lixeira' && method === 'DELETE') fail(403, 'Exclusão permanente apenas para a Gerente.');
+  if (!Number(u.admin) && !TEAM_WRITE.includes(mod) && mod !== 'lixeira') fail(403, 'Seu perfil não pode alterar este módulo.');
+  if (!Number(u.admin) && mod === 'lixeira' && method === 'DELETE') fail(403, 'Exclusão permanente apenas para o Administrador.');
   if (mod === 'calescolar' && (method === 'POST' || method === 'PUT')) fail(400, 'O Calendário Escolar é editado pela própria tela (com validação de datas, segmentos e duplicidade).');
   if (mod === 'datacom' && (method === 'POST' || method === 'PUT')) fail(400, 'As Datas Comemorativas são editadas pela própria tela (com validação das regras e de duplicidade).');
   await autoBackupIfDue();
@@ -682,7 +688,7 @@ async function dataRoute(c: Ctx): Promise<Response> {
   if (method === 'PUT') {
     const patch = await c.body();
     const antes = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
-    if (u.role !== 'manager' && 'responsavel' in patch) {
+    if (false && 'responsavel' in patch) {
       const dono = String(antes.responsavel ?? '').trim();
       const novoResp = strv(patch.responsavel).trim();
       if (dono && lower(dono) !== lower(u.nome) && novoResp !== dono) fail(403, 'Só a Gerente ou o responsável atual pode reatribuir este item.');

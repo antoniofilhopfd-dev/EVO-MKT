@@ -1,6 +1,7 @@
 import { Ctx } from '../ctx';
 import { q } from '../db';
 import { requireInternal, requireManager } from '../auth';
+import { gerarXlsx } from '../xlsxWrite';
 import { adsSnapshots } from '../integrations/metaads';
 import { audit, insertRow, listRows } from '../records';
 import { setting } from '../settings';
@@ -69,13 +70,28 @@ export async function relatoriosRoute(c: Ctx) {
     return json(await visaoGeral(de, ate));
   }
   if (path === '/reports/save' && method === 'POST') {
-    await requireManager(c);
+    await requireInternal(c);
     const b = await c.body();
     const de = mes(strv(b.de)) || padrao, ate = mes(strv(b.ate)) || de;
     const dados = await visaoGeral(de, ate);
     const rel = await insertRow('relatorios', { titulo: `Painel integrado ${de}${ate !== de ? ' a ' + ate : ''}`, tipoRelatorio: 'Painel integrado', periodo: de === ate ? de : `${de} a ${ate}`, status: 'GERADO', snapshot: JSON.stringify(dados).slice(0, 200000), descricao: 'Cópia fiel dos dados no momento da geração (fonte e data em cada bloco).' }, String(u.codigo));
     await audit(String(u.codigo), 'relatorio-salvo', 'relatorios', String(rel.id));
     return json({ ok: true, id: rel.id });
+  }
+  if (path === '/reports/xlsx' && method === 'POST') {
+    // formata em .xlsx os dados que a tela já tem (respeitando as colunas escolhidas); o servidor não busca nada novo
+    const b = await c.body();
+    const abas = Array.isArray(b.abas) ? b.abas : [];
+    if (!abas.length || abas.length > 10) fail(400, 'Informe de 1 a 10 abas.');
+    let celulas = 0;
+    const limpas = abas.map((a: Row) => {
+      const linhas = (Array.isArray(a.linhas) ? a.linhas : []).map((l: unknown) => (Array.isArray(l) ? l : []).slice(0, 80).map((v: unknown) => (typeof v === 'number' || typeof v === 'string' ? v : v == null ? null : String(v)) as string | number | null));
+      celulas += linhas.reduce((n: number, l: unknown[]) => n + l.length, 0);
+      return { nome: strv(a.nome), linhas: linhas.slice(0, 20000) };
+    });
+    if (celulas > 400_000) fail(413, 'Planilha grande demais (limite de 400 mil células).');
+    await audit(String(u.codigo), 'relatorio-xlsx', 'relatorios', strv(b.titulo).slice(0, 60));
+    return new Response(new Uint8Array(gerarXlsx(limpas)), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="relatorio.xlsx"', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
   }
   return fail(404, 'Rota não encontrada.');
 }

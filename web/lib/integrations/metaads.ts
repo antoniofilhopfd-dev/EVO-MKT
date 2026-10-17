@@ -97,6 +97,7 @@ export async function adsSync(meses = 3): Promise<number> {
   }
   await setSetting('meta_ads_ultima_sync', now());
   await notificarAlertasTrafego();
+  try { await (await import('./metaadsAnalise')).avaliarLimitesGasto(true); } catch { /* limites de gasto não derrubam a leitura */ }
   await intLog('instagram', 'ok', `Meta Ads: ${n} linha(s) de campanha/mês atualizadas (somente leitura).`);
   return n;
 }

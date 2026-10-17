@@ -41,10 +41,6 @@ async function escForm(it,dataInicial=''){
    <label>Local (opcional)<input class="control" id="eLocal" maxlength="140" value="${attr(e.local||'')}" ${dis}></label>
    <fieldset class="wide cm-segs"><legend>Segmentos</legend>${(ESC_OPC.segmentos||[]).map(([k,l])=>`<label class="check-row"><input type="checkbox" data-seg="${k}" ${segs.has(k)?'checked':''} ${dis}> ${esc(l)}</label>`).join('')}</fieldset>
    <label class="wide">Descrição ou observações (opcional)<textarea class="control" id="eDesc" rows="3" maxlength="1000" ${dis}>${esc(e.descricao||'')}</textarea></label>
-   ${edit?`<section class="wide cm-pedidos"><h4>Planejamento de Marketing</h4><p class="kpi-note">Opcional: ações de Planejamento ligadas a este evento. Editá-las não altera o evento.</p>${(e.acoes||[]).length?`<div class="cm-vinc">${e.acoes.map(x=>`<button type="button" class="softbtn" data-acao="${attr(x.id)}">${esc(x.id)} · ${esc(x.titulo)}</button>`).join('')}</div>`:''}<div class="cm-acoes"><button type="button" class="softbtn" id="eNovaAcao">Criar ação de planejamento</button></div></section>`:''}
-   ${edit?`<section class="wide cm-pedidos"><h4>Apoio do Marketing</h4><p class="kpi-note">Opcional: cria uma solicitação ligada a este evento. Nada é pedido sozinho.</p>
-     ${ligados.length?`<div class="cm-vinc">${ligados.map(s=>`<button type="button" class="softbtn" data-sol="${attr(s.id)}">${esc(s.id)} · ${esc(s.titulo)}</button>`).join('')}</div>`:''}
-     <div class="cm-acoes">${(ESC_OPC.acoes||[]).map(([k,l])=>`<button type="button" class="softbtn" data-pedir="${k}">${esc(l)}</button>`).join('')}</div></section>`:''}
    <div class="cm-erro wide" id="eErro" role="alert"></div>
    <div class="actions wide">${edit&&!ro?'<button type="button" class="btn danger-soft" id="eExcluir">Excluir</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>${ro?'Fechar':'Cancelar'}</button>${ro?'':'<button type="submit" class="btn" id="eSalvar">Salvar</button>'}</div>
   </form>`);
@@ -55,11 +51,7 @@ async function escForm(it,dataInicial=''){
   else if(c.checked)f.querySelector('[data-seg="TODOS"]').checked=false;
   if(![...f.querySelectorAll('[data-seg]')].some(x=>x.checked))f.querySelector('[data-seg="TODOS"]').checked=true;
  });
- f.querySelectorAll('[data-sol]').forEach(b=>b.onclick=()=>{o.close();slAbrirExterno(b.dataset.sol,()=>ESC.recarregar())});
- f.querySelectorAll('[data-acao]').forEach(b=>b.onclick=()=>{o.close();plAbrirPorId(b.dataset.acao,()=>ESC.recarregar())});
- $('#eNovaAcao',f)&&($('#eNovaAcao',f).onclick=async()=>{o.close();try{await plCarregar()}catch(x){return toast(x.message,'warn')}plModal(null,e.dataInicio,()=>ESC.recarregar(),e.id)});
- f.querySelectorAll('[data-pedir]').forEach(b=>b.onclick=()=>escPedir(e,b.dataset.pedir,o));
- if(ro)return;
+   if(ro)return;
  $('#eTitulo',f).focus();
  $('#escForm',f).onsubmit=async ev=>{
   ev.preventDefault();const err=$('#eErro',f);err.textContent='';

@@ -12,7 +12,7 @@ async function listaOrigem(titulo,ids,modulo){
  o.el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{o.close();go(modulo);setTimeout(()=>{const r=(state.rows||[]).find(x=>x.id===b.dataset.open);if(r)openModal(r)},900)});
 }
 async function painelIndicadores(){
- if(internalSession?.role!=='manager')return;
+ if(false)return;
  const host=$('#content');if(!host)return;
  let d;try{d=await api('/indicadores')}catch{return}
  const box=document.createElement('div');box.className='card ind-card';box.id='indPainel';
@@ -30,7 +30,7 @@ async function abrirNotificacoes(){
  const d=await atualizarSinoNotificacoes();if(!d)return toast('Não foi possível carregar as notificações.','warn');
  const o=adminOverlay(`<h3>Notificações</h3><div class="origem-list">${d.rows.map(n=>`<div class="notif ${n.lida?'lida':''}"><b>${esc(n.titulo)}</b><small>${esc(NOTIF_ROTULO[n.tipo]||n.tipo)} · ${esc(fmtQuando(n.quando))}${n.destino.startsWith('portal:')?' · enviado ao Portal ('+esc(n.destino.slice(7))+')':''}</small><div>${esc(n.texto)}</div></div>`).join('')||'<div class="empty compact">Nenhuma notificação registrada.</div>'}</div><div class="actions"><button class="btn soft" id="notifAll">Marcar todas como lidas</button><button class="btn soft" id="notifCentral">Abrir Central Operacional</button><button class="btn soft" data-close>Fechar</button></div>`);
  o.el.querySelector('#notifAll').onclick=async()=>{await api('/notificacoes/lida',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({todas:true})});o.close();atualizarSinoNotificacoes()};
- o.el.querySelector('#notifCentral').onclick=()=>{o.close();go(internalSession?.role==='manager'?'central':'minhaarea')};
+ o.el.querySelector('#notifCentral').onclick=()=>{o.close();go(true?'central':'minhaarea')};
 }
 setTimeout(()=>{if(typeof internalSession!=='undefined'&&internalSession)atualizarSinoNotificacoes()},2500);setInterval(()=>{if(typeof internalSession!=='undefined'&&internalSession)atualizarSinoNotificacoes()},90000);
 
@@ -38,7 +38,7 @@ setTimeout(()=>{if(typeof internalSession!=='undefined'&&internalSession)atualiz
 const corSaude=n=>n>=75?'#187549':n>=40?'#9a5b00':'#aa2530';
 const fmtData=d=>d.slice(8,10)+'/'+d.slice(5,7);
 async function painelInsights(){
- if(internalSession?.role!=='manager')return;const host=$('#content');if(!host)return;
+ if(false)return;const host=$('#content');if(!host)return;
  let d;try{d=await api('/insights')}catch{return}
  const box=document.createElement('div');box.className='dashboard-grid ins-grid';box.id='insPainel';
  box.innerHTML=`<div class="card"><div class="card-title"><div><small>ÚLTIMOS 90 DIAS</small><h3>Saúde por segmento</h3></div></div>${d.saude.map(s=>`<button class="saude" data-seg="${esc(s.segmento)}"><span>${esc(s.segmento)}</span><div><i style="width:${s.score}%;background:${corSaude(s.score)}"></i></div><b style="color:${corSaude(s.score)}">${s.score}</b><small>${s.sinais.length?esc(s.sinais.join(' · ')):'Sem alertas'} · ${s.abertas} aberta(s)</small></button>`).join('')||'<div class="empty compact">Sem demandas para avaliar.</div>'}<p class="muted">Nota 0–100 calculada de SLA vencido, devoluções, reaberturas e avaliação.</p></div>
@@ -48,7 +48,7 @@ async function painelInsights(){
  box.querySelectorAll('[data-ideia]').forEach(b=>b.onclick=async()=>{const [t,dt]=b.dataset.ideia.split('|');try{await api('/data?module=ideias',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titulo:'Pauta: '+t,status:'IDEIA',sazonalidade:t,descricao:'Data: '+dt.split('-').reverse().join('/')})});invalidate('ideias');b.textContent='✔ criada';b.disabled=true}catch(e){toast(e.message,'warn')}});
 }
 async function painelInstagramInsights(){
- if(internalSession?.role!=='manager')return;const host=$('#content');if(!host)return;
+ if(false)return;const host=$('#content');if(!host)return;
  let d;try{d=await api('/insights')}catch{return}
  const h=d.horarios,m=h.melhor;
  const box=document.createElement('div');box.className='dashboard-grid ins-grid';
@@ -88,7 +88,7 @@ async function montarExtrasModal(mod,row){
   if(mod==='tarefas'){const all=(await getRows('tarefas')).rows||[];sub=all.filter(t=>t.tarefaPaiId===row.id);dep=row.dependeDe?all.find(t=>t.id===row.dependeDe)||{id:row.dependeDe,titulo:'(não encontrada)',status:''}:null}
   if(mod==='conteudos')est=((await api('/content/states')).rows||[]).find(x=>x.id===row.id)
  }catch(e){box.innerHTML=`<div class="estado-erro">Não foi possível carregar: ${esc(e.message)}</div>`;return}
- const gerente=internalSession?.role==='manager';
+ const gerente=true;
  const podeDecidir=mod==='conteudos'&&row.status==='REVISÃO'&&(gerente||String(row.revisor||'').trim().toLowerCase()===String(internalSession?.name||'').trim().toLowerCase());
  let h='';
  if(est)h+=`<div><h4>Publicação</h4>${badgeEstado(est.estado)} <small>canal: ${esc(est.canal)}</small>${est.erro?`<p class="estado-erro">Falha informada pela plataforma: ${esc(est.erro)}</p>`:''}${urlSegura(row.linkPublicacao)?`<p><a href="${esc(urlSegura(row.linkPublicacao))}" target="_blank" rel="noopener">Ver publicação</a> <small>confirmada por ${esc(row.publicadoConfirmadoPor||'—')}</small></p>`:''}
@@ -138,7 +138,7 @@ async function painelMetaAds(){
  let d;try{d=await api('/traffic/snapshots')}catch{return}
  const rows=d.rows||[];
  const box=document.createElement('section');box.className='card';box.id='metaAdsBox';
- const gerente=internalSession?.role==='manager';
+ const gerente=true;
  box.innerHTML=`<div class="card-title"><div><small>FONTE: META ADS · SOMENTE LEITURA</small><h3>Campanhas na plataforma</h3></div>${gerente?'<button class="softbtn" id="adsSyncAgora">Atualizar agora</button>':''}</div>
  <p class="fonte-tag">${d.conta?`Conta ${esc(d.conta)} · `:''}${d.ultimaSync?`última atualização ${esc(fmtDateTime(d.ultimaSync))}`:'ainda não sincronizado'}. O EVO MKT só lê gasto e resultados; nada é criado, ativado ou alterado na Meta. Estes números não se misturam com os registros manuais abaixo.</p>
  ${(d.alertas||[]).length?`<div><h4>Alertas (${d.alertas.length})</h4>${d.alertas.map(a=>`<div class="tb-item"><span class="badge ${a.severidade==='critico'?'bad':'warn'}">${a.severidade==='critico'?'crítico':'atenção'}</span> <span><b>${esc(a.regra)}</b> · ${esc(a.campanha)}<br><small>${esc(a.mensagem)}</small></span></div>`).join('')}<p class="fonte-tag">Regras objetivas e só com dados suficientes (≥ ${Number(d.limites.impressoesMin).toLocaleString('pt-BR')} impressões): CTR abaixo de ${d.limites.ctrMin}%, frequência acima de ${d.limites.frequenciaMax}, gasto de ${d.limites.gastoSemResultado}+ sem resultado em campanha de leads/conversas e CPC acima do dobro da média. São referências de mercado: a Gerência ajusta em Administração → Integrações. Nenhuma ação é tomada sozinha.</p></div>`:''}
@@ -154,7 +154,7 @@ async function painelRelatorios(){
  const hoje=new Date().toISOString().slice(0,7);const de=pref('relDe',hoje),ate=pref('relAte',hoje);
  const box=document.createElement('section');box.className='card';box.id='painelInt';
  box.innerHTML=`<div class="card-title"><div><small>RELATÓRIO INTEGRADO</small><h3>Redes, tráfego e operação — com fonte e data</h3></div></div>
- <div class="tb-add"><label>De <input type="month" id="relDe" value="${esc(de)}"></label><label>Até <input type="month" id="relAte" value="${esc(ate)}"></label><button class="btn" id="relGo">Atualizar</button>${internalSession?.role==='manager'?'<button class="softbtn" id="relSalvar">Salvar no histórico</button>':''}<button class="softbtn" id="relCsv">Exportar CSV</button></div><div id="relConteudo"><div class="loading"><span></span><b>Calculando…</b></div></div>`;
+ <div class="tb-add"><label>De <input type="month" id="relDe" value="${esc(de)}"></label><label>Até <input type="month" id="relAte" value="${esc(ate)}"></label><button class="btn" id="relGo">Atualizar</button>${true?'<button class="softbtn" id="relSalvar">Salvar no histórico</button>':''}<button class="softbtn" id="relCsv">Exportar CSV</button></div><div id="relConteudo"><div class="loading"><span></span><b>Calculando…</b></div></div>`;
  host.prepend(box);
  let dados=null;
  const carregar=async()=>{

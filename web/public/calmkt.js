@@ -183,12 +183,15 @@ const CAL_MKT_TIPOS=[
  {k:'PLANO',rotulo:'Ação planejada',glifo:'◆'},
 ];
 /** Tipos que a equipe escolhe ao cadastrar (publicações e prazos vêm dos próprios registros). */
-const CAL_MKT_TIPOS_FORM=[['REUNIAO','Reunião'],['COBERTURA','Cobertura foto/vídeo'],['COMPROMISSO','Compromisso'],['INTERNA','Atividade interna']];
+const CAL_MKT_TIPOS_FORM=[['REUNIAO','Reunião'],['COMPROMISSO','Compromisso'],['COBERTURA_FOTO','Cobertura fotográfica'],['COBERTURA_VIDEO','Cobertura de vídeo'],['ACAO','Ação institucional'],['INTERNA','Atividade interna']];
+const CAL_SEGMENTOS=['Geral','Infantil','Anos Iniciais','Anos Finais','Ensino Médio'];
+function calMktTipoForm(r){const t=String(r.tipoItem||'').toLowerCase();if(/reuni/.test(t))return 'REUNIAO';if(/v[ií]deo|grava/.test(t))return 'COBERTURA_VIDEO';if(/cobert|foto/.test(t))return 'COBERTURA_FOTO';if(/institucional|a[cç][aã]o/.test(t))return 'ACAO';if(/intern|atividade/.test(t))return 'INTERNA';return 'COMPROMISSO'}
 const calMktRotuloTipo=k=>(CAL_MKT_TIPOS_FORM.find(x=>x[0]===k)||[,'Compromisso'])[1];
 function calMktTipoDe(r){
  const t=String(r.tipoItem||'').toLowerCase();
  if(/reuni/.test(t))return 'REUNIAO';
  if(/cobert|foto|v[ií]deo|grava/.test(t))return 'COBERTURA';
+ if(/institucional|a[cç][aã]o/.test(t))return 'ACAO';
  if(/intern|atividade/.test(t))return 'INTERNA';
  if(!t){const ti=String(r.titulo||'').toLowerCase();if(/reuni/.test(ti))return 'REUNIAO';if(/cobertura|grava[cç]/.test(ti))return 'COBERTURA'}
  return 'COMPROMISSO';
@@ -250,7 +253,7 @@ async function calMktForm(it,dataInicial=''){
  const edit=!!it,r=edit?it.raw:{};
  let resp=[];try{resp=((await api('/solicitacoes/painel')).opcoes||{}).responsaveis||[]}catch{}
  if(edit&&it.responsavel&&!resp.includes(it.responsavel))resp=[it.responsavel,...resp];
- const tipoAtual=edit?it.tipo:'REUNIAO',tipos=CAL_MKT_TIPOS_FORM;
+ const tipoAtual=edit?calMktTipoForm(r):'REUNIAO',tipos=CAL_MKT_TIPOS_FORM;let anexos=String(r.anexos||'').split('|').map(x=>x.trim()).filter(Boolean);
  const o=adminOverlay(`<h3>${edit?'Editar evento':'Novo evento'}</h3>
   <form id="cmForm" class="cm-form" novalidate>
    <label class="wide">Título *<input class="control" id="fTitulo" maxlength="140" required autocomplete="off" value="${attr(edit?it.titulo:'')}"></label>
@@ -258,17 +261,21 @@ async function calMktForm(it,dataInicial=''){
    <label>Horário (opcional)<input class="control" type="time" id="fHora" value="${attr(edit?it.hora:'')}"></label>
    <label>Tipo de atividade<select class="control" id="fTipo">${tipos.map(([k,l])=>`<option value="${k}" ${k===tipoAtual?'selected':''}>${l}</option>`).join('')}</select></label>
    <label>Responsável (opcional)<select class="control" id="fResp"><option value="">Sem responsável</option>${resp.map(n=>`<option value="${attr(n)}" ${n===(edit?it.responsavel:'')?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
+   <label>Segmento escolar (opcional)<select class="control" id="fSeg"><option value="">Não se aplica</option>${CAL_SEGMENTOS.map(sg=>`<option value="${attr(sg)}" ${sg===(r.segmento||'')?'selected':''}>${esc(sg==='Geral'?'Toda a escola':sg)}</option>`).join('')}</select></label>
+   <div class="wide cal-anexos"><b>Anexos (opcional)</b><div id="fAnexLista"></div><button type="button" class="softbtn" id="fAnexAdd">Anexar da biblioteca</button></div>
    <label class="wide">Observações (opcional)<textarea class="control" id="fObs" rows="3" maxlength="1000">${esc(edit?(r.descricao||''):'')}</textarea></label>
    <div class="cm-erro wide" id="fErro" role="alert"></div>
    <div class="actions wide">${edit?'<button type="button" class="btn danger-soft" id="fExcluir">Excluir</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Cancelar</button><button type="submit" class="btn" id="fSalvar">Salvar</button></div>
   </form>`);
  $('#fTitulo',o.el).focus();
+ const pintaAnex=()=>{$('#fAnexLista',o.el).innerHTML=anexos.length?anexos.map((a,i)=>`<div class="cal-anex"><a href="/api/file?path=${encodeURIComponent(a)}" target="_blank" rel="noopener">${esc(a.split('/').pop())}</a><button type="button" class="softbtn" data-rm="${i}" aria-label="Remover anexo">×</button></div>`).join(''):'<small class="kpi-note">Nenhum anexo.</small>';o.el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{anexos.splice(Number(b.dataset.rm),1);pintaAnex()})};pintaAnex();
+ $('#fAnexAdd',o.el).onclick=async()=>{const esc2=await arquivosEscolher({tipos:['imagem','video','documento','audio','outro'],multi:true});esc2.forEach(c=>{if(!anexos.includes(c))anexos.push(c)});pintaAnex()};
  $('#cmForm',o.el).onsubmit=async ev=>{
   ev.preventDefault();const err=$('#fErro',o.el);err.textContent='';
   const titulo=$('#fTitulo',o.el).value.trim(),data=$('#fData',o.el).value,hora=$('#fHora',o.el).value;
   if(titulo.length<2){err.textContent='Informe o título.';return}
   if(!data){err.textContent='Escolha a data.';return}
-  const body={titulo,tipoItem:calMktRotuloTipo($('#fTipo',o.el).value),dataInicio:data,inicioEm:`${data}T${hora||'00:00'}`,fimEm:`${data}T${hora||'00:00'}`,diaInteiro:hora?'Não':'Sim',responsavel:$('#fResp',o.el).value,descricao:$('#fObs',o.el).value.trim()};
+  const body={titulo,tipoItem:calMktRotuloTipo($('#fTipo',o.el).value),dataInicio:data,inicioEm:`${data}T${hora||'00:00'}`,fimEm:`${data}T${hora||'00:00'}`,diaInteiro:hora?'Não':'Sim',responsavel:$('#fResp',o.el).value,segmento:$('#fSeg',o.el).value,anexos:anexos.join(' | '),descricao:$('#fObs',o.el).value.trim()};
   if(edit&&r.fimEm&&String(r.fimEm).slice(0,10)!==String(r.inicioEm||r.dataInicio||'').slice(0,10)){ // evento de vários dias: preserva a duração
    const dias=Math.round((CalMotor.dataDe(String(r.fimEm).slice(0,10))-CalMotor.dataDe(String(r.inicioEm||r.dataInicio).slice(0,10)))/86400000);const f=CalMotor.dataDe(data);f.setDate(f.getDate()+Math.max(0,dias));body.fimEm=`${isoDate(f)}T${hora||'00:00'}`}
   else if(edit&&hora&&r.fimEm&&String(r.fimEm).length>10&&String(r.fimEm).slice(11,16)>hora)body.fimEm=`${data}T${String(r.fimEm).slice(11,16)}`;

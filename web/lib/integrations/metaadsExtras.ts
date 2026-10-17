@@ -83,26 +83,6 @@ export async function enviarRelatorioSemanal(forcar = false): Promise<Row> {
 }
 
 // ---------- matrículas por mês (custo por matrícula) ----------
-export async function listarMatriculas(): Promise<Row[]> {
-  let m: Record<string, number> = {};
-  try { m = JSON.parse((await setting('ads_matriculas')) || '{}'); } catch { /* vazio */ }
-  const gastos = await q("SELECT SUBSTR(dia,1,7) mes, SUM(gasto) gasto FROM ads_diario GROUP BY SUBSTR(dia,1,7)");
-  const meses = new Set([...Object.keys(m), ...gastos.map((g) => String(g.mes))]);
-  return [...meses].sort().map((mes) => {
-    const gasto = Number(gastos.find((g) => String(g.mes) === mes)?.gasto ?? 0), n = Number(m[mes] ?? 0);
-    return { mes, gasto, matriculas: m[mes] === undefined ? null : n, custo: n > 0 ? gasto / n : null };
-  });
-}
-export async function salvarMatriculas(mes: string, n: number): Promise<void> {
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) throw new Error('Informe o mês no formato AAAA-MM.');
-  if (!Number.isFinite(n) || n < 0 || n > 100000) throw new Error('Número de matrículas inválido.');
-  let m: Record<string, number> = {};
-  try { m = JSON.parse((await setting('ads_matriculas')) || '{}'); } catch { /* recomeça */ }
-  m[mes] = Math.floor(n);
-  await setSetting('ads_matriculas', JSON.stringify(m));
-}
-
-// ---------- rascunhos de campanha ----------
 export async function rascunhos(): Promise<Row[]> {
   try { return JSON.parse((await setting('ads_rascunhos')) || '[]'); } catch { return []; }
 }
