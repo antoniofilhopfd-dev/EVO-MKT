@@ -172,7 +172,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove())});
  // nova data pela tela
  await p.click('#cmNovo');await p.waitForSelector('#dcForm');
- await p.click('#dcForm #fOk');t('formulário valida o nome',/nome/i.test(await p.textContent('#fErro')));
+ await p.click('#dcForm #fOk');await p.waitForFunction(()=>document.querySelector('#fErro')?.textContent,null,{timeout:8000}).catch(()=>{});t('formulário valida o nome',/nome/i.test(await p.textContent('#fErro')));
  await p.fill('#fNome','Semana da Matemática');await p.selectOption('#fTipo','nesimo');await p.selectOption('#fN','1');await p.selectOption('#fSem','1');await p.selectOption('#fMesN','11');await p.selectOption('#fCat','__nova');await p.fill('#fCatNova','Semanas temáticas');await p.click('#fOk');await p.waitForSelector('#dcForm',{state:'detached'});await p.waitForTimeout(500);
  const sm=(await call('GET','/data?module=datacom'))[1].rows.find(x=>x.titulo==='Semana da Matemática');
  t('data móvel e categoria nova criadas pela tela (1ª segunda de novembro)',sm&&sm.regraTipo==='nesimo'&&/^CAT_SEMANAS/.test(sm.categoria));
