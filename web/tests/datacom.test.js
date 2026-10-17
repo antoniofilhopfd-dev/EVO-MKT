@@ -128,7 +128,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const p=await entra('NAT-3301');
  await p.evaluate(()=>go('agenda'));await p.waitForSelector('#subtabs .subtab');
  const sub=await p.$$eval('#subtabs .subtab',e=>e.map(x=>x.innerText.trim()));
- t('as três agendas ficam no Planejamento: Marketing, Escolar e Datas Comemorativas',['Calendário de Marketing','Calendário Escolar','Datas Comemorativas'].every(x=>sub.includes(x)),sub.join('|'));
+ t('os três calendários ficam juntos: Marketing, Escolar e Datas Comemorativas',['Marketing','Escolar','Datas Comemorativas'].every(x=>sub.includes(x))&&sub.length===3,sub.join('|'));
  await p.evaluate(()=>go('datacom'));await p.waitForSelector('.cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
  t('título, botão "+ Nova data" e visões Mês, Ano e Lista',/Datas Comemorativas/.test(await p.$eval('#content h1',e=>e.textContent))&&/Nova data/.test(await p.$eval('#cmNovo',e=>e.textContent))&&(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Mês,Ano,Lista');
  await p.selectOption('#cmAno','2026');await p.waitForFunction(()=>/2026/.test(document.querySelector('.cm-periodo')?.textContent||''));
