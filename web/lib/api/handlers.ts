@@ -59,7 +59,7 @@ export async function route(c: Ctx): Promise<Out> {
       return gestaoAnunciosRoute(c);
     case path.startsWith('/solicitacoes/'):
       return solicitacoesRoute(c);
-    case path === '/portal/pagina' || path === '/admin/portal':
+    case path.startsWith('/portal/pagina/') || path === '/admin/portal':
       return portalRoute(c);
     case path.startsWith('/reports/'):
       return relatoriosRoute(c);

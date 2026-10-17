@@ -31,8 +31,8 @@ async function estado(): Promise<Row> {
 export async function portalRoute(c: Ctx): Promise<Response> {
   const { path: rota, method } = c;
   // entrega controlada das páginas do Portal (as URLs diretas são reescritas para cá)
-  if (rota === '/portal/pagina' && method === 'GET') {
-    const f = c.qs('f');
+  if (rota.startsWith('/portal/pagina/') && method === 'GET') {
+    const f = rota.slice('/portal/pagina/'.length);
     if (!(f in ARQUIVOS)) fail(404, 'Não encontrado.');
     if (!(await portalAtivo())) {
       if (f === 'solicitante.html') return new Response(PAGINA_OFF, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Retry-After': '86400' } });

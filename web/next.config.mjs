@@ -19,9 +19,9 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        { source: '/solicitante.html', destination: '/api/portal/pagina?f=solicitante.html' },
-        { source: '/portal.js', destination: '/api/portal/pagina?f=portal.js' },
-        { source: '/manifest-portal.webmanifest', destination: '/api/portal/pagina?f=manifest-portal.webmanifest' },
+        { source: '/solicitante.html', destination: '/api/portal/pagina/solicitante.html' },
+        { source: '/portal.js', destination: '/api/portal/pagina/portal.js' },
+        { source: '/manifest-portal.webmanifest', destination: '/api/portal/pagina/manifest-portal.webmanifest' },
       ],
     };
   },
