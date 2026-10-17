@@ -21,7 +21,7 @@ const INTERNAL_USERS=[
  {code:'ALU-3304',name:'Aluizo Junior',role:'team',label:'Equipe de Marketing'},
  {code:'EDU-3305',name:'Maria Eduarda',role:'team',label:'Equipe de Marketing'}
 ];
-const TEAM_ALLOWED=['minhaarea','studio','igposts','igranking','agenda','calendario','tarefas','projetos','eventos','conteudos','ideias','campanhas','aprovacoes','instagram','trafego','templates','arquivos'];
+const TEAM_ALLOWED=['minhaarea','solicitacoes','studio','igposts','igranking','agenda','calendario','tarefas','projetos','eventos','conteudos','ideias','campanhas','aprovacoes','instagram','trafego','templates','arquivos'];
 let internalSession=null;
 function loadInternalSession(){try{const x=JSON.parse(sessionStorage.getItem('evo.internal.session')||'null');if(x&&INTERNAL_USERS.some(u=>u.code===x.code&&u.name===x.name))return x}catch{}return null}
 function canAccess(page){if(!internalSession)return false;return internalSession.role==='manager'||TEAM_ALLOWED.includes(page)}
