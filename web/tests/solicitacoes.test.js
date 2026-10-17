@@ -82,7 +82,7 @@ const dia=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
  // ============ INTERFACE ============
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const errs=[];
- const entra=async(cod,w=1366,h=1000)=>{const p=await (await b.newContext({viewport:{width:w,height:h}})).newPage();p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept(d.type()==='prompt'?'Motivo de teste':undefined));await p.goto(BASE+'/');await p.fill('#internalCode',cod);await p.fill('#internalPass',cod==='NAT-3301'?'Nat26ab':cod==='ANT-3302'?'Ant26ab':'Mon26ab');await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');return p};
+ const entra=async(cod,w=1366,h=1000)=>{const p=await (await b.newContext({viewport:{width:w,height:h}})).newPage();p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept(d.type()==='prompt'?'Motivo de teste':undefined));await p.goto(BASE+'/');await p.fill('#internalCode',cod);await p.fill('#internalPass',cod==='NAT-3301'?'Nat26ab':cod==='ANT-3302'?'Ant26ab':'Mon26ab');await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');await p.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:20000}).catch(()=>{});await p.waitForTimeout(800);return p};
  const p=await entra('NAT-3301');
  await p.evaluate(()=>go('solicitacoes'));await p.waitForSelector('.sl-board');
  t('área única "Solicitações" no menu, sem "Fluxos"',(await p.$$eval('#nav .navitem',e=>e.map(x=>x.textContent.trim())))?.some(x=>/Solicita/.test(x))&&!(await p.$$eval('#nav .navitem',e=>e.some(x=>/Fluxos|Gestão de Demandas/i.test(x.textContent)))));
