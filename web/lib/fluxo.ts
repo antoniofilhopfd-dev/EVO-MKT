@@ -69,3 +69,35 @@ export function validarTransicaoSolicitacao(de: string, para: string, motivoInfo
 export function fluxoPublico() {
   return { status: STATUS_BY_MODULE, solicitacoes: { transicoes: T, finais: FINAL_SOLICITACAO, pausaSla: PAUSA_SLA } };
 }
+
+// ---------- Visão simplificada (tela Solicitações): 4 etapas sobre os 9 status internos ----------
+/** Os dados e o Portal continuam usando os 9 status; a tela interna mostra só estas 4 etapas. */
+export const ETAPAS = ['PENDENTE', 'EM_ANDAMENTO', 'EM_APROVACAO', 'CONCLUIDO'] as const;
+export type Etapa = (typeof ETAPAS)[number];
+export const ROTULO_ETAPA: Record<Etapa, string> = { PENDENTE: 'Pendente', EM_ANDAMENTO: 'Em andamento', EM_APROVACAO: 'Em aprovação', CONCLUIDO: 'Concluído' };
+
+export function etapaDe(status: string): Etapa {
+  const s = (status || '').toUpperCase();
+  if (s === 'EM EXECUÇÃO') return 'EM_ANDAMENTO';
+  if (s === 'AGUARDANDO APROVAÇÃO DO SOLICITANTE') return 'EM_APROVACAO';
+  if (s === 'CONCLUÍDA' || s === 'CANCELADA') return 'CONCLUIDO';
+  return 'PENDENTE';
+}
+
+/** Caminho mais curto (pelas transições permitidas) entre dois status; [] se não houver. */
+export function caminhoSolicitacao(de: string, para: string): string[] {
+  const ini = de.toUpperCase(), fim = para.toUpperCase();
+  if (ini === fim) return [];
+  const fila: string[][] = [[ini]], vistos = new Set([ini]);
+  while (fila.length) {
+    const p = fila.shift()!;
+    for (const x of T[p[p.length - 1]] ?? []) {
+      if (vistos.has(x.to)) continue;
+      const np = [...p, x.to];
+      if (x.to === fim) return np.slice(1);
+      vistos.add(x.to);
+      fila.push(np);
+    }
+  }
+  return [];
+}

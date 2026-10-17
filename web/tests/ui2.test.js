@@ -30,27 +30,29 @@ let ok=0,bad=0;const t=(n,c)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n)};
  t('Portal: anexo enviado e vinculado',sol&&/ANEXOS\/SOLICITACOES\/.+brief/.test(sol.anexos||''));
 
  // ========== 2) GERENTE: triagem → distribui ==========
- await G.evaluate(()=>{invalidate('solicitacoes');go('solicitacoes')});await G.waitForSelector(`.executor-select[data-id="${sol.id}"]`);
- tx('Gerente vê a demanda na fila de triagem',await G.$eval('.request-manager-grid',e=>e.innerText),/Banner Olimp/i);
- await G.fill(`.executor-select[data-id="${sol.id}"]`,'Antônio Filho');await G.click(`.distribute[data-id="${sol.id}"]`);await G.waitForTimeout(900);
+ await G.evaluate(()=>{invalidate('solicitacoes');go('solicitacoes')});await G.waitForSelector(`.sl-card[data-id="${sol.id}"]`);
+ tx('Gerente vê a demanda em Pendente (Kanban)',await G.$eval('.sl-col[data-etapa="PENDENTE"]',e=>e.innerText),/Banner Olimp/i);
+ await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dResp');await G.selectOption('#dResp','Antônio Filho');await G.click('#dSalvar');await G.waitForTimeout(1200);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);
- t('Gerente distribui: EM EXECUÇÃO com executor',sol.status==='EM EXECUÇÃO'&&sol.responsavel==='Antônio Filho'&&sol.triagemStatus==='DISTRIBUÍDA');
+ t('Gerente distribui: DISTRIBUÍDA com responsável',sol.status==='DISTRIBUÍDA'&&sol.responsavel==='Antônio Filho'&&sol.triagemStatus==='DISTRIBUÍDA');
+ await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`[data-sl-mover="${sol.id}"][data-para="EM_ANDAMENTO"]`);await G.click(`[data-sl-mover="${sol.id}"][data-para="EM_ANDAMENTO"]`);await G.waitForTimeout(900);
+ sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Iniciar: EM EXECUÇÃO',sol.status==='EM EXECUÇÃO');
 
  // ========== 3) pede ajuste → solicitante responde ==========
- await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`.req-adjust[data-id="${sol.id}"]`);
- G.removeAllListeners('dialog');G.once('dialog',d=>d.accept('Qual horário do evento?'));await G.click(`.req-adjust[data-id="${sol.id}"]`);await G.waitForTimeout(800);
- sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Gerente devolve para ajuste',sol.triagemStatus==='DEVOLVIDA PARA AJUSTES');
+ await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`[data-sl-abrir="${sol.id}"]`);await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dPedirInfo');
+ G.removeAllListeners('dialog');G.once('dialog',d=>d.accept('Qual horário do evento?'));await G.click('#dPedirInfo');await G.waitForTimeout(900);
+ sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Gerente pede informação ao solicitante',sol.status==='AGUARDANDO SOLICITANTE'&&sol.triagemStatus==='DEVOLVIDA PARA AJUSTES');
  await P.click('[data-tab="list"]').catch(()=>{});await P.evaluate(()=>renderList());await P.waitForSelector('.send-reply',{timeout:5000});
  await P.fill(`#reply-${sol.id}`,'Sábado às 9h, no pátio.');await P.click(`.send-reply[data-id="${sol.id}"]`);await P.waitForTimeout(1000);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Solicitante responde: volta para triagem',sol.status==='EM ANÁLISE'&&/Sábado/.test(sol.respostaSolicitante));
  await A(G,'/data?module=solicitacoes&id='+sol.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'EM EXECUÇÃO',triagemStatus:'DISTRIBUÍDA'})});
 
  // ========== 4) entrega: arquivo final + envio para aprovação ==========
- await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`.req-final-file[data-id="${sol.id}"]`);
- await G.click(`.req-final-file[data-id="${sol.id}"]`);await G.waitForSelector('#delFiles');await G.setInputFiles('#delFiles','/tmp/evo-final.png');await G.click('#delSend');await G.waitForTimeout(1200);
+ await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`[data-sl-abrir="${sol.id}"]`);await G.click(`[data-sl-abrir="${sol.id}"]`);await G.waitForSelector('#dEntrega');
+ await G.click('#dEntrega');await G.waitForSelector('#delFiles');await G.setInputFiles('#delFiles','/tmp/evo-final.png');await G.click('#delSend');await G.waitForTimeout(1200);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Entrega: arquivo final salvo em /ENTREGA/',/\/ENTREGA\/.+final/.test(sol.arquivosEntrega||''));
- await G.evaluate(()=>go('solicitacoes'));await G.waitForSelector(`.req-deliver[data-id="${sol.id}"]`);
- G.removeAllListeners('dialog');G.once('dialog',d=>d.accept('Arte pronta! Confira.'));await G.click(`.req-deliver[data-id="${sol.id}"]`);await G.waitForTimeout(800);
+ await G.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove());go('solicitacoes')});await G.waitForSelector(`[data-sl-mover="${sol.id}"][data-para="EM_APROVACAO"]`);
+ G.removeAllListeners('dialog');G.once('dialog',d=>d.accept('Arte pronta! Confira.'));await G.click(`[data-sl-mover="${sol.id}"][data-para="EM_APROVACAO"]`);await G.waitForTimeout(900);
  sol=(await rows(G,'solicitacoes')).find(r=>r.id===sol.id);t('Entrega enviada para aprovação do solicitante',sol.status==='AGUARDANDO APROVAÇÃO DO SOLICITANTE');
 
  // ========== 5) solicitante vê o arquivo, aprova e avalia ==========

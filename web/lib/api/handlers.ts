@@ -25,6 +25,7 @@ import { conteudoRoute } from './conteudo';
 import { relatoriosRoute } from './relatorios';
 import { calendarioPublicoRoute } from './calendarioPublico';
 import { gestaoAnunciosRoute } from './gestaoAnuncios';
+import { solicitacoesRoute } from './solicitacoes';
 import { aprovacaoPublicaRoute } from './aprovacaoPublica';
 import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
@@ -49,6 +50,8 @@ export async function route(c: Ctx): Promise<Out> {
       return calendarioPublicoRoute(c);
     case path.startsWith('/ads/'):
       return gestaoAnunciosRoute(c);
+    case path.startsWith('/solicitacoes/'):
+      return solicitacoesRoute(c);
     case path.startsWith('/reports/'):
       return relatoriosRoute(c);
     case path.startsWith('/content/'):
@@ -648,6 +651,10 @@ async function dataRoute(c: Ctx): Promise<Response> {
       const dono = String(antes.responsavel ?? '').trim();
       const novoResp = strv(patch.responsavel).trim();
       if (dono && lower(dono) !== lower(u.nome) && novoResp !== dono) fail(403, 'Só a Gerente ou o responsável atual pode reatribuir este item.');
+    }
+    if (mod === 'solicitacoes' && u.role !== 'manager') {
+      const dono = String(antes.responsavel ?? '').trim();
+      if (dono === '' || lower(dono) !== lower(u.nome)) fail(403, 'Só a Gerente ou o responsável pode alterar esta solicitação.');
     }
     const dep = await updateRow(mod, id, patch, u.codigo);
     await notifyAssignment(mod, dep, antes, u.nome);

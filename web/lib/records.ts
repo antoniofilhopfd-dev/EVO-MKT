@@ -111,7 +111,7 @@ export async function modifyRow(mod: string, id: string, fn: (cur: Row, c: any) 
   await mergeHeaders(mod, Object.keys(nw));
   return nw;
 }
-export async function updateRow(mod: string, id: string, patchIn: Row, ator: string): Promise<Row> {
+export async function updateRow(mod: string, id: string, patchIn: Row, ator: string, opts: { semTarefa?: boolean } = {}): Promise<Row> {
   const patch = cleanInput(patchIn);
   for (const k of ['id', 'criadoEm', 'criadoPor', 'atualizadoPor']) delete patch[k];
   const motivoInformado = strv(patch.motivoTransicao);
@@ -151,7 +151,7 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
   await audit(ator, 'editar', mod, id);
   if (mod === 'solicitacoes') {
     await avisosDaSolicitacao(prev, nw, ator);
-    return (await tarefaDaDemanda(nw, ator)) ?? nw;
+    return opts.semTarefa ? nw : (await tarefaDaDemanda(nw, ator)) ?? nw;
   }
   return nw;
 }
