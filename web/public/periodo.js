@@ -8,7 +8,7 @@ const PeriodoPicker=(()=>{
  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  let css=false;
  function estilo(){if(css)return;css=true;const s=document.createElement('style');s.textContent=`
- .pp-ov{position:fixed;inset:0;z-index:300;background:rgba(0,39,95,.45);display:flex;align-items:center;justify-content:center;padding:12px}
+ .pp-ov{position:fixed;inset:0;z-index:20000;background:rgba(0,39,95,.45);display:flex;align-items:center;justify-content:center;padding:12px}
  .pp{background:#fff;border-radius:16px;width:min(360px,100%);max-height:calc(100vh - 24px);overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:16px;font-family:inherit;color:#1D2433}
  .pp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.pp-top h3{margin:0;font-size:16px;color:#00275F}
  .pp-x{border:0;background:#F0F2F7;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;color:#00275F}

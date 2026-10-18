@@ -61,6 +61,11 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('tabela traz colunas de desempenho (Gasto/Alcance/CTR)',ths.some(x=>/Invest/i.test(x))&&ths.some(x=>/CTR/i.test(x))&&ths.some(x=>/Conversas/i.test(x)),ths);
  await p.click('#tpFiltros');await p.waitForTimeout(400);
  t('painel de filtros avançados abre',!!(await p.$('#ffSt'))&&!!(await p.$('#ffCd')));
+ await p.click('[data-rng^="ffCd"]');await p.waitForSelector('.pp');await p.click('.pp-g button[data-d$="-03"]');await p.click('.pp-g button[data-d$="-09"]');await p.click('.pp .ok');await p.waitForTimeout(300);
+ const rng=await p.evaluate(()=>[document.querySelector('#ffCd').value,document.querySelector('#ffCa').value,document.querySelector('[data-rng^="ffCd"]').textContent]);
+ t('filtro de datas: primeiro e último dia escolhidos no mesmo calendário (um modal, uma confirmação)',rng[0].endsWith('-03')&&rng[1].endsWith('-09')&&/📅/.test(rng[2])&&!(await p.$('.pp')),rng);
+ await p.click('[aria-label^="Limpar datas de Criação"]');
+ t('limpar as datas do filtro com um toque',(await p.$eval('#ffCd',e=>e.value))===''&&(await p.$eval('#ffCa',e=>e.value))==='');
  await p.click('#tpFiltros').catch(()=>{});
  await p.click('#tpColunas');await p.waitForTimeout(400);
  t('painel de colunas abre com busca e padrão',!!(await p.$('#colBusca'))&&!!(await p.$('#colPadrao')));

@@ -90,6 +90,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const p=await entra('NAT-3301');
  const mesVista=async(pg=p)=>{await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pg.$('.cm-mes'))){await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes')}};
  const abre=async(pg=p)=>pg.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));
+ const setD=(a,b)=>p.evaluate(([x,y])=>{document.querySelector('#eData').value=x;document.querySelector('#eFim').value=y||'';document.querySelector('#eRange')&&document.querySelector('#eRange').click&&0},[a,b]);
  const novoEsc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="esc"]');await pg.waitForSelector('#escForm')};
  await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-semana, .cm-mes, .cm-proximos');
  const sub=await p.$$eval('.cm-tipo',x=>x.map(y=>y.innerText.trim()));
@@ -116,15 +117,16 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await novoEsc();
  const campos=await p.$eval('#escForm',e=>e.innerText);t('formulário: Título, Data, Horários, Tipo, Segmentos, Local e Descrição',['Título','Data','Horário inicial','Horário final','Tipo de evento','Local','Segmentos','Descrição'].every(x=>campos.includes(x)),campos);
  t('"Toda a escola" já vem marcado',await p.isChecked('[data-seg="TODOS"]'));
- await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.fill('#eFim',dia(13));await p.selectOption('#eTipo','ESPORTIVA');await p.check('[data-seg="FUND2"]');
+ await p.fill('#eTitulo','Torneio de vôlei');await setD(dia(12),dia(13));await p.selectOption('#eTipo','ESPORTIVA');await p.check('[data-seg="FUND2"]');
  t('marcar um segmento desmarca "Toda a escola"',!(await p.isChecked('[data-seg="TODOS"]')));
  await p.check('[data-seg="MEDIO"]');await p.fill('#eLocal','Ginásio');await p.click('#eSalvar');await p.waitForSelector('#escForm',{state:'detached'});
  const tor=(await lista()).find(x=>x.titulo==='Torneio de vôlei');
  t('criado pela tela, em dois dias e dois segmentos',tor&&tor.dataFim===dia(13)&&tor.segmentos==='FUND2|MEDIO'&&tor.local==='Ginásio',tor);
  await p.click(`.cm-num[data-novo="${dia(11)}"]`);await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="esc"]');await p.waitForSelector('#escForm');t('clicar no dia preenche a data',(await p.inputValue('#eData'))===dia(11));
+ await p.click('#eRange');await p.waitForSelector('.pp');await p.click('.pp-g button[data-d$="-20"]');await p.click('.pp-g button[data-d$="-22"]');await p.click('.pp .ok');await p.waitForTimeout(200);t('Data e "Até" são escolhidos no mesmo calendário, de uma vez',(await p.inputValue('#eData')).endsWith('-20')&&(await p.inputValue('#eFim')).endsWith('-22')&&/ a /.test(await p.textContent('#eRange')));
  await p.fill('#eTitulo','ab');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});t('erros do servidor aparecem no formulário',/título/i.test(await p.textContent('#eErro')));await p.click('#escForm [data-close]');
  // duplicado na tela
- await novoEsc();await p.fill('#eTitulo','Torneio de vôlei');await p.fill('#eData',dia(12));await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});
+ await novoEsc();await p.fill('#eTitulo','Torneio de vôlei');await setD(dia(12),'');await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});
  t('evento repetido é barrado na tela',/já está cadastrado/.test(await p.textContent('#eErro')),await p.textContent('#eErro'));await p.click('#escForm [data-close]');
  // editar, reagendar por arrastar, excluir
  await p.click('.cm-item:has-text("Torneio de vôlei")');await p.waitForSelector('#escForm');t('abrir o evento mostra os dados',(await p.inputValue('#eTitulo'))==='Torneio de vôlei'&&(await p.inputValue('#eLocal'))==='Ginásio');

@@ -33,8 +33,7 @@ async function escForm(it,dataInicial=''){
  const o=adminOverlay(`<h3>${edit?(ro?esc(e.titulo):'Editar evento'):'Novo evento'}</h3>
   <form id="escForm" class="cm-form" novalidate>
    <label class="wide">Título *<input class="control" id="eTitulo" maxlength="140" required autocomplete="off" value="${attr(e.titulo||'')}" ${dis}></label>
-   <label>Data *<input class="control" type="date" id="eData" required value="${attr(e.dataInicio||dataInicial)}" ${dis}></label>
-   <label>Até (se durar mais de um dia)<input class="control" type="date" id="eFim" value="${attr(e.dataFim&&e.dataFim!==e.dataInicio?e.dataFim:'')}" ${dis}></label>
+   <div class="wide"><span class="cm-lbl">Data *</span><input type="hidden" id="eData" value="${attr(e.dataInicio||dataInicial)}"><input type="hidden" id="eFim" value="${attr(e.dataFim&&e.dataFim!==e.dataInicio?e.dataFim:'')}"><button type="button" class="control cm-rng" id="eRange" ${dis}></button><small class="cm-dica">Escolha o dia e, se durar mais de um dia, o último dia — tudo no mesmo calendário.</small></div>
    <label>Horário inicial (opcional)<input class="control" type="time" id="eHi" value="${attr(e.horaInicio||'')}" ${dis}></label>
    <label>Horário final (opcional)<input class="control" type="time" id="eHf" value="${attr(e.horaFim||'')}" ${dis}></label>
    <label>Tipo de evento<select class="control" id="eTipo" ${dis}>${(ESC_OPC.tipos||[]).map(([k,l])=>`<option value="${k}" ${k===(e.tipoEvento||'EVENTO')?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
@@ -51,6 +50,8 @@ async function escForm(it,dataInicial=''){
   else if(c.checked)f.querySelector('[data-seg="TODOS"]').checked=false;
   if(![...f.querySelectorAll('[data-seg]')].some(x=>x.checked))f.querySelector('[data-seg="TODOS"]').checked=true;
  });
+  const pintaRng=()=>{const d=$('#eData',f).value,a=$('#eFim',f).value;$('#eRange',f).textContent='📅 '+(d?(a&&a!==d?`${fmtDate(d)} a ${fmtDate(a)}`:fmtDate(d)):'Escolher a data')};pintaRng();
+  $('#eRange',f).onclick=()=>{if(ro)return;PeriodoPicker.abrir({de:$('#eData',f).value,ate:$('#eFim',f).value||$('#eData',f).value,titulo:'Dia do evento (e o último dia)'},(d,a)=>{$('#eData',f).value=d;$('#eFim',f).value=a===d?'':a;pintaRng()})};
    if(ro)return;
  $('#eTitulo',f).focus();
  $('#escForm',f).onsubmit=async ev=>{
