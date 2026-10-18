@@ -238,3 +238,8 @@ button.db-card{cursor:pointer}button.db-card:hover{border-color:var(--brand)}
 .subtabs{z-index:70!important;overflow:visible!important}
 .submenu{z-index:80!important}
 @media(max-width:760px){.subtabs{overflow:visible!important;flex-wrap:wrap!important}}
+@media(max-width:760px){
+ .subtabs{position:relative!important}
+ .submais{position:static}
+ .submenu{left:12px!important;right:12px!important;min-width:0!important;top:100%!important}
+}

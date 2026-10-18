@@ -81,6 +81,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await ir(p,'igvisao');const igv=await p.evaluate(()=>document.querySelector('#content').innerText);t('Instagram › Visão geral: seguidores, publicações, interações, alcance, andamento e próximas',/Seguidores/.test(igv)&&/Publica/.test(igv)&&/Intera/.test(igv)&&/Alcance/.test(igv)&&/Andamento da produ/.test(igv)&&/Pr[oó]ximas publica/.test(igv),igv.slice(0,300));
  t('Visão geral do Instagram é a primeira aba da área',(await p.$$eval('#subtabs .subtab',e=>e[0].textContent.trim()))==='Visão geral');
  await p.click('[data-ig-ir="studio"].btn');await p.waitForTimeout(800);t('Visão geral: "Nova publicação" abre o Estúdio',(await p.evaluate(()=>state.page))==='studio');
+ for(const [pg,rx,nome] of [['igposts',/Desempenho|publica/i,'Desempenho'],['igranking',/Ranking|Métricas|m[eê]s/i,'Ranking']]){await ir(p,pg);const tx=await p.evaluate(()=>document.querySelector('#content').innerText);t(`Instagram › ${nome} abre e traz conteúdo`,tx.length>80&&rx.test(tx),tx.slice(0,160))}
+ t('Instagram: seletor de conta no topo da Visão geral (quando há conta)',(await ir(p,'igvisao'),true)&&(await p.$$('[data-igconta]')).length>=1);
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);

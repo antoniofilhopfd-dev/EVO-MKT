@@ -158,7 +158,7 @@ function toneClass(m){return MODULES[m]?.tone||'blue'}
 const AREAS=[
  {k:'visao',label:'Dashboard',icon:'◉',pages:['hoje']},
  {k:'calendario',label:'Calendário',icon:'▤',pages:['calendario']},
- {k:'instagramarea',label:'Instagram',icon:'◎',pages:['igvisao','studio','conteudos','instagram','editorial','ideias','aprovacoes','templates','igposts','igranking'],main:['igvisao','studio','conteudos','instagram']},
+ {k:'instagramarea',label:'Instagram',icon:'◎',pages:['igvisao','studio','conteudos','instagram','editorial','ideias','aprovacoes','templates','igposts','igranking'],main:['igvisao','studio','conteudos','instagram','igposts','igranking']},
  {k:'trafego',label:'Tráfego Pago',icon:'↗',pages:['trafego','gerenciador','tfcriativos','tfanalises','tfpublicos','tforcamentos','tfalertas','tfrelatorios','tfhistorico'],main:['trafego','gerenciador','tfcriativos','tfanalises']},
  {k:'arquivos',label:'Arquivos',icon:'▱',pages:['arquivos']},
  {k:'configuracoes',label:'Configurações',icon:'⚙',pages:['configuracoes']},

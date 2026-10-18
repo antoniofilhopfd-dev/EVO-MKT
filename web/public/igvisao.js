@@ -6,15 +6,16 @@ TP_PAGINAS.igvisao=async function(){
   state.module=null;
   $('#content').innerHTML='<div class="loading"><span></span><b>Carregando a visão geral…</b></div>';
   let d,conts=[];
-  try{d=await api('/dashboard/resumo?dias='+igvDias)}catch(e){$('#content').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar a visão geral</strong><p>${esc(e.message)}</p></div>`;return}
-  try{conts=(await getRows('conteudos')).rows||[]}catch{conts=[]}
+  if(!igContas.length)await igCarregaContas();
+  try{d=await api('/dashboard/resumo?dias='+igvDias+igQ('&'))}catch(e){$('#content').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar a visão geral</strong><p>${esc(e.message)}</p></div>`;return}
+  try{conts=((await getRows('conteudos')).rows||[]).filter(r=>igContas.length<2||igContaDoPost(r)===igConta)}catch{conts=[]}
   if(state.page!=='igvisao')return;
   const ig=d.instagram;
   const eng=ig.interacoes!==null&&ig.alcance?(ig.interacoes/ig.alcance)*100:null;
   const porStatus=conts.reduce((m,c)=>{const s=String(c.status||'').toUpperCase();const k=/PUBLICAD/.test(s)?'pub':/PROGRAMAD|AGENDAD/.test(s)?'prog':/APROVAD/.test(s)?'apr':/REVIS/.test(s)?'rev':/ARQUIV/.test(s)?'arq':'prod';m[k]=(m[k]||0)+1;return m},{});
   const sync=ig.ultimaSync?new Date(ig.ultimaSync).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):null;
   const andamento=[['prod','Em produção','studio'],['rev','Em revisão','aprovacoes'],['apr','Aprovados','conteudos'],['prog','Programados','editorial'],['pub','Publicados','conteudos']];
-  $('#content').innerHTML=`<div class="db-topo"><div><small>INSTAGRAM</small><h1>Visão geral</h1></div>
+  $('#content').innerHTML=`<div class="db-topo"><div><small>INSTAGRAM${igContas.length>1?' · @'+esc((igContas.find(c=>c.ig===igConta)||{}).usuario||''):''}</small><h1>Visão geral</h1></div>
     <div class="db-acoes"><label class="db-per">Período<select id="igvDias" class="control">${[[7,'7 dias'],[14,'14 dias'],[30,'30 dias'],[90,'90 dias']].map(([v,l])=>`<option value="${v}" ${d.dias===v?'selected':''}>Últimos ${l}</option>`).join('')}</select></label>
     <button class="softbtn" data-ig-ir="editorial">Planejamento editorial</button><button class="softbtn" data-ig-ir="instagram">Análises</button><button class="btn" data-ig-ir="studio">Nova publicação</button></div></div>
    <div class="kpi-note" style="margin:-6px 0 12px">${ig.conectado?`Instagram conectado${sync?` · última atualização em ${esc(sync)}`:''}`:'Instagram não conectado — conecte em Configurações › Integrações para ver os números.'}</div>

@@ -5,6 +5,7 @@ import { listRows } from '../records';
 import { setting } from '../settings';
 import { addDays, fail, fmtDate, parseLocal, Row, strv } from '../util';
 import { alertasTrafego, saudeConta } from '../integrations/metaads';
+import { contasMonitoradas, igContaValida } from '../integrations/meta';
 import { ocorrencias } from './datacom';
 import { json } from './handlers';
 
@@ -16,8 +17,10 @@ import { json } from './handlers';
 const somar = (s: string, n: number) => fmtDate(addDays(parseLocal(s + 'T12:00:00'), n));
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
-async function instagram(de: string, ate: string, hoje: string): Promise<Row> {
-  const conta = await setting('ig_user_id');
+async function instagram(de: string, ate: string, hoje: string, contaPedida = ''): Promise<Row> {
+  const principal = await setting('ig_user_id');
+  const conta = contaPedida ? await igContaValida(contaPedida) : principal;
+  const varias = (await contasMonitoradas().catch(() => [])).length > 1;
   const conectado = !!conta && (await setting('meta_token_invalido')) !== '1';
   const seg = conta ? await q('SELECT dia,seguidores FROM ig_seguidores WHERE conta=? AND dia>=? AND dia<=? ORDER BY dia', [conta, somar(de, -1), ate]) : [];
   const serie = seg.map((r) => ({ dia: String(r.dia), seguidores: num(r.seguidores) }));
@@ -26,7 +29,7 @@ async function instagram(de: string, ate: string, hoje: string): Promise<Row> {
   const melhor = [...posts].sort((a, b) => inter(b) - inter(a))[0];
   const comAlcance = posts.filter((p) => p.alcance !== null && p.alcance !== undefined);
   const programadas = (await listRows('conteudos'))
-    .filter((r) => strv(r.publicacaoEm).slice(0, 10) >= hoje && !/PUBLICADO|ARQUIV/i.test(strv(r.status)))
+    .filter((r) => strv(r.publicacaoEm).slice(0, 10) >= hoje && !/PUBLICADO|ARQUIV/i.test(strv(r.status)) && (!varias || (strv(r.contaInstagram) || principal) === conta))
     .sort((a, b) => strv(a.publicacaoEm).localeCompare(strv(b.publicacaoEm))).slice(0, 5)
     .map((r) => ({ id: r.id, titulo: r.titulo, quando: strv(r.publicacaoEm), formato: strv(r.formato), canal: strv(r.canal), status: strv(r.status) }));
   return {
@@ -96,5 +99,5 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   const saude = await saudeConta().catch(() => null);
   if (saude && !saude.ok) integ.push({ nome: 'Conta de anúncios', msg: `A Meta informa: ${saude.rotulo}.` });
 
-  return json({ hoje, dias, de, ate: hoje, eu: { nome: u.nome, admin: !!Number(u.admin) }, instagram: await instagram(de, hoje, hoje), trafego: await trafego(de, hoje, dias), eventos: eventos.slice(0, 6), datas, alertas, integracoes: integ });
+  return json({ hoje, dias, de, ate: hoje, eu: { nome: u.nome, admin: !!Number(u.admin) }, instagram: await instagram(de, hoje, hoje, c.qs('conta')), trafego: await trafego(de, hoje, dias), eventos: eventos.slice(0, 6), datas, alertas, integracoes: integ });
 }
