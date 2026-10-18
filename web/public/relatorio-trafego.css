@@ -43,4 +43,4 @@ td.foto{width:70px;padding:4px}td img{width:60px;height:76px;object-fit:contain;
  .pg{box-shadow:none;margin:0;padding:0;width:auto;min-height:0;break-after:page}.pg:last-of-type{break-after:auto}
  @page{@bottom-center{content:"Colégio Evolução · EVO MKT · página " counter(page) " de " counter(pages);font:9px Arial;color:#7A8195}}
 }
-@media (max-width:640px){.bloco{grid-template-columns:1fr}.cab{flex-wrap:wrap}.cab h1{font-size:19px}.kpis{grid-template-columns:repeat(2,1fr)}.kpis div:nth-child(4n){border-right:1px solid var(--line)}.kpis div:nth-child(2n){border-right:0}.pg{padding:18px 12px 40px;overflow-x:auto}}
+@media screen and (max-width:640px){.bloco{grid-template-columns:1fr}.cab{flex-wrap:wrap}.cab h1{font-size:19px}.kpis{grid-template-columns:repeat(2,1fr)}.kpis div:nth-child(4n){border-right:1px solid var(--line)}.kpis div:nth-child(2n){border-right:0}.pg{padding:18px 12px 40px;overflow-x:auto}}
