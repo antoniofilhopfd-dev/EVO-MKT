@@ -76,3 +76,5 @@
 .tp-tab .tf-ord{background:none;border:0;font:inherit;font-weight:700;color:inherit;cursor:pointer;padding:0;text-align:left;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:0}
 .tp-tab thead th{padding-right:12px}
 .tp-tab .tp-ck input{margin:0}
+
+.tp-per-t{border:1px solid var(--line);background:#fff;border-radius:10px;min-height:34px;padding:2px 12px;font:inherit;font-size:13px;font-weight:600;color:var(--brand,#063996);cursor:pointer}.tp-per-t:hover{background:var(--brand-bg,#E3ECFB)}

@@ -20,11 +20,13 @@ const tpPeriodo=()=>{if(!TP.per){const s=pref('trafego.periodo',null)||{p:'30'};
 function tpLinkRelatorio(el){if(!el)return;el.addEventListener('click',()=>{const p=tpPeriodo();el.href='/relatorio-trafego.html?de='+encodeURIComponent(p.de)+'&ate='+encodeURIComponent(p.ate)})}
 function tpDefinePeriodo(p,de,ate){const [a,b]=tpIntervalo(p,de,ate);TP.per={p,de:a,ate:b};setPref('trafego.periodo',TP.per)}
 /** Seletor de período (rápido ou personalizado). aoMudar é chamado depois de escolher. */
-function tpSeletorPeriodo(){const per=tpPeriodo();return `<div class="tp-per"><select id="tpPer" class="control" aria-label="Período das métricas">${TP_PERIODOS.map(([k,l])=>`<option value="${k}" ${per.p===k?'selected':''}>${l}</option>`).join('')}</select><span class="tp-per-x" ${per.p==='x'?'':'hidden'}><input type="date" id="tpDe" class="control" value="${attr(per.de)}" aria-label="Início"><input type="date" id="tpAte" class="control" value="${attr(per.ate)}" aria-label="Fim"><button type="button" class="softbtn" id="tpPerOk">Aplicar</button></span><small class="tp-per-t">${esc(fmtDate(per.de))} a ${esc(fmtDate(per.ate))}</small></div>`}
+function tpSeletorPeriodo(){const per=tpPeriodo();return `<div class="tp-per"><select id="tpPer" class="control" aria-label="Período das métricas">${TP_PERIODOS.map(([k,l])=>`<option value="${k}" ${per.p===k?'selected':''}>${l}</option>`).join('')}</select><button type="button" class="tp-per-t" id="tpPerBtn" title="Escolher o primeiro e o último dia" aria-label="Escolher período: ${attr(fmtDate(per.de))} a ${attr(fmtDate(per.ate))}">📅 ${esc(fmtDate(per.de))} a ${esc(fmtDate(per.ate))}</button></div>`}
+/** Um único modal para escolher o primeiro e o último dia (ver periodo.js). */
+function tpAbrePeriodo(aoMudar){const per=tpPeriodo();PeriodoPicker.abrir({de:per.de,ate:per.ate,titulo:'Período das métricas',max:tpIso(new Date())},(de,ate)=>{tpDefinePeriodo('x',de,ate);aoMudar()})}
 function tpLigaPeriodo(aoMudar){
   const sel=$('#tpPer');if(!sel)return;
-  sel.onchange=()=>{if(sel.value==='x'){$('.tp-per-x').hidden=false;return}tpDefinePeriodo(sel.value);aoMudar()};
-  $('#tpPerOk')&&($('#tpPerOk').onclick=()=>{const de=$('#tpDe').value,ate=$('#tpAte').value;if(!de||!ate||de>ate)return toast('Escolha um período válido (início antes do fim).','warn');tpDefinePeriodo('x',de,ate);aoMudar()});
+  sel.onchange=()=>{if(sel.value==='x'){sel.value=tpPeriodo().p;tpAbrePeriodo(aoMudar);return}tpDefinePeriodo(sel.value);aoMudar()};
+  $('#tpPerBtn')&&($('#tpPerBtn').onclick=()=>tpAbrePeriodo(aoMudar));
 }
 
 // ---------- preferências por usuário (servidor), com cache e gravação com atraso ----------

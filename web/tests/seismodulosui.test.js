@@ -95,6 +95,18 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  const pm2=await login('NAT-3301','Nat26ab',{width:390,height:800});
  await maisFunciona(pm2,'trafego','Tráfego (celular)');
  await maisFunciona(pm2,'studio','Instagram (celular)');
+ // ---- período em um único modal (primeiro e último dia) ----
+ await ir(p,'gerenciador');await p.click('#tpPerBtn');await p.waitForSelector('.pp');
+ const antes=await p.$$eval('.pp-g button[data-d]',e=>e.length);
+ await p.click('.pp-g button[data-d$="-04"]');await p.waitForTimeout(100);
+ t('modal de período: o primeiro dia fica marcado e o Aplicar já libera',(await p.$eval('.pp .ok',e=>!e.disabled))&&(await p.$$('.pp-g button.ini')).length===1);
+ await p.click('.pp-g button[data-d$="-10"]');await p.waitForTimeout(100);
+ const fimMarcado=await p.$$eval('.pp-g button.fim',e=>e.length);
+ await p.click('.pp .ok');await p.waitForTimeout(1500);
+ const per=await p.evaluate(()=>tpPeriodo());
+ t('um único modal escolhe o primeiro e o último dia e aplica de uma vez',antes>=28&&fimMarcado===1&&per.p==='x'&&per.de.endsWith('-04')&&per.ate.endsWith('-10')&&!(await p.$('.pp')),[antes,fimMarcado,per]);
+ t('o botão do período mostra o intervalo escolhido',/📅/.test(await p.$eval('#tpPerBtn',e=>e.textContent)));
+ await p.evaluate(()=>tpDefinePeriodo('30'));
  // ---- celular ----
  const pm=await login('NAT-3301','Nat26ab',{width:390,height:800});
  for(const pg of ['hoje','calendario','arquivos','trafego','gerenciador','configuracoes']){await ir(pm,pg);const w=await pm.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);t(`celular: ${pg} sem rolagem horizontal da página`,w<=2,w)}
