@@ -233,3 +233,8 @@ button.db-card{cursor:pointer}button.db-card:hover{border-color:var(--brand)}
 .db-vazio-g{background:#fff;border:1px dashed var(--line);border-radius:14px;padding:18px;color:var(--ink-3)}
 @media(max-width:1000px){.db-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.db-dois{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:560px){.db-cards{grid-template-columns:minmax(0,1fr)}.db-sp{display:none}}
+
+/* menu "Mais" das sub-abas: precisa ficar acima do conteúdo da página (cartões, painéis e cabeçalhos fixos) */
+.subtabs{z-index:70!important;overflow:visible!important}
+.submenu{z-index:80!important}
+@media(max-width:760px){.subtabs{overflow:visible!important;flex-wrap:wrap!important}}

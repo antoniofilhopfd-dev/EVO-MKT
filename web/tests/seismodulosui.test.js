@@ -78,6 +78,18 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await ir(p,'trafego');t('Visão Geral tem o atalho do relatório semanal (PDF)',!!(await p.$('#tpRelSemanalVg[href="/relatorio-trafego.html"]')));
  await ir(p,'tfrelatorios');t('Relatórios tem o atalho do relatório semanal aprovado',!!(await p.$('#tpRelSemanal[href="/relatorio-trafego.html"]')));
  await p.evaluate(()=>setPref&&0).catch(()=>{});await p.evaluate(()=>tpDefinePeriodo('x','2026-10-04','2026-10-10'));await ir(p,'tfrelatorios');const href=await p.$eval('#tpRelSemanal',e=>{e.addEventListener('click',ev=>ev.preventDefault(),{capture:true});e.click();return e.getAttribute('href')});t('o relatório semanal abre no período escolhido no Tráfego (04/10 a 10/10)',/de=2026-10-04&ate=2026-10-10/.test(href),href);
+ // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
+ const maisFunciona=async(pg,inicio,nome)=>{
+  await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);
+  const r=await pg.evaluate(()=>{const m=document.getElementById('subMenu');if(!m||m.hidden)return {aberto:false};const b=m.querySelector('button');const bx=b.getBoundingClientRect();const topo=document.elementFromPoint(bx.left+bx.width/2,bx.top+bx.height/2);return {aberto:true,alvo:b.dataset.sub,clicavel:b===topo||b.contains(topo)||(topo&&topo.closest('#subMenu')!==null),coberto_por:topo?(topo.tagName+'.'+topo.className+'#'+topo.id):null,caixa:[Math.round(bx.left),Math.round(bx.top),Math.round(bx.width),Math.round(bx.height)]}});
+  t(`${nome}: "Mais" abre o menu e o item fica clicável`,r.aberto&&r.clicavel,r);
+  if(r.aberto){await pg.click('#subMenu button');await pg.waitForTimeout(1500);t(`${nome}: item do "Mais" abre a tela`,(await pg.evaluate(()=>state.page))===r.alvo,r)}
+ };
+ await maisFunciona(p,'trafego','Tráfego (computador)');
+ await maisFunciona(p,'studio','Instagram (computador)');
+ const pm2=await login('NAT-3301','Nat26ab',{width:390,height:800});
+ await maisFunciona(pm2,'trafego','Tráfego (celular)');
+ await maisFunciona(pm2,'studio','Instagram (celular)');
  // ---- celular ----
  const pm=await login('NAT-3301','Nat26ab',{width:390,height:800});
  for(const pg of ['hoje','calendario','arquivos','trafego','gerenciador','configuracoes']){await ir(pm,pg);const w=await pm.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);t(`celular: ${pg} sem rolagem horizontal da página`,w<=2,w)}
