@@ -211,3 +211,8 @@ Medido com 16.000 registros (5.000 solicitações, 5.000 tarefas, 3.000 conteúd
 - Implantação: a migração 021 roda no build (prebuild). Push na `main` aciona o deploy da Hostinger — só com autorização.
 - Dependem de credenciais reais da Meta (não validadas aqui): escrita em lote, quebras por posicionamento, públicos personalizados, séries diárias e saúde da integração.
 - Matriz completa: `docs/AUDITORIA_17-10.md`.
+
+## Criar campanha, conjunto e anúncio separados (v5.17.23)
+
+No Gerenciador, o botão **+ Criar** pergunta o que criar: **Campanha**, **Conjunto de anúncios** (dentro de uma campanha existente) ou **Anúncio** (dentro de um conjunto existente), como no Gerenciador da Meta. Cada um passa por **Conferir** (nada é enviado antes) e **nasce pausado**; quem ativa é a pessoa, depois de conferir. O assistente de **campanha completa** continua existindo, mas ele cria tudo de uma vez e **vai ao ar ativo**.
+Regras: só com o modo completo ligado (Administrador) e a permissão `ads_management`; respeita os tetos de gasto, a duração máxima e o orçamento mínimo; campanha com orçamento próprio (CBO) dispensa orçamento no conjunto; cada criação fica no histórico do Gerenciador e é protegida contra duplicidade. Validado só contra o simulador da Meta: o primeiro uso real deve ser supervisionado.

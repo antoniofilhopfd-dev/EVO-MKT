@@ -36,10 +36,10 @@ export const OBJETIVOS: Record<string, Objetivo> = {
   APP: { objective: 'OUTCOME_APP_PROMOTION', rotulo: 'Promoção do app', ajuda: 'Instalações de um aplicativo.', metas: {
     APP_INSTALLS: { rotulo: 'Instalações do app', goal: 'APP_INSTALLS', destino: 'APP', exige: ['app'], criativos: ['IMAGEM'], cta: 'INSTALL_MOBILE_APP', ajuda: 'Precisa do ID do app e do link da loja.' } } },
 };
-const MENSAGENS: Record<string, string> = { DIRECT: 'INSTAGRAM_DIRECT', MESSENGER: 'MESSENGER', WHATSAPP: 'WHATSAPP' };
-const CTAS = ['LEARN_MORE', 'SIGN_UP', 'CONTACT_US', 'APPLY_NOW', 'GET_QUOTE', 'SHOP_NOW', 'INSTALL_MOBILE_APP', 'MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'NO_BUTTON'];
-const PLATAFORMAS = ['instagram', 'facebook', 'messenger', 'audience_network'];
-const EVENTOS = ['PURCHASE', 'LEAD', 'COMPLETE_REGISTRATION', 'CONTACT', 'SUBMIT_APPLICATION', 'ADD_TO_CART', 'INITIATE_CHECKOUT', 'VIEW_CONTENT', 'OTHER'];
+export const MENSAGENS: Record<string, string> = { DIRECT: 'INSTAGRAM_DIRECT', MESSENGER: 'MESSENGER', WHATSAPP: 'WHATSAPP' };
+export const CTAS = ['LEARN_MORE', 'SIGN_UP', 'CONTACT_US', 'APPLY_NOW', 'GET_QUOTE', 'SHOP_NOW', 'INSTALL_MOBILE_APP', 'MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'NO_BUTTON'];
+export const PLATAFORMAS = ['instagram', 'facebook', 'messenger', 'audience_network'];
+export const EVENTOS = ['PURCHASE', 'LEAD', 'COMPLETE_REGISTRATION', 'CONTACT', 'SUBMIT_APPLICATION', 'ADD_TO_CART', 'INITIATE_CHECKOUT', 'VIEW_CONTENT', 'OTHER'];
 
 export interface Spec {
   chave: string; objetivo: string; meta: string; nome?: string;
@@ -121,7 +121,7 @@ export async function previaCampanha(sp: Spec) {
   };
 }
 
-async function enviarImagem(conta: string, conteudoId: string): Promise<string> {
+export async function enviarImagem(conta: string, conteudoId: string): Promise<string> {
   const c = await q1('SELECT data FROM records WHERE modulo=? AND id=?', ['conteudos', conteudoId]);
   const rel = c ? String(JSON.parse(String(c.data)).midiaInstagram ?? '') : '';
   const f = rel ? await q1('SELECT conteudo FROM arquivos WHERE caminho=?', [rel]) : null;

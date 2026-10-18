@@ -399,10 +399,10 @@ async function tpRecarrega(){await tpArvore(true);tpDesenhaGm()}
 async function renderGerenciador(){
   state.module=null;
   await adsCarregaModo();await tpCfgCarrega();
-  $('#content').innerHTML=`<div class="tp-topo"><div class="tf-head" style="margin:0"><div><small>TRÁFEGO PAGO · GERENCIADOR DE ANÚNCIOS</small><h1>Campanhas, conjuntos e anúncios</h1></div></div><div class="tp-topo-d">${tpSeletorPeriodo()}<span id="tpSaudeBox"></span><button class="softbtn" id="tpAtualiza">Atualizar</button>${adsCompleto?'<button class="btn" id="tpNova">+ Nova campanha</button>':''}</div></div><div id="tpGm"><div class="loading"><span></span><b>Lendo a conta na Meta…</b></div></div>`;
+  $('#content').innerHTML=`<div class="tp-topo"><div class="tf-head" style="margin:0"><div><small>TRÁFEGO PAGO · GERENCIADOR DE ANÚNCIOS</small><h1>Campanhas, conjuntos e anúncios</h1></div></div><div class="tp-topo-d">${tpSeletorPeriodo()}<span id="tpSaudeBox"></span><button class="softbtn" id="tpAtualiza">Atualizar</button>${adsCompleto?'<button class="btn" id="tpNova">+ Criar</button>':''}</div></div><div id="tpGm"><div class="loading"><span></span><b>Lendo a conta na Meta…</b></div></div>`;
   tpLigaPeriodo(()=>renderGerenciador());
   $('#tpAtualiza').onclick=tpRecarrega;
-  if($('#tpNova'))$('#tpNova').onclick=()=>novaCampanha();
+  if($('#tpNova'))$('#tpNova').onclick=()=>tpMenuCriar();
   tpSaudeChip().then(h=>{const b=$('#tpSaudeBox');if(b){b.innerHTML=h;const bt=$('#tpSaude');if(bt)bt.onclick=tpAbrirSaude}});
   try{await tpArvore()}catch(e){if(state.page!=='gerenciador')return;$('#tpGm').innerHTML=`<div class="empty-rich"><strong>Não foi possível ler a conta</strong><p>${esc(e.message)}</p></div>`;return}
   if(state.page!=='gerenciador')return;

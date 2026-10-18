@@ -1,0 +1,2 @@
+-- Criação avulsa no Gerenciador (campanha, conjunto ou anúncio separados): a chave evita criar duas vezes o mesmo pedido.
+CREATE TABLE IF NOT EXISTS ads_criacoes(chave VARCHAR(40) PRIMARY KEY,quem VARCHAR(80) NOT NULL DEFAULT '',quando VARCHAR(40) NOT NULL,nivel VARCHAR(12) NOT NULL,objeto_id VARCHAR(40) NOT NULL DEFAULT '',nome VARCHAR(250) NOT NULL DEFAULT '',estado VARCHAR(12) NOT NULL DEFAULT 'CRIANDO',erro VARCHAR(600) NOT NULL DEFAULT '') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -57,7 +57,13 @@ if (str_starts_with($p, '/graph')) {
         $oid = $mm[1];
         if ($m === 'POST') { if ($tok === 'NOEDIT_TOKEN') j(['error' => ['message' => 'Permissions error']], 400); $S['edits'][$oid][] = $in; if (isset($in['status']) && isset($S['ads_novos'][$oid])) { $S['ads_novos'][$oid]['status'] = $in['status']; $S['ads_novos'][$oid]['mudancas'][] = $in['status']; } j(['success' => true]); }
         $base = ['OUTRA_1' => ['name' => 'De outra conta', 'account_id' => '999'], 'c1' => ['name' => 'Matrículas 2027', 'status' => 'PAUSED', 'daily_budget' => '5000'], 's1' => ['name' => 'Conjunto matrículas', 'status' => 'ACTIVE', 'daily_budget' => '5000', 'end_time' => '2026-12-01T00:00:00-0300', 'targeting' => ['age_min' => 25, 'age_max' => 55, 'geo_locations' => ['cities' => [['key' => '2430536', 'name' => 'João Pessoa', 'radius' => 15, 'distance_unit' => 'kilometer']]]]], 'a1' => ['name' => 'Vídeo depoimento', 'status' => 'ACTIVE']][$oid] ?? ['name' => $S['ads_novos'][$oid]['params']['name'] ?? $oid, 'status' => $S['ads_novos'][$oid]['status'] ?? 'ACTIVE'];
-        j($base + ['id' => $oid, 'account_id' => '111222333']);
+        $ex = [];
+        if ($oid === 'c1') $ex = ['objective' => 'OUTCOME_ENGAGEMENT'];
+        if ($oid === 's1') $ex = ['optimization_goal' => 'CONVERSATIONS', 'destination_type' => 'INSTAGRAM_DIRECT', 'campaign' => ['id' => 'c1', 'objective' => 'OUTCOME_ENGAGEMENT', 'name' => 'Matrículas 2027']];
+        if (isset($S['ads_novos'][$oid])) { $nv = $S['ads_novos'][$oid]; $pp = $nv['params'] ?? [];
+            if ($nv['tipo'] === 'campanha') $ex = ['objective' => $pp['objective'] ?? ''];
+            if ($nv['tipo'] === 'conjunto') { $cp = $S['ads_novos'][$pp['campaign_id'] ?? ''] ?? null; $ex = ['optimization_goal' => $pp['optimization_goal'] ?? '', 'destination_type' => $pp['destination_type'] ?? '', 'campaign' => ['id' => $pp['campaign_id'] ?? '', 'objective' => $cp['params']['objective'] ?? 'OUTCOME_ENGAGEMENT', 'name' => $cp['params']['name'] ?? '']]; } }
+        j($base + $ex + ['id' => $oid, 'account_id' => '111222333']);
     }
     if (preg_match('#^/(CAMP_\d+)$#', $g, $mm) && $m === 'POST') { $S['ads_novos'][$mm[1]]['status'] = $in['status'] ?? ''; $S['ads_novos'][$mm[1]]['mudancas'][] = $in['status'] ?? ''; j(['success' => true]); }
     if ($g === '/me/adaccounts') j(['data' => [['account_id' => '111222333', 'name' => 'Conta Colégio', 'currency' => 'BRL', 'account_status' => 1], ['account_id' => '999', 'name' => 'Outra conta', 'currency' => 'USD', 'account_status' => 1]]]);

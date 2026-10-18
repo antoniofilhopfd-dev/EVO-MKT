@@ -128,7 +128,7 @@ export async function arvore(de: string, ate: string, arquivados = false): Promi
   return { conta, moeda, de, ate, lidoEm: now(), orcamentoConta, campanhas, totais: { ...tot, ctr: tot.impressoes ? (tot.cliques / tot.impressoes) * 100 : 0, cpc: tot.cliques ? tot.gasto / tot.cliques : 0 } };
 }
 
-async function registrar(quem: string, nivel: string, id: string, nome: string, acao: string, antes: unknown, depois: unknown, erro = '') {
+export async function registrar(quem: string, nivel: string, id: string, nome: string, acao: string, antes: unknown, depois: unknown, erro = '') {
   await run('INSERT INTO ads_acoes(quando,quem,nivel,objeto_id,nome,acao,antes,depois,resultado,erro) VALUES(?,?,?,?,?,?,?,?,?,?)',
     [now(), quem.slice(0, 80), nivel, id, nome.slice(0, 250), acao, JSON.stringify(antes).slice(0, 900), JSON.stringify(depois).slice(0, 900), erro ? 'ERRO' : 'OK', erro.slice(0, 500)]);
 }

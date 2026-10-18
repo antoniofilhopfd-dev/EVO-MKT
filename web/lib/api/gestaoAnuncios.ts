@@ -1,5 +1,6 @@
 import { Ctx } from '../ctx';
 import { requireInternal, requireAdmin } from '../auth';
+import { criarObjeto, infoCriacao, previaCriar, NivelCriar } from '../integrations/metaadsCriar';
 import { audit } from '../records';
 import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
@@ -34,7 +35,7 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     }
     return json({ gestao: completo });
   }
-  const ESCRITA = ['/ads/gestao/config', '/ads/previa', '/ads/impulsionar', '/ads/pausar', '/ads/retomar', '/ads/pausar-tudo', '/ads/editar', '/ads/duplicar', '/ads/campanha/opcoes', '/ads/campanha/interesses', '/ads/campanha/previa', '/ads/campanha/lancar', '/ads/regras', '/ads/regras/simular', '/ads/rascunhos'];
+  const ESCRITA = ['/ads/criar', '/ads/criar/previa', '/ads/criar/info', '/ads/gestao/config', '/ads/previa', '/ads/impulsionar', '/ads/pausar', '/ads/retomar', '/ads/pausar-tudo', '/ads/editar', '/ads/duplicar', '/ads/campanha/opcoes', '/ads/campanha/interesses', '/ads/campanha/previa', '/ads/campanha/lancar', '/ads/regras', '/ads/regras/simular', '/ads/rascunhos'];
   if (!completo && ESCRITA.includes(path)) fail(403, 'O Tráfego está em modo somente leitura (só métricas). Para criar ou editar anúncios pelo sistema, ligue o modo completo em Administração → Integrações.');
   if (path === '/ads/gestao' && method === 'GET') {
     let permissao = false;
@@ -159,6 +160,27 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     const t = c.qs('q').trim();
     if (t.length < 2) return json({ rows: [] });
     try { return json({ rows: await pesquisarInteresse(t.slice(0, 60)) }); } catch (e: any) { return fail(502, e.message); }
+  }
+  // criação avulsa (campanha, conjunto ou anúncio por vez, tudo pausado)
+  if (path === '/ads/criar/info' && method === 'GET') {
+    const nivel = c.qs('nivel'), id = c.qs('id');
+    if (nivel !== 'campanha' && nivel !== 'conjunto') return fail(400, 'Nível inválido.');
+    try { return json(await infoCriacao(nivel, id)); } catch (e: any) { return fail(400, e.message); }
+  }
+  if (path === '/ads/criar/previa' && method === 'POST') {
+    const b = await c.body();
+    if (!['campanha', 'conjunto', 'anuncio'].includes(String(b.nivel))) return fail(400, 'Nível inválido.');
+    return json(await previaCriar(b.nivel as NivelCriar, (b.spec ?? {}) as Record<string, unknown>));
+  }
+  if (path === '/ads/criar' && method === 'POST') {
+    const b = await c.body();
+    if (!['campanha', 'conjunto', 'anuncio'].includes(String(b.nivel))) return fail(400, 'Nível inválido.');
+    if (b.confirmou !== true) fail(400, 'Confirme a criação na tela de resumo.');
+    try {
+      const r = await criarObjeto(b.nivel as NivelCriar, (b.spec ?? {}) as Record<string, unknown>, String(u.nome || u.codigo));
+      await audit(String(u.codigo), 'ads-criar', 'ads', `${b.nivel}:${r.id}`);
+      return json(r);
+    } catch (e: any) { return fail(502, e.message); }
   }
   if (path === '/ads/campanha/previa' && method === 'POST') return json(await previaCampanha((await c.body()) as unknown as Spec));
   if (path === '/ads/campanha/lancar' && method === 'POST') {

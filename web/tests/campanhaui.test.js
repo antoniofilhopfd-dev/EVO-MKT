@@ -20,7 +20,7 @@ const JPG=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP///////////////////////
  const toast=async()=>await p.$eval('#toast',e=>e.innerText).catch(()=>'');
  await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('#tpNova',{timeout:20000});
  // ---- tráfego com imagem nova
- await p.click('#tpNova');await p.waitForSelector('#wz .wz-obj',{timeout:20000});
+ await p.click('#tpNova');await p.click('[data-cri="assistente"]');await p.waitForSelector('#wz .wz-obj',{timeout:20000});
  t('o assistente mostra os 6 objetivos da Meta',(await p.$$('#wz .wz-obj')).length===6&&/Reconhecimento/.test(await p.$eval('#wz',e=>e.innerText))&&/Promoção do app/.test(await p.$eval('#wz',e=>e.innerText)));
  await p.screenshot({path:PR+'/36_nova_campanha_objetivo.png'});
  await p.click('#wzProx');t('sem escolher o objetivo não avança',(await p.$eval('.wz-passos .ativo',e=>e.innerText)).startsWith('1.'));
@@ -47,7 +47,7 @@ const JPG=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP///////////////////////
  t('lançou ATIVA: objetivo de tráfego, meta LINK_CLICKS, R$ 30/dia, COST_CAP 9, público, interesse e link da imagem',C.status==='ACTIVE'&&C.objective==='OUTCOME_TRAFFIC'&&S.optimization_goal==='LINK_CLICKS'&&S.daily_budget==='3000'&&S.bid_strategy==='COST_CAP'&&S.bid_amount==='900'&&tg.genders.join()==='2'&&tg.geo_locations.cities[0].radius===15&&tg.flexible_spec[0].interests[0].name==='Educação infantil'&&JSON.parse(K.object_story_spec).link_data.link==='https://matricula.exemplo.com.br',JSON.stringify([C,S]));
  t('lançamento registrado como CAMPANHA com o nome escolhido',(await api('GET','/ads/gestao')).lancamentos.some(l=>l.tipo==='CAMPANHA'&&/Matrículas via site/.test(l.titulo)));
  // ---- reconhecimento com publicação
- await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('#tpNova');await p.click('#tpNova');await p.waitForSelector('#wz .wz-obj');
+ await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('#tpNova');await p.click('#tpNova');await p.click('[data-cri="assistente"]');await p.waitForSelector('#wz .wz-obj');
  await p.click('[data-obj="AWARENESS"]');await p.check('input[name="meta"][value="REACH"]');await p.click('#wzProx');await p.waitForSelector('[data-w="publico.raioKm"]');await p.click('#wzProx');
  await p.waitForSelector('[data-w="orc.valor"]');await p.fill('[data-w="dias"]','4');await p.click('#wzProx');await p.waitForSelector('[data-post="m2"]');
  await p.click('#wzProx');t('passo 4: sem escolher a publicação não avança',/Escolha a publicação/.test(await toast()));
@@ -55,7 +55,7 @@ const JPG=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP///////////////////////
  const C2=(await novos('campanha')).pop(),K2=(await novos('criativo')).pop();
  t('reconhecimento/alcance com publicação existente: ATIVA e criativo da publicação',C2.objective==='OUTCOME_AWARENESS'&&C2.status==='ACTIVE'&&K2.source_instagram_media_id==='m2',[C2,K2]);
  // ---- erro visível na revisão
- await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('#tpNova');await p.click('#tpNova');await p.waitForSelector('#wz .wz-obj');
+ await p.evaluate(()=>go('gerenciador'));await p.waitForSelector('#tpNova');await p.click('#tpNova');await p.click('[data-cri="assistente"]');await p.waitForSelector('#wz .wz-obj');
  await p.click('[data-obj="SALES"]');await p.click('#wzProx');await p.waitForSelector('[data-w="publico.raioKm"]');await p.click('#wzProx');await p.waitForSelector('[data-w="orc.valor"]');await p.fill('[data-w="dias"]','3');await p.click('#wzProx');
  await p.waitForSelector('[data-w="destino.pixelId"]');await p.selectOption('[data-w="criativo.conteudoId"]',post);await p.fill('[data-w="criativo.texto"]','Matricule-se');await p.click('#wzProx');await p.waitForSelector('#wzPrev .gi-lista');
  const ev=await p.$eval('#wzPrev',e=>e.innerText);await p.check('#wzOk');

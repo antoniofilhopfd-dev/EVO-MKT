@@ -135,6 +135,29 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('marcar um conjunto e abrir Anúncios mostra só os anúncios dele',so2.n>=1&&so2.todos&&/conjunto\(s\) marcado/.test(so2.chip),so2);
  await p.click('[data-niv="campanha"]');await p.waitForTimeout(300);
  t('voltar para Campanhas limpa a seleção e o filtro',(await p.evaluate(()=>GM2.foco.camps.length+GM2.foco.conjs.length+GM2.sel.size))===0);
+ // ---- criar campanha, conjunto e anúncio, cada um separado (nascem pausados) ----
+ await post('/ads/gestao/config',{ativa:true,cidade:'João Pessoa',tetoDia:100,tetoMes:6000,diasMax:30});
+ const mockNovos=async()=>Object.entries((await (await fetch('http://127.0.0.1:8099/__state')).json()).ads_novos||{});
+ await ir(p,'gerenciador');await p.click('#tpNova');await p.waitForSelector('[data-cri]');
+ t('Criar abre a escolha: campanha, conjunto, anúncio e assistente completo',(await p.$$('[data-cri]')).length===4);
+ await p.click('[data-cri="campanha"]');await p.waitForSelector('#crNome');await p.fill('#crNome','Campanha de teste da interface');await p.selectOption('#crObj','ENGAGEMENT');
+ await p.click('#crConf');await p.waitForSelector('.cri-msg.ok');t('campanha: a conferência mostra o resumo e libera o botão Criar',!(await p.$eval('#crOk',e=>e.disabled))&&/pausad/i.test(await p.$eval('.cri-msg',e=>e.innerText)));
+ await p.click('#crOk');await p.waitForSelector('#crForm',{state:'detached'});await p.waitForTimeout(800);
+ const nc=(await mockNovos()).filter(([,v])=>v.tipo==='campanha').pop();
+ t('campanha criada pela tela, pausada, só ela',!!nc&&nc[1].params.status==='PAUSED'&&nc[1].params.name==='Campanha de teste da interface'&&(await mockNovos()).filter(([,v])=>v.tipo==='conjunto').length===0,nc);
+ await ir(p,'gerenciador');await p.click('#tpNova');await p.click('[data-cri="conjunto"]');await p.waitForSelector('#crCamp');await p.selectOption('#crCamp','c1');await p.waitForSelector('#crMeta');
+ await p.fill('#crNome','Conjunto de teste da interface');await p.selectOption('#crMeta','CONVERSATIONS');
+ await p.click('#crPer');await p.waitForSelector('.pp');await p.click('.pp [data-m="1"]');await p.click('.pp-g button[data-d$="-05"]');await p.click('.pp-g button[data-d$="-07"]');await p.click('.pp .ok');
+ await p.click('#crConf');await p.waitForSelector('.cri-msg.ok');const msgC=await p.$eval('.cri-msg',e=>e.innerText);
+ t('conjunto: dentro da campanha escolhida (com orçamento próprio, sem pedir orçamento) a conferência passa',!(await p.$('#crOrcV'))&&!(await p.$eval('#crOk',e=>e.disabled)),msgC);
+ await p.click('#crOk');await p.waitForSelector('#crForm',{state:'detached'});await p.waitForTimeout(800);
+ const ns=(await mockNovos()).filter(([,v])=>v.tipo==='conjunto').pop();
+ t('conjunto criado pela tela na campanha certa, pausado',!!ns&&ns[1].params.status==='PAUSED'&&ns[1].params.campaign_id==='c1'&&ns[1].params.optimization_goal==='CONVERSATIONS',ns);
+ await ir(p,'gerenciador');await p.click('#tpNova');await p.click('[data-cri="anuncio"]');await p.waitForSelector('#crSet');await p.selectOption('#crSet','s1');await p.waitForSelector('#crTipo');
+ await p.fill('#crNome','Anúncio de teste da interface');await p.selectOption('#crTipo','POST_IG');await p.waitForSelector('#crPost');await p.selectOption('#crPost','m2');
+ await p.click('#crConf');await p.waitForSelector('.cri-msg.ok');await p.click('#crOk');await p.waitForSelector('#crForm',{state:'detached'});await p.waitForTimeout(800);
+ const na=(await mockNovos()).filter(([,v])=>v.tipo==='anuncio').pop();
+ t('anúncio criado pela tela no conjunto escolhido, pausado',!!na&&na[1].params.status==='PAUSED'&&na[1].params.adset_id==='s1',na);
  // ---- período em um único modal (primeiro e último dia) ----
  await ir(p,'gerenciador');await p.click('#tpPerBtn');await p.waitForSelector('.pp');
  const antes=await p.$$eval('.pp-g button[data-d]',e=>e.length);
