@@ -1,5 +1,5 @@
 import { Ctx } from '../ctx';
-import { requireInternal } from '../auth';
+import { requireInternal, requireAdmin } from '../auth';
 import { audit } from '../records';
 import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
@@ -23,6 +23,8 @@ export async function gestaoAnunciosRoute(c: Ctx) {
   const u = await requireInternal(c);
   // Modo do Tráfego: por padrão SOMENTE LEITURA (métricas). Criar/editar/pausar anúncios só com a chave ligada em Administração → Integrações.
   const completo = (await setting('trafego_gestao')) === '1';
+  // ligar a escrita na Meta, mudar tetos e ligar automações são decisões de configuração: só o Administrador
+  if (method === 'POST' && ['/ads/modo', '/ads/gestao/config', '/ads/regras', '/ads/relatorio-semanal'].includes(path)) await requireAdmin(c);
   if (path === '/ads/modo') {
     if (method === 'POST') {
       const b = await c.body();

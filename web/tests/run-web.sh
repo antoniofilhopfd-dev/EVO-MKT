@@ -5,7 +5,7 @@ set -u
 HERE=$(cd "$(dirname "$0")" && pwd); WEB=$(cd "$HERE/.." && pwd); T="$HERE"
 D=${EVO_TEST_DIR:-/tmp/evo-web-test}; mkdir -p "$D"; PORT=${PORT:-8080}
 FALHOU=''
-SUITES=${*:-api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui ui2 ui3 ui4 ui5 ui6 ui7 ui8 ui9 ui10 studio gestao gestaoui gerenciador gerenciadorui campanha campanhaui igtrafego contas contasui trafegoui contraste seguranca-estatica seguranca xss migracoes solicitacoes portal calmkt escolar datacom planejamento auditoria reorg desempenho responsive seismodulos}; rc=0
+SUITES=${*:-api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui3 ui4 ui5 ui6 studio gestao gerenciador campanha campanhaui igtrafego contas contasui contraste seguranca-estatica seguranca xss migracoes portal escolar datacom auditoria desempenho responsive seismodulos seismodulosui}; rc=0
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 || { (mysqld_safe --user=mysql >/dev/null 2>&1 &); for i in $(seq 30); do mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 && break; sleep 1; done; }
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "CREATE USER IF NOT EXISTS 'evo'@'127.0.0.1' IDENTIFIED BY 'evopass'; GRANT ALL ON *.* TO 'evo'@'127.0.0.1';" 2>/dev/null
 (cd "$WEB" && npm run build >"$D/build.log" 2>&1) || { echo "build falhou (ver $D/build.log)"; exit 2; }

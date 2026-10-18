@@ -65,9 +65,9 @@ const sql=q=>execFileSync('mariadb',['--default-character-set=utf8mb4','-uroot',
  const apos=(await call('GET','/data?module=solicitacoes&id='+rq.id))[1];
  t('Portal não consegue alterar status, responsável, prazo negociado, triagem, autor nem segmento da própria demanda',apos.status!=='CONCLUÍDA'&&apos.responsavel!=='Natália Mello'&&apos.prazoNegociado!=='2030-01-01'&&apos.segmento==='Infantil'&&apos.criadoPor!=='NAT-3301',[mp.status,apos]);
  // ---- escalada de privilégio (Equipe nas rotas da Gerência, incluindo as novas) ----
- const gerente=[['GET','/insights'],['GET','/indicadores'],['GET','/admin/integridade'],['GET','/admin/automacoes'],['POST','/admin/automacoes'],['POST','/reports/save'],['GET','/integrations/ads/accounts'],['POST','/integrations/ads/account'],['POST','/integrations/ads/sync'],['POST','/integrations/ads/config'],['POST','/integrations/meta/account'],['GET','/integrations/prontidao'],['POST','/integrations/settings']];
+ const gerente=[['GET','/admin/integridade'],['GET','/admin/automacoes'],['POST','/admin/automacoes'],['GET','/integrations/ads/accounts'],['POST','/integrations/ads/account'],['POST','/integrations/ads/config'],['POST','/integrations/meta/account'],['POST','/integrations/settings']];
  const falhas=[];for(const [m,u] of gerente){const x=await call(m,u,m==='POST'?{}:undefined,E);if(x[0]!==403)falhas.push([m,u,x[0]])}
- t('Equipe recebe 403 em todas as rotas exclusivas da Gerência (incluindo as novas)',falhas.length===0,falhas);
+ t('Equipe recebe 403 em todas as rotas exclusivas do Administrador (incluindo as novas)',falhas.length===0,falhas);
  const semSessao=[];for(const [m,u] of [...gerente,['GET','/comments?module=tarefas&id=TAR-0001'],['POST','/comments'],['POST','/checklist'],['GET','/content/states'],['POST','/content/decision'],['GET','/reports/overview'],['GET','/traffic/snapshots'],['POST','/manager/approval-link']]){const x=await call(m,u,m==='POST'?{}:undefined,{...J});if(![401,403].includes(x[0]))semSessao.push([m,u,x[0]])}
  t('rotas novas exigem sessão (401/403 sem login)',semSessao.length===0,semSessao);
  // ---- tentativas contra o link público ----

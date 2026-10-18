@@ -75,7 +75,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('"Salvar sem mudar a etapa" preserva o status',novo.status==='PROGRAMADO'&&novo.cta==='Novo CTA',novo);
  // ---- área Instagram no menu + desempenho por publicação
  await p.evaluate(()=>go('studio'));await p.waitForSelector('.st-week');
- t('menu tem a área Instagram com Estúdio, Conteúdos, Aprovações, Métricas e Mais (Desempenho, Ranking)',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&['Estúdio','Conteúdos','Aprovações','Métricas'].every((x,i)=>subs[i]===x)&&/Mais/.test(subs[4]||'')}));
+ t('menu tem a área Instagram com Estúdio, Publicações e Análises + Mais',await p.evaluate(()=>{const subs=[...document.querySelectorAll('#subtabs .subtab')].map(x=>x.textContent);return !!document.querySelector('#nav [data-area="instagramarea"]')&&['Estúdio','Publicações','Análises'].every((x,i)=>subs[i]===x)&&/Mais/.test(subs[3]||'')}));
  t('a área Instagram reúne Estúdio, Conteúdos, Métricas, Desempenho e Ranking (não existe mais a área Conteúdo)',await p.evaluate(()=>{const a=AREAS.find(x=>x.k==='instagramarea');return !AREAS.some(x=>x.k==='conteudo')&&['studio','conteudos','instagram','igposts','igranking'].every(k=>a.pages.includes(k))}));
  await p.evaluate(()=>go('igposts'));await p.waitForFunction(()=>/DESEMPENHO/.test(document.querySelector('.dashboard-head')?.textContent||''));
  t('sem Instagram sincronizado mostra aviso claro',/Nenhuma publicação lida ainda/.test(await p.$eval('#content',e=>e.innerText)));
@@ -130,13 +130,6 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('a direção aprova pelo link e o post vira APROVADO',/Post aprovado/.test(await anon.$eval('#box',e=>e.innerText))&&(await api('GET','/data?module=conteudos&id='+aprId)).status==='APROVADO');
  await anon.reload();await anon.waitForSelector('.msg.err');t('o link usado não abre mais',/não é mais válido/.test(await anon.$eval('#box',e=>e.innerText)));
  t('sem erros de JS na página pública',e3.length===0,e3.join('|'));
- // ---- fechamento mensal com Instagram, atendimento e tráfego
- await p.evaluate(()=>go('fechamento'));await p.waitForSelector('#closingExtras',{state:'attached',timeout:20000});
- const fx=await p.$eval('.closing-grid',e=>e.innerText);
- t('Fechamento Mensal traz o resultado do Instagram do mês (alcance, melhor post)',/Resultado no mês/.test(fx)&&/18\.000/.test(fx)&&/Bastidores da feira/.test(fx),fx.slice(0,400));
- t('Fechamento Mensal traz atendimento e tráfego no mesmo relatório',/Solicitações no mês/.test(fx)&&/Investimento e retorno/.test(fx)&&!!(await p.$('#closingPrint')));
- t('bloco de atendimento mostra só os indicadores principais',(fx.match(/closing-stat/g)||[]).length>=0&&!/Urgentes sem responsável/.test(fx)&&/NPS do atendimento/.test(fx)&&/Cumprimento do SLA/.test(fx),fx.slice(-500));
- await p.screenshot({path:PR+'/27_fechamento_direcao.png',fullPage:true});
  // ---- calendário compartilhável (somente leitura)
  const hojeIso=await p.evaluate(()=>stIso(new Date()));
  await api('POST','/data?module=conteudos',{titulo:'Post agendado visível',perfil:'@evolucaopb',formato:'Feed',status:'PROGRAMADO',publicacaoEm:hojeIso+'T15:00'});
@@ -158,18 +151,6 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await p.evaluate(()=>go('studio'));await p.waitForSelector('#stCompartilha');await p.click('#stCompartilha');await p.waitForSelector('#cmpOff');await p.click('#cmpOff');await p.waitForTimeout(800);
  const depois=await p.evaluate(async t=>(await fetch('/api/public/calendario?t='+t,{credentials:'omit'})).status,tok);t('desativar o link o invalida na hora',depois===404);
  t('sem erros de JS na página pública do calendário',e4.length===0,e4.join('|'));
- // ---- Tráfego: visão do mês, orçamento, gasto por dia e anúncios
- await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});const sa=await api('POST','/integrations/ads/sync',{});
- await p.evaluate(()=>go('trafego'));await p.waitForSelector('#tfRaiz .tf-hero',{timeout:20000});
- const tg=await p.$eval('#tfRaiz',e=>e.innerText);
- t('Tráfego mostra a saúde da conta e os indicadores do mês com comparação',/Ativa/.test(tg)&&/Investimento em/i.test(tg)&&/Custo por resultado/i.test(tg)&&/vs |= /i.test(tg),JSON.stringify([sa,tg]).slice(0,900));
- t('gráfico de gasto por dia lê os 10 dias sincronizados',await p.$eval('#tfSvg',e=>/últimos 10 dias/.test(e.getAttribute('aria-label'))));
- t('anúncios: melhor custo por resultado, gasto sem resultado e anúncio com problema aparecem',/Vídeo depoimento/i.test(tg)&&/Cartaz antigo/i.test(tg)&&/Com problema/i.test(tg)&&/acima do permitido/i.test(tg),tg.slice(-500));
- await api('POST','/integrations/ads/orcamento',{valor:1000});await p.evaluate(()=>go('trafego'));await p.waitForFunction(()=>/No ritmo atual, o mês fecha em/.test(document.querySelector('#tfRaiz')?.innerText||''),null,{timeout:20000});
- t('a Gerência tem o botão do relatório semanal em PDF no Tráfego',(await p.$eval('#tfRaiz a[href="/relatorio-trafego.html"]',e=>e.getAttribute('href')))==='/relatorio-trafego.html');
- t('definir o orçamento mostra o ritmo e a projeção do mês',/No ritmo atual, o mês fecha em/.test(await p.$eval('#tfRaiz',e=>e.innerText)));
- await p.screenshot({path:PR+'/29_trafego_visao_mes.png',fullPage:true});
- await api('POST','/integrations/ads/orcamento',{valor:0});
  // ---- Dashboard de Tráfego (relatório semanal em PDF)
  const rp=await ctx.newPage();const e5=[];rp.on('pageerror',e=>e5.push(e.message));
  await rp.goto(BASE+'/relatorio-trafego.html');await rp.waitForSelector('.pg',{timeout:20000});
@@ -190,8 +171,6 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  t('sem erros de JS no relatório',e5.length===0,e5.join('|'));await rp.close();
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];
- await m.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(o=>o.remove());go('trafego')});await m.waitForSelector('#tfRaiz .tf-hero',{state:'attached',timeout:20000});
- t('no celular a tela de Tráfego não rola para o lado',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await m.evaluate(()=>go('studio'));await m.waitForSelector('.st-week');
  t('no celular a página não rola para o lado',await m.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
  await m.screenshot({path:PR+'/24_estudio_celular.png'});

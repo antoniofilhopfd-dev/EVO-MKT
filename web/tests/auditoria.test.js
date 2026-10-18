@@ -23,7 +23,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('toda escrita sem o cabeçalho anti-CSRF é recusada (403)',semCsrf.length===0,semCsrf);
  // 3) autorização por perfil
  const so=(n,rs,h)=>rs.map(([m,u,b])=>req(m,u,b,h));
- const restritasEquipe=[['POST','/escolar/salvar',{titulo:'Teste',dataInicio:dia(5)}],['POST','/escolar/mover',{id:'ESC-1',data:dia(6)}],['POST','/escolar/excluir',{id:'ESC-1'}],['POST','/admin/portal',{ativo:true,confirmar:'REATIVAR'}],['GET','/admin/portal'],['POST','/solicitacoes/distribuir',{id:'SOL-1',responsavel:'Antônio Filho'}],['GET','/portal/users'],['POST','/backup',{}],['GET','/admin/audit']];
+ const restritasEquipe=[['POST','/admin/portal',{ativo:true,confirmar:'REATIVAR'}],['GET','/admin/portal'],['POST','/solicitacoes/distribuir',{id:'SOL-1',responsavel:'Antônio Filho'}],['GET','/portal/users'],['POST','/backup',{}],['GET','/admin/audit']];
  const rs=await Promise.all(so('',restritasEquipe,E));t('a equipe é barrada nas ações da Gerência/Administração (403)',rs.every(([s])=>s===403),rs.map(([s],i)=>restritasEquipe[i][1]+':'+s));
  const [,aud]=await req('GET','/admin/audit');t('a Gerência vê o registro de operações',Array.isArray(aud)&&aud.length>0);
  // 4) entradas maliciosas ou absurdas nunca viram erro 500 nem vazam detalhes

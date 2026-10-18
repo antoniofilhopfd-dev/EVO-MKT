@@ -74,12 +74,12 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('personalizada: relevância e editável pelo dono',Q26.itens.find(x=>x.id===ANIV.id).relevante==='SIM'&&Q26.itens.find(x=>x.id===ANIV.id).editavel===true&&(await painel(2026,M)).itens.find(x=>x.id===ANIV.id).editavel===false);
 
  // ---- editar / excluir (dono ou Gerência) ----
- [s]=await call('POST','/datacom/salvar',{...base,id:ANIV.id,nome:'Aniversário do Colégio Evolução'},M);t('outra pessoa da equipe não edita a data alheia (403)',s===403);
+ [s]=await call('POST','/datacom/salvar',{...base,id:ANIV.id,nome:'Aniversário do Colégio Evolução'},M);t('a equipe de Marketing edita a data de outra pessoa (200)',s===200);
  [s,r]=await call('POST','/datacom/salvar',{...base,id:ANIV.id,nome:'Aniversário do Colégio Evolução',regra:{tipo:'fixa',dia:'15',mes:'3'}},E);t('o autor edita (nome e regra)',s===200&&r.titulo==='Aniversário do Colégio Evolução');
  t('a edição vale para todos os anos (15/03)',dataDe(await painel(2027),ANIV.id,2027)==='2027-03-15');
  [s]=await call('POST','/datacom/excluir',{id:'natal'});t('datas do catálogo não se excluem (404)',s===404);
- [s]=await call('POST','/datacom/excluir',{id:BIS.id},M);t('quem não é autor nem Gerente não exclui (403)',s===403);
- [s]=await call('POST','/datacom/excluir',{id:BIS.id});t('a Gerência exclui (vai para a Lixeira)',s===200&&(await call('GET','/data?module=lixeira'))[1].rows.some(x=>x.titulo==='Dia bissexto da escola'));
+ [s]=await call('POST','/datacom/excluir',{id:BIS.id},M);t('a equipe exclui (vai para a Lixeira)',s===200);
+ t('a exclusão vai para a Lixeira',(await call('GET','/data?module=lixeira'))[1].rows.some(x=>x.titulo==='Dia bissexto da escola'));
 
  // ---- relevância ----
  [s]=await call('POST','/datacom/relevancia',{id:'dia-do-trabalho',relevante:'TALVEZ'});t('valor inválido de relevância é recusado',s===400);
@@ -116,7 +116,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);const PL=r;
  t('cria ação no Planejamento (Projeto) com a referência à data, sem copiar a comemoração',s===201&&/^PRJ-/.test(r.id)&&r.status==='PLANEJAMENTO'&&r.dataComemorativaId==='dia-do-professor'&&r.dataComemorativaData===DP26&&r.prazo===DP26&&(await call('GET','/data?module=datacom'))[1].rows.length===5,r);
  [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);t('ação repetida é barrada (409)',s===409);
- [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Outra',responsavel:'Monique Vilante'},E);t('a equipe não atribui a outra pessoa (403)',s===403);
+ [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Outra',responsavel:'Monique Vilante'},E);t('a equipe atribui a outra pessoa (200)',s===200);
  const pv=(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data===DP26);
  t('a data mostra os vínculos (ação planejada) só na ocorrência do ano certo',pv.vinculos.planejamento.length===1&&pv.vinculos.planejamento[0].id===PL.id&&(await painel(2027)).itens.find(x=>x.id==='dia-do-professor'&&x.data.startsWith('2027')).vinculos.planejamento.length===0&&(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data.startsWith('2025')).vinculos.planejamento.length===0);
  t('natal mostra as 2 solicitações',(await painel(2026)).itens.find(x=>x.id==='natal'&&x.data===NATAL26).vinculos.solicitacoes.length===2);

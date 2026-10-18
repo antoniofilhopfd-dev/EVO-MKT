@@ -16,10 +16,12 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [,r]=await call('GET','/ads/modo');t('Tráfego nasce em modo somente leitura',r.gestao===false,r);
  for(const [m,u,b] of [['POST','/ads/impulsionar',{confirmou:true}],['POST','/ads/editar',{}],['POST','/ads/duplicar',{}],['POST','/ads/campanha/lancar',{}],['POST','/ads/pausar-tudo',{}],['POST','/ads/gestao/config',{ativa:true}],['POST','/ads/regras',{ativa:true}]]){[s,r]=await call(m,u,b);t(`somente leitura bloqueia ${u} (403)`,s===403&&/somente leitura/.test(r.error||''),r)}
  [s]=await call('GET','/ads/gestao');t('somente leitura ainda mostra a configuração e métricas (/ads/gestao, /ads/arvore)',s===200&&(await call('GET','/ads/arvore'))[0]===200);
- [s,r]=await call('POST','/ads/modo',{gestao:true},E);t('Equipe não muda o modo (403)',s===403);
+ [s,r]=await call('POST','/ads/modo',{gestao:true},E);t('Equipe não muda o modo (403): só o Administrador liga a escrita na Meta',s===403);
  [s,r]=await call('POST','/ads/modo',{gestao:true});t('Gerência liga o modo completo',s===200&&r.gestao===true);
  // permissões
- for(const [m,u,b] of [['GET','/ads/extras'],['POST','/ads/regras',{ativa:true}],['POST','/ads/regras/simular',{}],['POST','/ads/relatorio-semanal',{ativo:true}],['POST','/ads/matriculas',{mes:'2026-01',matriculas:3}],['POST','/ads/rascunhos',{nome:'x',dados:{}}],['GET','/instagram/relatorio'],['POST','/instagram/seguidores/manual',{mes:'2025-01',seguidores:10}]]){[s]=await call(m,u,b,E);t(`Equipe não acessa ${u} (403)`,s===403)}
+ for(const [m,u,b] of [['POST','/ads/regras',{ativa:true}],['POST','/ads/relatorio-semanal',{ativo:true}]]){[s]=await call(m,u,b,E);t(`Equipe não acessa ${u} (403): automações são do Administrador`,s===403)}
+ for(const [m,u,b] of [['GET','/ads/extras'],['GET','/instagram/relatorio']]){[s]=await call(m,u,b,E);t(`Equipe acessa ${u} (operação)`,s===200)}
+ [s]=await call('POST','/ads/matriculas',{mes:'2026-01',matriculas:3});t('rota de matrículas (CRM) foi removida (404)',s===404);
  // modelos de legenda (Equipe pode)
  [s,r]=await call('GET','/studio/modelos',null,E);t('modelos: lista vazia no início',s===200&&r.modelos.length===0,r);
  [s]=await call('POST','/studio/modelos',{modelos:[{nome:'',legenda:'x'}]},E);t('modelo sem nome é recusado',s===400);
@@ -42,9 +44,6 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('POST','/ads/regras/simular',{});t('simulação lê a conta e devolve a lista do que a regra pegaria',s===200&&Array.isArray(r.achados)&&r.simulado===true,r);
  // relatório semanal
  [s,r]=await call('POST','/ads/relatorio-semanal',{ativo:true});t('liga o relatório semanal por e-mail',s===200&&r.ativo===true);
- // matrículas
- [s]=await call('POST','/ads/matriculas',{mes:'2026-1',matriculas:3});t('mês inválido nas matrículas: 400',s===400);
- [s,r]=await call('POST','/ads/matriculas',{mes:mesAtual,matriculas:4});const linha=(r.matriculas||[]).find(x=>x.mes===mesAtual);t('matrículas do mês guardadas; custo por matrícula = investimento / matrículas',s===200&&linha&&linha.matriculas===4&&(linha.gasto===0?linha.custo===0:Math.abs(linha.custo-linha.gasto/4)<0.01),r);
  // rascunhos
  [s,r]=await call('POST','/ads/rascunhos',{nome:'Matrículas 2027',dados:{passo:2,objetivo:'ENGAGEMENT'}});const rid=r.rascunho&&r.rascunho.id;t('salva rascunho de campanha',s===200&&rid&&r.rascunhos.length===1,r);
  [s,r]=await call('POST','/ads/rascunhos',{nome:'Matrículas 2027 v2',dados:{passo:3},id:rid});t('salvar de novo com o mesmo id atualiza (não duplica)',r.rascunhos.length===1&&r.rascunhos[0].dados.passo===3,r);

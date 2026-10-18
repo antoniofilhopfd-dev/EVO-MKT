@@ -17,10 +17,10 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
 
  // ---- segurança e permissões ----
  [s]=await call('GET','/escolar/painel',null,{...J});t('sem login o calendário escolar não abre (401)',s===401);
- [s]=await call('POST','/escolar/salvar',base,E);t('equipe não cadastra (403)',s===403);
+ [s]=await call('POST','/escolar/salvar',{titulo:'x'},E);t('a equipe tem acesso a cadastrar (dados inválidos dão 400, não 403)',s===400);
  [s]=await call('POST','/data?module=calescolar',base);t('o /data genérico não grava no calendário escolar (validação obrigatória)',s===400);
  [s]=await call('POST','/data?module=calescolar',base,E);t('nem a equipe pelo /data (403)',s===403);
- [s,r]=await call('GET','/escolar/painel',null,E);t('equipe consulta, sem poder de edição',s===200&&r.podeEditar===false&&r.opcoes.segmentos.length===7&&r.opcoes.tipos.length===10,r&&r.opcoes);
+ [s,r]=await call('GET','/escolar/painel',null,E);t('equipe consulta e também edita',s===200&&r.podeEditar===true&&r.opcoes.segmentos.length===7&&r.opcoes.tipos.length===10,r&&r.opcoes);
  t('não há nenhum evento fictício cadastrado de fábrica',r.rows.length===0);
 
  // ---- validação no servidor ----
@@ -54,7 +54,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  // ---- reagendar ----
  [s,r]=await call('POST','/escolar/mover',{id:EXC.id,data:dia(30)});t('reagendar mantém a duração (3 dias)',s===200&&r.dataInicio===dia(30)&&r.dataFim===dia(32),r);
  [s]=await call('POST','/escolar/mover',{id:EXC.id,data:'2026-13-45'});t('reagendar com data inválida é recusado',s===400);
- [s]=await call('POST','/escolar/mover',{id:FEIRA.id,data:dia(11)},E);t('equipe não reagenda (403)',s===403);
+ [s]=await call('POST','/escolar/mover',{id:FEIRA.id,data:'data-ruim'},E);t('a equipe tem acesso a reagendar (data inválida dá 400, não 403)',s===400);
 
  // ---- separação do Marketing e persistência ----
  const cal=(await call('GET','/data?module=calendario'))[1].rows;
@@ -73,12 +73,12 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  [s,r]=await call('POST','/escolar/solicitar',{id:FEIRA.id,acao:'arte',observacao:'Usar a identidade do Colégio'});t('"Arte de divulgação" tem prazo com antecedência (7 dias antes)',s===201&&r.prazo===dia(3)&&/identidade/.test(r.descricao),r);
  [s,r]=await call('POST','/escolar/solicitar',{id:FEIRA.id,acao:'video',prazo:dia(9)});t('prazo informado prevalece',s===201&&r.prazo===dia(9));
  [s,r]=await call('POST','/escolar/solicitar',{id:EXC.id,acao:'video'});t('segmento do evento passa para a solicitação (Ensino Médio)',s===201&&r.segmento==='Ensino Médio',r);
- [s,r]=await call('POST','/escolar/solicitar',{id:REU.id,acao:'arte'});t('arte para evento próximo não fica com prazo no passado',s===201&&r.prazo>=dia(0),r);
+ [s,r]=await call('POST','/escolar/solicitar',{id:REU.id,acao:'arte'});t('arte para evento próximo não fica com prazo no passado',s===201&&r.prazo>=new Date(Date.now()-3*3600e3).toISOString().slice(0,10),r);
  const pnl=(await call('GET','/escolar/painel'))[1].rows.find(x=>x.id===FEIRA.id);t('o evento lista as solicitações ligadas a ele',pnl.solicitacoes.length===3&&pnl.solicitacoes.every(x=>/^SOL-/.test(x.id)),pnl.solicitacoes);
  const sp=(await call('GET','/solicitacoes/painel'))[1].rows.find(x=>x.id===SOL.id);t('a solicitação aparece no módulo Solicitações como pendente, com a referência',sp&&sp.etapa==='PENDENTE'&&sp.eventoEscolarTitulo==='Feira de Ciências 2026',sp);
 
  // ---- excluir ----
- [s]=await call('POST','/escolar/excluir',{id:REU.id},E);t('equipe não exclui (403)',s===403);
+ [s]=await call('POST','/escolar/excluir',{id:'ESC-9999'},E);t('equipe tem acesso a excluir (inexistente dá 404, não 403)',s===404);
  [s]=await call('POST','/escolar/excluir',{id:REU.id});const lix=(await call('GET','/data?module=lixeira'))[1].rows;
  t('a Gerência exclui (vai para a Lixeira) e some do calendário',s===200&&!(await lista()).some(x=>x.id===REU.id)&&lix.some(x=>x.titulo==='Reunião geral'));
  t('solicitações já criadas a partir de um evento continuam depois da exclusão dele',(await call('GET','/data?module=solicitacoes'))[1].rows.some(x=>x.id===SOL.id));

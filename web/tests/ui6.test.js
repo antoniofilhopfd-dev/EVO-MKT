@@ -30,7 +30,7 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  // dois gerentes: Antônio Filho vira Gerente
  await p.selectOption('[data-nivel="ANT-3302"]','admin');await p.waitForTimeout(900);
  const A=await (await b.newContext()).newPage();A.on('dialog',d=>d.accept('Ant26x'));await A.goto(BASE+'/');await A.fill('#internalCode','ANT-3302');await A.fill('#internalPass',pw('ANT-3302'));await A.click('#internalLoginBtn');await A.waitForSelector('#nav .navitem');
- t('Antônio Filho agora é Administrador e vê a Administração',await A.evaluate(()=>canAccess('administracao')));
+ t('Antônio Filho agora é Administrador (perfil e administração no servidor)',await A.evaluate(async()=>{const r=await (await fetch('/api/auth/me')).json();const a=await fetch('/api/admin/users');return r.user&&r.user.admin===true&&a.status===200}));
  t('a tabela mostra os dois com acesso de gestão',((await p.$eval('#adminBody',e=>e.innerText)).match(/Administrador|Gerente de Marketing/g)||[]).length>=2);
  await p.selectOption('[data-nivel="ANT-3302"]','team');await p.waitForTimeout(900);
  await p.evaluate(()=>{adminTab='acessos';go('administracao')});await p.waitForTimeout(500);

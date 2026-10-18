@@ -16,7 +16,8 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await call('GET','/integrations/ads/accounts');await call('POST','/integrations/ads/account',{conta:'111222333'});await call('POST','/integrations/ads/sync',{});
  // ---- desligado por padrão e só Gerência
  [s,r]=await call('GET','/ads/gestao');t('gestão vem desligada por padrão, com os tetos e o público padrão do desenho',s===200&&r.config.ativa===false&&r.config.tetoDia===50&&r.config.tetoMes===3000&&r.config.diasMax===14&&r.config.publico.raioKm===20&&r.config.publico.idadeMin===25&&r.config.publico.idadeMax===55,r.config);
- for(const [m,u,b] of [['GET','/ads/gestao'],['POST','/ads/gestao/config',{ativa:true}],['POST','/ads/previa',{}],['POST','/ads/impulsionar',{confirmou:true}],['POST','/ads/pausar',{id:1}],['POST','/ads/retomar',{id:1}],['POST','/ads/pausar-tudo',{}]]){[s]=await call(m,u,b,E);t(`Equipe não acessa ${u} (403)`,s===403)}
+ for(const [m,u,b] of [['POST','/ads/gestao/config',{ativa:true}]]){[s]=await call(m,u,b,E);t(`Equipe não acessa ${u} (403): ligar a escrita e mudar tetos é do Administrador`,s===403)}
+ [s]=await call('GET','/ads/gestao',null,E);t('Equipe consulta a gestão (200)',s===200);
  [s,r]=await call('POST','/ads/previa',{chave:'x',midia:'m2',orcamentoDia:20,dias:7,objetivo:'CONVERSAS'});t('com a gestão desligada a prévia recusa e explica',s===200&&r.ok===false&&r.erros.some(e=>/desligada/.test(e)),r);
  [s,r]=await call('POST','/ads/impulsionar',{chave:'abcdefghijklmnop0001',midia:'m2',orcamentoDia:20,dias:7,objetivo:'CONVERSAS',confirmou:true});t('com a gestão desligada nada é criado na Meta',s===502&&(await novos()).length===0,r);
  // ---- configuração

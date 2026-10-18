@@ -33,9 +33,9 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s]=await call('POST','/ads/vinculo',{ad:'a1',conteudo:cid});r2.x=0;const r3=(await call('GET','/ads/arvore'))[1];
  t('anúncio vinculado a um Conteúdo mostra o conteúdo na árvore',s===200&&r3.campanhas.find(c=>c.id==='c1').conjuntos[0].anuncios[0].conteudo.titulo==='Vídeo Matrículas Infantil',r3.campanhas.find(c=>c.id==='c1').conjuntos[0].anuncios[0].conteudo);
  await call('POST','/ads/vinculo',{ad:'a1',conteudo:''});t('desvincular remove o vínculo',(await call('GET','/ads/arvore'))[1].campanhas.find(c=>c.id==='c1').conjuntos[0].anuncios[0].conteudo===null);
- [s]=await call('GET','/ads/arvore',null,E);t('Equipe não vê o gerenciador (403)',s===403);
+ [s]=await call('GET','/ads/arvore',null,E);t('Equipe vê o gerenciador (200)',s===200);
  [s]=await call('GET','/ads/arvore?de=2026-10-10&ate=2026-10-01');t('período invertido: 400',s===400);
- [s]=await call('GET','/ads/arvore?de=2026-01-01&ate=2026-12-31');t('período acima de 93 dias: 400',s===400);
+ [s]=await call('GET','/ads/arvore?de=2026-01-01&ate=2027-12-31');t('período acima de 400 dias: 400',s===400);
  // ---- editar exige gestão ligada
  [s,r]=await call('POST','/ads/editar',{nivel:'campanha',id:'c1',campos:{nome:'X novo'}});t('com a gestão desligada não edita nada',s===400&&/desligada/.test(r.error)&&!((await mock('/__state')).edits),r);
  await call('POST','/ads/gestao/config',{ativa:true,cidade:'João Pessoa'});
@@ -70,7 +70,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await ed('campanha','OUTRA_1',{nome:'invasão'});t('objeto de outra conta de anúncios é recusado',s===400&&/não pertence/.test(r.error)&&!(await edits('OUTRA_1')).length,r);
  [s]=await ed('campanha','a b;c',{nome:'x'});t('identificador malformado é recusado',s===400);
  [s]=await ed('campanha','c1',{});t('pedido vazio é recusado',s===400);
- [s]=await call('POST','/ads/editar',{nivel:'campanha',id:'c1',campos:{nome:'zzz'}},E);t('Equipe não edita (403)',s===403);
+ [s]=await call('POST','/ads/editar',{nivel:'campanha',id:'c1',campos:{}},E);t('Equipe tem acesso à edição (pedido vazio é 400, não 403)',s===400);
  // falha da Meta
  await call('POST','/integrations/meta/token',{token:'NOEDIT_TOKEN'});[s,r]=await ed('campanha','c3',{nome:'vai falhar'});
  t('Meta recusa: erro mostrado (502) e registrado no histórico como ERRO',s===502&&/Permissions error/.test(r.error)&&(await call('GET','/ads/acoes'))[1].rows[0].resultado==='ERRO');

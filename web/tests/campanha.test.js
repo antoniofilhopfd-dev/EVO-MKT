@@ -26,7 +26,7 @@ const JPG=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP///////////////////////
  t('opções: 6 objetivos da Meta com seus resultados',s===200&&Object.keys(r.objetivos).join()==='AWARENESS,TRAFFIC,ENGAGEMENT,LEADS,SALES,APP'&&r.objetivos.ENGAGEMENT.metas.CONVERSATIONS&&r.objetivos.SALES.metas.OFFSITE_CONVERSIONS.exige.join()==='site,pixel',Object.keys(r.objetivos||{}));
  t('opções: pixels, públicos personalizados, formulários ativos, publicações do Instagram e imagens do Estúdio',r.pixels[0].id==='PX1'&&r.publicos[0].id==='CA1'&&r.formularios.length===1&&r.formularios[0].id==='LF1'&&r.posts.some(x=>x.id==='m2')&&r.imagens.some(x=>x.id===post),[r.pixels,r.publicos,r.formularios,r.imagens]);
  [s,r]=await call('GET','/ads/campanha/interesses?q=educ');t('pesquisa de interesses na Meta',s===200&&r.rows.length===2&&r.rows[0].nome==='Educação infantil',r);
- [s]=await call('GET','/ads/campanha/opcoes',null,E);t('Equipe não usa o assistente (403)',s===403);
+ [s]=await call('GET','/ads/campanha/opcoes',null,E);t('Equipe usa o assistente de campanha (200)',s===200);
  // ---- validações por objetivo
  const prev=async b=>(await call('POST','/ads/campanha/previa',b))[1];
  r=await prev({...base(),objetivo:'XXX'});t('objetivo inexistente é recusado',!r.ok&&r.erros.some(e=>/objetivo/i.test(e)),r.erros);
