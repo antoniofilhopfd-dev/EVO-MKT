@@ -157,7 +157,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await rp.goto(BASE+'/relatorio-trafego.html');await rp.waitForSelector('.pg',{timeout:20000});
  const rtx=await rp.$eval('#rel',e=>e.innerText);
  t('relatório: título, indicadores do mês e da semana no modelo do PDF',/Dashboard de Tráfego — Meta Ads/.test(rtx)&&/Indicadores do período/.test(rtx)&&/Indicadores da semana/.test(rtx)&&/MENSAL •/.test(rtx)&&/SEMANAL •/.test(rtx)&&/R\$ 2\.084,56/.test(rtx),rtx.slice(0,300));
- t('relatório: 2 páginas, gráfico com uma linha por campanha + total, resumo e detalhamento',(await rp.$$('.pg')).length===2&&(await rp.$$('svg polyline')).length===4&&/Resumo por campanha/.test(rtx)&&/Detalhamento por anúncio/.test(rtx)&&/01 - EI/.test(rtx));
+ t('relatório: gráfico com uma linha por campanha + total, resumo e detalhamento',(await rp.$$('.sec')).length===5&&!!(await rp.$('#fechar[href="/?page=tfrelatorios"]'))&&(await rp.$$('svg polyline')).length===4&&/Resumo por campanha/.test(rtx)&&/Detalhamento por anúncio/.test(rtx)&&/01 - EI/.test(rtx));
  t('relatório: anúncios com status em português e uma foto (só https)',/Vídeo depoimento/.test(rtx)&&/Reprovado/.test(rtx)&&(await rp.$$('td img')).length===1);
  await rp.fill('#sub','Colégio Evolução | Teste de subtítulo');await rp.fill('#obs','Observação da semana para a direção.');
  t('editar subtítulo e observações atualiza o relatório na hora',/Teste de subtítulo/.test(await rp.$eval('.cab .sub',e=>e.textContent))&&/Observação da semana/.test(await rp.$eval('.nota',e=>e.textContent)));
@@ -168,7 +168,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  await rp.screenshot({path:PR+'/30_dashboard_trafego_tela.png',fullPage:true});
  await rp.emulateMedia({media:'print'});const pdf=await rp.pdf({format:'A4',printBackground:true});fs.writeFileSync(PR+'/relatorio_trafego_exemplo.pdf',pdf);
  const nPag=(pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g)||[]).length;
- t('o PDF sai em A4 com 2 a 3 páginas e sem a barra de controles',pdf.length>15000&&nPag>=2&&nPag<=3,[pdf.length,nPag]);
+ t('o PDF sai em A4 com 1 a 3 páginas e sem a barra de controles',pdf.length>15000&&nPag>=1&&nPag<=3,[pdf.length,nPag]);
  t('sem erros de JS no relatório',e5.length===0,e5.join('|'));await rp.close();
  // celular
  const m=p;await m.setViewportSize({width:390,height:844});const e2=[];

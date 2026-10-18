@@ -38,12 +38,15 @@ function html(d,sub,obs){
   const ta=d.totalAnuncios;
   const det=`<table><thead><tr><th>Foto</th><th>Anúncio</th><th>Camp.</th><th>Status</th><th>Custo (R$)</th><th>Impress.</th><th>Alcance</th><th>Cliques</th><th>CTR</th><th>CPC (R$)</th><th>Conv.</th><th>Custo/Conv.</th></tr></thead><tbody>${d.anuncios.map(a=>`<tr><td class="foto">${a.foto?`<img alt="" referrerpolicy="no-referrer" src="${esc(a.foto)}">`:''}</td><td class="l">${esc(a.nome)}</td><td>${esc(a.camp)}</td><td>${esc(a.status)}</td><td>${MONEY(a.investimento)}</td><td>${N0(a.impressoes)}</td><td>${N0(a.alcance)}</td><td>${N0(a.cliques)}</td><td>${PCT(a.ctr)}</td><td>${a.cliques?MONEY(a.cpc):'-'}</td><td>${N0(a.conversas)}</td><td>${a.conversas?MONEY(a.custoConversa):'-'}</td></tr>`).join('')||'<tr><td colspan="12" class="vazio">Nenhum anúncio com gasto neste período.</td></tr>'}<tr class="tot"><td></td><td>TOTAL</td><td></td><td></td><td>${MONEY(ta.investimento)}</td><td>${N0(ta.impressoes)}</td><td>${N0(ta.alcance)}</td><td>${N0(ta.cliques)}</td><td>${PCT(ta.ctr)}</td><td>${ta.cliques?MONEY(ta.cpc):'-'}</td><td>${N0(ta.conversas)}</td><td>${ta.conversas?MONEY(ta.custoConversa):'-'}</td></tr></tbody></table>${d.anuncios.length&&!d.anuncios.some(a=>a.foto)?'<p class="nota">Fotos indisponíveis: a Meta não devolveu as miniaturas dos anúncios deste período (confira a conexão e a permissão ads_read em Configurações › Integrações).</p>':''}`;
   const agora=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
-  return `<section class="pg"><header class="cab"><img class="logo" src="/img/logo-colegio.png" alt="Colégio Evolução"><div class="tit"><h1>Dashboard de Tráfego — Meta Ads</h1><p class="sub">${esc(sub)}</p></div></header>
-  <div class="bloco"><h2>Indicadores do período</h2><span class="tag m">${esc(tagM)}</span></div>${kpiHtml(m,'m')}
-  <div class="bloco"><h2>Indicadores da semana</h2><span class="tag s">${esc(tagS)}</span></div>${kpiHtml(d.semanal,'s')}
-  <div class="bloco"><h2>Investimento diário</h2><span class="tag s">${esc(tagS)}</span></div>${grafico(d.diario,d.periodo.de,d.periodo.ate)}
-  <div class="bloco"><h2>Resumo por campanha</h2><span class="tag s">${esc(tagS)}</span></div>${resumo}</section>
-  <section class="pg"><header class="cab"><img class="logo" src="/img/logo-colegio.png" alt="Colégio Evolução"><div class="tit"><h1>Detalhamento por anúncio</h1><p class="sub">${esc(sub)}</p></div><span class="tag s">${esc(tagS)}</span></header>${det}${obs?`<p class="nota">${esc(obs)}</p>`:''}<div class="fim"><span>Colégio Evolução · EVO MKT · dados lidos da Meta (somente leitura)</span><span>Gerado em ${esc(agora)}</span></div></section>`;
+  const sec=(t,tag,corpo,cls='')=>`<section class="sec ${cls}"><div class="bloco"><h2>${t}</h2><span class="tag ${tag.cor}">${esc(tag.txt)}</span></div>${corpo}</section>`;
+  const tM={cor:'m',txt:tagM},tS={cor:'s',txt:tagS};
+  return `<div class="pg"><header class="cab"><img class="logo" src="/img/logo-colegio.png" alt="Colégio Evolução"><div class="tit"><h1>Dashboard de Tráfego — Meta Ads</h1><p class="sub">${esc(sub)}</p></div></header>
+  ${sec('Indicadores do período',tM,kpiHtml(m,'m'))}
+  ${sec('Indicadores da semana',tS,kpiHtml(d.semanal,'s'))}
+  ${sec('Investimento diário',tS,`<div class="tw">${grafico(d.diario,d.periodo.de,d.periodo.ate)}</div>`)}
+  ${sec('Resumo por campanha',tS,`<div class="tw">${resumo}</div>`)}
+  ${sec('Detalhamento por anúncio',tS,`<div class="tw">${det}</div>`,'det')}
+  ${obs?`<p class="nota">${esc(obs)}</p>`:''}<div class="fim"><span>Colégio Evolução · EVO MKT · dados lidos da Meta (somente leitura)</span><span>Gerado em ${esc(agora)}</span></div></div>`;
 }
 function obsPadrao(d){
   const m=d.mensal,p=[];if(m.parcial)p.push(`O mensal de ${MESES[Number(m.ate.slice(5,7))-1].toLowerCase()} inclui o dia ${DM(m.ate)} em andamento (valores parciais).`);

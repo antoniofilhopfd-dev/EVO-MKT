@@ -11,12 +11,14 @@ body{margin:0;background:#EEF1F6;color:var(--ink);font-family:Arial,Helvetica,sa
 .bt{padding:8px 14px;border:1px solid var(--line);background:#fff;border-radius:8px;font:inherit;font-weight:700;cursor:pointer;color:var(--blue)}.bt.pri{background:var(--blue);color:#fff;border-color:var(--blue)}
 .dica{font-size:12px;color:#5E6678;margin:8px 0 0}
 .msg{max-width:794px;margin:20px auto;padding:14px;background:#fff;border-radius:10px;text-align:center}
-.pg{width:794px;max-width:100%;min-height:1050px;margin:0 auto 16px;background:#fff;padding:34px 36px 80px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.pg{width:794px;max-width:100%;min-height:0;margin:0 auto 16px;background:#fff;padding:34px 36px 80px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
 .cab{display:flex;align-items:center;gap:18px;padding-bottom:14px;margin-bottom:16px;border-bottom:3px solid var(--orange)}
 .cab .logo{height:40px;width:auto;flex:none}
 .cab .tit{flex:1;min-width:0}
 .cab h1{margin:0;color:var(--navy);font-size:23px;line-height:1.15}
 .cab .sub{margin:4px 0 0;color:#5E6678;font-size:12.5px}
+.sec{break-inside:avoid;page-break-inside:avoid}.sec.det{break-inside:auto;page-break-inside:auto}
+.tw{max-width:100%}
 .bloco{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:16px 0 8px;break-after:avoid}
 .bloco h2{margin:0;color:var(--blue);font-size:16px}
 .tag{display:inline-block;color:#fff;font-weight:700;font-size:11px;padding:6px 12px;border-radius:5px;white-space:nowrap}.tag.m{background:var(--orange)}.tag.s{background:var(--teal)}
@@ -40,7 +42,14 @@ td.foto{width:70px;padding:4px}td img{width:60px;height:76px;object-fit:contain;
 @media print{
  @page{size:A4;margin:10mm 12mm 14mm}
  body{background:#fff}.no-print{display:none!important}
- .pg{box-shadow:none;margin:0;padding:0;width:auto;min-height:0;break-after:page}.pg:last-of-type{break-after:auto}
+ html,body{width:auto!important}
+ .pg{box-shadow:none;margin:0;padding:0;width:100%!important;max-width:none!important;min-height:0;overflow:visible!important}.tw{overflow:visible!important}svg{max-width:100%}
+ .x{display:none!important}
  @page{@bottom-center{content:"Colégio Evolução · EVO MKT · página " counter(page) " de " counter(pages);font:9px Arial;color:#7A8195}}
 }
-@media screen and (max-width:640px){.bloco{grid-template-columns:1fr}.cab{flex-wrap:wrap}.cab h1{font-size:19px}.kpis{grid-template-columns:repeat(2,1fr)}.kpis div:nth-child(4n){border-right:1px solid var(--line)}.kpis div:nth-child(2n){border-right:0}.pg{padding:18px 12px 40px;overflow-x:auto}}
+@media screen and (max-width:900px){.tw{overflow-x:auto}.tw table{min-width:620px}.tw svg{min-width:560px}.pg{overflow-x:hidden}}
+@media screen and (max-width:640px){.bloco{grid-template-columns:1fr}.cab{flex-wrap:wrap}.cab h1{font-size:19px}.kpis{grid-template-columns:repeat(2,1fr)}.kpis div:nth-child(4n){border-right:1px solid var(--line)}.kpis div:nth-child(2n){border-right:0}.pg{padding:18px 12px 40px}}
+
+/* botão X: volta ao EVO MKT (no celular não há botão "voltar" do navegador) */
+.x{position:fixed;top:10px;right:12px;z-index:60;width:42px;height:42px;border-radius:50%;background:#fff;border:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--navy);text-decoration:none}
+.barra{padding-right:64px}
