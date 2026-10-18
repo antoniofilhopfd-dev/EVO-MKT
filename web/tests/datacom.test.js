@@ -126,11 +126,11 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const p=await entra('NAT-3301');
  const abre=async(pg=p)=>pg.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));
  const novoDc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="dc"]');await pg.waitForSelector('#dcForm')};
- await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-tipo');
- const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText.trim()));
- t('os três calendários ficam juntos em um só: categorias Escolar, Datas e Feriados ao lado das de Marketing',['escolar','datas','feriados','compromissos'].every(x=>sub.some(y=>y.toLowerCase().includes(x)))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
+ await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-semana, .cm-mes, .cm-proximos');
+ const sub=await p.$$eval('.cm-tipo',e=>e.map(x=>x.innerText.trim()));
+ t('Calendário único sem faixa de categorias e sem subabas (um só calendário)',sub.length===0&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
  await p.evaluate(()=>go('datacom'));await p.waitForSelector('.cm-semana, .cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
- t('Calendário único aberto filtrado em Datas e Feriados, com Semana, Mês, Dia, Lista e Ano',(await p.$$eval('.cm-tipo.off',e=>e.length))===4&&(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
+ t('Calendário único aberto pelas Datas, com Semana, Mês, Dia, Lista e Ano',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
  await p.selectOption('#cmAno','2026');await p.waitForFunction(()=>/2026/.test(document.querySelector('.cm-periodo')?.textContent||''));
  await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');
  let txt=await p.$eval('.cm-proximos',e=>e.innerText);
@@ -143,7 +143,6 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await abre();await p.selectOption('#cmMes','12');await p.waitForTimeout(250);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('filtro por mês (dezembro)',/Natal/.test(txt)&&!/Dia do Professor/.test(txt));await abre();await p.selectOption('#cmMes','');await p.waitForTimeout(150);
  await abre();await p.click('[data-tog="relevantes"]');await p.waitForTimeout(250);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('"Somente datas relevantes" (Dia dos Pais sim, Tiradentes não)',/Dia dos Pais/.test(txt)&&!/Tiradentes/.test(txt));await abre();await p.click('[data-tog="relevantes"]');await p.waitForTimeout(150);
  await p.fill('#cmBusca','professor');await p.waitForTimeout(300);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('pesquisa pelo nome (acentos e caixa não atrapalham)',/Dia do Professor/.test(txt)&&!/Natal/.test(txt));await p.fill('#cmBusca','');await p.waitForTimeout(300);
- await p.click('[data-tipo="DATA"]');await p.waitForTimeout(200);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('filtro por categoria (esconde as Datas, mantém os Feriados)',!/Dia das Mães/.test(txt)&&/Natal/.test(txt));await p.click('[data-tipo="DATA"]');await p.waitForTimeout(150);
  // navegação entre anos
  await p.click('#cmNext');await p.waitForFunction(()=>document.querySelector('.cm-periodo')?.textContent==='2027');
  const l27=await p.$eval('.cm-proximos',e=>e.innerText);t('navegar para 2027: as datas aparecem sozinhas (e as móveis mudam de dia)',/Natal/.test(l27)&&/Dia das Mães/.test(l27)&&/28\/03/.test(l27),l27.slice(0,300));

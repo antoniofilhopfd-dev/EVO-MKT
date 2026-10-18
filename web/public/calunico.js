@@ -68,7 +68,7 @@ function calNovo(data){
 /** Ação ou evento muito longo aparece só no primeiro dia (e na lista); repetir em todos os dias poluiria o calendário. */
 const calEncurta=i=>{if(i.fim&&(CalMotor.dataDe(i.fim)-CalMotor.dataDe(i.data))/86400000>6)return {...i,fim:'',periodo:i.data+'→'+i.fim};return i};
 const CAL_UNICO=CalMotor.criar({
- chave:'calendario',tituloPagina:'Calendário',eyebrow:'CALENDÁRIO',rotuloNovo:'+ Novo',
+ chave:'calendario',semTipos:true,tituloPagina:'Calendário',eyebrow:'CALENDÁRIO',rotuloNovo:'+ Novo',
  descricao:'Tudo o que tem data no marketing e no colégio, em um só lugar. Clique em um dia para criar; arraste para reagendar.',
  tipos:CAL_TIPOS,carregar:calCarregar,novo:calNovo,abrir:calAbrir,mover:calMover,porAno:true,
  modos:[['week','Semana'],['month','Mês'],['day','Dia'],['list','Lista'],['year','Ano']],modoPadrao:'week',listaEscopo:'ano',busca:true,filtrosCompactos:true,

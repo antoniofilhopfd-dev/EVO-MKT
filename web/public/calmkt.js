@@ -25,7 +25,7 @@ const CalMotor=(()=>{
   const modoSalvo=guarda(cfg.chave+'.modo',cfg.modoPadrao||'month');
   const extrasDef=cfg.filtrosExtras||(cfg.filtroExtra?[{chave:'extra',vazio:cfg.filtroExtra.vazio,opcoes:cfg.filtroExtra.opcoes,testa:(i,v)=>!v||cfg.filtroExtra.testa(i,v)}]:[]);
   const alternDef=cfg.alternancias||[];
-  const est={modo:modos.some(m=>m[0]===modoSalvo)?modoSalvo:(cfg.modoPadrao||modos[0][0]),data:new Date(),ocultos:new Set(guarda(cfg.chave+'.ocultos',[])),resp:guarda(cfg.chave+'.resp',''),extras:guarda(cfg.chave+'.extras',{}),tog:guarda(cfg.chave+'.tog',{}),mes:'',busca:'',itens:[],tipos:cfg.tipos,opcoes:{responsaveis:[]},eu:{nome:'',role:''},podeEditar:true};
+  const est={modo:modos.some(m=>m[0]===modoSalvo)?modoSalvo:(cfg.modoPadrao||modos[0][0]),data:new Date(),ocultos:new Set(cfg.semTipos?[]:guarda(cfg.chave+'.ocultos',[])),resp:guarda(cfg.chave+'.resp',''),extras:guarda(cfg.chave+'.extras',{}),tog:guarda(cfg.chave+'.tog',{}),mes:'',busca:'',itens:[],tipos:cfg.tipos,opcoes:{responsaveis:[]},eu:{nome:'',role:''},podeEditar:true};
   let anoCarregado=null;
   const tipo=k=>est.tipos.find(t=>t.k===k)||est.tipos[0]||{k,rotulo:k,glifo:'▪'};
   const cls=k=>tipo(k).classe||('t-'+k);
@@ -101,7 +101,7 @@ const CalMotor=(()=>{
     :`<div class="cm-nav"><button type="button" class="softbtn" id="cmPrev" aria-label="Período anterior">‹</button><button type="button" class="softbtn" id="cmHoje">Hoje</button><button type="button" class="softbtn" id="cmNext" aria-label="Próximo período">›</button><h2 class="cm-periodo" aria-live="polite">${esc(rotuloPeriodo())}</h2>${cfg.porAno?`<select class="control cm-ano-sel" id="cmAno" aria-label="Ano">${anos.map(a=>`<option value="${a}" ${a===est.data.getFullYear()?'selected':''}>${a}</option>`).join('')}</select>`:''}<label class="cm-ir"><span class="sr-only">Ir para a data</span><input type="date" id="cmIr" value="${isoDate(est.data)}" aria-label="Ir para a data"></label></div>`;
    alvo.innerHTML=`${cfg.faixa?cfg.faixa(est.itens.filter(i=>!est.ocultos.has(i.tipo)),itens):''}<div class="cm-barra">${nav}
      <div class="view-switch" role="group" aria-label="Visualização">${modos.map(([k,l])=>`<button type="button" data-modo="${k}" class="${est.modo===k?'active':''}" aria-pressed="${est.modo===k}">${l}</button>`).join('')}</div></div>
-     <div class="cm-filtros"><div class="cm-tipos" role="group" aria-label="Tipos">${est.tipos.map(t=>`<button type="button" class="cm-tipo ${t.classe||'t-'+t.k}${est.ocultos.has(t.k)?' off':''}" data-tipo="${t.k}" aria-pressed="${!est.ocultos.has(t.k)}"><i class="cm-g" aria-hidden="true">${t.glifo}</i>${esc(t.rotulo)}</button>`).join('')}${est.ocultos.size?'<button type="button" class="cm-tipo cm-todos" id="cmTodos">Ver tudo</button>':''}</div>
+     <div class="cm-filtros">${cfg.semTipos?'':`<div class="cm-tipos" role="group" aria-label="Tipos">${est.tipos.map(t=>`<button type="button" class="cm-tipo ${t.classe||'t-'+t.k}${est.ocultos.has(t.k)?' off':''}" data-tipo="${t.k}" aria-pressed="${!est.ocultos.has(t.k)}"><i class="cm-g" aria-hidden="true">${t.glifo}</i>${esc(t.rotulo)}</button>`).join('')}${est.ocultos.size?'<button type="button" class="cm-tipo cm-todos" id="cmTodos">Ver tudo</button>':''}</div>`}
       ${cfg.filtrosCompactos?`<details class="cm-maisfiltros"${filtrosAtivos()?' open':''}><summary>Filtros${filtrosAtivos()?` <b>${filtrosAtivos()}</b>`:''}</summary><div class="cm-maisfiltros-corpo">`:''}
       ${extrasDef.map((f,ix)=>`<select class="control cm-resp" id="cmExtra${ix?ix+1:''}" data-extra="${f.chave}" aria-label="${attr(f.vazio)}"><option value="">${esc(f.vazio)}</option>${f.opcoes().map(([v,l])=>`<option value="${attr(v)}" ${(est.extras[f.chave]||'')===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`).join('')}
       ${cfg.filtroResponsavel===false?'':`<select class="control cm-resp" id="cmResp" aria-label="Filtrar por responsável"><option value="">Todos os responsáveis</option><option value="__eu" ${est.resp==='__eu'?'selected':''}>Meus</option>${est.opcoes.responsaveis.map(n=>`<option value="${attr(n)}" ${est.resp===n?'selected':''}>${esc(n)}</option>`).join('')}</select>`}
@@ -165,7 +165,7 @@ const CalMotor=(()=>{
    try{await recarregar()}catch(e){$('#cmRaiz').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar o calendário</strong><p>${esc(e.message)}</p></div>`}
   }
   const definirFiltro=(chave,valor)=>{if(chave==='modo'){est.modo=valor;salva(cfg.chave+'.modo',valor)}else{est.extras[chave]=valor;salva(cfg.chave+'.extras',est.extras)}desenhar()};
-  const mostrarSo=ks=>{est.ocultos=new Set(ks?est.tipos.map(t=>t.k).filter(k=>!ks.includes(k)):[]);salva(cfg.chave+'.ocultos',[...est.ocultos])};
+  const mostrarSo=ks=>{if(cfg.semTipos)return;est.ocultos=new Set(ks?est.tipos.map(t=>t.k).filter(k=>!ks.includes(k)):[]);salva(cfg.chave+'.ocultos',[...est.ocultos])};
   return {render,recarregar,definirFiltro,mostrarSo,estado:est};
  }
  const api_={criar,fmtCurto,dataDe,redirecionar:null};

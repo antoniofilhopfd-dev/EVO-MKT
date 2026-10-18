@@ -91,11 +91,11 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const mesVista=async(pg=p)=>{await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pg.$('.cm-mes'))){await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes')}};
  const abre=async(pg=p)=>pg.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));
  const novoEsc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="esc"]');await pg.waitForSelector('#escForm')};
- await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-tipo');
- const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText.trim()));
- t('Calendário único: Escolar ao lado de Compromissos e Datas (sem subabas)',sub.some(x=>/escolar/i.test(x))&&sub.some(x=>/compromissos/i.test(x))&&sub.some(x=>/Datas/.test(x))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
+ await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-semana, .cm-mes, .cm-proximos');
+ const sub=await p.$$eval('.cm-tipo',x=>x.map(y=>y.innerText.trim()));
+ t('Calendário único: sem faixa de categorias e sem subabas',sub.length===0&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
  await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-semana, .cm-mes');await mesVista();
- t('Calendário único aberto já filtrado em Escolar (um botão "+ Novo")',(await p.$$eval('.cm-tipo.off',e=>e.length))===5&&/Novo/.test(await p.$eval('#cmNovo',e=>e.textContent)));
+ t('Calendário escolar aberto pelo calendário único (um botão "+ Novo")',/Novo/.test(await p.$eval('#cmNovo',x=>x.textContent)));
  t('visões Semana, Mês, Dia, Lista e Ano',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
  // eventos de arrastar sintéticos: exercitam os mesmos tratadores (dragstart/dragover/drop) sem depender do gesto do mouse
  const soltar=(txt,data)=>p.evaluate(([txt,data])=>{const s=[...document.querySelectorAll('.cm-item')].find(x=>x.textContent.includes(txt)),d=document.querySelector(`.cm-dia[data-date="${data}"]`),dt=new DataTransfer();s.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));s.dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}))},[txt,data]);
@@ -111,7 +111,6 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await abre();await p.selectOption('#cmExtra3','MEDIO');await p.waitForTimeout(200);txt=await p.$eval('#cmRaiz',e=>e.innerText);
  t('filtro por segmento (Ensino Médio): tira o do Fundamental, mantém "Toda a escola"',!/Feira de Ciências/.test(txt)&&/Prova bimestral/.test(txt));
  await abre();await p.selectOption('#cmExtra3','');await p.waitForTimeout(150);
- await p.click('[data-tipo="ESCOLAR"]');await p.waitForTimeout(150);t('a categoria Escolar esconde os eventos escolares',!/Prova bimestral/.test(await p.$eval('#cmRaiz',e=>e.innerText)));await p.click('[data-tipo="ESCOLAR"]');await p.waitForTimeout(150);
  await p.fill('#cmBusca','feira');await p.waitForTimeout(250);txt=await p.$eval('#cmRaiz',e=>e.innerText);t('pesquisa pelo título',/Feira de Ciências/.test(txt)&&!/Prova bimestral/.test(txt));await p.fill('#cmBusca','');await p.waitForTimeout(250);
  // criar pelo botão e pelo dia
  await novoEsc();
@@ -143,7 +142,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  // ---- equipe: só consulta e pede apoio ----
  const pe=await entra('MON-3303');await pe.evaluate(()=>go('calescolar'));await pe.waitForSelector('.cm-semana, .cm-mes');await mesVista(pe);
  await pe.click('#cmNovo');await pe.waitForSelector('.cal-escolha');t('a equipe de Marketing também cria eventos (escolhe o tipo)',true);await pe.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
- t('a equipe arrasta eventos',await pe.$eval('.cm-item',e=>e.hasAttribute('draggable')));
+ t('a equipe arrasta eventos',await pe.$eval('.cm-item:has-text("Feira de Ciências")',e=>e.hasAttribute('draggable')));
 
  // ---- celular ----
  const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('calescolar'));await pc.waitForSelector('.cm-semana, .cm-mes');await mesVista(pc);
