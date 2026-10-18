@@ -16,6 +16,8 @@ function tpIntervalo(p,de,ate){
   const n=Number(p)||30;return [dia(-(n-1)),dia(0)];
 }
 const tpPeriodo=()=>{if(!TP.per){const s=pref('trafego.periodo',null)||{p:'30'};TP.per={p:s.p||'30',de:s.de||'',ate:s.ate||''};const [a,b]=tpIntervalo(TP.per.p,TP.per.de,TP.per.ate);TP.per.de=a;TP.per.ate=b}return TP.per};
+/** Abre o relatório semanal (PDF) já no período escolhido no Tráfego; lá o período continua editável. */
+function tpLinkRelatorio(el){if(!el)return;el.addEventListener('click',()=>{const p=tpPeriodo();el.href='/relatorio-trafego.html?de='+encodeURIComponent(p.de)+'&ate='+encodeURIComponent(p.ate)})}
 function tpDefinePeriodo(p,de,ate){const [a,b]=tpIntervalo(p,de,ate);TP.per={p,de:a,ate:b};setPref('trafego.periodo',TP.per)}
 /** Seletor de período (rápido ou personalizado). aoMudar é chamado depois de escolher. */
 function tpSeletorPeriodo(){const per=tpPeriodo();return `<div class="tp-per"><select id="tpPer" class="control" aria-label="Período das métricas">${TP_PERIODOS.map(([k,l])=>`<option value="${k}" ${per.p===k?'selected':''}>${l}</option>`).join('')}</select><span class="tp-per-x" ${per.p==='x'?'':'hidden'}><input type="date" id="tpDe" class="control" value="${attr(per.de)}" aria-label="Início"><input type="date" id="tpAte" class="control" value="${attr(per.ate)}" aria-label="Fim"><button type="button" class="softbtn" id="tpPerOk">Aplicar</button></span><small class="tp-per-t">${esc(fmtDate(per.de))} a ${esc(fmtDate(per.ate))}</small></div>`}
@@ -158,7 +160,7 @@ async function tpRenderVisao(){
   const salva=lay=>{TP.layout={ordem:lay.ordem,tam:lay.tam};tpPrefSet('trafego.layout',TP.layout)};
   function ligaVisao(lay){
     tpSaudeChip().then(h=>{const b=$('#tpSaudeBox');if(b){b.innerHTML=h;const bt=$('#tpSaude');if(bt)bt.onclick=tpAbrirSaude}});
-    $('#tpPers').onclick=()=>{tpEdicao=!tpEdicao;redesenha()};
+    $('#tpPers').onclick=()=>{tpEdicao=!tpEdicao;redesenha()};tpLinkRelatorio($('#tpRelSemanalVg'));
     $('#tfGer').onclick=()=>go('gerenciador');
     $$('[data-met]').forEach(b=>b.onclick=()=>{tfMetrica=b.dataset.met;redesenha()});
     $$('[data-dias]').forEach(b=>b.onclick=()=>{tfDias=+b.dataset.dias;redesenha()});

@@ -103,8 +103,9 @@ const TP_REL_MODELOS={
 const TPR={m:'geral',campanhas:new Set(),segs:new Set(),cols:null,graf:'barras',comparar:false,met:'gasto'};
 TP_PAGINAS.tfrelatorios=async function(){
   state.module=null;
-  $('#content').innerHTML=tpCabecalho('Relatórios de anúncios','Escolha o modelo, o período, as campanhas, os segmentos, as métricas e o gráfico. Exporte em PDF, Excel ou CSV.')+'<div class="card" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><div><b>Dashboard semanal de Tráfego (PDF)</b><div class="kpi-note">O relatório aprovado, com indicadores do mês e da semana, gráfico diário, resumo por campanha e detalhamento por anúncio com foto.</div></div><a class="btn" href="/relatorio-trafego.html" target="_blank" rel="noopener" id="tpRelSemanal">Abrir o relatório semanal</a></div><div id="tpPg"><div class="loading"><span></span><b>Lendo a conta…</b></div></div>';
+  $('#content').innerHTML=tpCabecalho('Relatórios de anúncios','Escolha o modelo, o período, as campanhas, os segmentos, as métricas e o gráfico. Exporte em PDF, Excel ou CSV.')+'<div class="card" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><div><b>Dashboard semanal de Tráfego (PDF)</b><div class="kpi-note">O relatório aprovado, no período escolhido acima (você ainda pode mudar as datas dentro dele), com indicadores do mês e da semana, gráfico diário, resumo por campanha e detalhamento por anúncio com foto.</div></div><a class="btn" href="/relatorio-trafego.html" target="_blank" rel="noopener" id="tpRelSemanal">Abrir o relatório semanal</a></div><div id="tpPg"><div class="loading"><span></span><b>Lendo a conta…</b></div></div>';
   tpPosCabecalho(()=>TP_PAGINAS.tfrelatorios());
+  tpLinkRelatorio($('#tpRelSemanal'));
   const d=await tpCarregaOuErro('tfrelatorios');if(!d)return;
   const modelos=await tpPrefGet('trafego.rel.modelos',[]);
   const aplicaModelo=k=>{const m=TP_REL_MODELOS[k];TPR.m=k;TPR.cols=[...m.cols];TPR.graf=m.graf};

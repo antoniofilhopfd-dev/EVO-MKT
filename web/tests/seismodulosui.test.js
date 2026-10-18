@@ -77,6 +77,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  }
  await ir(p,'trafego');t('Visão Geral tem o atalho do relatório semanal (PDF)',!!(await p.$('#tpRelSemanalVg[href="/relatorio-trafego.html"]')));
  await ir(p,'tfrelatorios');t('Relatórios tem o atalho do relatório semanal aprovado',!!(await p.$('#tpRelSemanal[href="/relatorio-trafego.html"]')));
+ await p.evaluate(()=>setPref&&0).catch(()=>{});await p.evaluate(()=>tpDefinePeriodo('x','2026-10-04','2026-10-10'));await ir(p,'tfrelatorios');const href=await p.$eval('#tpRelSemanal',e=>{e.addEventListener('click',ev=>ev.preventDefault(),{capture:true});e.click();return e.getAttribute('href')});t('o relatório semanal abre no período escolhido no Tráfego (04/10 a 10/10)',/de=2026-10-04&ate=2026-10-10/.test(href),href);
  // ---- celular ----
  const pm=await login('NAT-3301','Nat26ab',{width:390,height:800});
  for(const pg of ['hoje','calendario','arquivos','trafego','gerenciador','configuracoes']){await ir(pm,pg);const w=await pm.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);t(`celular: ${pg} sem rolagem horizontal da página`,w<=2,w)}
