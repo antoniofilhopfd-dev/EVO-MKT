@@ -548,17 +548,3 @@ async function igPerCarrega(box){
    +t('Engajamento',pct(eng),dl(eng,engP));
   n.innerHTML=`<b>${esc(d.rotulo)}</b> · ${d.usuario?'@'+esc(d.usuario)+' · ':''}${esc(fmtDate(d.de))} a ${esc(fmtDate(d.ate))} · ${esc(d.fonte)}. ${a.posts!=null?`${a.posts} post(s) e ${a.reels} reel(s) publicados no período. `:''}Engajamento = interações ÷ alcance.${d.aviso?` <b>${esc(d.aviso)}</b>`:''}`;
 }
-
-/** Publicações › "Já publicadas no Instagram": posts sincronizados da conta escolhida que não nasceram no Estúdio (somente consulta). */
-async function carregaPubIg(alvo){
-  try{
-    if(!igContas.length)await igCarregaContas();
-    const [igp,cont]=await Promise.all([api('/instagram/posts'+igQ()),getRows('conteudos')]);
-    if(state.page!=='conteudos'||!alvo.isConnected)return;
-    const ja=new Set((cont.rows||[]).map(r=>String(r.instagramMediaId||'')).filter(Boolean));
-    const lista=(igp.rows||[]).filter(p=>p.quando&&!ja.has(String(p.id))).slice(0,30);
-    if(!lista.length){alvo.innerHTML='';return}
-    alvo.innerHTML=`<div class="mod-sub"><h3>Já publicadas no Instagram${igContas.length>1?' · @'+esc((igContas.find(c=>c.ig===igConta)||{}).usuario||''):''}</h3><p class="kpi-note">Posts lidos da conta (somente consulta). Os criados e programados pelo Estúdio aparecem na lista acima.</p>
-     <ul class="db-lista">${lista.map(p=>{const dt=new Date(p.quando),link=/^https:\/\//.test(p.link||'')?p.link:'';const dia=isNaN(dt)?String(p.quando).slice(0,10):fmtDate(stIso(dt));return `<li>${link?`<a class="db-lnk" href="${attr(link)}" target="_blank" rel="noopener">`:'<div class="db-lnk">'}<span class="db-dia">${esc(dia)}</span><span class="db-tit"><b>${esc(String(p.legenda||'(sem legenda)').slice(0,90))}</b><small>${esc([IG_TIPO[p.tipo]||p.tipo,p.interacoes?Number(p.interacoes).toLocaleString('pt-BR')+' interações':''].filter(Boolean).join(' · '))}</small></span>${link?'</a>':'</div>'}</li>`}).join('')}</ul></div>`;
-  }catch{alvo.innerHTML=''}
-}

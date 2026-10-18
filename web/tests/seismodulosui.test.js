@@ -97,7 +97,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  const igEst=await p.evaluate(()=>{const l=studioCache.ig||[];if(!l.length)return {n:0};studioSemana=stSegunda(new Date(l[0].dia+'T12:00:00'));desenharStudio();return {n:l.length,cards:document.querySelectorAll('.st-ig').length,rotulo:(document.querySelector('.st-ig em')||{}).textContent}});
  t('Estúdio mostra os posts já publicados no Instagram (somente consulta), além dos programados',igEst.n>=1&&igEst.cards>=1&&igEst.rotulo==='Publicado',igEst);
  await ir(p,'conteudos');await p.waitForTimeout(1500);
- t('Publicações lista também o que já foi publicado no Instagram (somente consulta)',/Já publicadas no Instagram/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&(await p.$$('#pubIg .db-lista li')).length>=1);
+ t('Publicações não lista os posts já publicados no Instagram (isso fica no Estúdio e nas Análises)',!(await p.$('#pubIg'))&&!/Já publicadas no Instagram/.test(await p.evaluate(()=>document.querySelector('#content').innerText)));
  // ---- posts já agendados no Instagram: acompanhados como Programado e conciliados como Publicado ----
  const conc=await p.evaluate(async()=>{const h={'Content-Type':'application/json','X-EVO':'1'};const cur=new Date().toISOString().slice(0,7);
   const mk=async b=>(await (await fetch('/api/data?module=conteudos',{method:'POST',headers:h,body:JSON.stringify(b)})).json());
