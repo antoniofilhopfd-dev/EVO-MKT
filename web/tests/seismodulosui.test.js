@@ -93,6 +93,11 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  if(optsD.length>1){await p.selectOption('[data-igconta]',optsD[1]);await p.waitForTimeout(2500);t('Dashboard: trocar a conta recarrega o resumo do Instagram',/Instagram/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&(await p.evaluate(()=>igConta))===optsD[1]);await p.selectOption('[data-igconta]',optsD[0]);await p.waitForTimeout(1500)}
  await ir(p,'conteudos');const pub=await p.evaluate(()=>document.querySelector('#content').innerText);
  t('Publicações: lista enxuta (sem Salvar filtro, Exportar CSV, Favoritar, Calendário nem chips técnicos)',!/Salvar filtro|Exportar CSV|Favoritar|Banco de dados|Backup autom/.test(pub)&&!(await p.$('[data-view="calendar"]'))&&!!(await p.$('#modNovo'))&&!!(await p.$('#moduleSearch')),pub.slice(0,300));
+ await ir(p,'studio');await p.waitForTimeout(1200);
+ const igEst=await p.evaluate(()=>{const l=studioCache.ig||[];if(!l.length)return {n:0};studioSemana=stSegunda(new Date(l[0].dia+'T12:00:00'));desenharStudio();return {n:l.length,cards:document.querySelectorAll('.st-ig').length,rotulo:(document.querySelector('.st-ig em')||{}).textContent}});
+ t('Estúdio mostra os posts já publicados no Instagram (somente consulta), além dos programados',igEst.n>=1&&igEst.cards>=1&&igEst.rotulo==='Publicado',igEst);
+ await ir(p,'conteudos');await p.waitForTimeout(1500);
+ t('Publicações lista também o que já foi publicado no Instagram (somente consulta)',/Já publicadas no Instagram/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&(await p.$$('#pubIg .db-lista li')).length>=1);
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);

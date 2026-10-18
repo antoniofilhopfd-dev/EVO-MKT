@@ -30,6 +30,16 @@ function stAtivo(r){return !/PUBLICADO|ARQUIVADO/i.test(String(r.status||''))}
 function stFiltrar(rows){return rows.filter(r=>(!studioFiltro.perfil||r.perfil===studioFiltro.perfil)&&(!studioFiltro.status||String(r.status||'').toUpperCase()===studioFiltro.status)&&(!studioFiltro.formato||r.formato===studioFiltro.formato))}
 function stContaTags(txt){return (String(txt||'').match(/#[\p{L}\p{N}_]+/gu)||[]).length}
 
+/** Post que já está no Instagram (sincronizado da Meta) e não nasceu no Estúdio: aparece como Publicado, só para consulta. */
+function stCardIg(p){
+  const link=/^https:\/\//.test(p.link||'')?p.link:'';
+  const corpo=`<span class="st-top"><b>◇ ${esc(p.hora||'')}</b><em>Publicado</em></span><strong>${esc(String(p.legenda||'(sem legenda)').slice(0,80))}</strong><small>Instagram${p.tipo?' · '+esc(IG_TIPO[p.tipo]||p.tipo):''}${p.interacoes?` · ${Number(p.interacoes).toLocaleString('pt-BR')} interações`:''}</small>`;
+  return link?`<a class="st-card st-done st-ig" href="${attr(link)}" target="_blank" rel="noopener" title="Abrir no Instagram">${corpo}</a>`:`<div class="st-card st-done st-ig">${corpo}</div>`;
+}
+function stIgDoDia(iso){
+  if(studioFiltro.perfil||studioFiltro.formato||(studioFiltro.status&&studioFiltro.status!=='PUBLICADO'))return [];
+  return (studioCache.ig||[]).filter(p=>p.dia===iso);
+}
 function stCard(r){
   const st=String(r.status||'').toUpperCase(),est=studioCache.estados.get(r.id)||'';
   const falha=/FALHA/.test(est),mov=stAtivo(r);
@@ -42,9 +52,11 @@ function stCard(r){
 
 async function renderStudio(){
   await igCarregaContas();
-  const [d,est,datas,ins]=await Promise.all([getRows('conteudos',true),api('/content/states').catch(()=>({rows:[]})),api('/datas?dias=60').catch(()=>({rows:[]})),api('/insights'+igQ()).catch(()=>null)]);
+  const [d,est,datas,ins,igp]=await Promise.all([getRows('conteudos',true),api('/content/states').catch(()=>({rows:[]})),api('/datas?dias=60').catch(()=>({rows:[]})),api('/insights'+igQ()).catch(()=>null),api('/instagram/posts'+igQ()).catch(()=>({rows:[]}))]);
+  const jaNoEstudio=new Set((d.rows||[]).map(r=>String(r.instagramMediaId||'')).filter(Boolean));
   if(state.page!=='studio')return; // o usuário já foi para outra aba: descarta este carregamento atrasado
-  studioCache={rows:(d.rows||[]).filter(r=>igContas.length<2||igContaDoPost(r)===igConta),estados:new Map((est.rows||[]).map(x=>[x.id,x.estado])),datas:datas.rows||[],horarios:ins?.horarios||null};
+  studioCache={rows:(d.rows||[]).filter(r=>igContas.length<2||igContaDoPost(r)===igConta),estados:new Map((est.rows||[]).map(x=>[x.id,x.estado])),datas:datas.rows||[],horarios:ins?.horarios||null,
+    ig:(igp.rows||[]).filter(p=>p.quando&&!jaNoEstudio.has(String(p.id))).map(p=>{const dt=new Date(p.quando);return {...p,dia:isNaN(dt)?String(p.quando).slice(0,10):stIso(dt),hora:isNaN(dt)?'':dt.toTimeString().slice(0,5)}})};
   desenharStudio();
 }
 
@@ -53,7 +65,7 @@ function desenharStudio(){
   const rows=studioCache.rows,vis=stFiltrar(rows),hoje=today(),ini=studioSemana,fim=stAddDias(ini,6);
   const cont=s=>rows.filter(r=>String(r.status||'').toUpperCase()===s).length;
   const prox14=rows.filter(r=>stAtivo(r)&&stDia(r)>=hoje&&stDia(r)<=stIso(stAddDias(new Date(),14))&&/PROGRAMADO|APROVADO/i.test(r.status||'')).length;
-  const mes=hoje.slice(0,7),pubMes=rows.filter(r=>/PUBLICADO/i.test(r.status||'')&&stDia(r).slice(0,7)===mes).length;
+  const mes=hoje.slice(0,7),pubMes=rows.filter(r=>/PUBLICADO/i.test(r.status||'')&&stDia(r).slice(0,7)===mes).length+(studioCache.ig||[]).filter(p=>String(p.dia).slice(0,7)===mes).length;
   const dias=[...Array(7)].map((_,i)=>stAddDias(ini,i));
   const datasPor=new Map();studioCache.datas.forEach(x=>{(datasPor.get(x.data)||datasPor.set(x.data,[]).get(x.data)).push(x)});
   const semData=vis.filter(r=>stAtivo(r)&&!stDia(r));
@@ -66,7 +78,7 @@ function desenharStudio(){
   <div class="card st-tip"><span>◷</span><div>${dica}</div></div>
   <div class="st-toolbar"><div class="st-nav"><button class="softbtn" id="stPrev" aria-label="Semana anterior">‹</button><b>${fmtSem}</b><button class="softbtn" id="stNext" aria-label="Próxima semana">›</button><button class="softbtn" id="stHoje">Hoje</button></div><div class="st-filtros">${sel('perfil',[...new Set([...(SELECTS.perfil||[]),...rows.map(r=>r.perfil).filter(Boolean)])],studioFiltro.perfil)}${sel('status',Object.keys(ST_ROTULO),studioFiltro.status)}${sel('formato',SELECTS.formato||[],studioFiltro.formato)}</div></div>
   <div class="st-layout"><aside class="st-backlog" data-date=""><h3>Sem data <span>${semData.length}</span></h3><p class="kpi-note">Arraste para um dia da semana para agendar.</p><div class="st-lista">${semData.map(stCard).join('')||'<div class="empty compact">Tudo com data.</div>'}</div></aside>
-  <div class="st-week">${dias.map(dt=>{const iso=stIso(dt),ps=vis.filter(r=>stDia(r)===iso).sort((a,b)=>stHora(a).localeCompare(stHora(b)));const ds=datasPor.get(iso)||[];return `<section class="st-day ${iso===hoje?'today':''} ${iso<hoje?'past':''}" data-date="${iso}"><header><b>${ST_DIAS[dt.getDay()].slice(0,3)}</b><span>${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}</span><button class="st-add" data-add="${iso}" aria-label="Novo post em ${iso}">+</button></header>${ds.map(x=>`<div class="st-data" title="${attr(x.tema)}">★ ${esc(x.titulo)}</div>`).join('')}${ps.map(stCard).join('')}</section>`}).join('')}</div></div>`;
+  <div class="st-week">${dias.map(dt=>{const iso=stIso(dt),ps=vis.filter(r=>stDia(r)===iso).sort((a,b)=>stHora(a).localeCompare(stHora(b)));const ds=datasPor.get(iso)||[];return `<section class="st-day ${iso===hoje?'today':''} ${iso<hoje?'past':''}" data-date="${iso}"><header><b>${ST_DIAS[dt.getDay()].slice(0,3)}</b><span>${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}</span><button class="st-add" data-add="${iso}" aria-label="Novo post em ${iso}">+</button></header>${ds.map(x=>`<div class="st-data" title="${attr(x.tema)}">★ ${esc(x.titulo)}</div>`).join('')}${ps.map(stCard).join('')}${stIgDoDia(iso).map(stCardIg).join('')}</section>`}).join('')}</div></div>`;
   $('#stNovo').onclick=()=>studioCompositor(null);
   if($('#stCompartilha'))$('#stCompartilha').onclick=studioCompartilhar;
   $('#stPrev').onclick=()=>{studioSemana=stAddDias(studioSemana,-7);desenharStudio()};
@@ -533,4 +545,18 @@ async function igPerCarrega(box){
    +t('Visitas ao perfil',f(a.visitasPerfil),dl(a.visitasPerfil,p&&p.visitasPerfil))+t('Interações',f(a.interacoes),dl(a.interacoes,p&&p.interacoes))
    +t('Engajamento',pct(eng),dl(eng,engP));
   n.innerHTML=`<b>${esc(d.rotulo)}</b> · ${d.usuario?'@'+esc(d.usuario)+' · ':''}${esc(fmtDate(d.de))} a ${esc(fmtDate(d.ate))} · ${esc(d.fonte)}. ${a.posts!=null?`${a.posts} post(s) e ${a.reels} reel(s) publicados no período. `:''}Engajamento = interações ÷ alcance.${d.aviso?` <b>${esc(d.aviso)}</b>`:''}`;
+}
+
+/** Publicações › "Já publicadas no Instagram": posts sincronizados da conta escolhida que não nasceram no Estúdio (somente consulta). */
+async function carregaPubIg(alvo){
+  try{
+    if(!igContas.length)await igCarregaContas();
+    const [igp,cont]=await Promise.all([api('/instagram/posts'+igQ()),getRows('conteudos')]);
+    if(state.page!=='conteudos'||!alvo.isConnected)return;
+    const ja=new Set((cont.rows||[]).map(r=>String(r.instagramMediaId||'')).filter(Boolean));
+    const lista=(igp.rows||[]).filter(p=>p.quando&&!ja.has(String(p.id))).slice(0,30);
+    if(!lista.length){alvo.innerHTML='';return}
+    alvo.innerHTML=`<div class="mod-sub"><h3>Já publicadas no Instagram${igContas.length>1?' · @'+esc((igContas.find(c=>c.ig===igConta)||{}).usuario||''):''}</h3><p class="kpi-note">Posts lidos da conta (somente consulta). Os criados e programados pelo Estúdio aparecem na lista acima.</p>
+     <ul class="db-lista">${lista.map(p=>{const dt=new Date(p.quando),link=/^https:\/\//.test(p.link||'')?p.link:'';const dia=isNaN(dt)?String(p.quando).slice(0,10):fmtDate(stIso(dt));return `<li>${link?`<a class="db-lnk" href="${attr(link)}" target="_blank" rel="noopener">`:'<div class="db-lnk">'}<span class="db-dia">${esc(dia)}</span><span class="db-tit"><b>${esc(String(p.legenda||'(sem legenda)').slice(0,90))}</b><small>${esc([IG_TIPO[p.tipo]||p.tipo,p.interacoes?Number(p.interacoes).toLocaleString('pt-BR')+' interações':''].filter(Boolean).join(' · '))}</small></span>${link?'</a>':'</div>'}</li>`}).join('')}</ul></div>`;
+  }catch{alvo.innerHTML=''}
 }

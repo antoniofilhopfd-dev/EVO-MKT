@@ -139,3 +139,5 @@
 .ig-per{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
 .ig-per .chip{border:1px solid var(--line,#E2E4EC);background:#fff;color:var(--blue,#063996);border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer;min-height:36px}
 .ig-per .chip.on{background:var(--blue,#063996);color:#fff;border-color:var(--blue,#063996)}
+
+a.st-card,div.st-card{display:block;text-decoration:none;color:inherit;text-align:left}
