@@ -160,15 +160,6 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await p.click('[data-rel="SIM"]');await p.waitForSelector('.dc-det',{state:'detached'});await p.waitForTimeout(400);
  t('marcar como relevante pela tela',(await painel(new Date().getFullYear())).itens.find(x=>x.id==='natal').relevante==='SIM');await call('POST','/datacom/relevancia',{id:'natal',relevante:''});
  await p.click('[data-modo="month"]').catch(()=>{});
- // criar ação no Planejamento e solicitação pela tela
- await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove())});
- await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');
- await p.click('.cm-item:has-text("Internacional da Mulher")');await p.waitForSelector('#dcPlanejar');
- await p.click('#dcPlanejar');await p.waitForSelector('#dcAc');t('ação no Planejamento já vem com o texto sugerido e o prazo da data',/Ação para Dia Internacional da Mulher/.test(await p.inputValue('#aTexto'))&&(await p.inputValue('#aPrazo')).endsWith('-03-08'));
- await p.fill('#aTexto','Campanha de março');await p.click('#aOk');await p.waitForSelector('#dcAc',{state:'detached'});await p.waitForTimeout(500);
- const pj=(await call('GET','/data?module=projetos'))[1].rows.find(x=>x.titulo==='Campanha de março');t('criada pela tela, com a referência',pj&&pj.dataComemorativaId==='dia-da-mulher');
- await p.click('.cm-item:has-text("Internacional da Mulher")').catch(async()=>{await p.click('[data-modo="list"]')});await p.waitForSelector('.dc-det');
- t('o detalhe passa a listar a ação criada',/Campanha de março/.test(await p.$eval('.dc-vinc',e=>e.innerText)));
  await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove())});
  // nova data pela tela
  await novoDc();

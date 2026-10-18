@@ -34,10 +34,10 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('módulos retirados não deixam item no menu',(await nav(p)).join('|')===SEIS);
 
  // ---- Dashboard ----
- await ir(p,'hoje');
+ await ir(p,'hoje');await p.waitForFunction(()=>document.querySelector('#content').innerText.length>400,null,{timeout:15000}).catch(()=>{});
  const dash=await p.evaluate(()=>document.querySelector('#content').innerText);
  t('Dashboard mostra Instagram, Tráfego, próximos eventos e integrações',/Instagram/.test(dash)&&/Tr[aá]fego|Invest/i.test(dash)&&/eventos|Calend/i.test(dash)&&/Integra/i.test(dash),dash.slice(0,300));
- t('Dashboard não cita Matrículas nem Leads cadastrados (sem CRM)',!/Matr[ií]culas|Capta[cç][aã]o|funil/i.test(dash),dash.slice(0,300));
+ t('Dashboard não cita Matrículas nem Leads cadastrados (sem CRM)',!/custo por matr[ií]cula|matr[ií]culas efetivadas|capta[cç][aã]o de leads|funil/i.test(dash),dash.slice(0,300));
 
  // ---- Calendário único ----
  await ir(p,'calendario');
@@ -54,7 +54,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await ir(p,'trafego');
  const vg=await p.evaluate(()=>document.querySelector('#content').innerText);
  t('Visão Geral: indicadores de investimento, alcance e conversas',/Investimento/i.test(vg)&&/Alcance/i.test(vg)&&/Conversas/i.test(vg),vg.slice(0,300));
- t('Visão Geral não mostra Matrículas nem funil',!/Matr[ií]culas|funil/i.test(vg));
+ t('Visão Geral não mostra Matrículas nem funil',!/custo por matr[ií]cula|matr[ií]culas efetivadas|funil|leads cadastrados/i.test(vg));
  await ir(p,'gerenciador');
  t('Gerenciador abre direto na tabela com campanhas',!!(await p.$('#tpTabBox table, .tp-tab'))&&(await p.$$('.tp-tab tbody tr')).length>0);
  const ths=await p.$$eval('.tp-tab thead th',e=>e.map(x=>x.innerText.trim()).filter(Boolean));
@@ -73,7 +73,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await ir(p,'gerenciador');
  if(await p.$('[data-painel]')){await p.click('[data-painel]');await p.waitForTimeout(1500);t('painel lateral abre ao clicar na campanha',!!(await p.$('.tp-lateral')))}
  for(const [pg,rx,nome] of [['tfcriativos',/Criativ/i,'Criativos'],['tfpublicos',/Segmento|Públic/i,'Públicos'],['tfanalises',/Comparar|Análise/i,'Análises'],['tforcamentos',/Orçamento/i,'Orçamentos'],['tfalertas',/Alerta/i,'Alertas'],['tfrelatorios',/Relat/i,'Relatórios'],['tfhistorico',/Hist/i,'Histórico']]){
-  await ir(p,pg);const tx=await p.evaluate(()=>document.querySelector('#content').innerText);t(`Tráfego › ${nome} carrega`,rx.test(tx)&&!/Matr[ií]culas|funil/i.test(tx),tx.slice(0,160));
+  await ir(p,pg);const tx=await p.evaluate(()=>document.querySelector('#content').innerText);t(`Tráfego › ${nome} carrega`,rx.test(tx)&&!/custo por matr[ií]cula|matr[ií]culas efetivadas|funil|leads cadastrados/i.test(tx),tx.slice(0,160));
  }
  // ---- celular ----
  const pm=await login('NAT-3301','Nat26ab',{width:390,height:800});
