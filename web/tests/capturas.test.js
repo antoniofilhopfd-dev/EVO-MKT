@@ -23,7 +23,8 @@ const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().sli
  await shot('01-dashboard','hoje');
  await shot('02-calendario-semana','calendario');
  await shot('03-calendario-mes','calendario',async()=>{await p.click('[data-modo="month"]');await p.waitForTimeout(500)});
- await shot('04-instagram-estudio','studio');
+ await shot('04-instagram-visao-geral','igvisao');
+ await shot('04b-instagram-estudio','studio');
  await shot('05-instagram-publicacoes','conteudos');
  await shot('06-arquivos','arquivos');
  await shot('07-trafego-visao-geral','trafego');

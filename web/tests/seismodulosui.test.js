@@ -78,6 +78,9 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await ir(p,'trafego');t('Visão Geral tem o atalho do relatório semanal (PDF)',!!(await p.$('#tpRelSemanalVg[href="/relatorio-trafego.html"]')));
  await ir(p,'tfrelatorios');t('Relatórios tem o atalho do relatório semanal aprovado',!!(await p.$('#tpRelSemanal[href="/relatorio-trafego.html"]')));
  await p.evaluate(()=>setPref&&0).catch(()=>{});await p.evaluate(()=>tpDefinePeriodo('x','2026-10-04','2026-10-10'));await ir(p,'tfrelatorios');const href=await p.$eval('#tpRelSemanal',e=>{e.addEventListener('click',ev=>ev.preventDefault(),{capture:true});e.click();return e.getAttribute('href')});t('o relatório semanal abre no período escolhido no Tráfego (04/10 a 10/10)',/de=2026-10-04&ate=2026-10-10/.test(href),href);
+ await ir(p,'igvisao');const igv=await p.evaluate(()=>document.querySelector('#content').innerText);t('Instagram › Visão geral: seguidores, publicações, interações, alcance, andamento e próximas',/Seguidores/.test(igv)&&/Publica/.test(igv)&&/Intera/.test(igv)&&/Alcance/.test(igv)&&/Andamento da produ/.test(igv)&&/Pr[oó]ximas publica/.test(igv),igv.slice(0,300));
+ t('Visão geral do Instagram é a primeira aba da área',(await p.$$eval('#subtabs .subtab',e=>e[0].textContent.trim()))==='Visão geral');
+ await p.click('[data-ig-ir="studio"].btn');await p.waitForTimeout(800);t('Visão geral: "Nova publicação" abre o Estúdio',(await p.evaluate(()=>state.page))==='studio');
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);
