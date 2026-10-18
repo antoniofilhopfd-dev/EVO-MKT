@@ -88,6 +88,9 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await p.click('[data-ig-ir="studio"].btn');await p.waitForTimeout(800);t('Visão geral: "Nova publicação" abre o Estúdio',(await p.evaluate(()=>state.page))==='studio');
  for(const [pg,rx,nome] of [['igposts',/Desempenho|publica/i,'Desempenho'],['igranking',/Ranking|Métricas|m[eê]s/i,'Ranking']]){await ir(p,pg);const tx=await p.evaluate(()=>document.querySelector('#content').innerText);t(`Instagram › ${nome} abre e traz conteúdo`,tx.length>80&&rx.test(tx),tx.slice(0,160))}
  t('Instagram: seletor de conta no topo da Visão geral (quando há conta)',(await ir(p,'igvisao'),true)&&(await p.$$('[data-igconta]')).length>=1);
+ await ir(p,'hoje');t('Dashboard: seletor de conta do Instagram no topo',(await p.$$('[data-igconta]')).length>=1);
+ const optsD=await p.$$eval('[data-igconta] option',e=>e.map(o=>o.value).filter(v=>v!=='__admin'));
+ if(optsD.length>1){await p.selectOption('[data-igconta]',optsD[1]);await p.waitForTimeout(2500);t('Dashboard: trocar a conta recarrega o resumo do Instagram',/Instagram/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&(await p.evaluate(()=>igConta))===optsD[1]);await p.selectOption('[data-igconta]',optsD[0]);await p.waitForTimeout(1500)}
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);

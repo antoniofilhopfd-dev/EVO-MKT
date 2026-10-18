@@ -51,6 +51,10 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(
  await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove());go('instagram')});await p.waitForSelector('#igPerBox [data-igper]',{timeout:20000});await p.waitForFunction(()=>!/Carregando/.test(document.querySelector('#igPerKpis')?.textContent||''),null,{timeout:20000});
  t('Métricas do Instagram mostram os 5 filtros de período e o seletor de conta',(await p.$$eval('[data-igper]',e=>e.map(x=>x.textContent))).join()==='7 dias,30 dias,90 dias,Ano,Todo'&&!!(await p.$('[data-igconta]')));
  t('a nota diz a que período e conta os números se referem',/30 dias/.test(await p.textContent('#igPerNota'))&&/@/.test(await p.textContent('#igPerNota')));
+ await p.evaluate(()=>go('hoje'));await p.waitForSelector('[data-igconta]',{timeout:20000});await p.waitForTimeout(1500);
+ const optD=await p.$$eval('[data-igconta] option',o=>o.map(x=>x.value).filter(v=>v!=='__admin'));
+ t('Dashboard: seletor de conta com as contas acompanhadas',optD.length>=2,optD);
+ if(optD.length>=2){const atual=await p.evaluate(()=>igConta);const outra=optD.find(v=>v!==atual);await p.selectOption('[data-igconta]',outra);await p.waitForTimeout(2500);const dbg=[await p.evaluate(()=>igConta),outra];t('Dashboard: trocar a conta troca o perfil exibido',dbg[0]===outra&&/instagram/i.test(await p.$eval('.db-sec',e=>e.innerText)),dbg);await p.selectOption('[data-igconta]',atual);await p.waitForTimeout(1500)}
  await p.click('[data-igper="90"]');await p.waitForFunction(()=>/90 dias/.test(document.querySelector('#igPerNota')?.textContent||''),null,{timeout:20000});
  t('trocar para 90 dias atualiza os números e marca o botão',(await p.getAttribute('[data-igper="90"]','aria-pressed'))==='true');
  t('sem erros de JavaScript',errs.length===0,errs.join(' | '));

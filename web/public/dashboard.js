@@ -16,7 +16,8 @@ function dbCard(rotulo,valor,extra='',spark='',ir=''){
 async function renderToday(){
   $('#content').innerHTML='<div class="loading"><span></span><b>Carregando o painel…</b></div>';
   let d;
-  try{d=await api('/dashboard/resumo?dias='+dbDias)}catch(e){$('#content').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar o painel</strong><p>${esc(e.message)}</p></div>`;return}
+  if(typeof igCarregaContas==='function'&&!igContas.length)await igCarregaContas();
+  try{d=await api('/dashboard/resumo?dias='+dbDias+(typeof igQ==='function'?igQ('&'):''))}catch(e){$('#content').innerHTML=`<div class="empty-rich"><strong>Não foi possível carregar o painel</strong><p>${esc(e.message)}</p></div>`;return}
   const ig=d.instagram,tp=d.trafego,nome=String(d.eu.nome||'').split(' ')[0];
   const hojeTxt=new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'2-digit',month:'long'}).format(new Date(d.hoje+'T12:00:00'));
   const avisos=[...d.integracoes.map(x=>({t:x.nome,m:x.msg,ir:'configuracoes'})),...d.alertas.map(a=>({t:`${a.regra} · ${a.campanha}`,m:a.mensagem,ir:'trafego',crit:a.severidade==='critico'}))];
@@ -25,7 +26,7 @@ async function renderToday(){
     <div class="db-acoes"><label class="db-per">Período<select id="dbDias" class="control">${[[7,'7 dias'],[14,'14 dias'],[30,'30 dias'],[90,'90 dias']].map(([v,l])=>`<option value="${v}" ${d.dias===v?'selected':''}>Últimos ${l}</option>`).join('')}</select></label>
     <button class="softbtn" data-db-ir="studio">Nova publicação</button><button class="softbtn" data-db-ir="calendario">Calendário</button><button class="btn" data-db-ir="gerenciador">Gerenciador de anúncios</button></div></div>
    ${avisos.length?`<div class="db-alerta" role="alert"><b>Atenção</b>${avisos.slice(0,4).map(a=>`<button type="button" data-db-ir="${a.ir}">${esc(a.t)} <small>${esc(a.m)}</small></button>`).join('')}</div>`:''}
-   <section class="db-sec"><header><h2>Instagram</h2><button class="db-link" data-db-ir="instagram">Ver análises ›</button></header>
+   <section class="db-sec"><header><h2>Instagram${typeof igContas!=='undefined'&&igContas.length>1?` <small>· @${esc((igContas.find(c=>c.ig===igConta)||{}).usuario||'')}</small>`:''}</h2><button class="db-link" data-db-ir="instagram">Ver análises ›</button></header>
     ${ig.conectado||ig.seguidores!==null?`<div class="db-cards">
      ${dbCard('Seguidores',dbN(ig.seguidores),ig.variacaoSeguidores===null?'':`<small class="db-var neutro">${ig.variacaoSeguidores>=0?'▲':'▼'} ${dbN(Math.abs(ig.variacaoSeguidores))} no período</small>`,EvoCharts.spark(ig.serieSeguidores.map(x=>x.seguidores)),'instagram')}
      ${dbCard('Publicações',dbN(ig.publicacoes),'<small class="db-var">no período</small>','','conteudos')}

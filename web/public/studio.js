@@ -13,7 +13,7 @@ const igQ=(pre='?')=>igConta?`${pre}conta=${encodeURIComponent(igConta)}`:'';
 async function igCarregaContas(){try{const d=await api('/instagram/contas');igContas=d.contas||[];igPrincipal=d.principal||'';if(!igConta||!igContas.some(c=>c.ig===igConta))igConta=igPrincipal||(igContas[0]&&igContas[0].ig)||''}catch{igContas=[]}igTopo()}
 const igSeletor=()=>'';
 const igSeletorTopo=()=>igContas.length>=1?`<select data-igconta aria-label="Trocar a conta do Instagram" class="ig-conta-sel">${igContas.map(c=>`<option value="${attr(c.ig)}" ${c.ig===igConta?'selected':''}>@${esc(c.usuario)}</option>`).join('')}<option value="__admin">＋ Adicionar / gerenciar contas…</option></select>`:'';
-const IG_PAGINAS={igvisao:()=>TP_PAGINAS.igvisao(),studio:()=>renderStudio(),igposts:()=>renderIgPosts(),igranking:()=>renderIgRanking(),instagram:()=>go('instagram')};
+const IG_PAGINAS={hoje:()=>renderToday(),igvisao:()=>TP_PAGINAS.igvisao(),studio:()=>renderStudio(),igposts:()=>renderIgPosts(),igranking:()=>renderIgRanking(),instagram:()=>go('instagram')};
 function igTopo(){const el=document.getElementById('igTop');if(!el)return;const ativo=IG_PAGINAS[state.page]&&igContas.length>=1;el.innerHTML=ativo?igSeletorTopo():'';el.querySelectorAll('[data-igconta]').forEach(sel=>sel.onchange=()=>{if(sel.value==='__admin'){sel.value=igConta;return go('administracao')}igConta=sel.value;try{localStorage.setItem('evo.igConta',igConta)}catch{};IG_PAGINAS[state.page]()})}
 function igLigaSeletor(){igTopo()}
 const igContaDoPost=r=>String(r.contaInstagram||igPrincipal||'');
