@@ -377,6 +377,8 @@ async function tpPainel(id){
     <div class="tp-det-topo">${o.foto?`<img class="tp-det-foto" alt="" referrerpolicy="no-referrer" src="${attr(o.foto)}">`:''}<div>${gmBadge(o.estado)} <small>${nivel==='campanha'?'Campanha':nivel==='conjunto'?'Conjunto':'Anúncio'} · ${esc(o.codigo||'')} · ${esc(o.id)}</small><div class="tp-det-ac">${adsCompleto?`<button class="softbtn" data-pa="edit">Editar</button><button class="softbtn" data-pa="tog">${o.status==='ACTIVE'?'Pausar':'Ativar'}</button><button class="softbtn" data-pa="dup">Duplicar</button>`:''}<button class="softbtn" data-pa="mais">Todos os campos</button></div></div></div>
     <div class="tp-det-k"><div><small>Investimento</small><b>${esc(gmBrl(o.gasto))}</b></div><div><small>Resultados</small><b>${gmN(o.resultados)}</b><small>${esc(o.rotuloResultado||'')}</small></div><div><small>Custo/resultado</small><b>${esc(gmMoeda(o.resultados?o.custoResultado:null))}</b></div><div><small>CTR</small><b>${o.impressoes?gmPct(o.ctr):'—'}</b></div></div>
     <h4>Evolução</h4><div class="tf-chips" id="pnMet" role="group"></div><div id="pnGr"><div class="loading"><span></span><b>Lendo a série…</b></div></div>
+    <h4>Detalhar por</h4><div class="tp-ff-acoes" style="margin:0 0 6px"><select class="control" id="pnDet" aria-label="Detalhar por"><option value="">Escolha…</option><option value="age">Idade</option><option value="gender">Gênero</option><option value="publisher_platform">Plataforma</option><option value="platform_position">Posicionamento</option><option value="impression_device">Dispositivo</option><option value="region">Região</option></select></div><div id="pnDetBox"></div>
+    ${nivel==='anuncio'?`<h4>Prévia do anúncio</h4><div class="tp-ff-acoes" style="margin:0 0 6px"><select class="control" id="pnPrevF" aria-label="Formato da prévia"><option value="INSTAGRAM_STANDARD">Feed do Instagram</option><option value="INSTAGRAM_STORY">Stories do Instagram</option><option value="INSTAGRAM_REELS">Reels do Instagram</option><option value="MOBILE_FEED_STANDARD">Feed do Facebook (celular)</option><option value="DESKTOP_FEED_STANDARD">Feed do Facebook (computador)</option></select></div><div id="pnPrev"><small class="kpi-note">Carregando a prévia…</small></div>`:''}
     <h4>Configuração</h4><dl class="dc-dl">${lin('Objetivo',esc(GM_OBJ[o.objetivo]||o.objetivo||''))}${lin('Orçamento',orc?gmOrc(orc):'')}${lin('Início',o.inicio?esc(fmtDateTime(o.inicio)):'')}${lin('Término',o.fim?esc(fmtDateTime(o.fim)):'')}${lin('Criado em',o.criado?esc(fmtDateTime(o.criado)):'')}${lin('Última alteração',o.atualizado?esc(fmtDateTime(o.atualizado)):'')}${lin('Segmento escolar',seg?esc(seg)+' <small>(pelo nome)</small>':'')}${lin('Origem',esc(o.origem||''))}${lin('Público',p?esc(tpPublicoTxt(p)):'')}${lin('Posicionamentos',p?esc([...(p.plataformas||[]),...(p.posicionamentos||[])].join(', ')||'Automáticos'):'')}${lin('Otimização',esc(o.otimizacao||''))}</dl>
     ${nivel==='anuncio'?`<h4>Criativo</h4><dl class="dc-dl">${lin('Formato',esc(cr.formato))}${lin('Título',esc(cr.titulo))}${lin('Texto',esc(cr.texto))}${lin('Botão',esc(cr.cta))}${lin('Publicação',cr.instagram?`<a href="${attr(cr.instagram)}" target="_blank" rel="noopener">abrir no Instagram</a>`:'')}${lin('Conteúdo vinculado',o.conteudo?esc(o.conteudo.id+' · '+(o.conteudo.titulo||'')):'')}</dl>`:''}
     <h4>Histórico de alterações pelo EVO MKT</h4><div id="pnHist"><small class="kpi-note">Carregando…</small></div>
@@ -385,6 +387,24 @@ async function tpPainel(id){
   const ed=pn.querySelector('[data-pa="edit"]');if(ed)ed.onclick=()=>{pn.fechar();gmEditor(o,nivel)};
   const tg=pn.querySelector('[data-pa="tog"]');if(tg)tg.onclick=async()=>{const ativar=o.status!=='ACTIVE';if(!confirm(ativar?`Ativar "${o.nome}"? Volta a gastar.`:`Pausar "${o.nome}"?`))return;try{await gmPost('/ads/editar',{nivel,id,campos:{status:ativar?'ACTIVE':'PAUSED'}});o.status=ativar?'ACTIVE':'PAUSED';o.estado=o.status;toast('Alterado na Meta');pn.fechar();tpRedesenhaTabela()}catch(e){toast(e.message,'bad')}};
   const dp=pn.querySelector('[data-pa="dup"]');if(dp)dp.onclick=async()=>{if(!confirm(`Duplicar "${o.nome}"? A cópia nasce pausada.`))return;try{await gmPost('/ads/duplicar',{nivel,id});toast('Cópia criada (pausada)');pn.fechar();tpRecarrega()}catch(e){toast(e.message,'bad')}};
+  // detalhamento por idade, gênero, plataforma…
+  pn.querySelector('#pnDet').onchange=async e=>{
+    const por=e.target.value,box=pn.querySelector('#pnDetBox');if(!por){box.innerHTML='';return}
+    box.innerHTML='<small class="kpi-note">Lendo da Meta…</small>';
+    try{
+      const r=(await api(`/ads/quebra?por=${encodeURIComponent(por)}&id=${encodeURIComponent(id)}&de=${gmDados.de}&ate=${gmDados.ate}`)).rows;
+      const rot={FEMALE:'Mulheres',MALE:'Homens',UNKNOWN:'Não informado',female:'Mulheres',male:'Homens',unknown:'Não informado'};
+      box.innerHTML=r.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>${esc(e.target.selectedOptions[0].textContent)}</th><th>Invest.</th><th>Alcance</th><th>Cliques</th><th>Conversas</th><th>Custo/conv.</th></tr></thead><tbody>${r.map(x=>`<tr><td>${esc(rot[x.chave]||x.chave||'—')}</td><td>${esc(gmBrl(x.gasto))}</td><td>${gmN(x.alcance)}</td><td>${gmN(x.cliques)}</td><td>${gmN(x.conversas)}</td><td>${x.conversas?esc(gmBrl(x.gasto/x.conversas)):'—'}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">Valores lidos da Meta no período da tela. Sem dado vira "—", nunca zero inventado.</p>`:'<div class="ch-vazio">A Meta não devolveu dados neste detalhamento e período.</div>';
+    }catch(err){box.innerHTML=`<div class="cri-msg err">${esc(err.message)}</div>`}
+  };
+  // prévia oficial do anúncio
+  if(nivel==='anuncio'){
+    const carregaPrev=async()=>{const box=pn.querySelector('#pnPrev');box.innerHTML='<small class="kpi-note">Carregando a prévia…</small>';
+      try{const r=await api(`/ads/previa-anuncio?id=${encodeURIComponent(id)}&formato=${encodeURIComponent(pn.querySelector('#pnPrevF').value)}`);
+        box.innerHTML=r.ok?`<iframe class="tp-prev" src="${attr(r.url)}" title="Prévia do anúncio" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>`:`<div class="ch-vazio">${esc(r.motivo||'Sem prévia para este formato.')}</div>`}
+      catch(err){box.innerHTML=`<div class="ch-vazio">${esc(err.message)}</div>`}};
+    pn.querySelector('#pnPrevF').onchange=carregaPrev;carregaPrev();
+  }
   // histórico local
   let hist=[];try{hist=((await api('/ads/acoes')).rows||[]).filter(x=>x.objeto_id===id)}catch{}
   pn.querySelector('#pnHist').innerHTML=hist.length?`<ul class="tp-lista">${hist.slice(0,8).map(h=>`<li><small>${esc(fmtDateTime(h.quando))} · ${esc(h.quem)}</small> ${esc(h.acao)} <span class="badge ${h.resultado==='OK'?'ok':'bad'}">${esc(h.resultado)}</span>${h.erro?`<br><small>${esc(h.erro)}</small>`:''}</li>`).join('')}</ul>`:'<small class="kpi-note">Nenhuma alteração feita pelo EVO MKT neste item.</small>';
@@ -395,11 +415,21 @@ async function tpPainel(id){
   try{serie=(await api(`/ads/serie?id=${encodeURIComponent(id)}&de=${gmDados.de}&ate=${gmDados.ate}`)).rows;if(!serie.length)pn.querySelector('#pnGr').innerHTML='<div class="ch-vazio">A Meta não devolveu dias com entrega neste período.</div>';else grafico()}catch(e){pn.querySelector('#pnGr').innerHTML=`<div class="ch-vazio">Série indisponível: ${esc(e.message)}</div>`}
 }
 // ---------- tela ----------
+/** Faixa da conta como no cabeçalho do Gerenciador da Meta: gasto total, limite, saldo e pagamento. */
+async function tpCarregaConta(){
+  const box=$('#tpConta');if(!box)return;
+  try{
+    const c=await api('/ads/conta');if(!$('#tpConta'))return;
+    const m=v=>v===null||v===undefined?'—':gmBrl(v);
+    const uso=c.limiteGasto&&c.gastoTotal!==null?Math.round(c.gastoTotal/c.limiteGasto*100):null;
+    $('#tpConta').innerHTML=`<span class="tp-ct ${c.ativa?'ok':'bad'}">${c.ativa?'● Conta ativa':'⚠ Conta com restrição'}</span><span><small>Conta</small> <b>${esc(c.nome||'—')}</b></span><span><small>Gasto total</small> <b>${esc(m(c.gastoTotal))}</b></span><span><small>Limite de gastos</small> <b>${c.limiteGasto?esc(m(c.limiteGasto)):'sem limite'}</b>${uso!==null?` <small>(${uso}% usado)</small>`:''}</span><span><small>Saldo a pagar</small> <b>${esc(m(c.saldo))}</b></span>${c.pagamento?`<span><small>Pagamento</small> <b>${esc(c.pagamento)}</b></span>`:''}`;
+  }catch{box.innerHTML=''}
+}
 async function tpRecarrega(){await tpArvore(true);tpDesenhaGm()}
 async function renderGerenciador(){
   state.module=null;
   await adsCarregaModo();await tpCfgCarrega();
-  $('#content').innerHTML=`<div class="tp-topo"><div class="tf-head" style="margin:0"><div><small>TRÁFEGO PAGO · GERENCIADOR DE ANÚNCIOS</small><h1>Campanhas, conjuntos e anúncios</h1></div></div><div class="tp-topo-d">${tpSeletorPeriodo()}<span id="tpSaudeBox"></span><button class="softbtn" id="tpAtualiza">Atualizar</button>${adsCompleto?'<button class="btn" id="tpNova">+ Criar</button>':''}</div></div><div id="tpGm"><div class="loading"><span></span><b>Lendo a conta na Meta…</b></div></div>`;
+  $('#content').innerHTML=`<div class="tp-topo"><div class="tf-head" style="margin:0"><div><small>TRÁFEGO PAGO · GERENCIADOR DE ANÚNCIOS</small><h1>Campanhas, conjuntos e anúncios</h1></div></div><div class="tp-topo-d">${tpSeletorPeriodo()}<span id="tpSaudeBox"></span><button class="softbtn" id="tpAtualiza">Atualizar</button>${adsCompleto?'<button class="btn" id="tpNova">+ Criar</button>':''}</div></div><div id="tpConta" class="tp-conta" aria-label="Conta de anúncios"></div><div id="tpGm"><div class="loading"><span></span><b>Lendo a conta na Meta…</b></div></div>`;
   tpLigaPeriodo(()=>renderGerenciador());
   $('#tpAtualiza').onclick=tpRecarrega;
   if($('#tpNova'))$('#tpNova').onclick=()=>tpMenuCriar();
@@ -410,4 +440,5 @@ async function renderGerenciador(){
   for(const [n] of TP_NIVEIS){const pd=GM2.cfg.padrao[n];if(pd&&!GM2.cfg._aplicou){const v=(GM2.cfg.visoes[n]||[]).find(x=>x.id===pd);if(v){const c=GM2.cfg.nivel[n];c.modelo='v:'+v.id;c.cols=[...v.cols];c.larg={...(v.larg||{})};c.fixas=[...(v.fixas||[])]}}}
   GM2.cfg._aplicou=true;
   tpDesenhaGm();
+  tpCarregaConta();
 }

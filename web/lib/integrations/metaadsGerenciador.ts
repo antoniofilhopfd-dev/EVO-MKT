@@ -4,7 +4,7 @@ import { registrarNotificacao } from '../notificacoes';
 import { intLog, setting } from '../settings';
 import { fmtDate, now, parseLocal, Row } from '../util';
 import { ContaAds, paginar } from './metaads';
-import { cfgGestao } from './metaadsGestao';
+import { cfgGestao, resolverCidade } from './metaadsGestao';
 import { metaConnected, metaGet, metaPost } from './meta';
 
 /**
@@ -91,7 +91,7 @@ export async function arvore(de: string, ate: string, arquivados = false): Promi
   const a = `act_${conta}`, filtro = JSON.stringify([...ATIVOS, ...(arquivados ? ['ARCHIVED'] : [])]);
   const tr = JSON.stringify({ since: de, until: ate });
   const camp = await paginar(`/${a}/campaigns`, { fields: 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time,stop_time,budget_remaining,created_time,updated_time', effective_status: filtro, limit: 200 }, 4);
-  const conj = await paginar(`/${a}/adsets`, { fields: 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,start_time,end_time,optimization_goal,destination_type,bid_strategy,targeting,promoted_object,created_time,updated_time', effective_status: filtro, limit: 200 }, 4);
+  const conj = await paginar(`/${a}/adsets`, { fields: 'id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,start_time,end_time,optimization_goal,destination_type,bid_strategy,bid_amount,targeting,promoted_object,created_time,updated_time', effective_status: filtro, limit: 200 }, 4);
   const anun = await paginar(`/${a}/ads`, { fields: 'id,name,adset_id,campaign_id,status,effective_status,created_time,updated_time,creative.thumbnail_width(120).thumbnail_height(150){id,thumbnail_url,title,body,call_to_action_type,object_type,instagram_permalink_url,object_story_spec,url_tags}', effective_status: filtro, limit: 200 }, 6);
   const por = async (level: string, campo: string) => {
     const m = new Map<string, ReturnType<typeof ins>>();
@@ -102,11 +102,11 @@ export async function arvore(de: string, ate: string, arquivados = false): Promi
   const objDe = new Map(camp.map((c) => [String(c.id), String(c.objective ?? '')]));
   const goalDe = new Map(conj.map((c) => [String(c.id), String(c.optimization_goal ?? '')]));
   const orc = (o: Row) => ({ diario: o.daily_budget ? deMenor(o.daily_budget, moeda) : null, total: o.lifetime_budget ? deMenor(o.lifetime_budget, moeda) : null });
-  const pub = (t: Row) => ({ idadeMin: t?.age_min ?? null, idadeMax: t?.age_max ?? null, cidades: (t?.geo_locations?.cities ?? []).map((c: Row) => ({ key: String(c.key), nome: String(c.name ?? ''), raioKm: num(c.radius) })), plataformas: t?.publisher_platforms ?? [], posicionamentos: [...(t?.facebook_positions ?? []).map((x: string) => 'fb:' + x), ...(t?.instagram_positions ?? []).map((x: string) => 'ig:' + x)], generos: (t?.genders ?? []).map((g: number) => (g === 1 ? 'Homens' : g === 2 ? 'Mulheres' : String(g))), regioes: (t?.geo_locations?.regions ?? []).map((r: Row) => String(r.name ?? r.key ?? '')), paises: t?.geo_locations?.countries ?? [] });
+  const pub = (t: Row) => ({ idadeMin: t?.age_min ?? null, idadeMax: t?.age_max ?? null, cidades: (t?.geo_locations?.cities ?? []).map((c: Row) => ({ key: String(c.key), nome: String(c.name ?? ''), raioKm: num(c.radius) })), plataformas: t?.publisher_platforms ?? [], posicionamentos: [...(t?.facebook_positions ?? []).map((x: string) => 'fb:' + x), ...(t?.instagram_positions ?? []).map((x: string) => 'ig:' + x)], generos: (t?.genders ?? []).map((g: number) => (g === 1 ? 'Homens' : g === 2 ? 'Mulheres' : String(g))), regioes: (t?.geo_locations?.regions ?? []).map((r: Row) => String(r.name ?? r.key ?? '')), paises: t?.geo_locations?.countries ?? [], interesses: (t?.flexible_spec ?? []).flatMap((f: Row) => f.interests ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.name ?? i.id) })), personalizados: (t?.custom_audiences ?? []).map((a: Row) => ({ id: String(a.id), nome: String(a.name ?? a.id) })) });
   const anuncios = anun.map((x) => ({ id: String(x.id), nome: String(x.name ?? ''), adset: String(x.adset_id ?? ''), campanha: String(x.campaign_id ?? ''), status: String(x.status ?? ''), estado: String(x.effective_status ?? x.status ?? ''), foto: /^https:\/\//.test(String(x.creative?.thumbnail_url ?? '')) ? String(x.creative.thumbnail_url) : '', criado: String(x.created_time ?? ''), atualizado: String(x.updated_time ?? ''), criativo: criativoDe(x.creative), ...metricas(iAn.get(String(x.id)), objDe.get(String(x.campaign_id)) ?? '', goalDe.get(String(x.adset_id)) ?? '') }));
   const conjuntos = conj.map((x) => ({
     id: String(x.id), nome: String(x.name ?? ''), campanha: String(x.campaign_id ?? ''), status: String(x.status ?? ''), estado: String(x.effective_status ?? x.status ?? ''), orcamento: orc(x), inicio: String(x.start_time ?? ''), fim: String(x.end_time ?? ''),
-    criado: String(x.created_time ?? ''), atualizado: String(x.updated_time ?? ''), evento: String(x.promoted_object?.custom_event_type ?? ''), estrategiaLance: String(x.bid_strategy ?? ''), otimizacao: String(x.optimization_goal ?? ''), destino: String(x.destination_type ?? ''), publico: pub(x.targeting ?? {}), ...metricas(iConj.get(String(x.id)), objDe.get(String(x.campaign_id)) ?? '', String(x.optimization_goal ?? '')),
+    criado: String(x.created_time ?? ''), atualizado: String(x.updated_time ?? ''), evento: String(x.promoted_object?.custom_event_type ?? ''), estrategiaLance: String(x.bid_strategy ?? ''), lanceValor: x.bid_amount ? deMenor(x.bid_amount, moeda) : null, otimizacao: String(x.optimization_goal ?? ''), destino: String(x.destination_type ?? ''), publico: pub(x.targeting ?? {}), ...metricas(iConj.get(String(x.id)), objDe.get(String(x.campaign_id)) ?? '', String(x.optimization_goal ?? '')),
     anuncios: anuncios.filter((n) => n.adset === String(x.id)),
   }));
   const campanhas = camp.map((x) => ({
@@ -152,7 +152,7 @@ const dataIso = (v: string, nome: string) => {
   return d.toISOString();
 };
 
-export interface Campos { nome?: string; status?: string; orcamentoDia?: number; orcamentoTotal?: number; inicio?: string; fim?: string; idadeMin?: number; idadeMax?: number; raioKm?: number }
+export interface Campos { nome?: string; status?: string; orcamentoDia?: number; orcamentoTotal?: number; inicio?: string; fim?: string; idadeMin?: number; idadeMax?: number; raioKm?: number; cidade?: string; genero?: string; plataformas?: string[]; interesses?: { id: string; nome: string }[]; publicosPersonalizados?: string[]; lance?: { tipo?: string; valor?: number }; criativo?: { texto?: string; titulo?: string; descricao?: string; cta?: string; link?: string } }
 
 export async function editarObjeto(nivel: Nivel, id: string, c: Campos, confirmou: boolean, quem: string): Promise<Row> {
   if (!NIVEIS.includes(nivel)) throw new Error('Nível inválido.');
@@ -161,8 +161,9 @@ export async function editarObjeto(nivel: Nivel, id: string, c: Campos, confirmo
   if (!cfg.ativa) throw new Error('A gestão de anúncios está desligada. Ligue em Tráfego → Gestor de anúncios e reconecte a Meta.');
   const pedido: Row = {};
   const campoOrc = nivel === 'anuncio' ? '' : 'daily_budget,lifetime_budget,';
-  const campoData = nivel === 'campanha' ? 'start_time,stop_time,' : nivel === 'conjunto' ? 'start_time,end_time,targeting,' : '';
-  const atual = await conferirObjeto(id, conta, `status,${campoOrc}${campoData}`.replace(/,$/, ''));
+  const campoData = nivel === 'campanha' ? 'start_time,stop_time,' : nivel === 'conjunto' ? 'start_time,end_time,targeting,bid_strategy,bid_amount,' : '';
+  const campoCri = nivel === 'anuncio' ? 'creative{id,name,object_story_spec,instagram_user_id,source_instagram_media_id},' : '';
+  const atual = await conferirObjeto(id, conta, `status,${campoOrc}${campoData}${campoCri}`.replace(/,$/, ''));
   const antes: Row = {}, depois: Row = {};
   if (c.nome !== undefined) {
     const n = String(c.nome).trim();
@@ -197,18 +198,67 @@ export async function editarObjeto(nivel: Nivel, id: string, c: Campos, confirmo
       if (new Date(String(pedido[k])).getTime() - Date.now() > cfg.diasMax * 86400000 + 86400000 && nivel === 'conjunto') throw new Error(`O término passa da duração máxima (${cfg.diasMax} dias).`);
     }
   }
-  if (nivel === 'conjunto' && (c.idadeMin !== undefined || c.idadeMax !== undefined || c.raioKm !== undefined)) {
+  const mexeuPublico = c.idadeMin !== undefined || c.idadeMax !== undefined || c.raioKm !== undefined || c.cidade !== undefined || c.genero !== undefined || c.plataformas !== undefined || c.interesses !== undefined || c.publicosPersonalizados !== undefined;
+  if (nivel === 'conjunto' && mexeuPublico) {
     const t: Row = JSON.parse(JSON.stringify(atual.targeting ?? {}));
     const a = c.idadeMin ?? t.age_min ?? cfg.publico.idadeMin, z = c.idadeMax ?? t.age_max ?? cfg.publico.idadeMax;
     if (!(a >= 18 && z <= 65 && a <= z)) throw new Error('Faixa de idade inválida (18 a 65, mínima ≤ máxima).');
     t.age_min = a; t.age_max = z;
+    if (c.cidade !== undefined && String(c.cidade).trim()) {
+      const nova = await resolverCidade(String(c.cidade));
+      const raioAtual = t.geo_locations?.cities?.[0]?.radius ?? cfg.publico.raioKm;
+      t.geo_locations = { ...(t.geo_locations ?? {}), cities: [{ key: nova.key, name: nova.nome, radius: c.raioKm ?? raioAtual, distance_unit: 'kilometer' }] };
+    }
     if (c.raioKm !== undefined) {
       if (!(c.raioKm >= 1 && c.raioKm <= 80)) throw new Error('O raio deve estar entre 1 e 80 km.');
       if (!t.geo_locations?.cities?.length) throw new Error('Este conjunto não tem cidade para ajustar o raio.');
       t.geo_locations.cities = t.geo_locations.cities.map((x: Row) => ({ ...x, radius: c.raioKm, distance_unit: 'kilometer' }));
     }
-    antes.publico = { idadeMin: atual.targeting?.age_min, idadeMax: atual.targeting?.age_max, raioKm: atual.targeting?.geo_locations?.cities?.[0]?.radius }; depois.publico = { idadeMin: a, idadeMax: z, raioKm: c.raioKm ?? antes.publico.raioKm };
+    if (c.genero !== undefined) {
+      if (!['todos', 'mulheres', 'homens'].includes(c.genero)) throw new Error('Gênero inválido.');
+      if (c.genero === 'todos') delete t.genders; else t.genders = c.genero === 'mulheres' ? [2] : [1];
+    }
+    if (c.plataformas !== undefined) {
+      if (!Array.isArray(c.plataformas) || c.plataformas.some((x) => !['instagram', 'facebook', 'messenger', 'audience_network'].includes(x))) throw new Error('Plataforma de veiculação inválida.');
+      if (c.plataformas.length) t.publisher_platforms = c.plataformas; else { delete t.publisher_platforms; delete t.facebook_positions; delete t.instagram_positions; } // vazio = posicionamentos automáticos
+    }
+    if (c.interesses !== undefined) {
+      if (!Array.isArray(c.interesses) || c.interesses.length > 20) throw new Error('Até 20 interesses.');
+      if (c.interesses.length) t.flexible_spec = [{ interests: c.interesses.map((i) => ({ id: String(i.id), name: String(i.nome ?? i.id) })) }]; else delete t.flexible_spec;
+    }
+    if (c.publicosPersonalizados !== undefined) {
+      if (!Array.isArray(c.publicosPersonalizados) || c.publicosPersonalizados.length > 20 || c.publicosPersonalizados.some((x) => !ID_OK.test(String(x)))) throw new Error('Público personalizado inválido (até 20).');
+      if (c.publicosPersonalizados.length) t.custom_audiences = c.publicosPersonalizados.map((id) => ({ id: String(id) })); else delete t.custom_audiences;
+    }
+    antes.publico = { idadeMin: atual.targeting?.age_min, idadeMax: atual.targeting?.age_max, raioKm: atual.targeting?.geo_locations?.cities?.[0]?.radius, cidade: atual.targeting?.geo_locations?.cities?.[0]?.name, genders: atual.targeting?.genders ?? null, plataformas: atual.targeting?.publisher_platforms ?? null };
+    depois.publico = { idadeMin: a, idadeMax: z, raioKm: t.geo_locations?.cities?.[0]?.radius ?? null, cidade: t.geo_locations?.cities?.[0]?.name, genders: t.genders ?? null, plataformas: t.publisher_platforms ?? null, interesses: (t.flexible_spec?.[0]?.interests ?? []).length, personalizados: (t.custom_audiences ?? []).length };
     pedido.targeting = JSON.stringify(t);
+  }
+  if (nivel === 'conjunto' && c.lance !== undefined) {
+    const tipo = String(c.lance.tipo ?? '');
+    if (!['MENOR_CUSTO', 'LIMITE_CUSTO'].includes(tipo)) throw new Error('Estratégia de lance inválida.');
+    if (tipo === 'LIMITE_CUSTO') {
+      const v = Number(c.lance.valor);
+      if (!(v > 0)) throw new Error('Informe o valor do limite de custo.');
+      pedido.bid_strategy = 'COST_CAP'; pedido.bid_amount = paraMenor(v, moeda);
+    } else pedido.bid_strategy = 'LOWEST_COST_WITHOUT_CAP';
+    antes.lance = { estrategia: atual.bid_strategy ?? null, valor: atual.bid_amount ? deMenor(atual.bid_amount, moeda) : null }; depois.lance = { estrategia: pedido.bid_strategy, valor: c.lance.valor ?? null };
+  }
+  if (nivel === 'anuncio' && c.criativo !== undefined) {
+    // criativo de anúncio não se edita na Meta: cria-se um novo criativo com os campos mudados e troca-se no anúncio
+    const cr = atual.creative ?? {}, ld = cr.object_story_spec?.link_data;
+    if (!ld) throw new Error('Este anúncio usa uma publicação do Instagram (ou vídeo): o texto vem da própria publicação. Edite a publicação, ou crie um anúncio novo.');
+    const n = c.criativo, novoLd: Row = { ...ld };
+    if (n.texto !== undefined) novoLd.message = String(n.texto).slice(0, 2000);
+    if (n.titulo !== undefined) novoLd.name = String(n.titulo).slice(0, 255);
+    if (n.descricao !== undefined) novoLd.description = String(n.descricao).slice(0, 255);
+    if (n.link !== undefined) { if (!/^https:\/\/[^\s]{4,500}$/.test(String(n.link))) throw new Error('O link precisa começar com https://.'); novoLd.link = String(n.link); if (novoLd.call_to_action?.value) novoLd.call_to_action = { ...novoLd.call_to_action, value: { ...novoLd.call_to_action.value, link: String(n.link) } }; }
+    if (n.cta !== undefined) { if (!['LEARN_MORE', 'SIGN_UP', 'CONTACT_US', 'APPLY_NOW', 'GET_QUOTE', 'SHOP_NOW', 'MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'NO_BUTTON'].includes(String(n.cta))) throw new Error('Botão de chamada inválido.'); if (n.cta === 'NO_BUTTON') delete novoLd.call_to_action; else novoLd.call_to_action = { type: String(n.cta), value: novoLd.call_to_action?.value ?? { link: String(novoLd.link ?? '') } }; }
+    const spec = { ...cr.object_story_spec, link_data: novoLd };
+    const novoCri = await metaPost(`/act_${conta}/adcreatives`, { name: `${String(cr.name ?? atual.name).slice(0, 200)} (editado)`, object_story_spec: JSON.stringify(spec), ...(cr.instagram_user_id ? { instagram_user_id: cr.instagram_user_id } : {}) });
+    pedido.creative = JSON.stringify({ creative_id: String(novoCri.id) });
+    antes.criativo = { texto: ld.message ?? null, titulo: ld.name ?? null, descricao: ld.description ?? null, cta: ld.call_to_action?.type ?? null, link: ld.link ?? null };
+    depois.criativo = { texto: novoLd.message ?? null, titulo: novoLd.name ?? null, descricao: novoLd.description ?? null, cta: novoLd.call_to_action?.type ?? null, link: novoLd.link ?? null };
   }
   if (!Object.keys(pedido).length) throw new Error('Nada para alterar.');
   const nome = String(atual.name ?? id), acao = Object.keys(depois).join('+');

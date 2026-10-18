@@ -41,6 +41,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await call('POST','/ads/gestao/config',{ativa:true,cidade:'João Pessoa'});
  const ed=async(nivel,id,campos,confirmou)=>call('POST','/ads/editar',{nivel,id,campos,confirmou});
  const edits=async id=>((await mock('/__state')).edits||{})[id]||[];
+ const novos=async()=>Object.entries((await mock('/__state')).ads_novos||{});
  // nome e status
  [s]=await ed('campanha','c1',{nome:'Matrículas 2027 – v2'});t('renomear campanha',s===200&&(await edits('c1')).some(e=>e.name==='Matrículas 2027 – v2'));
  [s]=await ed('campanha','c1',{nome:'  '});t('nome vazio é recusado',s===400);
@@ -64,6 +65,35 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s]=await ed('conjunto','s1',{idadeMin:30,idadeMax:50,raioKm:25});const tg=JSON.parse(((await edits('s1')).filter(e=>e.targeting).pop()||{targeting:'{}'}).targeting);
  t('editar público: idade 30 a 50 e raio 25 km mantendo a cidade',s===200&&tg.age_min===30&&tg.age_max===50&&tg.geo_locations.cities[0].radius===25&&tg.geo_locations.cities[0].key==='2430536'&&tg.publisher_platforms===undefined||(s===200&&tg.age_min===30&&tg.geo_locations.cities[0].radius===25),tg);
  [s]=await ed('conjunto','s1',{raioKm:100});t('raio acima de 80 km: recusado',s===400);
+ // edição ampliada do conjunto (o que o Gerenciador da Meta também edita)
+ [s]=await ed('conjunto','s1',{genero:'mulheres',plataformas:['instagram'],interesses:[{id:'6003107902433',nome:'Educação infantil'}],publicosPersonalizados:['CA1'],cidade:'João Pessoa'});const tg2=JSON.parse(((await edits('s1')).filter(e=>e.targeting).pop()||{targeting:'{}'}).targeting);
+ t('editar público: gênero, plataforma, interesse, público personalizado e cidade',s===200&&JSON.stringify(tg2.genders)==='[2]'&&JSON.stringify(tg2.publisher_platforms)==='["instagram"]'&&tg2.flexible_spec[0].interests[0].id==='6003107902433'&&tg2.custom_audiences[0].id==='CA1'&&tg2.geo_locations.cities[0].key==='2430536',tg2);
+ [s]=await ed('conjunto','s1',{genero:'todos',plataformas:[],interesses:[],publicosPersonalizados:[]});const tg3=JSON.parse(((await edits('s1')).filter(e=>e.targeting).pop()||{targeting:'{}'}).targeting);
+ t('limpar gênero, plataformas (automático), interesses e públicos personalizados',s===200&&tg3.genders===undefined&&tg3.publisher_platforms===undefined&&tg3.flexible_spec===undefined&&tg3.custom_audiences===undefined,tg3);
+ [s]=await ed('conjunto','s1',{plataformas:['tiktok']});t('plataforma inválida é recusada',s===400);
+ [s]=await ed('conjunto','s1',{genero:'x'});t('gênero inválido é recusado',s===400);
+ [s]=await ed('conjunto','s1',{publicosPersonalizados:['a b;c']});t('público personalizado malformado é recusado',s===400);
+ [s]=await ed('conjunto','s1',{lance:{tipo:'LIMITE_CUSTO',valor:12.5}});const lb=((await edits('s1')).filter(e=>e.bid_strategy).pop()||{});
+ t('lance: limite de custo R$ 12,50 (1250) com a estratégia COST_CAP',s===200&&lb.bid_strategy==='COST_CAP'&&lb.bid_amount==='1250',lb);
+ [s]=await ed('conjunto','s1',{lance:{tipo:'LIMITE_CUSTO'}});t('limite de custo sem valor é recusado',s===400);
+ [s]=await ed('conjunto','s1',{lance:{tipo:'MENOR_CUSTO'}});t('voltar ao menor custo',s===200&&((await edits('s1')).filter(e=>e.bid_strategy).pop()||{}).bid_strategy==='LOWEST_COST_WITHOUT_CAP');
+ // detalhamento, prévia, conta e atividade da Meta (somente leitura)
+ [s,r]=await call('GET','/ads/quebra?por=age&id=c1&de=2026-09-01&ate=2026-10-17');t('detalhar uma campanha por idade (e não a conta toda)',s===200&&r.rows.length===2&&r.rows[0].chave==='25-34'&&r.rows[0].gasto===400&&r.rows[0].conversas===9,r);
+ [s,r]=await call('GET','/ads/quebra?por=impression_device&id=s1&de=2026-09-01&ate=2026-10-17');t('detalhar por dispositivo',s===200&&r.rows.length===1,r);
+ [s]=await call('GET','/ads/quebra?por=age&id=OUTRA_1&de=2026-09-01&ate=2026-10-17');t('detalhar objeto de outra conta é recusado',s===400||s===502);
+ [s]=await call('GET','/ads/quebra?por=cpf&id=c1&de=2026-09-01&ate=2026-10-17');t('dimensão não permitida é recusada',s===400);
+ [s,r]=await call('GET','/ads/previa-anuncio?id=a1&formato=INSTAGRAM_STANDARD');t('prévia oficial do anúncio (endereço da Meta)',s===200&&r.ok===true&&/^https:\/\/www\.facebook\.com\//.test(r.url)&&!/&amp;/.test(r.url),r);
+ [s]=await call('GET','/ads/previa-anuncio?id=a1&formato=XPTO');t('formato de prévia inválido é recusado',s===400);
+ [s,r]=await call('GET','/ads/conta');t('conta: gasto total, limite, saldo e pagamento (só leitura)',s===200&&r.gastoTotal===9500&&r.limiteGasto===10000&&r.saldo===123.45&&r.pagamento==='Visa 4242'&&r.ativa===true,r);
+ [s,r]=await call('GET','/ads/atividade');t('atividade da Meta: quem mudou o quê',s===200&&r.rows[0].quem==='Maria Gestora'&&/Orçamento/.test(r.rows[0].evento),r);
+ [s]=await call('GET','/ads/atividade',null,{...J});t('rotas novas exigem login',s===401);
+ // criativo do anúncio: cria um criativo novo com as mudanças e troca no anúncio
+ const antesCri=(await novos()).filter(([,v])=>v.tipo==='criativo').length;
+ [s]=await ed('anuncio','a1',{criativo:{texto:'Matrículas abertas 2027',titulo:'Venha conhecer',cta:'SIGN_UP'}});const novoCri=(await novos()).filter(([,v])=>v.tipo==='criativo').pop(),lk=novoCri&&JSON.parse(novoCri[1].params.object_story_spec).link_data,adEd=(await edits('a1')).filter(e=>e.creative).pop();
+ t('editar anúncio: cria criativo novo com texto, título e botão mudados e troca no anúncio',s===200&&(await novos()).filter(([,v])=>v.tipo==='criativo').length===antesCri+1&&lk.message==='Matrículas abertas 2027'&&lk.name==='Venha conhecer'&&lk.call_to_action.type==='SIGN_UP'&&lk.link==='https://colegio.example/matricula'&&adEd&&JSON.parse(adEd.creative).creative_id===novoCri[0],[lk,adEd]);
+ [s]=await ed('anuncio','a1',{criativo:{link:'http://inseguro'}});t('link do anúncio precisa ser https',s===400);
+ [s]=await ed('anuncio','a1',{criativo:{cta:'XPTO'}});t('botão inválido é recusado',s===400);
+ [s]=await ed('anuncio','a1',{nome:'Vídeo depoimento v2'});t('renomear anúncio continua funcionando',s===200);
  [s]=await ed('conjunto','s1',{idadeMin:70,idadeMax:75});t('idade fora de 18 a 65: recusada',s===400);
  [s]=await ed('conjunto','s2',{raioKm:10});t('raio em conjunto sem cidade: recusado com explicação',s===400);
  // segurança de objeto

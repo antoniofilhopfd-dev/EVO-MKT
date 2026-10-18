@@ -24,13 +24,14 @@ export async function serieObjeto(id: string, de: string, ate: string): Promise<
   return linhas.map((l) => ({ dia: String(l.date_start), gasto: num(l.spend), impressoes: num(l.impressions), alcance: num(l.reach), cliques: num(l.clicks), conversas: acao(l, 'onsite_conversion.messaging_conversation_started_7d'), leads: acao(l, 'lead', 'onsite_conversion.lead_grouped') })).sort((a, b) => a.dia.localeCompare(b.dia));
 }
 
-const POR = new Set(['publisher_platform', 'platform_position', 'age', 'gender', 'region', 'device_platform']);
+const POR = new Set(['publisher_platform', 'platform_position', 'age', 'gender', 'region', 'device_platform', 'impression_device']);
 /** Distribuição do investimento e dos resultados da conta por uma dimensão (somente as que a Meta oferece em /insights). */
-export async function quebra(por: string, de: string, ate: string): Promise<Row[]> {
+export async function quebra(por: string, de: string, ate: string, objeto = ''): Promise<Row[]> {
   const dims = por.split(',').map((x) => x.trim());
   if (!dims.length || dims.length > 2 || !dims.every((d) => POR.has(d))) throw new Error('Dimensão não permitida.');
   const { id: conta } = await act();
-  const linhas = await paginar(`/act_${conta}/insights`, { level: 'account', fields: 'spend,impressions,reach,clicks,actions', breakdowns: dims.join(','), time_range: faixa(de, ate), limit: 200 }, 4);
+  if (objeto) await conferirObjeto(objeto, conta, ''); // detalhar uma campanha, um conjunto ou um anúncio (e não a conta inteira)
+  const linhas = await paginar(objeto ? `/${objeto}/insights` : `/act_${conta}/insights`, { ...(objeto ? {} : { level: 'account' }), fields: 'spend,impressions,reach,clicks,actions', breakdowns: dims.join(','), time_range: faixa(de, ate), limit: 200 }, 4);
   return linhas.map((l) => ({ chave: dims.map((d) => String(l[d] ?? '')).join(' · '), gasto: num(l.spend), impressoes: num(l.impressions), alcance: num(l.reach), cliques: num(l.clicks), conversas: acao(l, 'onsite_conversion.messaging_conversation_started_7d'), leads: acao(l, 'lead', 'onsite_conversion.lead_grouped') })).sort((a, b) => b.gasto - a.gasto);
 }
 
@@ -109,3 +110,35 @@ export async function avaliarLimitesGasto(notificar = false): Promise<Row[]> {
   return out;
 }
 export { pacingMes, now };
+
+
+const PREVIAS = new Set(['INSTAGRAM_STANDARD', 'INSTAGRAM_STORY', 'INSTAGRAM_REELS', 'DESKTOP_FEED_STANDARD', 'MOBILE_FEED_STANDARD']);
+/** Prévia oficial do anúncio (como ele aparece em cada posicionamento). A Meta devolve um <iframe>: só repassamos o endereço, se for da própria Meta. */
+export async function previaAnuncio(id: string, formato: string): Promise<Row> {
+  if (!PREVIAS.has(formato)) throw new Error('Formato de prévia inválido.');
+  const { id: conta } = await act();
+  await conferirObjeto(id, conta, '');
+  const r = await metaGet(`/${id}/previews`, { ad_format: formato });
+  const html = String(r.data?.[0]?.body ?? '');
+  const m = html.match(/src="(https:\/\/[^"]+)"/);
+  const url = m ? m[1].replace(/&amp;/g, '&') : '';
+  if (!/^https:\/\/([a-z0-9-]+\.)?(facebook|fbcdn|instagram)\.com\//i.test(url)) return { ok: false, motivo: 'A Meta não devolveu uma prévia para este anúncio neste formato.' };
+  return { ok: true, url, formato };
+}
+
+/** Dados da conta de anúncios como no cabeçalho do Gerenciador da Meta: gasto total, limite de gastos, saldo e forma de pagamento. Só leitura. */
+export async function resumoConta(): Promise<Row> {
+  const { id: conta } = await act();
+  const a = await metaGet(`/act_${conta}`, { fields: 'name,currency,account_status,disable_reason,amount_spent,spend_cap,balance,timezone_name,funding_source_details' });
+  const moeda = String(a.currency ?? 'BRL'), cent = ['JPY', 'KRW', 'CLP', 'VND'].includes(moeda) ? 1 : 100;
+  const val = (v: unknown) => (v === undefined || v === null || v === '' ? null : Number(v) / cent);
+  return { nome: String(a.name ?? ''), moeda, statusCodigo: Number(a.account_status ?? 0), ativa: Number(a.account_status) === 1, motivoDesativacao: Number(a.disable_reason ?? 0) || null,
+    gastoTotal: val(a.amount_spent), limiteGasto: Number(a.spend_cap) ? val(a.spend_cap) : null, saldo: val(a.balance), fuso: String(a.timezone_name ?? ''), pagamento: String(a.funding_source_details?.display_string ?? '') };
+}
+
+/** Histórico de atividades da própria Meta (quem mudou o quê, inclusive fora do EVO MKT). */
+export async function atividadeMeta(): Promise<Row[]> {
+  const { id: conta } = await act();
+  const l = await paginar(`/act_${conta}/activities`, { fields: 'event_time,actor_name,event_type,object_name,object_type,translated_event_type', limit: 100 }, 2);
+  return l.map((x) => ({ quando: String(x.event_time ?? ''), quem: String(x.actor_name ?? ''), evento: String(x.translated_event_type ?? x.event_type ?? ''), tipo: String(x.object_type ?? ''), objeto: String(x.object_name ?? '') }));
+}

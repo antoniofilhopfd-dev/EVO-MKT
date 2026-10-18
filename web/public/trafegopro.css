@@ -109,3 +109,8 @@
 .cri-form .tp-ff-acoes{position:sticky;bottom:0;background:#fff;padding-top:8px}
 @media(max-width:600px){.cri-2{grid-template-columns:1fr}}
 .cri-c small{font-weight:400}.cri-form .tp-ff-acoes{border-top:1px solid var(--line);margin-top:4px;padding-top:10px;z-index:2}
+.cri-plat{display:flex;flex-wrap:wrap;gap:6px 14px}.cri-plat .check-row{margin:0}
+.tp-prev{width:100%;max-width:340px;height:560px;border:1px solid var(--line);border-radius:12px;background:#fff;display:block;margin:0 auto}
+
+.tp-conta{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 14px;margin-bottom:10px;font-size:13px}
+.tp-conta:empty{display:none}.tp-conta small{color:var(--ink-3,#5E6678)}.tp-ct{font-weight:700;padding:2px 10px;border-radius:999px}.tp-ct.ok{background:#EAF6EE;color:#14532D}.tp-ct.bad{background:#FDECEC;color:#8A1C1C}

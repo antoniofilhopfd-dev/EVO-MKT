@@ -119,3 +119,38 @@ async function tpCriar(nivel,pre={}){
     }catch(e){est.chave=criChave();rev(esc(e.message),'err')}
   };
 }
+
+
+/** Editor do conjunto: o que o Gerenciador da Meta também edita (cidade, gênero, posicionamentos, interesses, públicos personalizados e lance). */
+async function tpEditorAvancado(ov,o){
+  const box=ov.el.querySelector('#geAv');if(!box)return;
+  const op=await criOpcoes(),p=o.publico||{};
+  const gen0=(p.generos||[]).length===1?((p.generos[0]==='Mulheres')?'mulheres':'homens'):'todos';
+  const est={interesses:(p.interesses||[]).map(i=>({id:i.id,nome:i.nome})),pers:new Set((p.personalizados||[]).map(x=>x.id)),plat:new Set(p.plataformas||[])};
+  const cid0=(p.cidades||[])[0],lance0=o.estrategiaLance==='COST_CAP'?'LIMITE_CUSTO':'MENOR_CUSTO';
+  const PLAT=[['instagram','Instagram'],['facebook','Facebook'],['messenger','Messenger'],['audience_network','Audience Network']];
+  const pintaInt=()=>{box.querySelector('#geInts').innerHTML=est.interesses.map((i,k)=>`<span class="tp-chip">${esc(i.nome)} <button type="button" data-rmint="${k}" aria-label="Remover">×</button></span>`).join('')||'<small class="kpi-note">Nenhum interesse (público amplo).</small>';box.querySelectorAll('[data-rmint]').forEach(b=>b.onclick=()=>{est.interesses.splice(Number(b.dataset.rmint),1);pintaInt()})};
+  box.innerHTML=`<fieldset class="cri-fs"><legend>Público e veiculação</legend>
+    <div class="cri-2">${criLbl('Trocar a cidade',`<input class="control" id="geCidade" placeholder="${attr(cid0?cid0.nome:'Ex.: João Pessoa')}" autocomplete="off">`,'Deixe em branco para manter.')}${criLbl('Gênero',criSel('geGen',[['todos','Todos'],['mulheres','Mulheres'],['homens','Homens']],gen0))}</div>
+    <div class="cri-c"><span>Onde o anúncio aparece</span><div class="cri-plat">${PLAT.map(([k,l])=>`<label class="check-row"><input type="checkbox" data-plat="${k}" ${est.plat.has(k)?'checked':''}><span>${l}</span></label>`).join('')}</div><small class="kpi-note">Nenhuma marcada = posicionamentos automáticos (a Meta escolhe).</small></div>
+    <div class="cri-c"><span>Interesses</span><div id="geInts" class="tp-chips"></div><div class="cri-2"><input class="control" id="geIntQ" placeholder="Pesquisar interesse…" autocomplete="off"><button type="button" class="softbtn" id="geIntBusca">Buscar</button></div><div id="geIntRes"></div></div>
+    ${(op.publicos||[]).length?`<div class="cri-c"><span>Públicos personalizados</span><div class="cri-plat">${op.publicos.map(x=>`<label class="check-row"><input type="checkbox" data-pers="${attr(x.id)}" ${est.pers.has(x.id)?'checked':''}><span>${esc(x.nome)}</span></label>`).join('')}</div></div>`:''}
+    <div class="cri-2">${criLbl('Lance',criSel('geLance',[['MENOR_CUSTO','Menor custo (automático)'],['LIMITE_CUSTO','Limite de custo']],lance0))}${criLbl('Limite de custo (R$)',`<input class="control" id="geLanceV" type="number" min="1" step="0.01" value="${attr(o.lanceValor||'')}">`)}</div></fieldset>`;
+  pintaInt();
+  box.querySelectorAll('[data-plat]').forEach(c=>c.onchange=()=>{c.checked?est.plat.add(c.dataset.plat):est.plat.delete(c.dataset.plat)});
+  box.querySelectorAll('[data-pers]').forEach(c=>c.onchange=()=>{c.checked?est.pers.add(c.dataset.pers):est.pers.delete(c.dataset.pers)});
+  box.querySelector('#geIntBusca').onclick=async()=>{const q=box.querySelector('#geIntQ').value.trim();if(q.length<2)return;const r=box.querySelector('#geIntRes');r.innerHTML='<small class="kpi-note">Buscando na Meta…</small>';
+    try{const d=await api('/ads/campanha/interesses?q='+encodeURIComponent(q));r.innerHTML=(d.rows||[]).map(i=>`<button type="button" class="softbtn" data-addint="${attr(i.id)}|${attr(i.nome)}">+ ${esc(i.nome)}${i.publico?` <small>(${Number(i.publico).toLocaleString('pt-BR')})</small>`:''}</button>`).join('')||'<small class="kpi-note">Nada encontrado.</small>';
+      r.querySelectorAll('[data-addint]').forEach(b=>b.onclick=()=>{const [id,...n]=b.dataset.addint.split('|');if(!est.interesses.some(x=>x.id===id))est.interesses.push({id,nome:n.join('|')});pintaInt()})}catch(e){r.innerHTML=`<div class="cri-msg err">${esc(e.message)}</div>`}};
+  const igual=(a,b)=>a.length===b.length&&a.every(x=>b.includes(x));
+  ov.avancado=()=>{
+    const c={},v=id=>{const e=box.querySelector('#'+id);return e?e.value.trim():''};
+    if(v('geCidade'))c.cidade=v('geCidade');
+    if(v('geGen')!==gen0)c.genero=v('geGen');
+    if(!igual([...est.plat],p.plataformas||[]))c.plataformas=[...est.plat];
+    if(!igual(est.interesses.map(i=>i.id),(p.interesses||[]).map(i=>i.id)))c.interesses=est.interesses;
+    if(!igual([...est.pers],(p.personalizados||[]).map(x=>x.id)))c.publicosPersonalizados=[...est.pers];
+    if(v('geLance')!==lance0||(v('geLance')==='LIMITE_CUSTO'&&Number(v('geLanceV'))!==Number(o.lanceValor||0)))c.lance={tipo:v('geLance'),valor:Number(v('geLanceV'))||undefined};
+    return c;
+  };
+}

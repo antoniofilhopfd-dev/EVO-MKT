@@ -9,6 +9,7 @@ const csp = [
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  "frame-src https://www.facebook.com https://*.facebook.com",
 ].join('; ');
 
 const nextConfig = {

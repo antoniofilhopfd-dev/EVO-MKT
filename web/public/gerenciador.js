@@ -74,9 +74,12 @@ function gmEditor(o,nivel){
    ${nivel!=='anuncio'?`<div class="st-row"><label>Orçamento diário (R$)<input id="geDia" type="number" step="5" min="6" value="${o.orcamento&&o.orcamento.diario||''}" ${o.orcamento&&o.orcamento.diario?'':'placeholder="(sem orçamento diário)"'}></label><label>Orçamento total (R$)<input id="geTot" type="number" step="50" min="6" value="${o.orcamento&&o.orcamento.total||''}" ${o.orcamento&&o.orcamento.total?'':'placeholder="(sem orçamento total)"'}></label></div>
    <div class="st-row"><label>Início<input id="geIni" type="datetime-local" value="${attr(isoLocal(o.inicio))}"></label><label>Término<input id="geFim" type="datetime-local" value="${attr(isoLocal(o.fim))}"></label></div>`:''}
    ${nivel==='conjunto'?`<div class="st-row"><label>Idade mínima<input id="geIdMin" type="number" min="18" max="65" value="${p.idadeMin??''}"></label><label>Idade máxima<input id="geIdMax" type="number" min="18" max="65" value="${p.idadeMax??''}"></label></div>${cid?`<label>Raio em torno de ${esc(cid.nome||'cidade')} (km)<input id="geRaio" type="number" min="1" max="80" value="${cid.raioKm||''}"></label>`:'<p class="kpi-note">Este conjunto não tem cidade; o raio não se aplica.</p>'}`:''}
+   ${nivel==='conjunto'?'<div id="geAv"></div>':''}
+   ${nivel==='anuncio'?`<fieldset class="cri-fs"><legend>Criativo</legend>${(o.criativo&&o.criativo.formato==='Imagem')?'':'<p class="kpi-note">Este anúncio usa uma publicação do Instagram ou um vídeo: o texto vem da própria publicação, então só o nome e o estado se alteram aqui.</p>'}<label>Texto<textarea id="geTexto" rows="3" maxlength="2000">${esc((o.criativo&&o.criativo.texto)||'')}</textarea></label><div class="st-row"><label>Título<input id="geTit" maxlength="255" value="${attr((o.criativo&&o.criativo.titulo)||'')}"></label><label>Descrição<input id="geDesc" maxlength="255" value="${attr((o.criativo&&o.criativo.descricao)||'')}"></label></div><div class="st-row"><label>Link (https)<input id="geLink" type="url" value="${attr((o.criativo&&o.criativo.url)||'')}"></label><label>Botão<select id="geCta"><option value="">(manter)</option>${['LEARN_MORE','SIGN_UP','CONTACT_US','APPLY_NOW','GET_QUOTE','SHOP_NOW','MESSAGE_PAGE','INSTAGRAM_MESSAGE','WHATSAPP_MESSAGE','NO_BUTTON'].map(x=>`<option ${((o.criativo&&o.criativo.cta)||'')===x?'selected':''}>${x}</option>`).join('')}</select></label></div><p class="kpi-note">A Meta não edita o criativo: o sistema cria um criativo novo com as mudanças e troca no anúncio.</p></fieldset>`:''}
    <p class="kpi-note">Só são enviados os campos que você mudar. Respeita os tetos do Gestor de anúncios.</p>
    <div class="st-acoes"><button class="btn soft" type="button" data-close>Cancelar</button><button class="btn" type="button" id="geSalva">Salvar na Meta</button><button class="softbtn" type="button" id="geArq">Arquivar</button><button class="softbtn ga-perigo" type="button" id="geDel">Excluir</button></div></div>`);
   const g=id=>ov.el.querySelector('#'+id);
+  if(nivel==='conjunto'&&typeof tpEditorAvancado==='function')tpEditorAvancado(ov,o);
   g('geSalva').onclick=async()=>{
     const c={},v=(id)=>g(id)&&g(id).value.trim();
     if(v('geNome')!==o.nome)c.nome=v('geNome');
@@ -90,7 +93,11 @@ function gmEditor(o,nivel){
       if(v('geIdMin')&&Number(v('geIdMin'))!==p.idadeMin)c.idadeMin=Number(v('geIdMin'));
       if(v('geIdMax')&&Number(v('geIdMax'))!==p.idadeMax)c.idadeMax=Number(v('geIdMax'));
       if(g('geRaio')&&v('geRaio')&&Number(v('geRaio'))!==(cid&&cid.raioKm))c.raioKm=Number(v('geRaio'));
+      if(ov.avancado)Object.assign(c,ov.avancado());
     }
+    if(nivel==='anuncio'&&g('geTexto')){const cr=o.criativo||{},n={};
+      if(v('geTexto')!==(cr.texto||''))n.texto=v('geTexto');if(v('geTit')!==(cr.titulo||''))n.titulo=v('geTit');if(v('geDesc')!==(cr.descricao||''))n.descricao=v('geDesc');if(v('geLink')&&v('geLink')!==(cr.url||''))n.link=v('geLink');if(v('geCta')&&v('geCta')!==(cr.cta||''))n.cta=v('geCta');
+      if(Object.keys(n).length)c.criativo=n}
     if(!Object.keys(c).length)return toast('Nada mudou','warn');
     if(await gmEditar(nivel,o.id,c))ov.close();
   };

@@ -6,7 +6,7 @@ import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { metaConnected } from '../integrations/meta';
 import { cfgRegras, enviarRelatorioSemanal, excluirRascunho, rascunhos, rodarRegras, salvarRascunho, salvarRegras } from '../integrations/metaadsExtras';
-import { avaliarLimitesGasto, publicosConta, quebra, salvarLimitesGasto, saudeMeta, serieObjeto } from '../integrations/metaadsAnalise';
+import { atividadeMeta, avaliarLimitesGasto, previaAnuncio, publicosConta, quebra, resumoConta, salvarLimitesGasto, saudeMeta, serieObjeto } from '../integrations/metaadsAnalise';
 import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, whatsOk, numWhats, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
 import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel, vincularConteudo } from '../integrations/metaadsGerenciador';
 import { addDays, fmtDate } from '../util';
@@ -129,12 +129,21 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     try { return json({ rows: await serieObjeto(c.qs('id'), ymd(c.qs('de')), ymd(c.qs('ate'))) }); } catch (e: any) { return fail(/Meta|conta/.test(e.message) ? 502 : 400, e.message); }
   }
   if (path === '/ads/quebra' && method === 'GET') {
-    try { return json({ rows: await quebra(c.qs('por'), ymd(c.qs('de')), ymd(c.qs('ate'))) }); } catch (e: any) { return fail(/Meta|conta/.test(e.message) ? 502 : 400, e.message); }
+    try { return json({ rows: await quebra(c.qs('por'), ymd(c.qs('de')), ymd(c.qs('ate')), c.qs('id')) }); } catch (e: any) { return fail(/Meta|conta/.test(e.message) ? 502 : 400, e.message); }
   }
   if (path === '/ads/publicos' && method === 'GET') {
     try { return json({ rows: await publicosConta() }); } catch (e: any) { return fail(502, e.message); }
   }
   if (path === '/ads/saude' && method === 'GET') return json(await saudeMeta());
+  if (path === '/ads/previa-anuncio' && method === 'GET') {
+    try { return json(await previaAnuncio(c.qs('id'), c.qs('formato') || 'INSTAGRAM_STANDARD')); } catch (e: any) { return fail(/Meta|conta/.test(e.message) ? 502 : 400, e.message); }
+  }
+  if (path === '/ads/conta' && method === 'GET') {
+    try { return json(await resumoConta()); } catch (e: any) { return fail(502, e.message); }
+  }
+  if (path === '/ads/atividade' && method === 'GET') {
+    try { return json({ rows: await atividadeMeta() }); } catch (e: any) { return fail(502, e.message); }
+  }
   if (path === '/ads/limites' && method === 'GET') return json({ rows: await avaliarLimitesGasto(false) });
   if (path === '/ads/limites' && method === 'POST') {
     try { const r = await salvarLimitesGasto((await c.body()).rows); await audit(String(u.codigo), 'ads-limites', 'ads', String(r.length)); return json({ ok: true, rows: await avaliarLimitesGasto(false) }); } catch (e: any) { return fail(400, e.message); }

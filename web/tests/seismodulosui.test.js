@@ -135,6 +135,27 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('marcar um conjunto e abrir Anúncios mostra só os anúncios dele',so2.n>=1&&so2.todos&&/conjunto\(s\) marcado/.test(so2.chip),so2);
  await p.click('[data-niv="campanha"]');await p.waitForTimeout(300);
  t('voltar para Campanhas limpa a seleção e o filtro',(await p.evaluate(()=>GM2.foco.camps.length+GM2.foco.conjs.length+GM2.sel.size))===0);
+ // ---- o que o Gerenciador da Meta também faz: conta, detalhar, prévia, editor completo, atividade da Meta ----
+ await post('/ads/gestao/config',{ativa:true,cidade:'João Pessoa',tetoDia:100,tetoMes:6000,diasMax:30});
+ await ir(p,'gerenciador');await p.waitForTimeout(1500);
+ const faixa=await p.evaluate(()=>(document.querySelector('#tpConta')||{}).innerText||'');
+ t('Gerenciador mostra a conta (gasto total, limite, saldo e pagamento) como no cabeçalho da Meta',/Gasto total/.test(faixa)&&/Limite de gastos/.test(faixa)&&/Saldo/.test(faixa)&&/Visa 4242/.test(faixa),faixa);
+ await p.click('[data-niv="anuncio"]');await p.waitForTimeout(400);await p.click('[data-painel]');await p.waitForSelector('.tp-lateral');
+ await p.selectOption('#pnDet','age');await p.waitForTimeout(2500);const dbg=await p.$eval('#pnDetBox',e=>e.innerText).catch(()=>'sem box');
+ t('painel do anúncio: detalhar por idade traz a tabela da Meta',/25-34/.test(dbg),dbg);
+ await p.waitForSelector('#pnPrev iframe',{timeout:8000}).catch(()=>{});
+ t('painel do anúncio: prévia oficial em iframe da Meta (sandbox)',await p.$eval('#pnPrev iframe',e=>/^https:\/\/www\.facebook\.com\//.test(e.src)&&e.getAttribute('sandbox')!==null).catch(()=>false));
+ await p.evaluate(()=>document.querySelectorAll('.tp-lateral').forEach(x=>x.remove()));
+ await p.click('[data-niv="conjunto"]');await p.waitForTimeout(400);
+ const idSet='s1';
+ await p.evaluate(id=>{gmEditor(gmAchar(id)[0],'conjunto')},idSet);await p.waitForSelector('#geAv #geGen');
+ t('editor do conjunto: cidade, gênero, plataformas, interesses, públicos personalizados e lance',!!(await p.$('#geCidade'))&&!!(await p.$('[data-plat="instagram"]'))&&!!(await p.$('#geIntQ'))&&!!(await p.$('#geLance')));
+ await p.selectOption('#geGen','mulheres');await p.click('[data-plat="instagram"]');await p.click('#geSalva');await p.waitForTimeout(1500);const tst=await p.$eval('#toast',e=>e.innerText).catch(()=>'');
+ const edS=await(await fetch('http://127.0.0.1:8099/__state')).json();const lastEd=((edS.edits||{})[idSet]||[]).filter(e=>e.targeting).pop();
+ t('editor do conjunto: salvar envia o público novo à Meta',!!lastEd&&JSON.parse(lastEd.targeting).genders[0]===2,[tst,lastEd]);
+ await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ await ir(p,'tfhistorico');await p.waitForSelector('#hsMeta table',{timeout:8000});
+ t('Histórico traz também a atividade registrada na própria Meta',/Maria Gestora/.test(await p.$eval('#hsMeta',e=>e.innerText)));
  // ---- criar campanha, conjunto e anúncio, cada um separado (nascem pausados) ----
  await post('/ads/gestao/config',{ativa:true,cidade:'João Pessoa',tetoDia:100,tetoMes:6000,diasMax:30});
  const mockNovos=async()=>Object.entries((await (await fetch('http://127.0.0.1:8099/__state')).json()).ads_novos||{});
