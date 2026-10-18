@@ -243,3 +243,8 @@ button.db-card{cursor:pointer}button.db-card:hover{border-color:var(--brand)}
  .submais{position:static}
  .submenu{left:12px!important;right:12px!important;min-width:0!important;top:100%!important}
 }
+
+/* telas do Instagram (Publicações, Ideias, Aprovações, Modelos): cabeçalho simples, sem painéis genéricos */
+.mod-topo{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:6px 0 14px;flex-wrap:wrap}
+.mod-topo h1{margin:2px 0 0;font-size:24px;color:var(--navy,#00275F)}
+.mod-topo small{color:#FF7800;font-weight:700;letter-spacing:.08em;font-size:11px}

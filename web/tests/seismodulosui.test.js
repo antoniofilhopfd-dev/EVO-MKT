@@ -91,6 +91,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await ir(p,'hoje');t('Dashboard: seletor de conta do Instagram no topo',(await p.$$('[data-igconta]')).length>=1);
  const optsD=await p.$$eval('[data-igconta] option',e=>e.map(o=>o.value).filter(v=>v!=='__admin'));
  if(optsD.length>1){await p.selectOption('[data-igconta]',optsD[1]);await p.waitForTimeout(2500);t('Dashboard: trocar a conta recarrega o resumo do Instagram',/Instagram/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&(await p.evaluate(()=>igConta))===optsD[1]);await p.selectOption('[data-igconta]',optsD[0]);await p.waitForTimeout(1500)}
+ await ir(p,'conteudos');const pub=await p.evaluate(()=>document.querySelector('#content').innerText);
+ t('Publicações: lista enxuta (sem Salvar filtro, Exportar CSV, Favoritar, Calendário nem chips técnicos)',!/Salvar filtro|Exportar CSV|Favoritar|Banco de dados|Backup autom/.test(pub)&&!(await p.$('[data-view="calendar"]'))&&!!(await p.$('#modNovo'))&&!!(await p.$('#moduleSearch')),pub.slice(0,300));
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);
