@@ -36,7 +36,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  // ---- Dashboard ----
  await ir(p,'hoje');await p.waitForFunction(()=>document.querySelector('#content').innerText.length>400,null,{timeout:15000}).catch(()=>{});
  const dash=await p.evaluate(()=>document.querySelector('#content').innerText);
- t('Dashboard mostra Instagram, Tráfego, próximos eventos e integrações',/Instagram/.test(dash)&&/Tr[aá]fego|Invest/i.test(dash)&&/eventos|Calend/i.test(dash)&&/Integra/i.test(dash),dash.slice(0,300));
+ t('Dashboard mostra Instagram, Tráfego, próximos eventos e datas comemorativas',/Instagram/.test(dash)&&/Tr[aá]fego|Invest/i.test(dash)&&/eventos|Calend/i.test(dash)&&/Datas comemorativas/i.test(dash),dash.slice(0,300));
  t('Dashboard não cita Matrículas nem Leads cadastrados (sem CRM)',!/custo por matr[ií]cula|matr[ií]culas efetivadas|capta[cç][aã]o de leads|funil/i.test(dash),dash.slice(0,300));
 
  // ---- Calendário único ----

@@ -167,7 +167,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await p.fill('#fNome','Semana da Matemática');await p.selectOption('#fTipo','nesimo');await p.selectOption('#fN','1');await p.selectOption('#fSem','1');await p.selectOption('#fMesN','11');await p.selectOption('#fCat','__nova');await p.fill('#fCatNova','Semanas temáticas');await p.click('#fOk');await p.waitForSelector('#dcForm',{state:'detached'});await p.waitForTimeout(500);
  const sm=(await call('GET','/data?module=datacom'))[1].rows.find(x=>x.titulo==='Semana da Matemática');
  t('data móvel e categoria nova criadas pela tela (1ª segunda de novembro)',sm&&sm.regraTipo==='nesimo'&&/^CAT_SEMANAS/.test(sm.categoria));
- await p.click('.cm-item:has-text("Semana da Matemática")');await p.waitForSelector('#dcEditar');await p.click('#dcEditar');await p.waitForSelector('#dcForm');
+ await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');await p.click('.cm-item:has-text("Semana da Matemática")');await p.waitForSelector('#dcEditar');await p.click('#dcEditar');await p.waitForSelector('#dcForm');
  t('editar abre o formulário já preenchido',(await p.inputValue('#fNome'))==='Semana da Matemática'&&(await p.inputValue('#fTipo'))==='nesimo');await p.fill('#fNome','Semana da Matemática 2');await p.click('#fOk');await p.waitForSelector('#dcForm',{state:'detached'});
  t('edição pela tela',(await call('GET','/data?module=datacom'))[1].rows.some(x=>x.titulo==='Semana da Matemática 2'));
  await p.click('.cm-item:has-text("Semana da Matemática 2")');await p.waitForSelector('#dcExcluir');
