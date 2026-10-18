@@ -2,7 +2,7 @@
    Filtros combináveis (com favoritos), colunas personalizáveis (mostrar, ocultar, reordenar, fixar, redimensionar, modelos e visões salvas por usuário e nível),
    seleção múltipla com revisão em lote, painel lateral de detalhes, exportação CSV/Excel/PDF das colunas escolhidas.
    Reaproveita os editores, a criação de campanha e as rotas que já existiam (gerenciador.js); nada é alterado na Meta sem confirmação. */
-const GM2={nivel:null,filtro:{},cfg:null,ordem:{k:'gasto',d:-1},sel:new Set(),favoritos:null,foco:{campanha:'',conjunto:''},lista:[]};
+const GM2={nivel:null,filtro:{},cfg:null,ordem:{k:'gasto',d:-1},sel:new Set(),favoritos:null,foco:{campanha:'',conjunto:'',camps:[],conjs:[]},lista:[]};
 const TP_NIVEIS=[['campanha','Campanhas'],['conjunto','Conjuntos de anúncios'],['anuncio','Anúncios']];
 const tpOrcVal=x=>x.orcamento?(x.orcamento.diario??x.orcamento.total??null):null;
 const tpPublicoTxt=p=>{if(!p)return '';const o=[];if(p.idadeMin||p.idadeMax)o.push(`${p.idadeMin||'—'}–${p.idadeMax||'—'} anos`);if((p.generos||[]).length)o.push(p.generos.join('/'));const loc=[...(p.cidades||[]).map(c=>c.nome+(c.raioKm?` +${c.raioKm}km`:'')),...(p.regioes||[]),...(p.paises||[])];if(loc.length)o.push(loc.join(', '));return o.join(' · ')};
@@ -99,6 +99,8 @@ function tpLista(){
   let l=tpFlat(GM2.nivel);
   if(GM2.foco.campanha)l=l.filter(x=>GM2.nivel==='campanha'?x.id===GM2.foco.campanha:x._campanha===GM2.foco.campanha);
   if(GM2.foco.conjunto)l=l.filter(x=>GM2.nivel==='conjunto'?x.id===GM2.foco.conjunto:x._conjunto===GM2.foco.conjunto);
+  if((GM2.foco.camps||[]).length&&GM2.nivel!=='campanha')l=l.filter(x=>GM2.foco.camps.includes(x._campanha)); // só o que pertence às campanhas marcadas
+  if((GM2.foco.conjs||[]).length&&GM2.nivel==='anuncio')l=l.filter(x=>GM2.foco.conjs.includes(x._conjunto)); // só os anúncios dos conjuntos marcados
   const f=GM2.filtro||{};
   // sem escolher status, arquivados ficam de fora (como no Gerenciador da Meta); "Arquivados" ou "Todos" os mostram
   if(!f.status&&!f.statusMeta)l=l.filter(x=>tpEstadoDe(x)!=='ARCHIVED');
@@ -131,11 +133,19 @@ function tpBarraSel(){
    ${ok?`<button class="softbtn" data-lote="ativar">Ativar</button><button class="softbtn" data-lote="pausar">Pausar</button><button class="softbtn" data-lote="arquivar">Arquivar</button><button class="softbtn" data-lote="duplicar">Duplicar</button><button class="softbtn" data-lote="editar">Editar em massa…</button>`:'<small>Edição liberada só com o modo completo (Configurações → Integrações).</small>'}
    ${GM2.nivel==='anuncio'?`<button class="softbtn" data-lote="comparar">Comparar</button>`:''}<button class="softbtn" data-lote="analisar">Analisar</button><button class="softbtn" data-lote="limpar">Limpar seleção</button>`:''}</div>`;
 }
+/** Resumo do que está na tabela (respeita nível, filtros e período): leitura rápida antes de descer para as linhas. */
+function tpResumoHtml(lista){
+  const s={gasto:0,conversas:0,cliques:0,impressoes:0};lista.forEach(x=>{for(const k in s)s[k]+=Number(x[k])||0});
+  const ativos=lista.filter(x=>tpEstadoDe(x)==='ACTIVE').length;
+  const c=(r,v,n='')=>`<div class="tp-rs"><small>${r}</small><b>${v}</b>${n?`<em>${n}</em>`:''}</div>`;
+  const rot=GM2.nivel==='campanha'?'campanhas':GM2.nivel==='conjunto'?'conjuntos':'anúncios';
+  return `<div class="tp-resumo" aria-label="Resumo da lista">${c('Investimento',gmBrl(s.gasto),`${lista.length} ${rot}`)}${c('Conversas iniciadas',gmN(s.conversas))}${c('Custo por conversa',s.conversas?gmBrl(s.gasto/s.conversas):'—','investimento ÷ conversas')}${c('CTR',s.impressoes?gmPct(s.cliques/s.impressoes*100):'—')}${c('Ativos',`${ativos} de ${lista.length}`)}</div>`;
+}
 function tpDesenhaGm(){
   const raiz=$('#tpGm');if(!raiz)return;
   const ativos=tpFiltroAtivo(GM2.filtro),c=tpCfgN();
-  const foco=[];if(GM2.foco.campanha){const x=gmDados.campanhas.find(k=>k.id===GM2.foco.campanha);foco.push(x?x.nome:GM2.foco.campanha)}if(GM2.foco.conjunto){const x=tpFlat('conjunto').find(k=>k.id===GM2.foco.conjunto);foco.push(x?x.nome:GM2.foco.conjunto)}
-  raiz.innerHTML=`<div class="tp-barra"><div class="view-switch" role="tablist" aria-label="Nível">${TP_NIVEIS.map(([k,l])=>`<button type="button" role="tab" data-niv="${k}" class="${GM2.nivel===k?'active':''}" aria-selected="${GM2.nivel===k}">${l}</button>`).join('')}</div>
+  const foco=[];if((GM2.foco.camps||[]).length)foco.push(GM2.foco.camps.length+' campanha(s) marcada(s)');if((GM2.foco.conjs||[]).length)foco.push(GM2.foco.conjs.length+' conjunto(s) marcado(s)');if(GM2.foco.campanha){const x=gmDados.campanhas.find(k=>k.id===GM2.foco.campanha);foco.push(x?x.nome:GM2.foco.campanha)}if(GM2.foco.conjunto){const x=tpFlat('conjunto').find(k=>k.id===GM2.foco.conjunto);foco.push(x?x.nome:GM2.foco.conjunto)}
+  raiz.innerHTML=`${tpResumoHtml(tpLista())}<div class="tp-barra"><div class="view-switch" role="tablist" aria-label="Nível">${TP_NIVEIS.map(([k,l])=>`<button type="button" role="tab" data-niv="${k}" class="${GM2.nivel===k?'active':''}" aria-selected="${GM2.nivel===k}">${l}</button>`).join('')}</div>
     <input type="search" class="control tp-busca" id="tpBusca" placeholder="Pesquisar por nome ou código" aria-label="Pesquisar" value="${attr(GM2.filtro.busca||'')}">
     <select class="control" id="tpStatus" aria-label="Status">${Object.entries(TP_STATUS_ROT).map(([k,l])=>`<option value="${k}" ${(GM2.filtro.status||'')===k||(!GM2.filtro.status&&k==='todos'&&false)?'selected':''}>${k==='todos'?'Status: todos':l}</option>`).join('').replace('<option value="todos"','<option value=""')}</select>
     <button type="button" class="softbtn" id="tpFiltros">Filtros${ativos.length?` <b class="tp-n">${ativos.length}</b>`:''}</button>
@@ -159,7 +169,7 @@ function tpLigaTabela(){
   $$('[data-sel2]').forEach(i=>i.onchange=()=>{i.checked?GM2.sel.add(i.dataset.sel2):GM2.sel.delete(i.dataset.sel2);i.closest('tr').classList.toggle('sel',i.checked);$('#tpLoteBox').innerHTML=tpBarraSel();tpLigaLote();const t=$('#tpTodos');if(t)t.checked=GM2.lista.length&&GM2.lista.every(x=>GM2.sel.has(x.id))});
   const t=$('#tpTodos');if(t)t.onchange=()=>{GM2.lista.forEach(x=>t.checked?GM2.sel.add(x.id):GM2.sel.delete(x.id));tpRedesenhaTabela()};
   $$('[data-painel]').forEach(b=>b.onclick=()=>tpPainel(b.dataset.painel));
-  $$('[data-gf]').forEach(a=>a.onclick=e=>{e.preventDefault();const [n,id]=a.dataset.gf.split(':');if(n==='campanha'){GM2.foco={campanha:id,conjunto:''};GM2.nivel='conjunto'}else{GM2.foco={campanha:(tpFlat('conjunto').find(x=>x.id===id)||{})._campanha||GM2.foco.campanha,conjunto:id};GM2.nivel='anuncio'}GM2.sel.clear();tpDesenhaGm()});
+  $$('[data-gf]').forEach(a=>a.onclick=e=>{e.preventDefault();const [n,id]=a.dataset.gf.split(':');if(n==='campanha'){GM2.foco={campanha:id,conjunto:'',camps:[],conjs:[]};GM2.nivel='conjunto'}else{GM2.foco={campanha:(tpFlat('conjunto').find(x=>x.id===id)||{})._campanha||GM2.foco.campanha,conjunto:id};GM2.nivel='anuncio'}GM2.sel.clear();tpDesenhaGm()});
   $$('[data-sw]').forEach(i=>i.onchange=async()=>{const [o,n]=gmAchar(i.dataset.sw);const ativar=i.checked;if(!confirm(ativar?`Ativar "${o.nome}"? Volta a gastar.`:`Pausar "${o.nome}"?`)){i.checked=!ativar;return}try{await gmPost('/ads/editar',{nivel:n,id:o.id,campos:{status:ativar?'ACTIVE':'PAUSED'}});o.status=ativar?'ACTIVE':'PAUSED';o.estado=o.status;toast('Alterado na Meta');tpRedesenhaTabela()}catch(e){i.checked=!ativar;toast(e.message,'bad')}});
   // redimensionar colunas
   $$('[data-rz]').forEach(h=>h.onpointerdown=ev=>{ev.preventDefault();const k=h.dataset.rz,c=TP_COL[k],ini=ev.clientX,w0=tpLarg(c),th=h.parentElement;h.setPointerCapture(ev.pointerId);
@@ -168,7 +178,16 @@ function tpLigaTabela(){
 }
 function tpLigaLote(){$$('[data-lote]').forEach(b=>b.onclick=()=>tpLote(b.dataset.lote))}
 function tpLigaGm(){
-  $$('[data-niv]').forEach(b=>b.onclick=()=>{GM2.nivel=b.dataset.niv;GM2.sel.clear();if(GM2.nivel==='campanha')GM2.foco={campanha:'',conjunto:''};else if(GM2.nivel==='conjunto')GM2.foco.conjunto='';tpPrefSet('trafego.gm.nivel',GM2.nivel);tpDesenhaGm()});
+  $$('[data-niv]').forEach(b=>b.onclick=()=>{
+    const ant=GM2.nivel,novo=b.dataset.niv,marcados=[...GM2.sel];
+    GM2.nivel=novo;GM2.sel.clear();
+    if(novo==='campanha')GM2.foco={campanha:'',conjunto:'',camps:[],conjs:[]};
+    else{
+      if(ant==='campanha'&&marcados.length){GM2.foco={campanha:'',conjunto:'',camps:marcados,conjs:[]}} // marcou campanhas e foi para Conjuntos/Anúncios: mostra só o que é delas
+      else if(ant==='conjunto'&&novo==='anuncio'&&marcados.length){GM2.foco={...GM2.foco,conjunto:'',conjs:marcados}}
+      else if(novo==='conjunto'){GM2.foco.conjunto='';GM2.foco.conjs=[]}
+    }
+    tpPrefSet('trafego.gm.nivel',GM2.nivel);tpDesenhaGm()});
   const b=$('#tpBusca');b.oninput=()=>{GM2.filtro={...GM2.filtro,busca:b.value};tpSalvaFiltro();clearTimeout(tpLigaGm.t);tpLigaGm.t=setTimeout(()=>{tpRedesenhaTabela();tpAtualizaChips()},250)};
   $('#tpStatus').onchange=e=>{GM2.filtro={...GM2.filtro,status:e.target.value};tpSalvaFiltro();tpDesenhaGm()};
   $('#tpFiltros').onclick=tpPainelFiltros;
@@ -178,8 +197,8 @@ function tpLigaGm(){
   const ex=$('#tpExp'),mn=$('#tpExpMenu');ex.onclick=e=>{e.stopPropagation();mn.hidden=!mn.hidden};document.addEventListener('click',()=>{if(mn)mn.hidden=true},{once:true});
   $$('[data-exp]').forEach(x=>x.onclick=()=>{mn.hidden=true;tpExportar(x.dataset.exp)});
   $$('[data-fx]').forEach(x=>x.onclick=()=>{const k=x.dataset.fx;const f={...GM2.filtro};if(k.startsWith('nums.')){const m=k.slice(5);f.nums={...(f.nums||{})};delete f.nums[m]}else delete f[k];GM2.filtro=f;tpSalvaFiltro();tpDesenhaGm()});
-  $$('[data-foco-x]').forEach(x=>x.onclick=()=>{GM2.foco={campanha:'',conjunto:''};tpDesenhaGm()});
-  $('#tpLimpa')&&($('#tpLimpa').onclick=()=>{GM2.filtro={};GM2.foco={campanha:'',conjunto:''};tpSalvaFiltro();tpDesenhaGm()});
+  $$('[data-foco-x]').forEach(x=>x.onclick=()=>{GM2.foco={campanha:'',conjunto:'',camps:[],conjs:[]};tpDesenhaGm()});
+  $('#tpLimpa')&&($('#tpLimpa').onclick=()=>{GM2.filtro={};GM2.foco={campanha:'',conjunto:'',camps:[],conjs:[]};tpSalvaFiltro();tpDesenhaGm()});
   tpLigaTabela();tpLigaLote();
 }
 function tpAtualizaChips(){const ativos=tpFiltroAtivo(GM2.filtro);const bt=$('#tpFiltros');if(bt)bt.innerHTML=`Filtros${ativos.length?` <b class="tp-n">${ativos.length}</b>`:''}`}

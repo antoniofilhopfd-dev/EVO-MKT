@@ -82,3 +82,20 @@
 .tp-par-d{grid-template-columns:110px 1fr auto}.tp-rng{text-align:left;cursor:pointer;min-height:34px}.tp-rng-vazio{color:#7A8195;font-weight:500}
 .tp-rng-x{border:0;background:#F0F2F7;border-radius:50%;width:30px;height:30px;cursor:pointer;color:#00275F}
 @media(max-width:700px){.tp-par-d{grid-template-columns:1fr auto}.tp-par-d>span{grid-column:1/-1}}
+
+/* Gerenciador: resumo no topo, toolbar organizada, links de nível em pílula, nota sem sobrepor a tabela, celular com Nome fixo */
+.tp-resumo{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:2px 0 12px}
+.tp-rs{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:0}
+.tp-rs small{display:block;font-size:11.5px;color:var(--ink-3,#5E6678);font-weight:600}.tp-rs b{display:block;font-size:20px;color:var(--navy,#00275F);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tp-rs em{display:block;font-style:normal;font-size:11px;color:var(--ink-3,#7A8195);margin-top:1px}
+#tpGm>.kpi-note{margin-top:12px;line-height:1.5}
+.tp-dr{display:inline-block;margin-top:3px;padding:1px 9px;border-radius:999px;background:var(--brand-bg,#E3ECFB);color:var(--brand,#063996);text-decoration:none;font-size:11.5px;font-weight:700}.tp-dr:hover{background:#d3e1fa}
+.tp-tab tbody tr:hover td{background:#F7FAFF}.tp-tab tbody tr.sel:hover td{background:#E8F1FF}
+.tp-tab tfoot td{border-top:2px solid var(--line)}
+.tp-barra{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:12px}
+@media(max-width:900px){.tp-resumo{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){
+ .tp-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.tp-rs b{font-size:17px}
+ .tp-barra{gap:6px}.tp-barra .view-switch{flex:1 1 100%}.tp-busca{flex:1 1 100%;max-width:none}
+ .tp-barra select.control{flex:1 1 calc(50% - 6px);min-width:0}.tp-barra .softbtn{flex:1 1 calc(33% - 6px)}.cm-esp{display:none}
+ .tp-tab th:nth-child(2),.tp-tab td:nth-child(2){position:sticky;left:40px;z-index:2;background:#fff;box-shadow:1px 0 0 var(--line)}.tp-tab thead th:nth-child(2){z-index:4;background:#F8F9FC}
+}

@@ -59,6 +59,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('Gerenciador abre direto na tabela com campanhas',!!(await p.$('#tpTabBox table, .tp-tab'))&&(await p.$$('.tp-tab tbody tr')).length>0);
  const ths=await p.$$eval('.tp-tab thead th',e=>e.map(x=>x.innerText.trim()).filter(Boolean));
  t('tabela traz colunas de desempenho (Gasto/Alcance/CTR)',ths.some(x=>/Invest/i.test(x))&&ths.some(x=>/CTR/i.test(x))&&ths.some(x=>/Conversas/i.test(x)),ths);
+ const rs=await p.$$eval('.tp-resumo .tp-rs',e=>e.map(x=>x.innerText.replace(/\n/g,' ')));
+ t('Gerenciador: resumo no topo (investimento, conversas, custo por conversa, CTR, ativos)',rs.length===5&&/Investimento/.test(rs[0])&&/Ativos/.test(rs[4])&&/\d+ de \d+/.test(rs[4]),rs);
  await p.click('#tpFiltros');await p.waitForTimeout(400);
  t('painel de filtros avançados abre',!!(await p.$('#ffSt'))&&!!(await p.$('#ffCd')));
  await p.click('[data-rng^="ffCd"]');await p.waitForSelector('.pp');await p.click('.pp-g button[data-d$="-03"]');await p.click('.pp-g button[data-d$="-09"]');await p.click('.pp .ok');await p.waitForTimeout(300);
@@ -121,6 +123,18 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  const pm2=await login('NAT-3301','Nat26ab',{width:390,height:800});
  await maisFunciona(pm2,'trafego','Tráfego (celular)');
  await maisFunciona(pm2,'studio','Instagram (celular)');
+ // ---- marcar campanhas/conjuntos e ver só os conjuntos/anúncios deles ----
+ await ir(p,'gerenciador');await p.click('[data-niv="campanha"]');await p.waitForTimeout(300);
+ const idC=await p.$eval('[data-sel2]',e=>e.dataset.sel2);await p.check('[data-sel2="'+idC+'"]');
+ await p.click('[data-niv="conjunto"]');await p.waitForTimeout(500);
+ const so1=await p.evaluate(id=>({n:GM2.lista.length,todas:GM2.lista.every(x=>x._campanha===id),total:tpFlat('conjunto').length,chip:(document.querySelector('.tp-chips')||{}).innerText||''}),idC);
+ t('marcar uma campanha e abrir Conjuntos mostra só os conjuntos dela',so1.n>=1&&so1.todas&&/campanha\(s\) marcada/.test(so1.chip),so1);
+ const idS=await p.$eval('[data-sel2]',e=>e.dataset.sel2);await p.check('[data-sel2="'+idS+'"]');
+ await p.click('[data-niv="anuncio"]');await p.waitForTimeout(500);
+ const so2=await p.evaluate(id=>({n:GM2.lista.length,todos:GM2.lista.every(x=>x._conjunto===id),chip:(document.querySelector('.tp-chips')||{}).innerText||''}),idS);
+ t('marcar um conjunto e abrir Anúncios mostra só os anúncios dele',so2.n>=1&&so2.todos&&/conjunto\(s\) marcado/.test(so2.chip),so2);
+ await p.click('[data-niv="campanha"]');await p.waitForTimeout(300);
+ t('voltar para Campanhas limpa a seleção e o filtro',(await p.evaluate(()=>GM2.foco.camps.length+GM2.foco.conjs.length+GM2.sel.size))===0);
  // ---- período em um único modal (primeiro e último dia) ----
  await ir(p,'gerenciador');await p.click('#tpPerBtn');await p.waitForSelector('.pp');
  const antes=await p.$$eval('.pp-g button[data-d]',e=>e.length);
