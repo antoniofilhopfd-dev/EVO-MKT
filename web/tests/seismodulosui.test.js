@@ -14,7 +14,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await post('/ads/modo',{gestao:true});await post('/integrations/meta/token',{token:'GOOD_TOKEN'});await post('/integrations/instagram/sync',{});await fetch(B+'/integrations/ads/accounts',{headers:H['NAT-3301']});await post('/integrations/ads/account',{conta:'111222333'});
  const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
  const login=async(cod,sen,vp={width:1440,height:900})=>{const p=await (await b.newContext({viewport:vp})).newPage();p.errs=[];p.on('pageerror',e=>p.errs.push(e.message));p.on('dialog',d=>d.accept());await p.goto(BASE+'/');await p.fill('#internalCode',cod);await p.fill('#internalPass',sen);await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');await p.waitForTimeout(1200);return p};
- const ir=async(p,pg)=>{await p.evaluate(x=>go(x),pg);await p.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:25000}).catch(()=>{});await p.waitForTimeout(900)};
+ const ir=async(p,pg)=>{await p.evaluate(x=>go(x),pg);await p.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:25000}).catch(()=>{});await p.waitForTimeout(2500)};
  const nav=p=>p.$$eval('#nav .navitem .navlabel',e=>e.map(x=>x.innerText.trim()));
  const SEIS='Dashboard|Calendário|Instagram|Tráfego Pago|Arquivos|Configurações';
 
@@ -58,7 +58,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await ir(p,'gerenciador');
  t('Gerenciador abre direto na tabela com campanhas',!!(await p.$('#tpTabBox table, .tp-tab'))&&(await p.$$('.tp-tab tbody tr')).length>0);
  const ths=await p.$$eval('.tp-tab thead th',e=>e.map(x=>x.innerText.trim()).filter(Boolean));
- t('tabela traz colunas de desempenho (Gasto/Alcance/CTR)',ths.some(x=>/Gasto|Invest/i.test(x))&&ths.some(x=>/Alcance/i.test(x)),ths);
+ t('tabela traz colunas de desempenho (Gasto/Alcance/CTR)',ths.some(x=>/Invest/i.test(x))&&ths.some(x=>/CTR/i.test(x))&&ths.some(x=>/Conversas/i.test(x)),ths);
  await p.click('#tpFiltros');await p.waitForTimeout(400);
  t('painel de filtros avançados abre',!!(await p.$('#ffSt'))&&!!(await p.$('#ffCd')));
  await p.click('#tpFiltros').catch(()=>{});

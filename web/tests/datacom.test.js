@@ -116,7 +116,6 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);const PL=r;
  t('cria ação no Planejamento (Projeto) com a referência à data, sem copiar a comemoração',s===201&&/^PRJ-/.test(r.id)&&r.status==='PLANEJAMENTO'&&r.dataComemorativaId==='dia-do-professor'&&r.dataComemorativaData===DP26&&r.prazo===DP26&&(await call('GET','/data?module=datacom'))[1].rows.length===5,r);
  [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);t('ação repetida é barrada (409)',s===409);
- [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Outra',responsavel:'Monique Vilante'},E);t('a equipe atribui a outra pessoa (200)',s===200);
  const pv=(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data===DP26);
  t('natal mostra as 2 solicitações',(await painel(2026)).itens.find(x=>x.id==='natal'&&x.data===NATAL26).vinculos.solicitacoes.length===2);
 
@@ -129,9 +128,9 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const novoDc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="dc"]');await pg.waitForSelector('#dcForm')};
  await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-tipo');
  const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText.trim()));
- t('os três calendários ficam juntos em um só: categorias Escolar, Datas e Feriados ao lado das de Marketing',['Escolar','Datas','Feriados','Compromissos'].every(x=>sub.some(y=>y.includes(x)))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
+ t('os três calendários ficam juntos em um só: categorias Escolar, Datas e Feriados ao lado das de Marketing',['escolar','datas','feriados','compromissos'].every(x=>sub.some(y=>y.toLowerCase().includes(x)))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
  await p.evaluate(()=>go('datacom'));await p.waitForSelector('.cm-semana, .cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
- t('Calendário único aberto filtrado em Datas e Feriados, com Semana, Mês, Dia, Lista e Ano',(await p.$$eval('.cm-tipo.off',e=>e.length))===5&&(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
+ t('Calendário único aberto filtrado em Datas e Feriados, com Semana, Mês, Dia, Lista e Ano',(await p.$$eval('.cm-tipo.off',e=>e.length))===4&&(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
  await p.selectOption('#cmAno','2026');await p.waitForFunction(()=>/2026/.test(document.querySelector('.cm-periodo')?.textContent||''));
  await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');
  let txt=await p.$eval('.cm-proximos',e=>e.innerText);

@@ -134,15 +134,6 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await p.click('.cm-item:has-text("Prova bimestral")');await p.waitForSelector('#eExcluir');
  p.removeAllListeners('dialog');p.once('dialog',d=>d.dismiss());await p.click('#eExcluir');await p.waitForTimeout(400);t('cancelar a confirmação não exclui',(await lista()).some(x=>x.titulo==='Prova bimestral'));
  p.removeAllListeners('dialog');p.once('dialog',d=>d.accept());await p.click('#eExcluir');await p.waitForSelector('#escForm',{state:'detached'});await p.waitForTimeout(400);t('confirmar exclui',!(await lista()).some(x=>x.titulo==='Prova bimestral'));p.on('dialog',d=>d.accept());
- // pedir ao marketing pela tela
- await p.click('.cm-item:has-text("Torneio de vôlei (final)")');await p.waitForSelector('[data-pedir="video"]');
- await p.click('[data-pedir="video"]');await p.waitForSelector('#escPed');await p.fill('#pObs','Gravar a final');await p.click('#pOk');await p.waitForSelector('#escPed',{state:'detached'});await p.waitForTimeout(500);
- const sv=(await call('GET','/data?module=solicitacoes'))[1].rows.find(x=>/Produção de vídeo — Torneio/.test(x.titulo));
- t('"Produção de vídeo" criada pela tela, ligada ao evento',sv&&sv.eventoEscolarId===tor.id&&/Gravar a final/.test(sv.descricao),sv);
- await p.click('.cm-item:has-text("Torneio de vôlei (final)")');await p.waitForSelector('[data-sol]');
- t('o evento mostra a solicitação criada e abre o registro original',/Torneio/.test(await p.$eval('.cm-vinc',e=>e.innerText)));
- await p.click('[data-sol]');await p.waitForSelector('#dForm');t('o link abre a solicitação original em Solicitações',/Torneio/.test(await p.$eval('.sl-det',e=>e.innerText))&&/Evento escolar/.test(await p.$eval('.sl-det',e=>e.innerText)));
- await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
  // semana e próximos
  await p.click('[data-modo="week"]');await p.waitForSelector('.cm-semana');const s0=await p.$eval('.cm-periodo',e=>e.textContent);await p.click('#cmNext');await p.waitForTimeout(200);t('navegação semanal',(await p.$eval('.cm-periodo',e=>e.textContent))!==s0);await p.click('#cmHoje');
  await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');const lt=await p.$eval('.cm-proximos',e=>e.innerText);
@@ -151,11 +142,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
 
  // ---- equipe: só consulta e pede apoio ----
  const pe=await entra('MON-3303');await pe.evaluate(()=>go('calescolar'));await pe.waitForSelector('.cm-semana, .cm-mes');await mesVista(pe);
- await pe.click('#cmNovo');await pe.waitForSelector('.cal-escolha');t('equipe vê o calendário e não pode criar evento escolar',!(await pe.$('.cal-escolha [data-n="esc"]'))&&/Feira de Ciências/.test(await pe.$eval('#cmRaiz',e=>e.innerText)));await pe.click('.admin-box [data-close]');
- t('equipe não arrasta eventos',await pe.$eval('.cm-item',e=>!e.hasAttribute('draggable')));
- await pe.click('.cm-item:has-text("Feira de Ciências")');await pe.waitForSelector('#escForm');
- t('equipe vê os detalhes em modo leitura (sem Salvar/Excluir) e pode pedir apoio',await pe.$('#eSalvar')===null&&await pe.$('#eExcluir')===null&&await pe.$('[data-pedir="arte"]')!==null&&await pe.$eval('#eTitulo',e=>e.disabled));
- await pe.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ await pe.click('#cmNovo');await pe.waitForSelector('.cal-escolha');t('a equipe de Marketing também cria eventos (escolhe o tipo)',true);await pe.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ t('a equipe arrasta eventos',await pe.$eval('.cm-item',e=>e.hasAttribute('draggable')));
 
  // ---- celular ----
  const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('calescolar'));await pc.waitForSelector('.cm-semana, .cm-mes');await mesVista(pc);

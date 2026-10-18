@@ -152,6 +152,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  const depois=await p.evaluate(async t=>(await fetch('/api/public/calendario?t='+t,{credentials:'omit'})).status,tok);t('desativar o link o invalida na hora',depois===404);
  t('sem erros de JS na página pública do calendário',e4.length===0,e4.join('|'));
  // ---- Dashboard de Tráfego (relatório semanal em PDF)
+ await api('GET','/integrations/ads/accounts');await api('POST','/integrations/ads/account',{conta:'111222333'});await api('POST','/integrations/ads/sync',{});
  const rp=await ctx.newPage();const e5=[];rp.on('pageerror',e=>e5.push(e.message));
  await rp.goto(BASE+'/relatorio-trafego.html');await rp.waitForSelector('.pg',{timeout:20000});
  const rtx=await rp.$eval('#rel',e=>e.innerText);
