@@ -98,6 +98,17 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('Estúdio mostra os posts já publicados no Instagram (somente consulta), além dos programados',igEst.n>=1&&igEst.cards>=1&&igEst.rotulo==='Publicado',igEst);
  await ir(p,'conteudos');await p.waitForTimeout(1500);
  t('Publicações lista também o que já foi publicado no Instagram (somente consulta)',/Já publicadas no Instagram/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&(await p.$$('#pubIg .db-lista li')).length>=1);
+ // ---- posts já agendados no Instagram: acompanhados como Programado e conciliados como Publicado ----
+ const conc=await p.evaluate(async()=>{const h={'Content-Type':'application/json','X-EVO':'1'};const cur=new Date().toISOString().slice(0,7);
+  const mk=async b=>(await (await fetch('/api/data?module=conteudos',{method:'POST',headers:h,body:JSON.stringify(b)})).json());
+  const a=await mk({titulo:'Feira agendada',legenda:'Bastidores da feira',status:'PROGRAMADO',agendadoNoInstagram:'SIM',publicarInstagram:'NÃO',publicacaoEm:cur+'-01T12:00',canal:'Instagram',formato:'Reels'});
+  const b=await mk({titulo:'Outro post',legenda:'Texto que não existe no perfil',status:'PROGRAMADO',agendadoNoInstagram:'SIM',publicarInstagram:'NÃO',publicacaoEm:cur+'-01T12:00',canal:'Instagram',formato:'Feed'});
+  const antes=(await (await fetch('/api/data?module=conteudos&id='+a.id)).json()).status;
+  await fetch('/api/integrations/instagram/sync',{method:'POST',headers:h,body:'{}'});
+  const ra=await (await fetch('/api/data?module=conteudos&id='+a.id)).json(),rb=await (await fetch('/api/data?module=conteudos&id='+b.id)).json();
+  return {antes,a:[ra.status,ra.instagramMediaId],b:[rb.status,rb.instagramMediaId]}});
+ t('post agendado no Instagram vira Publicado quando aparece no perfil (casa por horário e legenda)',conc.antes==='PROGRAMADO'&&conc.a[0]==='PUBLICADO'&&conc.a[1]==='m2',conc);
+ t('post agendado sem correspondência no perfil continua Programado',conc.b[0]==='PROGRAMADO'&&!conc.b[1],conc);
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);

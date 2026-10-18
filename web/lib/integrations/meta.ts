@@ -155,6 +155,28 @@ export async function igContaValida(conta: string): Promise<string> {
   const cs = await contasMonitoradas();
   return cs.find((c) => c.ig === conta)?.ig ?? (await setting('ig_user_id'));
 }
+/** Posts marcados como "já agendados no Instagram" (feitos no aplicativo ou no Meta Business Suite): quando o post aparece no perfil,
+ *  o conteúdo vira Publicado. Casa pelo horário (até 24 h de diferença) e pela legenda; nunca reutiliza um post já vinculado. */
+async function conciliarAgendados(ig: string): Promise<void> {
+  const principal = await setting('ig_user_id');
+  const norm = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const pendentes = (await listRows('conteudos')).filter((r) => strv(r.agendadoNoInstagram) === 'SIM' && !r.instagramMediaId && !/PUBLICADO|ARQUIVADO/i.test(strv(r.status)) && (strv(r.contaInstagram) || principal) === ig && strv(r.publicacaoEm));
+  if (!pendentes.length) return;
+  const posts = await q('SELECT media_id,publicado_em,legenda,permalink FROM ig_posts WHERE conta=? ORDER BY publicado_em DESC LIMIT 300', [ig]);
+  const usados = new Set((await listRows('conteudos')).map((r) => strv(r.instagramMediaId)).filter(Boolean));
+  for (const r of pendentes) {
+    const alvo = parseLocal(strv(r.publicacaoEm)).getTime();
+    if (!Number.isFinite(alvo)) continue;
+    const base = norm(strv(r.legenda) || strv(r.titulo)).slice(0, 24);
+    const cands = posts.filter((p) => !usados.has(strv(p.media_id)) && Math.abs(new Date(strv(p.publicado_em)).getTime() - alvo) <= 24 * 3600 * 1000)
+      .map((p) => ({ p, ok: !!base && norm(strv(p.legenda)).includes(base), d: Math.abs(new Date(strv(p.publicado_em)).getTime() - alvo) }));
+    const melhor = cands.filter((c) => c.ok).sort((a, b) => a.d - b.d)[0] ?? (!base && cands.length === 1 ? cands[0] : undefined);
+    if (!melhor) continue;
+    usados.add(strv(melhor.p.media_id));
+    await updateRow('conteudos', String(r.id), { status: 'PUBLICADO', instagramMediaId: strv(melhor.p.media_id), instagramLink: strv(melhor.p.permalink), publicadoEm: strv(melhor.p.publicado_em) }, 'integracao:instagram');
+  }
+}
+
 /** Sincroniza o mês atual e o anterior de TODAS as contas acompanhadas. Devolve o nº de períodos gravados. */
 export async function igSync(months = 2): Promise<number> {
   if (!(await metaConnected())) throw new Error('Instagram não conectado.');
@@ -202,6 +224,7 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
       if ((await setting('meta_token_invalido')) === '1') throw e;
     }
   }
+  await conciliarAgendados(ig).catch(() => {});
   let n = 0;
   const listRowsSeg = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? ig) === ig);
   const lp = localParts(new Date());

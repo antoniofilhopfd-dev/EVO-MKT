@@ -46,7 +46,7 @@ function stCard(r){
   return `<button class="st-card st-${ST_CLASSE[st]||'draft'}${falha?' st-falha':''}" ${mov?'draggable="true"':''} data-id="${attr(r.id)}" title="${attr(r.titulo||'')}">
     <span class="st-top"><b>${ST_ICONE[r.formato]||'◇'} ${esc(stHora(r)||'sem hora')}</b><em>${esc(ST_ROTULO[st]||st||'—')}</em></span>
     <strong>${esc(r.titulo||'(sem título)')}</strong>
-    <small>${esc(r.perfil||'')}${r.formato?' · '+esc(r.formato):''}${falha?' · falha ao publicar':''}</small>
+    <small>${esc(r.perfil||'')}${r.formato?' · '+esc(r.formato):''}${/SIM/i.test(r.agendadoNoInstagram||'')&&stAtivo(r)?' · agendado no Instagram':''}${falha?' · falha ao publicar':''}</small>
   </button>`;
 }
 
@@ -126,7 +126,8 @@ async function studioCompositor(row,dataIni=''){
    ${sug?`<div class="st-sug"><span>Melhor momento nos seus dados: <b>${esc(h.dia)} às ${h.hora}h</b></span><button type="button" class="softbtn" id="sfSug">Usar</button></div>`:''}
    <label>Mídia (JPEG ou vídeo MP4/MOV; para Carrossel selecione de 2 a 20 arquivos de uma vez)${(()=>{let n=0;try{n=JSON.parse(r.midiasInstagram||'[]').length}catch{}return n>1?` <small>— ${n} itens já anexados; enviar novos substitui todos</small>`:''})()} <input id="sfArq" type="file" multiple accept=".jpg,.jpeg,.mp4,.mov,image/jpeg,video/mp4,video/quicktime"></label>
    <div class="st-biblio"><button type="button" class="softbtn" id="sfBiblio">Escolher da biblioteca de Arquivos</button><small id="sfBiblioInfo" class="kpi-note"></small></div>
-   <label class="check-row"><input type="checkbox" id="sfIG" ${(edit?/SIM/i.test(r.publicarInstagram||''):true)?'checked':''}> Publicar no Instagram automaticamente na data e hora marcadas (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
+   <label class="check-row"><input type="checkbox" id="sfJa" ${/SIM/i.test(r.agendadoNoInstagram||'')?'checked':''}><span>Este post já está agendado no Instagram (aplicativo ou Meta Business Suite). O sistema não publica: só acompanha como <b>Programado</b> e marca como <b>Publicado</b> quando ele aparecer no perfil.</span></label>
+ <label class="check-row"><input type="checkbox" id="sfIG" ${(edit?/SIM/i.test(r.publicarInstagram||''):true)?'checked':''}> Publicar no Instagram automaticamente na data e hora marcadas (só se estiver Aprovado ou Agendado, com mídia anexada)</label>
    <div class="st-row"><label>Colab com<select id="sfColabSel"></select></label><label id="sfColabOutroL" hidden>Outro perfil (@usuário; até 3, separados por vírgula)<input id="sfColab" maxlength="120" value="${attr(r.colaboradores||'')}" placeholder="@perfil"></label></div>
    <p class="kpi-note">Publica como colaboração: o post aparece nos dois perfis depois que o convidado aceitar o convite no Instagram. Vale para Feed e Reels.</p>
    <label class="check-row"><input type="checkbox" id="sfTagCom" ${/SIM/i.test(r.hashtagsComentario||'')?'checked':''}> Colocar as hashtags no primeiro comentário (legenda mais limpa)</label>
@@ -231,10 +232,11 @@ async function studioCompositor(row,dataIni=''){
       if(!gerente&&!liberado)return toast('Só publica depois de aprovado. Use "Enviar para aprovação".','warn');
       if(!confirm(gerente&&!liberado?'Isto APROVA e PUBLICA agora no Instagram do colégio. Não dá para desfazer pelo sistema. Continuar?':'Publicar agora no Instagram do colégio? Não dá para desfazer pelo sistema.'))return;
     }
-    const body={titulo,perfil:g('sfPerfil').value,formato:g('sfFormato').value,canal:'Instagram',legenda:leg,hashtags:g('sfTags').value,cta:g('sfCta').value,publicacaoEm:quando,revisor:g('sfRevisor').value,publicarInstagram:g('sfIG').checked?'SIM':'NÃO',hashtagsComentario:g('sfTagCom').checked?'SIM':'NÃO'};
+    const body={titulo,perfil:g('sfPerfil').value,formato:g('sfFormato').value,canal:'Instagram',legenda:leg,hashtags:g('sfTags').value,cta:g('sfCta').value,publicacaoEm:quando,revisor:g('sfRevisor').value,publicarInstagram:(g('sfIG').checked&&!g('sfJa').checked)?'SIM':'NÃO',agendadoNoInstagram:g('sfJa').checked?'SIM':'NÃO',hashtagsComentario:g('sfTagCom').checked?'SIM':'NÃO'};
     if(g('sfConta'))body.contaInstagram=g('sfConta').value;
     const colabSel=g('sfColabSel').value;body.colaboradores=(colabSel&&colabSel!=='__outro'?colabSel:colabSel==='__outro'?g('sfColab').value:'').split(/[\s,;]+/).map(x=>x.replace(/^@/,'').trim()).filter(Boolean).slice(0,3).map(x=>'@'+x).join(', ');
     if(tipo==='PUBLICAR'){if(!liberado)body.status='APROVADO';if(!body.publicacaoEm)body.publicacaoEm=stAgoraLocal()}else if(tipo!=='MANTER')body.status=ST_ETAPAS[tipo];else if(!edit)body.status='PRODUÇÃO';
+    if(g('sfJa').checked&&!jaPublicado){if(!quando)return toast('Informe a data e a hora em que o post está agendado no Instagram','warn');body.status='PROGRAMADO'}
     try{
       const salvo=await api(edit?`/data?module=conteudos&id=${encodeURIComponent(r.id)}`:'/data?module=conteudos',{method:edit?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       const id=salvo?.id||r.id,f=g('sfArq').files[0];
