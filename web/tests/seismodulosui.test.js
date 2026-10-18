@@ -75,6 +75,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  for(const [pg,rx,nome] of [['tfcriativos',/Criativ/i,'Criativos'],['tfpublicos',/Segmento|Públic/i,'Públicos'],['tfanalises',/Comparar|Análise/i,'Análises'],['tforcamentos',/Orçamento/i,'Orçamentos'],['tfalertas',/Alerta/i,'Alertas'],['tfrelatorios',/Relat/i,'Relatórios'],['tfhistorico',/Hist/i,'Histórico']]){
   await ir(p,pg);const tx=await p.evaluate(()=>document.querySelector('#content').innerText);t(`Tráfego › ${nome} carrega`,rx.test(tx)&&!/custo por matr[ií]cula|matr[ií]culas efetivadas|funil|leads cadastrados/i.test(tx),tx.slice(0,160));
  }
+ await ir(p,'trafego');t('Visão Geral tem o atalho do relatório semanal (PDF)',!!(await p.$('#tpRelSemanalVg[href="/relatorio-trafego.html"]')));
+ await ir(p,'tfrelatorios');t('Relatórios tem o atalho do relatório semanal aprovado',!!(await p.$('#tpRelSemanal[href="/relatorio-trafego.html"]')));
  // ---- celular ----
  const pm=await login('NAT-3301','Nat26ab',{width:390,height:800});
  for(const pg of ['hoje','calendario','arquivos','trafego','gerenciador','configuracoes']){await ir(pm,pg);const w=await pm.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);t(`celular: ${pg} sem rolagem horizontal da página`,w<=2,w)}
