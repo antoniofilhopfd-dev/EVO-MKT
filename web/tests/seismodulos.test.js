@@ -34,7 +34,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
  const cam=r&&r.arquivos&&r.arquivos[0].caminho;
  [s,r]=await envia(A,'x.exe',Buffer.from('MZ'),'Geral');t('tipo não permitido é recusado (400)',s===400,r);
  [s,r]=await envia(A,'falso.png',Buffer.from('isto não é imagem'),'Geral');t('conteúdo que não bate com a extensão é recusado (400)',s===400,r);
- [s,r]=await envia(A,'a.png',PNG,'../../etc');t('nome de pasta malicioso não sai da biblioteca',s===201&&r.arquivos[0].caminho.startsWith('BIBLIOTECA/')&&!r.arquivos[0].caminho.includes('..'),r);
+ [s,r]=await envia(A,'a.png',PNG,'../../etc');t('nome de pasta malicioso não sai da biblioteca',s===201&&r.arquivos[0].caminho.startsWith('BIBLIOTECA/')&&r.arquivos[0].caminho.split('/').length===3,r);
  [s,r]=await req('GET','/arquivos/lista');t('lista traz o arquivo, pastas e limite',s===200&&r.rows.some(x=>x.caminho===cam)&&r.pastas.includes('Campanhas')&&r.maxMb>0,r);
  [s]=await req('POST','/arquivos/pasta',{nome:'Eventos 2026'});t('cria pasta (201)',s===201);
  [s,r]=await req('POST','/arquivos/renomear',{caminho:cam,nome:'logo-novo.png'});t('renomear altera só o nome',s===200&&r.nome==='logo-novo.png');

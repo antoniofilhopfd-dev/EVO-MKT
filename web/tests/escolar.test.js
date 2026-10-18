@@ -93,9 +93,9 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const novoEsc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="esc"]');await pg.waitForSelector('#escForm')};
  await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-tipo');
  const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText.trim()));
- t('Calendário único: Escolar ao lado de Compromissos e Datas (sem subabas)',sub.some(x=>/Escolar/.test(x))&&sub.some(x=>/Compromissos/.test(x))&&sub.some(x=>/Datas/.test(x))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
+ t('Calendário único: Escolar ao lado de Compromissos e Datas (sem subabas)',sub.some(x=>/escolar/i.test(x))&&sub.some(x=>/compromissos/i.test(x))&&sub.some(x=>/Datas/.test(x))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
  await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-semana, .cm-mes');await mesVista();
- t('Calendário único aberto já filtrado em Escolar (um botão "+ Novo")',(await p.$$eval('.cm-tipo.off',e=>e.length))===7&&/Novo/.test(await p.$eval('#cmNovo',e=>e.textContent)));
+ t('Calendário único aberto já filtrado em Escolar (um botão "+ Novo")',(await p.$$eval('.cm-tipo.off',e=>e.length))===5&&/Novo/.test(await p.$eval('#cmNovo',e=>e.textContent)));
  t('visões Semana, Mês, Dia, Lista e Ano',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
  // eventos de arrastar sintéticos: exercitam os mesmos tratadores (dragstart/dragover/drop) sem depender do gesto do mouse
  const soltar=(txt,data)=>p.evaluate(([txt,data])=>{const s=[...document.querySelectorAll('.cm-item')].find(x=>x.textContent.includes(txt)),d=document.querySelector(`.cm-dia[data-date="${data}"]`),dt=new DataTransfer();s.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));s.dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}))},[txt,data]);

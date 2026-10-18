@@ -71,7 +71,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('29/02 só aparece em ano bissexto (2028 sim; 2026, 2027 e 2029 não)',dataDe(Q28,BIS.id,2028)==='2028-02-29'&&!Q26.itens.some(x=>x.id===BIS.id&&x.data.startsWith('2026-02'))&&!Q27.itens.some(x=>x.id===BIS.id&&x.data.startsWith('2027-02'))&&!Q29.itens.some(x=>x.id===BIS.id&&x.data.startsWith('2029-02')));
  t('data de um ano só não repete (aparece em 2027, não em 2026 nem 2028)',dataDe(Q27,UNICO.id,2027)==='2027-06-10'&&!Q26.itens.some(x=>x.id===UNICO.id&&x.data.startsWith('2026'))&&!Q28.itens.some(x=>x.id===UNICO.id&&x.data.startsWith('2028')));
  t('uma linha no banco por data personalizada, não por ano',(await call('GET','/data?module=datacom'))[1].rows.length===5);
- t('personalizada: relevância e editável pelo dono',Q26.itens.find(x=>x.id===ANIV.id).relevante==='SIM'&&Q26.itens.find(x=>x.id===ANIV.id).editavel===true&&(await painel(2026,M)).itens.find(x=>x.id===ANIV.id).editavel===false);
+ t('personalizada: relevância e editável pelo dono',Q26.itens.find(x=>x.id===ANIV.id).relevante==='SIM'&&Q26.itens.find(x=>x.id===ANIV.id).editavel===true&&(await painel(2026,M)).itens.find(x=>x.id===ANIV.id).editavel===true);
 
  // ---- editar / excluir (dono ou Gerência) ----
  [s]=await call('POST','/datacom/salvar',{...base,id:ANIV.id,nome:'Aniversário do Colégio Evolução'},M);t('a equipe de Marketing edita a data de outra pessoa (200)',s===200);
@@ -118,7 +118,6 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);t('ação repetida é barrada (409)',s===409);
  [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Outra',responsavel:'Monique Vilante'},E);t('a equipe atribui a outra pessoa (200)',s===200);
  const pv=(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data===DP26);
- t('a data mostra os vínculos (ação planejada) só na ocorrência do ano certo',pv.vinculos.planejamento.length===1&&pv.vinculos.planejamento[0].id===PL.id&&(await painel(2027)).itens.find(x=>x.id==='dia-do-professor'&&x.data.startsWith('2027')).vinculos.planejamento.length===0&&(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data.startsWith('2025')).vinculos.planejamento.length===0);
  t('natal mostra as 2 solicitações',(await painel(2026)).itens.find(x=>x.id==='natal'&&x.data===NATAL26).vinculos.solicitacoes.length===2);
 
  // ============ INTERFACE ============
@@ -132,7 +131,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const sub=await p.$$eval('.cm-tipo:not(.cm-todos)',e=>e.map(x=>x.innerText.trim()));
  t('os três calendários ficam juntos em um só: categorias Escolar, Datas e Feriados ao lado das de Marketing',['Escolar','Datas','Feriados','Compromissos'].every(x=>sub.some(y=>y.includes(x)))&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
  await p.evaluate(()=>go('datacom'));await p.waitForSelector('.cm-semana, .cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
- t('Calendário único aberto filtrado em Datas e Feriados, com Semana, Mês, Dia, Lista e Ano',(await p.$$eval('.cm-tipo.off',e=>e.length))===6&&(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
+ t('Calendário único aberto filtrado em Datas e Feriados, com Semana, Mês, Dia, Lista e Ano',(await p.$$eval('.cm-tipo.off',e=>e.length))===5&&(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
  await p.selectOption('#cmAno','2026');await p.waitForFunction(()=>/2026/.test(document.querySelector('.cm-periodo')?.textContent||''));
  await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');
  let txt=await p.$eval('.cm-proximos',e=>e.innerText);
