@@ -42,7 +42,11 @@ export async function relatorioTrafego(de: string, ate: string): Promise<Row> {
   const dia = await paginar(`/${act}/insights`, { ...base, level: 'campaign', time_increment: 1, time_range: faixa(de, ate) }, 8);
   const adSem = await paginar(`/${act}/insights`, { fields: 'ad_id,ad_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions,account_currency', level: 'ad', time_range: faixa(de, ate), limit: 200 }, 6);
   const meta = new Map<string, Row>();
-  try { for (const a of await paginar(`/${act}/ads`, { fields: 'id,effective_status,creative.thumbnail_width(220).thumbnail_height(280){thumbnail_url}', limit: 200 }, 8)) meta.set(String(a.id), a); } catch { /* sem foto/estado: o relatório sai assim mesmo */ }
+  const camposAd = 'id,effective_status,creative.thumbnail_width(300).thumbnail_height(380){thumbnail_url}';
+  const idsAd = [...new Set(adSem.map((l) => String(l.ad_id ?? '')).filter(Boolean))];
+  // busca só os anúncios do relatório (em lotes), para a foto não depender de a conta ter poucos anúncios; se não vier nada, cai na listagem geral
+  try { for (let i = 0; i < idsAd.length; i += 40) for (const a of await paginar(`/${act}/ads`, { fields: camposAd, filtering: JSON.stringify([{ field: 'id', operator: 'IN', value: idsAd.slice(i, i + 40) }]), limit: 100 }, 2)) meta.set(String(a.id), a); } catch { /* tenta a listagem geral */ }
+  if (!meta.size) { try { for (const a of await paginar(`/${act}/ads`, { fields: camposAd, limit: 200 }, 8)) meta.set(String(a.id), a); } catch { /* sem foto/estado: o relatório sai assim mesmo */ } }
 
   const moeda = String(camSem[0]?.account_currency ?? camMes[0]?.account_currency ?? 'BRL');
   const linha = (l: Row) => ({

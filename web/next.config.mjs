@@ -4,7 +4,7 @@ const csp = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob: https://*.cdninstagram.com https://*.fbcdn.net",
+  "img-src 'self' data: blob: https://*.cdninstagram.com https://*.fbcdn.net https://*.facebook.com",
   "connect-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
