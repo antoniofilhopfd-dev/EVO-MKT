@@ -558,7 +558,8 @@ async function carregaPubIg(alvo){
     const ja=new Set((cont.rows||[]).map(r=>String(r.instagramMediaId||'')).filter(Boolean));
     const lista=(igp.rows||[]).filter(p=>p.quando&&!ja.has(String(p.id))).slice(0,30);
     if(!lista.length){alvo.innerHTML='';return}
-    alvo.innerHTML=`<div class="mod-sub"><h3>Já publicadas no Instagram${igContas.length>1?' · @'+esc((igContas.find(c=>c.ig===igConta)||{}).usuario||''):''}</h3><p class="kpi-note">Posts lidos da conta (somente consulta). Os criados e programados pelo Estúdio aparecem na lista acima.</p>
+    if(!(state.rows||[]).length){document.querySelectorAll('#content .tablewrap,#content .module-empty,#content .kpi-note').forEach(e=>e.remove())} // nada criado pelo sistema: a lista de publicadas é a própria tela (sem aviso de "vazio")
+    alvo.innerHTML=`<div class="mod-sub"><h3>Publicadas no Instagram${igContas.length>1?' · @'+esc((igContas.find(c=>c.ig===igConta)||{}).usuario||''):''}</h3><p class="kpi-note">Posts lidos da conta (somente consulta). Os criados e programados pelo Estúdio aparecem na lista de cima.</p>
      <ul class="db-lista">${lista.map(p=>{const dt=new Date(p.quando),link=/^https:\/\//.test(p.link||'')?p.link:'';const dia=isNaN(dt)?String(p.quando).slice(0,10):fmtDate(stIso(dt));return `<li>${link?`<a class="db-lnk" href="${attr(link)}" target="_blank" rel="noopener">`:'<div class="db-lnk">'}<span class="db-dia">${esc(dia)}</span><span class="db-tit"><b>${esc(String(p.legenda||'(sem legenda)').slice(0,90))}</b><small>${esc([IG_TIPO[p.tipo]||p.tipo,p.interacoes?Number(p.interacoes).toLocaleString('pt-BR')+' interações':''].filter(Boolean).join(' · '))}</small></span>${link?'</a>':'</div>'}</li>`}).join('')}</ul></div>`;
   }catch{alvo.innerHTML=''}
 }
