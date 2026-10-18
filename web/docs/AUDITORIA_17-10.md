@@ -20,3 +20,13 @@ Legenda: **Impl.** implementado e testado com o mock · **Parcial** · **Ext.** 
 | Prévia oficial do anúncio, sobreposição de públicos | Ausente | declarado indisponível na tela |
 | CRM (Matrículas, leads cadastrados, funil, custo por matrícula) | Removido | conversas e leads da Meta permanecem como métrica |
 | Exportação Excel/CSV/PDF | Impl. | Excel via `/reports/xlsx` |
+
+## Testes (regressão completa de 18/10/2026)
+
+- `tsc --noEmit` limpo; checagem de sintaxe de todos os `public/*.js` e `tests/*.js` limpa; build de produção OK.
+- 42 suítes executadas pelo `tests/run-web.sh`, 0 falhas (1.185 verificações OK nesta rodada, sem contar a suíte de capturas).
+- Suítes novas: `seismodulos` (API: Arquivos, preferências por usuário, limites de gasto, Excel, perfis, rotas sem sessão/CSRF, rota de matrículas removida) e `seismodulosui` (menu por perfil, Dashboard, Calendário, Arquivos, todas as seções do Tráfego, Configurações, celular, erros de JS).
+- Permissões: a Equipe de Marketing opera (testes antigos de "403 para a Equipe" foram atualizados para 200). Seguem exclusivas do Administrador: usuários, auditoria, backup, modo de acesso, importação, credenciais de integração, **ligar a escrita na Meta (`/ads/modo`), tetos (`/ads/gestao/config`) e automações (`/ads/regras`, `/ads/relatorio-semanal`)**.
+- Suítes aposentadas (telas fora da navegação) estão em `tests/obsoletos/` e não rodam.
+- Cobertura de interface que **não** existe para o novo Gerenciador: edição, duplicação e lote contra a Meta (só rota, com o simulador). Nada disso foi exercitado na Meta real.
+- Capturas reais (ambiente de teste com simulador da Meta): `docs/screenshots/v5.17/`.
