@@ -273,7 +273,7 @@ function tpPainelColunas(){
      <div class="tp-ff-acoes"><button class="softbtn" id="colPadrao" type="button">Restaurar padrão</button><button class="btn" id="colOk" type="button">Concluir</button></div>`;
     liga();
   };
-  const aplica=()=>{c.modelo='personalizado';tpCfgSalva();tpRedesenhaTabela();const s=$('#tpVisao');if(s)s.value='m:personalizado';desenha()};
+  const aplica=()=>{c.modelo='personalizado';for(const [n] of TP_NIVEIS){if(n===GM2.nivel)continue;const o=GM2.cfg.nivel[n];if(!o)continue;o.modelo='personalizado';const ok=c.cols.filter(k=>TP_COL[k]&&TP_COL[k].niveis.includes(n));if(ok.length)o.cols=ok} /* as colunas escolhidas valem para campanhas, conjuntos e anúncios */tpCfgSalva();tpRedesenhaTabela();const s=$('#tpVisao');if(s)s.value='m:personalizado';desenha()};
   const liga=()=>{
     p.querySelector('#colBusca').oninput=e=>{desenha();const i=p.querySelector('#colBusca');i.focus();i.setSelectionRange(i.value.length,i.value.length)};
     p.querySelectorAll('[data-col]').forEach(i=>i.onchange=()=>{if(i.checked){if(!c.cols.includes(i.dataset.col))c.cols.push(i.dataset.col)}else{if(c.cols.length<=1){i.checked=true;return toast('Mantenha ao menos uma coluna','warn')}c.cols=c.cols.filter(k=>k!==i.dataset.col)}aplica()});
