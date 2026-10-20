@@ -30,7 +30,7 @@ const PeriodoPicker=(()=>{
   const fechar=()=>{ov.remove();document.removeEventListener('keydown',tecla)};
   const tecla=e=>{if(e.key==='Escape')fechar()};document.addEventListener('keydown',tecla);
   ov.onclick=e=>{if(e.target===ov)fechar()};
-  const pre=[['Hoje',()=>[hoje,hoje]],['7 dias',()=>{const d=new Date();d.setDate(d.getDate()-6);return [iso(d),hoje]}],['30 dias',()=>{const d=new Date();d.setDate(d.getDate()-29);return [iso(d),hoje]}],['Este mês',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth(),1,12)),hoje]}],['Mês anterior',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth()-1,1,12)),iso(new Date(d.getFullYear(),d.getMonth(),0,12))]}]];
+  const pre=[['Hoje',()=>[hoje,hoje]],['7 dias',()=>{const d=new Date();d.setDate(d.getDate()-6);return [iso(d),hoje]}],['30 dias',()=>{const d=new Date();d.setDate(d.getDate()-29);return [iso(d),hoje]}],['Este mês',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth(),1,12)),hoje]}],['Esta semana',()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());return [iso(d),hoje]}],['Semana passada',()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()-7);const f=new Date(d);f.setDate(f.getDate()+6);return [iso(d),iso(f)]}],['Mês anterior',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth()-1,1,12)),iso(new Date(d.getFullYear(),d.getMonth(),0,12))]}]];
   function desenha(){
    const ano=base.getFullYear(),mes=base.getMonth(),primeiro=new Date(ano,mes,1,12).getDay(),dias=new Date(ano,mes+1,0).getDate();
    let g=['D','S','T','Q','Q','S','S'].map(x=>`<i>${x}</i>`).join('');

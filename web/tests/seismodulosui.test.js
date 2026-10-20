@@ -197,6 +197,16 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await p.click('#crConf');await p.waitForSelector('.cri-msg.ok');await p.click('#crOk');await p.waitForSelector('#crForm',{state:'detached'});await p.waitForTimeout(800);
  const na=(await mockNovos()).filter(([,v])=>v.tipo==='anuncio').pop();
  t('anúncio criado pela tela no conjunto escolhido, pausado',!!na&&na[1].params.status==='PAUSED'&&na[1].params.adset_id==='s1',na);
+ // ---- períodos prontos do Tráfego (como no Gerenciador da Meta) ----
+ await ir(p,'gerenciador');
+ const pr=await p.evaluate(()=>{const h=new Date();h.setHours(12,0,0,0);const dow=h.getDay();const f=(n)=>{const d=new Date(h);d.setDate(d.getDate()+n);return tpIso(d)};
+  const sem=tpIntervalo('semana'),ant=tpIntervalo('semana_ant');
+  return {opts:[...document.querySelectorAll('#tpPer option')].map(o=>o.textContent),semOk:sem[0]===f(-dow)&&sem[1]===f(0)&&new Date(sem[0]+'T12:00:00').getDay()===0,antOk:ant[0]===f(-dow-7)&&ant[1]===f(-dow-1)&&new Date(ant[0]+'T12:00:00').getDay()===0&&new Date(ant[1]+'T12:00:00').getDay()===6,ontem:tpIntervalo('hoje_ontem')[0]===f(-1),ano:tpIntervalo('ano_ant')[0].endsWith('-01-01')&&tpIntervalo('ano_ant')[1].endsWith('-12-31'),trim:tpIntervalo('trim')[0].endsWith('-01')}});
+ t('períodos prontos: Esta semana, Semana passada, Hoje e ontem, 3 e 28 dias, trimestre e ano passado',['Esta semana','Semana passada','Hoje e ontem','Últimos 3 dias','Últimos 28 dias','Este trimestre','Ano passado','Personalizado'].every(x=>pr.opts.includes(x)),pr.opts);
+ t('Esta semana = domingo até hoje; Semana passada = domingo a sábado anterior',pr.semOk&&pr.antOk&&pr.ontem&&pr.ano&&pr.trim,pr);
+ await p.selectOption('#tpPer','semana_ant');await p.waitForTimeout(2500);
+ t('escolher Semana passada recarrega o Gerenciador no período certo',(await p.evaluate(()=>tpPeriodo().p))==='semana_ant'&&/Semana passada/.test(await p.$eval('#tpPer',e=>e.selectedOptions[0].textContent)));
+ await p.evaluate(()=>tpDefinePeriodo('30'));
  // ---- período em um único modal (primeiro e último dia) ----
  await ir(p,'gerenciador');await p.click('#tpPerBtn');await p.waitForSelector('.pp');
  const antes=await p.$$eval('.pp-g button[data-d]',e=>e.length);
