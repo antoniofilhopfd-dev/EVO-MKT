@@ -111,6 +111,19 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
   return {antes,a:[ra.status,ra.instagramMediaId],b:[rb.status,rb.instagramMediaId]}});
  t('post agendado no Instagram vira Publicado quando aparece no perfil (casa por horário e legenda)',conc.antes==='PROGRAMADO'&&conc.a[0]==='PUBLICADO'&&conc.a[1]==='m2',conc);
  t('post agendado sem correspondência no perfil continua Programado',conc.b[0]==='PROGRAMADO'&&!conc.b[1],conc);
+ // ---- visualizações dos posts (Desempenho, Ranking, Visão geral e Dashboard) ----
+ const apiV=await p.evaluate(async()=>{const r=await (await fetch('/api/instagram/posts')).json();const m2=(r.rows||[]).find(x=>x.id==='m2');const d=await (await fetch('/api/dashboard/resumo?dias=30')).json();return {m2:m2&&m2.visualizacoes,total:d.instagram.visualizacoes}});
+ t('a API traz as visualizações de cada post (views da Meta) e o total do período',apiV.m2===52000&&apiV.total>=52000,apiV);
+ await ir(p,'igposts');await p.waitForTimeout(1200);
+ const desV=await p.evaluate(()=>document.querySelector('#content').innerText);
+ t('Desempenho: cada post mostra Visualizações, a média por tipo e a ordem "Mais visualizações"',/Visualizações/.test(desV)&&/52\.000/.test(desV)&&/visualizações em média/.test(desV)&&!!(await p.$('option[value="visualizacoes"]')),desV.slice(0,200));
+ await ir(p,'igranking');await p.waitForTimeout(1200);
+ const rkV=await p.evaluate(()=>document.querySelector('#content').innerText);
+ t('Ranking: coluna Visualizações e ordenação por visualizações',/Visualizações/.test(rkV)&&!!(await p.$('option[value="visualizacoes"]')),rkV.slice(0,200));
+ await ir(p,'igvisao');await p.waitForTimeout(1500);
+ t('Visão geral do Instagram: cartão Visualizações',/Visualizações/.test(await p.evaluate(()=>document.querySelector('#content').innerText)));
+ await ir(p,'hoje');await p.waitForTimeout(2500);
+ t('Dashboard: Visualizações na seção do Instagram',/Visualizações/.test(await p.evaluate(()=>document.querySelector('#content').innerText)));
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);

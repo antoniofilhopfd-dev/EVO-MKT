@@ -154,7 +154,7 @@ export async function operacaoRoute(c: Ctx) {
     const conta = await igContaValida(c.qs('conta'));
     const linhas = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? conta) === conta);
     const pega = (per: string) => linhas.find((r) => r.periodo === per) ?? null;
-    const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts WHERE conta=? AND publicado_em LIKE ? ORDER BY publicado_em DESC', [conta, mes + '%'])).map((p) => ({ ...p, interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos) }));
+    const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,miniatura,permalink FROM ig_posts WHERE conta=? AND publicado_em LIKE ? ORDER BY publicado_em DESC', [conta, mes + '%'])).map((p) => ({ ...p, interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos) }));
     const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [conta, per + '%']))?.seguidores ?? null;
     return json({ mes, anterior: ant, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' });
   }
@@ -230,12 +230,12 @@ export async function operacaoRoute(c: Ctx) {
   if (path === '/instagram/posts') {
     await requireInternal(c);
     const conta = await igContaValida(c.qs('conta'));
-    const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,miniatura,permalink FROM ig_posts WHERE conta=? ORDER BY publicado_em DESC LIMIT 1000', [conta])).map((p) => {
+    const rows = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,miniatura,permalink FROM ig_posts WHERE conta=? ORDER BY publicado_em DESC LIMIT 1000', [conta])).map((p) => {
       const interacoes = Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos);
       const alcance = p.alcance === null || p.alcance === undefined ? null : Number(p.alcance);
       return {
         id: p.media_id, quando: p.publicado_em, tipo: p.tipo, legenda: p.legenda, curtidas: Number(p.curtidas), comentarios: Number(p.comentarios),
-        salvos: Number(p.salvos), compartilhamentos: Number(p.compartilhamentos), alcance, interacoes,
+        salvos: Number(p.salvos), compartilhamentos: Number(p.compartilhamentos), alcance, visualizacoes: p.visualizacoes === null || p.visualizacoes === undefined ? null : Number(p.visualizacoes), interacoes,
         engajamento: alcance ? Math.round((interacoes / alcance) * 1000) / 10 : null, miniatura: p.miniatura, link: p.permalink,
       };
     });

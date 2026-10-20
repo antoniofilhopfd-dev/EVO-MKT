@@ -220,6 +220,13 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
       const v: Record<string, number> = {};
       for (const m of r.data ?? []) v[m.name] = Number(m.values?.[0]?.value ?? m.total_value?.value ?? 0);
       await run('UPDATE ig_posts SET alcance=?,salvos=?,compartilhamentos=? WHERE media_id=?', ['reach' in v ? v.reach : null, v.saved ?? 0, v.shares ?? 0, String(md.id)]);
+      // visualizações (métrica "views"): pedida à parte, porque nem todo formato a aceita e isso não pode derrubar as demais
+      try {
+        const rv = await metaGet(`/${md.id}/insights`, { metric: 'views' });
+        const x = (rv.data ?? []).find((m: Row) => m.name === 'views');
+        const val = x ? Number(x.values?.[0]?.value ?? x.total_value?.value) : NaN;
+        if (Number.isFinite(val)) await run('UPDATE ig_posts SET visualizacoes=? WHERE media_id=?', [val, String(md.id)]);
+      } catch (e2: any) { if ((await setting('meta_token_invalido')) === '1') throw e2; }
     } catch (e: any) {
       if ((await setting('meta_token_invalido')) === '1') throw e;
     }
