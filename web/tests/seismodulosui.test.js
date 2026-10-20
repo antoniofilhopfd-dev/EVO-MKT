@@ -124,6 +124,11 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  t('Visão geral do Instagram: cartão Visualizações',/Visualizações/.test(await p.evaluate(()=>document.querySelector('#content').innerText)));
  await ir(p,'hoje');await p.waitForTimeout(2500);
  t('Dashboard: Visualizações na seção do Instagram',/Visualizações/.test(await p.evaluate(()=>document.querySelector('#content').innerText)));
+ const segP=await p.evaluate(async()=>{const r=await (await fetch('/api/instagram/posts')).json();const m2=(r.rows||[]).find(x=>x.id==='m2');const d=await (await fetch('/api/dashboard/resumo?dias=30')).json();return {m2:m2&&[m2.seguidoresNovos,m2.visitasPerfil],total:d.instagram.seguidoresGerados,top:d.instagram.maisSeguidores&&d.instagram.maisSeguidores.seguidores}});
+ t('a API traz os seguidores gerados e as visitas ao perfil de cada post, e o post que mais gerou seguidores',segP.m2&&segP.m2[0]===85&&segP.m2[1]===640&&segP.total>=85&&segP.top===85,segP);
+ await ir(p,'igposts');await p.waitForTimeout(1000);t('Desempenho: cada post mostra Novos seguidores e a ordem "Mais seguidores gerados"',/Novos seguidores/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&/\+85/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&!!(await p.$('option[value="seguidores"]')));
+ await ir(p,'igranking');await p.waitForTimeout(1000);t('Ranking: coluna Seguidores gerados e ordenação',/Seguidores gerados/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&!!(await p.$('option[value="seguidoresNovos"]')));
+ await ir(p,'igvisao');await p.waitForTimeout(1500);t('Visão geral: cartão Seguidores gerados e o post que mais gerou seguidores',/Seguidores gerados/.test(await p.evaluate(()=>document.querySelector('#content').innerText))&&/Gerou mais seguidores/.test(await p.evaluate(()=>document.querySelector('#content').innerText)));
  // ---- menu "Mais" das sub-abas (Tráfego e Instagram), no computador e no celular ----
  const maisFunciona=async(pg,inicio,nome)=>{
   await ir(pg,inicio);await pg.click('#subMais');await pg.waitForTimeout(250);

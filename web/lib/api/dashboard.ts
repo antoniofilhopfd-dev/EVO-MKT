@@ -24,7 +24,7 @@ async function instagram(de: string, ate: string, hoje: string, contaPedida = ''
   const conectado = !!conta && (await setting('meta_token_invalido')) !== '1';
   const seg = conta ? await q('SELECT dia,seguidores FROM ig_seguidores WHERE conta=? AND dia>=? AND dia<=? ORDER BY dia', [conta, somar(de, -1), ate]) : [];
   const serie = seg.map((r) => ({ dia: String(r.dia), seguidores: num(r.seguidores) }));
-  const posts = conta ? await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,alcance,visualizacoes,salvos,permalink,miniatura FROM ig_posts WHERE conta=? AND SUBSTR(publicado_em,1,10)>=? AND SUBSTR(publicado_em,1,10)<=? ORDER BY publicado_em DESC', [conta, de, ate]) : [];
+  const posts = conta ? await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,alcance,visualizacoes,seguidores_novos,salvos,permalink,miniatura FROM ig_posts WHERE conta=? AND SUBSTR(publicado_em,1,10)>=? AND SUBSTR(publicado_em,1,10)<=? ORDER BY publicado_em DESC', [conta, de, ate]) : [];
   const inter = (p: Row) => num(p.curtidas) + num(p.comentarios) + num(p.salvos);
   const melhor = [...posts].sort((a, b) => inter(b) - inter(a))[0];
   const comAlcance = posts.filter((p) => p.alcance !== null && p.alcance !== undefined);
@@ -39,6 +39,8 @@ async function instagram(de: string, ate: string, hoje: string, contaPedida = ''
     serieSeguidores: serie,
     publicacoes: posts.length, interacoes: posts.length ? posts.reduce((a, p) => a + inter(p), 0) : null,
     alcance: comAlcance.length ? comAlcance.reduce((a, p) => a + num(p.alcance), 0) : null,
+    seguidoresGerados: posts.some((p) => p.seguidores_novos !== null && p.seguidores_novos !== undefined) ? posts.reduce((a, p) => a + num(p.seguidores_novos), 0) : null,
+    maisSeguidores: (() => { const x = [...posts].filter((p) => p.seguidores_novos !== null && p.seguidores_novos !== undefined && num(p.seguidores_novos) > 0).sort((a, b) => num(b.seguidores_novos) - num(a.seguidores_novos))[0]; return x ? { legenda: strv(x.legenda).slice(0, 90), seguidores: num(x.seguidores_novos), link: strv(x.permalink), miniatura: strv(x.miniatura), tipo: strv(x.tipo) } : null; })(),
     visualizacoes: posts.some((p) => p.visualizacoes !== null && p.visualizacoes !== undefined) ? posts.reduce((a, p) => a + num(p.visualizacoes), 0) : null,
     melhor: melhor ? { legenda: strv(melhor.legenda).slice(0, 90), interacoes: inter(melhor), visualizacoes: melhor.visualizacoes === null || melhor.visualizacoes === undefined ? null : num(melhor.visualizacoes), miniatura: strv(melhor.miniatura), link: strv(melhor.permalink), tipo: strv(melhor.tipo) } : null,
     programadas,

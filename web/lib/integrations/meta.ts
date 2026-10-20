@@ -227,6 +227,15 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
         const val = x ? Number(x.values?.[0]?.value ?? x.total_value?.value) : NaN;
         if (Number.isFinite(val)) await run('UPDATE ig_posts SET visualizacoes=? WHERE media_id=?', [val, String(md.id)]);
       } catch (e2: any) { if ((await setting('meta_token_invalido')) === '1') throw e2; }
+      // seguidores que o post gerou e visitas ao perfil vindas dele (uma métrica por vez: nem todo formato aceita todas)
+      for (const [metrica, coluna] of [['follows', 'seguidores_novos'], ['profile_visits', 'visitas_perfil']] as const) {
+        try {
+          const rm = await metaGet(`/${md.id}/insights`, { metric: metrica });
+          const x = (rm.data ?? []).find((m: Row) => m.name === metrica);
+          const val = x ? Number(x.values?.[0]?.value ?? x.total_value?.value) : NaN;
+          if (Number.isFinite(val)) await run(`UPDATE ig_posts SET ${coluna}=? WHERE media_id=?`, [val, String(md.id)]);
+        } catch (e3: any) { if ((await setting('meta_token_invalido')) === '1') throw e3; }
+      }
     } catch (e: any) {
       if ((await setting('meta_token_invalido')) === '1') throw e;
     }

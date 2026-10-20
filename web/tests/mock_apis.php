@@ -115,6 +115,7 @@ if (str_starts_with($p, '/graph')) {
         $d = []; foreach (explode(',', $_GET['metric'] ?? '') as $k) { $d[] = ['name' => $k, 'period' => 'day', 'total_value' => ['value' => $vals[$k] ?? 0]]; }
         j(['data' => $d]);
     }
+    if (preg_match('#^/(m[0-9]|n[0-9])/insights$#', $g, $mm) && in_array(($_GET['metric'] ?? ''), ['follows', 'profile_visits'])) { $mt = $_GET['metric']; $tab = ['follows' => ['n1' => 3, 'n2' => 1, 'm1' => 14, 'm2' => 85, 'm3' => 6, 'm0' => 2], 'profile_visits' => ['n1' => 20, 'n2' => 9, 'm1' => 120, 'm2' => 640, 'm3' => 40, 'm0' => 15]]; j(['data' => [['name' => $mt, 'values' => [['value' => $tab[$mt][$mm[1]] ?? 0]]]]]); }
     if (preg_match('#^/(m[0-9]|n[0-9])/insights$#', $g, $mm) && ($_GET['metric'] ?? '') === 'views') { $vv = ['n1' => 1500, 'n2' => 800, 'm1' => 9000, 'm2' => 52000, 'm3' => 3000, 'm0' => 2000][$mm[1]] ?? 0; j(['data' => [['name' => 'views', 'values' => [['value' => $vv]]]]]); }
     if (preg_match('#^/(m[0-9]|n[0-9])/insights$#', $g, $mm)) { $b = ['n1' => [700, 9, 3], 'n2' => [300, 2, 1], 'm1' => [4000, 30, 12], 'm2' => [20000, 80, 40], 'm3' => [1500, 5, 2], 'm0' => [900, 3, 1]][$mm[1]] ?? [0, 0, 0]; j(['data' => [['name' => 'reach', 'values' => [['value' => $b[0]]]], ['name' => 'saved', 'values' => [['value' => $b[1]]]], ['name' => 'shares', 'values' => [['value' => $b[2]]]]]]); }
     if ($g === "/$IG/media" && $m === 'GET' && $is2) {
