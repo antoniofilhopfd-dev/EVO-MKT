@@ -53,5 +53,31 @@ const PeriodoPicker=(()=>{
   }
   document.body.appendChild(ov);desenha();
  }
- return {abrir};
+  /* Períodos prontos (iguais aos do Gerenciador da Meta; semana de domingo a sábado) compartilhados por Tráfego, Dashboard e Instagram. */
+ const PRESETS=[['hoje','Hoje'],['ontem','Ontem'],['hoje_ontem','Hoje e ontem'],['3','Últimos 3 dias'],['7','Últimos 7 dias'],['14','Últimos 14 dias'],['28','Últimos 28 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['semana','Esta semana'],['semana_ant','Semana passada'],['mes','Este mês'],['mes_ant','Mês anterior'],['trim','Este trimestre'],['ano','Este ano'],['ano_ant','Ano passado'],['x','Personalizado']];
+ function intervalo(p,de,ate){
+  const h=new Date();h.setHours(12,0,0,0);const dia=n=>{const d=new Date(h);d.setDate(d.getDate()+n);return iso(d)};
+  if(p==='tudo')return ['',''];
+  if(p==='hoje')return [dia(0),dia(0)];if(p==='ontem')return [dia(-1),dia(-1)];if(p==='hoje_ontem')return [dia(-1),dia(0)];
+  if(p==='semana'){const w=h.getDay();return [dia(-w),dia(0)]}
+  if(p==='semana_ant'){const w=h.getDay();return [dia(-w-7),dia(-w-1)]}
+  if(p==='mes')return [iso(new Date(h.getFullYear(),h.getMonth(),1,12)),dia(0)];
+  if(p==='mes_ant')return [iso(new Date(h.getFullYear(),h.getMonth()-1,1,12)),iso(new Date(h.getFullYear(),h.getMonth(),0,12))];
+  if(p==='trim')return [iso(new Date(h.getFullYear(),Math.floor(h.getMonth()/3)*3,1,12)),dia(0)];
+  if(p==='ano')return [iso(new Date(h.getFullYear(),0,1,12)),dia(0)];
+  if(p==='ano_ant')return [iso(new Date(h.getFullYear()-1,0,1,12)),iso(new Date(h.getFullYear()-1,11,31,12))];
+  if(p==='x')return [de||dia(-29),ate||dia(0)];
+  const n=Number(p)||30;return [dia(-(n-1)),dia(0)];
+ }
+ /** <select> de períodos. extra: opções a mais no começo, ex.: [['tudo','Todo o período']]. */
+ function selectHtml(id,atual,extra=[]){return `<select class="control" id="${id}" aria-label="Período">${[...extra,...PRESETS].map(([k,l])=>`<option value="${k}" ${String(atual)===k?'selected':''}>${esc(l)}</option>`).join('')}</select>`}
+ /** Liga o <select>: "Personalizado" abre o calendário único; ao escolher, atualiza est ({p,de,ate}) e chama aoMudar. */
+ function ligar(id,est,aoMudar){
+  const sel=document.getElementById(id);if(!sel)return;
+  sel.onchange=()=>{
+   if(sel.value==='x'){sel.value=est.p;abrir({de:est.de,ate:est.ate,titulo:'Escolha o período',max:iso(new Date())},(a,b)=>{est.p='x';est.de=a;est.ate=b;aoMudar()});return}
+   est.p=sel.value;[est.de,est.ate]=intervalo(est.p);aoMudar();
+  };
+ }
+ return {abrir,intervalo,selectHtml,ligar,PRESETS};
 })();

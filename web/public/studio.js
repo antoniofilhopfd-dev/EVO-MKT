@@ -255,7 +255,7 @@ async function studioCompositor(row,dataIni=''){
 async function stSalvaGrupos(grupos){try{await api('/studio/hashtags',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({grupos})})}catch(e){toast(e.message,'bad')}}
 
 // ---------- Desempenho por publicação (Instagram) ----------
-let igFiltro={periodo:'90',tipo:'',ordem:'recentes'},igDados=null;
+let igFiltro={periodo:'90',tipo:'',ordem:'recentes',de:'',ate:''},igDados=null;
 const IG_TIPO={FEED:'Feed',REELS:'Reels',STORY:'Stories',CAROUSEL_ALBUM:'Carrossel',IMAGE:'Feed',VIDEO:'Vídeo'};
 /** Quais métricas por post a Meta já devolveu (só mostramos o que tem número) e o aviso do que falta, com o motivo registrado na última sincronização. */
 function igTemMetricas(rows){return {vis:rows.some(r=>r.visualizacoes!=null),seg:rows.some(r=>r.seguidoresNovos!=null),vp:rows.some(r=>r.visitasPerfil!=null)}}
@@ -276,9 +276,9 @@ async function renderIgPosts(){
   desenharIgPosts();
 }
 function desenharIgPosts(){
-  const todos=igDados.rows||[],corte=igFiltro.periodo==='tudo'?null:new Date(Date.now()-Number(igFiltro.periodo)*86400000);
+  const todos=igDados.rows||[];[igFiltro.de,igFiltro.ate]=PeriodoPicker.intervalo(igFiltro.periodo,igFiltro.de,igFiltro.ate);const diaPost=r=>{const dt=new Date(String(r.quando).replace(/([+-]\d\d)(\d\d)$/,'$1:$2'));return isNaN(dt)?String(r.quando).slice(0,10):stIso(dt)};
   const tipoDe=r=>IG_TIPO[r.tipo]||r.tipo||'Outro';
-  let rows=todos.filter(r=>(!corte||new Date(String(r.quando).replace(/([+-]\d\d)(\d\d)$/,'$1:$2'))>=corte)&&(!igFiltro.tipo||tipoDe(r)===igFiltro.tipo));
+  let rows=todos.filter(r=>(!igFiltro.de||diaPost(r)>=igFiltro.de)&&(!igFiltro.ate||diaPost(r)<=igFiltro.ate)&&(!igFiltro.tipo||tipoDe(r)===igFiltro.tipo));
   rows=[...rows].sort(IG_ORDEM[igFiltro.ordem][1]);
   const tipos=[...new Set(todos.map(tipoDe))];
   const tm=igTemMetricas(todos);
@@ -290,13 +290,14 @@ function desenharIgPosts(){
   const vazio=!todos.length;
   $('#content').innerHTML=`<div class="dashboard-head"><div><small>INSTAGRAM · DESEMPENHO</small><h1>O que funcionou em cada publicação</h1><p>${igDados.ultimaSync?`Última leitura da Meta: ${fmtDateTime(igDados.ultimaSync)}.`:'Ainda não houve leitura da Meta.'} Alcance, salvamentos e compartilhamentos vêm das 30 publicações mais recentes.</p></div>${true?'<button class="btn" id="igAtualiza">Atualizar agora</button>':''}</div>
   ${vazio?`<div class="card empty"><strong>Nenhuma publicação lida ainda</strong><span>Conecte o Instagram em Administração → Integrações e clique em “Atualizar agora”.</span></div>`:`
-  <div class="st-toolbar"><div class="st-filtros">${igSeletor()}${sel('periodo',[['30','Últimos 30 dias'],['90','Últimos 90 dias'],['365','Último ano'],['tudo','Tudo']],igFiltro.periodo)}${sel('tipo',[['','Todos os formatos'],...tipos.map(t=>[t,t])],igFiltro.tipo)}${sel('ordem',Object.entries(IG_ORDEM).filter(([k])=>(k!=='visualizacoes'||tm.vis)&&(k!=='seguidores'||tm.seg)).map(([k,v])=>[k,v[0]]),igFiltro.ordem)}</div><span class="kpi-note">${rows.length} publicação(ões)</span></div>
+  <div class="st-toolbar"><div class="st-filtros">${igSeletor()}${PeriodoPicker.selectHtml('igPerSel',igFiltro.periodo,[['tudo','Todo o período']])}${sel('tipo',[['','Todos os formatos'],...tipos.map(t=>[t,t])],igFiltro.tipo)}${sel('ordem',Object.entries(IG_ORDEM).filter(([k])=>(k!=='visualizacoes'||tm.vis)&&(k!=='seguidores'||tm.seg)).map(([k,v])=>[k,v[0]]),igFiltro.ordem)}</div><span class="kpi-note">${rows.length} publicação(ões)</span></div>
   ${igAvisoMetricas(todos,igDados.metricas)}
   <div class="ig-resumo">${porTipo.map(x=>`<div class="card ig-tipo"><small>${esc(x.t.toUpperCase())} · ${x.n} POST(S)</small><div class="ig-nums">${tm.vis?`<div><strong>${x.vis===null?'—':igNum(x.vis)}</strong><span>visualizações em média</span></div>`:''}<div><strong>${x.inter===null?'—':igNum(x.inter)}</strong><span>interações em média</span></div><div><strong>${x.alc===null?'—':igNum(x.alc)}</strong><span>alcance médio</span></div><div><strong>${x.eng===null?'—':String(x.eng).replace('.',',')+'%'}</strong><span>engajamento médio</span></div></div></div>`).join('')||''}</div>
   ${melhor?`<div class="card st-tip"><span>★</span><div>Melhor publicação do período: <b>${esc((melhor.legenda||'sem legenda').slice(0,90))}</b> — ${igNum(melhor.interacoes)} interações.</div></div>`:''}
   <div class="ig-grid">${rows.map(card).join('')||'<div class="empty compact">Nada neste filtro.</div>'}</div>`}`;
   igLigaSeletor(renderIgPosts);
   $$('[data-igf]').forEach(s=>s.onchange=()=>{igFiltro[s.dataset.igf]=s.value;desenharIgPosts()});
+  PeriodoPicker.ligar('igPerSel',igFiltro,desenharIgPosts);
   $$('[data-imp]').forEach(b=>b.onclick=()=>gestorImpulsionar(rows.find(x=>x.id===b.dataset.imp)));
   const b=$('#igAtualiza');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Atualizando…';try{await api('/integrations/instagram/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});toast('Publicações atualizadas');await renderIgPosts()}catch(e){toast(e.message,'bad');b.disabled=false;b.textContent='Atualizar agora'}};
 }

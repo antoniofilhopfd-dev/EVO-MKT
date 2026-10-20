@@ -16,3 +16,4 @@
 .db-lista b{overflow-wrap:anywhere}.db-lista small{color:var(--muted,#6B6F80)}
 .db-vazio{margin:6px 0 0;color:var(--muted,#6B6F80);font-size:13px}
 @media(max-width:900px){.db-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.db-grade{grid-template-columns:minmax(0,1fr)}}
+.db-per-t{display:block;font-size:11px;color:var(--muted,#6b7280);margin-top:2px}

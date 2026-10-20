@@ -72,8 +72,15 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   if (c.path !== '/dashboard/resumo') return fail(404, 'Rota não encontrada.');
   const hoje = fmtDate(new Date());
-  const dias = [7, 14, 30, 90].includes(Number(c.qs('dias'))) ? Number(c.qs('dias')) : 30;
-  const de = somar(hoje, -(dias - 1));
+  let dias = [7, 14, 30, 90].includes(Number(c.qs('dias'))) ? Number(c.qs('dias')) : 30;
+  let de = somar(hoje, -(dias - 1)), ate = hoje;
+  const ok = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (ok(c.qs('de')) && ok(c.qs('ate'))) { // período escolhido (semana, mês, personalizado…): termina até hoje e tem no máximo 400 dias
+    if (c.qs('de') > c.qs('ate') || c.qs('ate') > hoje) fail(400, 'Período inválido.');
+    de = c.qs('de'); ate = c.qs('ate');
+    dias = Math.max(1, Math.round((parseLocal(`${ate}T12:00:00`).getTime() - parseLocal(`${de}T12:00:00`).getTime()) / 86400000) + 1);
+    if (dias > 400) fail(400, 'Período acima de 400 dias.');
+  }
   const lim = somar(hoje, 30);
 
   // próximos eventos: calendário escolar e compromissos do marketing; datas comemorativas à parte
@@ -102,5 +109,5 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   const saude = await saudeConta().catch(() => null);
   if (saude && !saude.ok) integ.push({ nome: 'Conta de anúncios', msg: `A Meta informa: ${saude.rotulo}.` });
 
-  return json({ hoje, dias, de, ate: hoje, eu: { nome: u.nome, admin: !!Number(u.admin) }, instagram: await instagram(de, hoje, hoje, c.qs('conta')), trafego: await trafego(de, hoje, dias), eventos: eventos.slice(0, 6), datas, alertas, integracoes: integ });
+  return json({ hoje, dias, de, ate, eu: { nome: u.nome, admin: !!Number(u.admin) }, instagram: await instagram(de, ate, hoje, c.qs('conta')), trafego: await trafego(de, ate, dias), eventos: eventos.slice(0, 6), datas, alertas, integracoes: integ });
 }

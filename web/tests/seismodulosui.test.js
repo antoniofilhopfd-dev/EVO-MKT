@@ -231,5 +231,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await post('/integrations/meta/token',{token:'GOOD_TOKEN'});await post('/integrations/instagram/sync',{});
  const sts2=await p.evaluate(async()=>(await (await fetch('/api/instagram/posts')).json()).metricas);
  t('com a Meta respondendo, a próxima sincronização traz as métricas e limpa o motivo',sts2.views.ok>=1&&sts2.follows.ok>=1&&!sts2.views.erro,sts2);
+ const per=await p.evaluate(async()=>{const a=await (await fetch('/api/dashboard/resumo?de=2026-10-04&ate=2026-10-10')).json();const r=await fetch('/api/dashboard/resumo?de=2099-01-01&ate=2099-01-02');return {de:a.de,ate:a.ate,dias:a.dias,st:r.status,ops:typeof PeriodoPicker!=='undefined'?PeriodoPicker.PRESETS.map(x=>x[1]):[]}});
+ t('Dashboard aceita período (de/ate) e usa os mesmos períodos prontos (Esta semana, Semana passada)',per.de==='2026-10-04'&&per.ate==='2026-10-10'&&per.dias===7&&per.ops.includes('Esta semana')&&per.ops.includes('Semana passada'),per);
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

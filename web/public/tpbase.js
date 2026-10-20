@@ -6,20 +6,7 @@ const TP={per:null,carregando:null,prefs:new Map()};
 [['tfcriativos','Criativos','▣'],['tfanalises','Análises','◧'],['tfpublicos','Públicos','◍'],['tforcamentos','Orçamentos','◔'],['tfalertas','Alertas e automações','⚑'],['tfrelatorios','Relatórios de anúncios','▥'],['tfhistorico','Histórico','◷']].forEach(([k,l,i])=>{MODULES[k]={label:l,icon:i,group:'Tráfego',tone:'orange',desc:'Tráfego Pago'}});
 const TP_PERIODOS=[['hoje','Hoje'],['ontem','Ontem'],['hoje_ontem','Hoje e ontem'],['3','Últimos 3 dias'],['7','Últimos 7 dias'],['14','Últimos 14 dias'],['28','Últimos 28 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['semana','Esta semana'],['semana_ant','Semana passada'],['mes','Este mês'],['mes_ant','Mês anterior'],['trim','Este trimestre'],['ano','Este ano'],['ano_ant','Ano passado'],['x','Personalizado']];
 const tpIso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-function tpIntervalo(p,de,ate){
-  const h=new Date();h.setHours(12,0,0,0);const dia=n=>{const d=new Date(h);d.setDate(d.getDate()+n);return tpIso(d)};
-  if(p==='hoje')return [dia(0),dia(0)];if(p==='ontem')return [dia(-1),dia(-1)];
-  if(p==='hoje_ontem')return [dia(-1),dia(0)];
-  if(p==='semana'){const dow=h.getDay();return [dia(-dow),dia(0)]} // semana de domingo a sábado, como no Gerenciador da Meta
-  if(p==='semana_ant'){const dow=h.getDay();return [dia(-dow-7),dia(-dow-1)]}
-  if(p==='trim'){const q=Math.floor(h.getMonth()/3)*3;return [tpIso(new Date(h.getFullYear(),q,1,12)),dia(0)]}
-  if(p==='ano_ant')return [tpIso(new Date(h.getFullYear()-1,0,1,12)),tpIso(new Date(h.getFullYear()-1,11,31,12))];
-  if(p==='mes')return [tpIso(new Date(h.getFullYear(),h.getMonth(),1,12)),dia(0)];
-  if(p==='mes_ant')return [tpIso(new Date(h.getFullYear(),h.getMonth()-1,1,12)),tpIso(new Date(h.getFullYear(),h.getMonth(),0,12))];
-  if(p==='ano')return [tpIso(new Date(h.getFullYear(),0,1,12)),dia(0)];
-  if(p==='x')return [de||dia(-29),ate||dia(0)];
-  const n=Number(p)||30;return [dia(-(n-1)),dia(0)];
-}
+function tpIntervalo(p,de,ate){return PeriodoPicker.intervalo(p,de,ate)}
 const tpPeriodo=()=>{if(!TP.per){const s=pref('trafego.periodo',null)||{p:'30'};TP.per={p:s.p||'30',de:s.de||'',ate:s.ate||''};const [a,b]=tpIntervalo(TP.per.p,TP.per.de,TP.per.ate);TP.per.de=a;TP.per.ate=b}return TP.per};
 /** Abre o relatório semanal (PDF) já no período escolhido no Tráfego; lá o período continua editável. */
 function tpLinkRelatorio(el){if(!el)return;el.addEventListener('click',()=>{const p=tpPeriodo();el.href='/relatorio-trafego.html?de='+encodeURIComponent(p.de)+'&ate='+encodeURIComponent(p.ate)})}
