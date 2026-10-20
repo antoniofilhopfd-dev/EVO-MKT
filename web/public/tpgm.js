@@ -109,9 +109,9 @@ function tpLista(){
   return [...l].sort((a,b)=>{let x=col.v(a),y=col.v(b);if(x===null||x===undefined)x=o>0?Infinity:-Infinity;if(y===null||y===undefined)y=o>0?Infinity:-Infinity;if(typeof x==='string')x=x.toLowerCase();if(typeof y==='string')y=y.toLowerCase();const c=x<y?-1:x>y?1:0;return c?c*o:(b.gasto-a.gasto)});
 }
 function tpRodape(lista,cols){
-  const s={gasto:0,impressoes:0,cliques:0,conversas:0,leads:0,resultados:0};lista.forEach(x=>{for(const k in s)s[k]+=Number(x[k])||0});
-  const v={gasto:s.gasto,impressoes:s.impressoes,cliques:s.cliques,conversas:s.conversas,leads:s.leads,resultados:s.resultados,ctr:s.impressoes?s.cliques/s.impressoes*100:null,cpc:s.cliques?s.gasto/s.cliques:null,cpm:s.impressoes?s.gasto/s.impressoes*1000:null,custoConversa:s.conversas?s.gasto/s.conversas:null,cpl:s.leads?s.gasto/s.leads:null};
-  const fmt={gasto:x=>gmBrl(x),impressoes:gmN,cliques:gmN,conversas:gmN,leads:gmN,resultados:gmN,ctr:gmPct,cpc:gmBrl,cpm:gmBrl,custoConversa:gmBrl,cpl:gmBrl};
+  const s={gasto:0,alcance:0,impressoes:0,cliques:0,conversas:0,leads:0,resultados:0};lista.forEach(x=>{for(const k in s)s[k]+=Number(x[k])||0});
+  const v={gasto:s.gasto,alcance:s.alcance||null,frequencia:s.alcance?s.impressoes/s.alcance:null,impressoes:s.impressoes,cliques:s.cliques,conversas:s.conversas,leads:s.leads,resultados:s.resultados,ctr:s.impressoes?s.cliques/s.impressoes*100:null,cpc:s.cliques?s.gasto/s.cliques:null,cpm:s.impressoes?s.gasto/s.impressoes*1000:null,custoConversa:s.conversas?s.gasto/s.conversas:null,cpl:s.leads?s.gasto/s.leads:null};
+  const fmt={gasto:x=>gmBrl(x),alcance:gmN,frequencia:gmDec,impressoes:gmN,cliques:gmN,conversas:gmN,leads:gmN,resultados:gmN,ctr:gmPct,cpc:gmBrl,cpm:gmBrl,custoConversa:gmBrl,cpl:gmBrl};
   return `<tr class="tot"><td class="tp-ck"></td>${cols.map((c,i)=>`<td ${tpFixaStyle(c,cols)}>${i===0?`Total de ${lista.length} ${GM2.nivel==='campanha'?'campanha(s)':GM2.nivel==='conjunto'?'conjunto(s)':'anúncio(s)'}`:(c.k in fmt&&v[c.k]!==null&&v[c.k]!==undefined?esc(fmt[c.k](v[c.k])):'')}</td>`).join('')}<td></td></tr>`;
 }
 let TP_NUMS=new Set();
@@ -159,7 +159,7 @@ function tpDesenhaGm(){
     <div class="tp-exp"><button type="button" class="softbtn" id="tpExp" aria-haspopup="true">Exportar ▾</button><div class="submenu" id="tpExpMenu" hidden><button data-exp="csv">CSV</button><button data-exp="xlsx">Excel (.xlsx)</button><button data-exp="pdf">PDF (imprimir)</button></div></div></div>
    ${ativos.length||foco.length?`<div class="tp-chips">${foco.length?`<span class="tp-chip">Dentro de: ${esc(foco.join(' › '))} <button data-foco-x aria-label="Remover">×</button></span>`:''}${ativos.map(([k,t])=>`<span class="tp-chip">${esc(t)} <button data-fx="${attr(k)}" aria-label="Remover filtro">×</button></span>`).join('')}<button class="db-link" id="tpLimpa">Limpar tudo</button></div>`:''}
    <div id="tpLoteBox">${tpBarraSel()}</div><div id="tpTabBox">${tpTabelaHtml()}</div>
-   <p class="kpi-note">${GM2.lista.length} item(ns) · métricas de ${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))} (independentes da data de criação). Status e números são os devolvidos pela Meta; o segmento escolar é identificado pelo nome.</p>`;
+   <p class="kpi-note">${GM2.lista.length} item(ns) · métricas de ${esc(fmtDate(gmDados.de))} a ${esc(fmtDate(gmDados.ate))} (independentes da data de criação). O alcance total é a soma das linhas (a mesma pessoa pode estar em mais de uma campanha) e a frequência total é calculada sobre essa soma. Status e números são os devolvidos pela Meta; o segmento escolar é identificado pelo nome.</p>`;
   tpLigaGm();
 }
 function tpRedesenhaTabela(){
