@@ -214,32 +214,33 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
       [ig, String(md.id), String(md.timestamp ?? ''), String(md.media_product_type ?? md.media_type ?? ''), String(md.caption ?? '').replace(/\s+/g, ' ').slice(0, 300), Number(md.like_count ?? 0), Number(md.comments_count ?? 0), String(md.permalink ?? '').slice(0, 300), /^https:\/\//.test(mini) ? mini.slice(0, 1000) : '', now()]);
   }
   // Alcance, salvamentos e compartilhamentos das 30 publicações mais recentes (a Meta não traz isso na lista). Falha numa publicação não derruba a sincronização.
+  // Visualizações, seguidores gerados e visitas ao perfil de cada post vêm em chamadas separadas (nem todo formato aceita todas as métricas) e o motivo de cada falha fica guardado.
+  const colunas = { views: 'visualizacoes', follows: 'seguidores_novos', profile_visits: 'visitas_perfil' } as const;
+  const st: Record<string, { ok: number; falhas: number; erro: string }> = { views: { ok: 0, falhas: 0, erro: '' }, follows: { ok: 0, falhas: 0, erro: '' }, profile_visits: { ok: 0, falhas: 0, erro: '' } };
   for (const md of media.slice(0, 30)) {
     try {
       const r = await metaGet(`/${md.id}/insights`, { metric: 'reach,saved,shares' });
       const v: Record<string, number> = {};
       for (const m of r.data ?? []) v[m.name] = Number(m.values?.[0]?.value ?? m.total_value?.value ?? 0);
       await run('UPDATE ig_posts SET alcance=?,salvos=?,compartilhamentos=? WHERE media_id=?', ['reach' in v ? v.reach : null, v.saved ?? 0, v.shares ?? 0, String(md.id)]);
-      // visualizações (métrica "views"): pedida à parte, porque nem todo formato a aceita e isso não pode derrubar as demais
-      try {
-        const rv = await metaGet(`/${md.id}/insights`, { metric: 'views' });
-        const x = (rv.data ?? []).find((m: Row) => m.name === 'views');
-        const val = x ? Number(x.values?.[0]?.value ?? x.total_value?.value) : NaN;
-        if (Number.isFinite(val)) await run('UPDATE ig_posts SET visualizacoes=? WHERE media_id=?', [val, String(md.id)]);
-      } catch (e2: any) { if ((await setting('meta_token_invalido')) === '1') throw e2; }
-      // seguidores que o post gerou e visitas ao perfil vindas dele (uma métrica por vez: nem todo formato aceita todas)
-      for (const [metrica, coluna] of [['follows', 'seguidores_novos'], ['profile_visits', 'visitas_perfil']] as const) {
-        try {
-          const rm = await metaGet(`/${md.id}/insights`, { metric: metrica });
-          const x = (rm.data ?? []).find((m: Row) => m.name === metrica);
-          const val = x ? Number(x.values?.[0]?.value ?? x.total_value?.value) : NaN;
-          if (Number.isFinite(val)) await run(`UPDATE ig_posts SET ${coluna}=? WHERE media_id=?`, [val, String(md.id)]);
-        } catch (e3: any) { if ((await setting('meta_token_invalido')) === '1') throw e3; }
-      }
     } catch (e: any) {
       if ((await setting('meta_token_invalido')) === '1') throw e;
     }
+    for (const [metrica, coluna] of Object.entries(colunas)) {
+      try {
+        const rm = await metaGet(`/${md.id}/insights`, { metric: metrica });
+        const x = (rm.data ?? []).find((m: Row) => m.name === metrica);
+        const val = x ? Number(x.values?.[0]?.value ?? x.total_value?.value) : NaN;
+        if (Number.isFinite(val)) { await run(`UPDATE ig_posts SET ${coluna}=? WHERE media_id=?`, [val, String(md.id)]); st[metrica].ok++; }
+        else { st[metrica].falhas++; if (!st[metrica].erro) st[metrica].erro = 'A Meta respondeu sem esse número para a publicação.'; }
+      } catch (e3: any) {
+        if ((await setting('meta_token_invalido')) === '1') throw e3;
+        st[metrica].falhas++; if (!st[metrica].erro) st[metrica].erro = String(e3.message ?? e3).slice(0, 240);
+      }
+    }
   }
+  await setSetting(`ig_metricas_${ig}`, JSON.stringify({ quando: now(), ...st })).catch(() => {});
+  for (const [mt, x] of Object.entries(st)) if (x.falhas && !x.ok) await intLog('instagram', 'erro', `Métrica "${mt}" por publicação indisponível para @${usuario}: ${x.erro}`).catch(() => {});
   await conciliarAgendados(ig).catch(() => {});
   let n = 0;
   const listRowsSeg = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? ig) === ig);

@@ -214,5 +214,12 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  for(const pg of ['hoje','calendario','arquivos','trafego','gerenciador','configuracoes']){await ir(pm,pg);const w=await pm.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);t(`celular: ${pg} sem rolagem horizontal da página`,w<=2,w)}
  // ---- erros de JS ----
  const errs=[...p.errs,...pe.errs,...pm.errs];t('sem erros de JS nas telas novas',errs.length===0,errs);
+ // ---- a Meta não devolve as métricas por post: o motivo fica registrado para a tela explicar ----
+ await post('/integrations/meta/token',{token:'NOVIEWS_TOKEN'});await post('/integrations/instagram/sync',{});
+ const sts=await p.evaluate(async()=>(await (await fetch('/api/instagram/posts')).json()).metricas);
+ t('quando a Meta recusa as métricas por post, o motivo fica registrado para a tela explicar',!!sts&&sts.views.ok===0&&/not supported/.test(sts.views.erro)&&/not supported/.test(sts.follows.erro),sts);
+ await post('/integrations/meta/token',{token:'GOOD_TOKEN'});await post('/integrations/instagram/sync',{});
+ const sts2=await p.evaluate(async()=>(await (await fetch('/api/instagram/posts')).json()).metricas);
+ t('com a Meta respondendo, a próxima sincronização traz as métricas e limpa o motivo',sts2.views.ok>=1&&sts2.follows.ok>=1&&!sts2.views.erro,sts2);
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

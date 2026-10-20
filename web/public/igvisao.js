@@ -21,8 +21,8 @@ TP_PAGINAS.igvisao=async function(){
    <div class="kpi-note" style="margin:-6px 0 12px">${ig.conectado?`Instagram conectado${sync?` · última atualização em ${esc(sync)}`:''}`:'Instagram não conectado — conecte em Configurações › Integrações para ver os números.'}</div>
    ${ig.conectado||ig.seguidores!==null?`<div class="db-cards">
      ${dbCard('Seguidores',dbN(ig.seguidores),ig.variacaoSeguidores===null?'':`<small class="db-var neutro">${ig.variacaoSeguidores>=0?'▲':'▼'} ${dbN(Math.abs(ig.variacaoSeguidores))} no período</small>`,EvoCharts.spark((ig.serieSeguidores||[]).map(x=>x.seguidores)),'instagram')}
-     ${dbCard('Visualizações',dbN(ig.visualizacoes),'<small class="db-var">das publicações com dado da Meta</small>','','igposts')}
-     ${dbCard('Seguidores gerados',ig.seguidoresGerados==null?'—':'+'+dbN(ig.seguidoresGerados),'<small class="db-var">novos seguidores vindos das publicações</small>','','igranking')}
+     ${ig.visualizacoes!=null?dbCard('Visualizações',dbN(ig.visualizacoes),'<small class="db-var">das publicações com dado da Meta</small>','','igposts'):''}
+     ${ig.seguidoresGerados!=null?dbCard('Seguidores gerados','+'+dbN(ig.seguidoresGerados),'<small class="db-var">novos seguidores vindos das publicações</small>','','igranking'):''}
      ${dbCard('Publicações',dbN(ig.publicacoes),'<small class="db-var">no período</small>','','conteudos')}
      ${dbCard('Interações',dbN(ig.interacoes),'<small class="db-var">curtidas, comentários e salvamentos</small>','','instagram')}
      ${dbCard('Alcance',dbN(ig.alcance),'<small class="db-var">das publicações com dado da Meta</small>','','instagram')}

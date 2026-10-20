@@ -239,7 +239,8 @@ export async function operacaoRoute(c: Ctx) {
         engajamento: alcance ? Math.round((interacoes / alcance) * 1000) / 10 : null, miniatura: p.miniatura, link: p.permalink,
       };
     });
-    return json({ rows, conta, contas: await contasMonitoradas(), ultimaSync: await setting('ig_last_sync') });
+    let metricas: unknown = null; try { metricas = JSON.parse((await setting(`ig_metricas_${conta}`)) || 'null'); } catch { /* sem registro */ }
+    return json({ rows, conta, contas: await contasMonitoradas(), ultimaSync: await setting('ig_last_sync'), metricas });
   }
   if (path === '/studio/hashtags') {
     const u = await requireInternal(c);

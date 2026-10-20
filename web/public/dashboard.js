@@ -29,7 +29,7 @@ async function renderToday(){
    <section class="db-sec"><header><h2>Instagram${typeof igContas!=='undefined'&&igContas.length>1?` <small>· @${esc((igContas.find(c=>c.ig===igConta)||{}).usuario||'')}</small>`:''}</h2><button class="db-link" data-db-ir="instagram">Ver análises ›</button></header>
     ${ig.conectado||ig.seguidores!==null?`<div class="db-cards">
      ${dbCard('Seguidores',dbN(ig.seguidores),ig.variacaoSeguidores===null?'':`<small class="db-var neutro">${ig.variacaoSeguidores>=0?'▲':'▼'} ${dbN(Math.abs(ig.variacaoSeguidores))} no período</small>`,EvoCharts.spark(ig.serieSeguidores.map(x=>x.seguidores)),'instagram')}
-     ${dbCard('Visualizações',dbN(ig.visualizacoes),'<small class="db-var">das publicações com dado da Meta</small>','','igposts')}
+     ${ig.visualizacoes!=null?dbCard('Visualizações',dbN(ig.visualizacoes),'<small class="db-var">das publicações com dado da Meta</small>','','igposts'):''}
      ${dbCard('Publicações',dbN(ig.publicacoes),'<small class="db-var">no período</small>','','conteudos')}
      ${dbCard('Interações',dbN(ig.interacoes),'<small class="db-var">curtidas, comentários e salvamentos</small>','','instagram')}
      ${dbCard('Alcance',dbN(ig.alcance),'<small class="db-var">das publicações com dado da Meta</small>','','instagram')}</div>
