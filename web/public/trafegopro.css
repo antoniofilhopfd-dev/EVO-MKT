@@ -114,3 +114,5 @@
 
 .tp-conta{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 14px;margin-bottom:10px;font-size:13px}
 .tp-conta:empty{display:none}.tp-conta small{color:var(--ink-3,#5E6678)}.tp-ct{font-weight:700;padding:2px 10px;border-radius:999px}.tp-ct.ok{background:#EAF6EE;color:#14532D}.tp-ct.bad{background:#FDECEC;color:#8A1C1C}
+
+.tp-tab [data-n]{text-align:right}.tp-tab thead [data-n] .tf-ord{text-align:right}.tp-tab td{white-space:nowrap}.tp-tab td:nth-child(2){white-space:normal}.tp-tab tbody td{padding-top:12px;padding-bottom:12px}

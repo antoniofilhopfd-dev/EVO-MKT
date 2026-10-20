@@ -52,7 +52,7 @@ const TP_MODELOS={padrao:['nome','ligado','estado','orcamento','gasto','conversa
 const TP_MODELO_ROT={padrao:'Padrão',desempenho:'Desempenho',conversas:'Conversas',investimento:'Investimento',entrega:'Entrega',criativos:'Criativos',personalizado:'Personalizado'};
 const colsDoNivel=n=>TP_COLS.filter(c=>c.niveis.includes(n));
 function tpCfgPadrao(){const c={};for(const [n] of TP_NIVEIS)c[n]={modelo:'padrao',cols:TP_MODELOS.padrao.filter(k=>TP_COL[k].niveis.includes(n)),larg:{},fixas:['nome']};return {nivel:c,visoes:{campanha:[],conjunto:[],anuncio:[]},padrao:{}}}
-async function tpCfgCarrega(){if(!GM2.cfg){const s=await tpPrefGet('trafego.gm',null);const p=tpCfgPadrao();GM2.cfg=s?{nivel:{...p.nivel,...(s.nivel||{})},visoes:{...p.visoes,...(s.visoes||{})},padrao:s.padrao||{}}:p}if(!GM2.favoritos)GM2.favoritos=await tpPrefGet('trafego.gm.filtros',[]);const f=await tpPrefGet('trafego.gm.filtro',null);if(f&&!GM2._f){GM2.filtro=f;GM2._f=1}if(!GM2.nivel)GM2.nivel=await tpPrefGet('trafego.gm.nivel','campanha')}
+async function tpCfgCarrega(){if(!GM2.cfg){const s=await tpPrefGet('trafego.gm',null);const p=tpCfgPadrao();GM2.cfg=s?{nivel:{...p.nivel,...(s.nivel||{})},visoes:{...p.visoes,...(s.visoes||{})},padrao:s.padrao||{}}:p}if(!GM2.favoritos)GM2.favoritos=await tpPrefGet('trafego.gm.filtros',[]);if(!GM2.nivel)GM2.nivel=await tpPrefGet('trafego.gm.nivel','campanha')}
 const tpCfgSalva=()=>tpPrefSet('trafego.gm',GM2.cfg);
 const tpCfgN=()=>GM2.cfg.nivel[GM2.nivel];
 const tpColsVisiveis=()=>{const c=tpCfgN();const lista=c.cols.filter(k=>TP_COL[k]&&TP_COL[k].niveis.includes(GM2.nivel));const fix=lista.filter(k=>(c.fixas||[]).includes(k)),resto=lista.filter(k=>!fix.includes(k));return [...fix,...resto].map(k=>TP_COL[k])};
@@ -114,13 +114,16 @@ function tpRodape(lista,cols){
   const fmt={gasto:x=>gmBrl(x),impressoes:gmN,cliques:gmN,conversas:gmN,leads:gmN,resultados:gmN,ctr:gmPct,cpc:gmBrl,cpm:gmBrl,custoConversa:gmBrl,cpl:gmBrl};
   return `<tr class="tot">${cols.map((c,i)=>`<td ${tpFixaStyle(c,cols)}>${i===0?`Total de ${lista.length} ${GM2.nivel==='campanha'?'campanha(s)':GM2.nivel==='conjunto'?'conjunto(s)':'anúncio(s)'}`:(c.k in fmt&&v[c.k]!==null&&v[c.k]!==undefined?esc(fmt[c.k](v[c.k])):'')}</td>`).join('')}<td></td></tr>`;
 }
-function tpFixaStyle(c,cols){
+let TP_NUMS=new Set();
+function tpFixaStyle(c,cols){return tpFixaStyle0(c,cols)+(TP_NUMS.has(c.k)?' data-n="1"':'')}
+function tpFixaStyle0(c,cols){
   const fix=tpCfgN().fixas||[];if(!fix.includes(c.k))return `style="min-width:${tpLarg(c)}px;width:${tpLarg(c)}px"`;
   let left=40;for(const o of cols){if(o.k===c.k)break;if(fix.includes(o.k))left+=tpLarg(o)}
   return `class="tp-fixa" style="min-width:${tpLarg(c)}px;width:${tpLarg(c)}px;left:${left}px"`;
 }
 function tpTabelaHtml(){
   const lista=tpLista(),cols=tpColsVisiveis();GM2.lista=lista;
+  TP_NUMS=new Set(cols.filter(c=>!['ligado','estado'].includes(c.k)&&lista.some(x=>typeof c.v(x)==='number')).map(c=>c.k));
   const th=c=>`<th scope="col" ${tpFixaStyle(c,cols)} aria-sort="${GM2.ordem.k===c.k?(GM2.ordem.d>0?'ascending':'descending'):'none'}"><button type="button" class="tf-ord" data-ord2="${c.k}">${esc(c.r)}${GM2.ordem.k===c.k?(GM2.ordem.d>0?' ▲':' ▼'):''}</button><i class="tp-rz" data-rz="${c.k}" aria-hidden="true"></i></th>`;
   const todos=lista.length&&lista.every(x=>GM2.sel.has(x.id));
   return `<div class="tablewrap tp-wrap" id="tpWrap"><table class="datatable gm-tab tp-tab"><thead><tr><th class="tp-ck"><input type="checkbox" id="tpTodos" aria-label="Selecionar todos" ${todos?'checked':''}></th>${cols.map(th).join('')}<th class="tp-ac">Ações</th></tr></thead>
