@@ -55,7 +55,7 @@ function tpCfgPadrao(){const c={};for(const [n] of TP_NIVEIS)c[n]={modelo:'padra
 async function tpCfgCarrega(){if(!GM2.cfg){const s=await tpPrefGet('trafego.gm',null);const p=tpCfgPadrao();GM2.cfg=s?{nivel:{...p.nivel,...(s.nivel||{})},visoes:{...p.visoes,...(s.visoes||{})},padrao:s.padrao||{}}:p}if(!GM2.favoritos)GM2.favoritos=await tpPrefGet('trafego.gm.filtros',[]);if(!GM2.nivel)GM2.nivel=await tpPrefGet('trafego.gm.nivel','campanha')}
 const tpCfgSalva=()=>tpPrefSet('trafego.gm',GM2.cfg);
 const tpCfgN=()=>GM2.cfg.nivel[GM2.nivel];
-const tpColsVisiveis=()=>{const c=tpCfgN();const lista=c.cols.filter(k=>TP_COL[k]&&TP_COL[k].niveis.includes(GM2.nivel));const fix=lista.filter(k=>(c.fixas||[]).includes(k)),resto=lista.filter(k=>!fix.includes(k));return [...fix,...resto].map(k=>TP_COL[k])};
+const tpColsVisiveis=()=>{const c=tpCfgN();const lista=c.cols.filter(k=>TP_COL[k]&&TP_COL[k].niveis.includes(GM2.nivel));const fix=lista.filter(k=>(c.fixas||[]).includes(k)),resto=lista.filter(k=>!fix.includes(k));const ord=[...fix,...resto];if(adsCompleto&&!ord.includes('ligado')){const i=ord.indexOf('nome');ord.splice(i<0?0:i+1,0,'ligado')}return ord.map(k=>TP_COL[k])};
 const tpLarg=c=>(tpCfgN().larg||{})[c.k]||c.w;
 
 // ---------- filtros ----------
@@ -262,7 +262,7 @@ function tpPainelLateral(titulo,html,larg=460){
 }
 // ---------- painel de colunas ----------
 function tpPainelColunas(){
-  const c=tpCfgN(),disp=colsDoNivel(GM2.nivel);
+  const c=tpCfgN(),disp=colsDoNivel(GM2.nivel).filter(x=>!(adsCompleto&&x.k==='ligado')); // o liga/desliga é fixo no modo completo
   const desenha=()=>{
     const gs=[...new Set(disp.map(x=>x.g))],q=(p.querySelector('#colBusca')||{}).value||'';
     p.querySelector('.tp-lat-corpo').innerHTML=`<input type="search" class="control" id="colBusca" placeholder="Pesquisar métricas" value="${attr(q)}" aria-label="Pesquisar métricas">
