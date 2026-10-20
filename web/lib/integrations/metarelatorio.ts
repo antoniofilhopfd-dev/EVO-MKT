@@ -32,7 +32,7 @@ export async function relatorioTrafego(de: string, ate: string): Promise<Row> {
   const hoje = fmtDate(new Date());
   const mesIni = `${ate.slice(0, 7)}-01`;
   const fimMesCal = fmtDate(new Date(Number(ate.slice(0, 4)), Number(ate.slice(5, 7)), 0));
-  const mesFim = fimMesCal > hoje ? hoje : fimMesCal; // mês em andamento: até hoje
+  const mesFim = fimMesCal > ate ? ate : fimMesCal; // o mensal acompanha o último dia escolhido no período
   const parcial = mesFim < fimMesCal;
   const faixa = (since: string, until: string) => JSON.stringify({ since, until });
   const base = { fields: 'campaign_id,campaign_name,spend,impressions,reach,clicks,actions,account_currency', limit: 200 };

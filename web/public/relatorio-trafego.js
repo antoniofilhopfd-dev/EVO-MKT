@@ -49,7 +49,7 @@ function html(d,sub,obs){
   ${obs?`<p class="nota">${esc(obs)}</p>`:''}<div class="fim"><span>Colégio Evolução · EVO MKT · dados lidos da Meta (somente leitura)</span><span>Gerado em ${esc(agora)}</span></div></div>`;
 }
 function obsPadrao(d){
-  const m=d.mensal,p=[];if(m.parcial)p.push(`O mensal de ${MESES[Number(m.ate.slice(5,7))-1].toLowerCase()} inclui o dia ${DM(m.ate)} em andamento (valores parciais).`);
+  const m=d.mensal,p=[];if(m.parcial)p.push(`O mensal de ${MESES[Number(m.ate.slice(5,7))-1].toLowerCase()} vai do dia 01 até ${DM(m.ate)}, o último dia do período escolhido (valores parciais).`);
   if(d.anunciosPausadosComGasto.length)p.push(`Anúncios pausados com gasto no período: ${d.anunciosPausadosComGasto.join('; ')}.`);
   p.push('Conversas = conversas iniciadas pelos anúncios (não inclui leads de formulário). Dados lidos da Meta; o EVO MKT não altera nada na plataforma.');
   return p.join(' ');
