@@ -112,7 +112,7 @@ function tpRodape(lista,cols){
   const s={gasto:0,impressoes:0,cliques:0,conversas:0,leads:0,resultados:0};lista.forEach(x=>{for(const k in s)s[k]+=Number(x[k])||0});
   const v={gasto:s.gasto,impressoes:s.impressoes,cliques:s.cliques,conversas:s.conversas,leads:s.leads,resultados:s.resultados,ctr:s.impressoes?s.cliques/s.impressoes*100:null,cpc:s.cliques?s.gasto/s.cliques:null,cpm:s.impressoes?s.gasto/s.impressoes*1000:null,custoConversa:s.conversas?s.gasto/s.conversas:null,cpl:s.leads?s.gasto/s.leads:null};
   const fmt={gasto:x=>gmBrl(x),impressoes:gmN,cliques:gmN,conversas:gmN,leads:gmN,resultados:gmN,ctr:gmPct,cpc:gmBrl,cpm:gmBrl,custoConversa:gmBrl,cpl:gmBrl};
-  return `<tr class="tot">${cols.map((c,i)=>`<td ${tpFixaStyle(c,cols)}>${i===0?`Total de ${lista.length} ${GM2.nivel==='campanha'?'campanha(s)':GM2.nivel==='conjunto'?'conjunto(s)':'anúncio(s)'}`:(c.k in fmt&&v[c.k]!==null&&v[c.k]!==undefined?esc(fmt[c.k](v[c.k])):'')}</td>`).join('')}<td></td></tr>`;
+  return `<tr class="tot"><td class="tp-ck"></td>${cols.map((c,i)=>`<td ${tpFixaStyle(c,cols)}>${i===0?`Total de ${lista.length} ${GM2.nivel==='campanha'?'campanha(s)':GM2.nivel==='conjunto'?'conjunto(s)':'anúncio(s)'}`:(c.k in fmt&&v[c.k]!==null&&v[c.k]!==undefined?esc(fmt[c.k](v[c.k])):'')}</td>`).join('')}<td></td></tr>`;
 }
 let TP_NUMS=new Set();
 function tpFixaStyle(c,cols){return tpFixaStyle0(c,cols)+(TP_NUMS.has(c.k)?' data-n="1"':'')}
