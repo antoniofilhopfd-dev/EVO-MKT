@@ -76,8 +76,10 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   let de = somar(hoje, -(dias - 1)), ate = hoje;
   const ok = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
   if (ok(c.qs('de')) && ok(c.qs('ate'))) { // período escolhido (semana, mês, personalizado…): termina até hoje e tem no máximo 400 dias
-    if (c.qs('de') > c.qs('ate') || c.qs('ate') > hoje) fail(400, 'Período inválido.');
+    if (c.qs('de') > c.qs('ate')) fail(400, 'Período inválido.');
     de = c.qs('de'); ate = c.qs('ate');
+    if (ate > hoje) ate = hoje; // o navegador pode já estar no dia seguinte (fuso): nunca passa de hoje
+    if (de > ate) de = ate;
     dias = Math.max(1, Math.round((parseLocal(`${ate}T12:00:00`).getTime() - parseLocal(`${de}T12:00:00`).getTime()) / 86400000) + 1);
     if (dias > 400) fail(400, 'Período acima de 400 dias.');
   }
