@@ -92,15 +92,17 @@ function gEventFromRow(mod: string, r: Row): Row | null {
   let timed = '', end = '';
   if (mod === 'agenda' || mod === 'calendario') { timed = r.inicioEm || ''; end = r.fimEm || ''; }
   else if (mod === 'conteudos') timed = r.publicacaoEm || '';
-  if (timed && timed.length >= 16) {
+  const diaInteiro = (mod === 'agenda' || mod === 'calendario') && /^s/i.test(String(r.diaInteiro ?? ''));
+  if (timed && timed.length >= 16 && !diaInteiro) {
     const s = parseLocal(timed);
     let e = end ? parseLocal(end) : new Date(s.getTime() + 30 * 60000);
     if (e <= s) e = new Date(s.getTime() + 30 * 60000);
     return { summary: title, description: desc, start: { dateTime: now(s), timeZone: tz() }, end: { dateTime: now(e), timeZone: tz() }, extendedProperties: ext };
   }
-  let d = String(mod === 'tarefas' ? r.prazo ?? '' : r.dataInicio ?? r.prazo ?? '').slice(0, 10);
+  let d = String(mod === 'tarefas' ? r.prazo ?? '' : r.dataInicio ?? r.prazo ?? (diaInteiro ? timed : '')).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
   let endDay = d;
+  if ((mod === 'agenda' || mod === 'calendario') && /^\d{4}-\d{2}-\d{2}/.test(String(r.dataFim ?? '')) && String(r.dataFim).slice(0, 10) >= d) endDay = String(r.dataFim).slice(0, 10); // evento de vários dias
   if (mod === 'campanhas' && /^\d{4}-\d{2}-\d{2}/.test(String(r.prazo ?? '')) && String(r.prazo).slice(0, 10) >= d) endDay = String(r.prazo).slice(0, 10);
   return { summary: title, description: desc, start: { date: d }, end: { date: fmtDate(addDays(parseLocal(endDay + 'T12:00:00'), 1)) }, extendedProperties: ext };
 }
@@ -115,7 +117,14 @@ function gApplyEventToRow(mod: string, row: Row, ev: Row): Row {
     else if (mod === 'conteudos') patch.publicacaoEm = fmtDateTimeLocal(s);
     else if (mod === 'tarefas') patch.prazo = fmtDate(s);
     else patch.dataInicio = fmtDate(s);
-  } else if (sd) patch[mod === 'tarefas' ? 'prazo' : 'dataInicio'] = sd;
+  } else if (sd) {
+    patch[mod === 'tarefas' ? 'prazo' : 'dataInicio'] = sd;
+    // dia inteiro de vários dias: o Google guarda o fim como o dia seguinte ao último
+    if ((mod === 'agenda' || mod === 'calendario') && ev.end?.date) {
+      const ultimo = fmtDate(addDays(parseLocal(String(ev.end.date) + 'T12:00:00'), -1));
+      patch.dataFim = ultimo > sd ? ultimo : '';
+    }
+  }
   return patch;
 }
 const closed = /CONCLU|CANCEL|ARQUIV/i;
@@ -159,6 +168,19 @@ export async function gCalendarSync(): Promise<Row> {
     if (mod && id && GCAL_MODULES.includes(mod)) {
       let row = await getRow(mod, id);
       if (!row) continue;
+      if (mod === 'calendario' && row.origem === 'GOOGLE_AGENDA' && ev.start?.date && ev.end?.date) {
+        // evento de vários dias importado antes desta correção: completa o último dia
+        const ultimo = fmtDate(addDays(parseLocal(String(ev.end.date) + 'T12:00:00'), -1));
+        if (ultimo > String(ev.start.date) && String(row.dataFim ?? '') !== ultimo) {
+          await updateRow(mod, id, { dataFim: ultimo }, 'integracao:google');
+          row = (await getRow(mod, id))!;
+          const nh = md5(gEventFromRow(mod, row) ?? []);
+          await run('UPDATE google_event_map SET hash=? WHERE modulo=? AND id=?', [nh, mod, id]);
+          if (map[`${mod}|${id}`]) map[`${mod}|${id}`].hash = nh;
+          stat.do_google++;
+          continue;
+        }
+      }
       const mine = gEventFromRow(mod, row);
       const hash = mine ? md5(mine) : '';
       const mapped = map[`${mod}|${id}`];

@@ -110,6 +110,12 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/integrations/settings',{m:'POST',ck:G,b:{g_importar:true}});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});const nat=(await rows('calendario')).find(c=>c.titulo==='Visita da inspetora');
  t('evento criado direto no Google vira item do Calendário (cópia duplicada é ignorada)',r.j.criados===1&&(await rows('calendario')).filter(c=>c.titulo==='Visita da inspetora').length===1&&nat&&nat.origem==='GOOGLE_AGENDA'&&nat.inicioEm===fut1+'T10:00');
+ const d0='2031-03-10',d1='2031-03-14'; // Google: dia inteiro de 10 a 13 (o fim vem como o dia seguinte ao último)
+ await mock('/__google_create',{summary:'Viagem longa',start:{date:d0},end:{date:d1}});
+ r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});const vl=(await rows('calendario')).find(c=>c.titulo==='Viagem longa');
+ t('evento de vários dias do Google entra com o último dia (10 a 13), sem ficar só no primeiro',vl&&vl.dataInicio===d0&&vl.dataFim==='2031-03-13',vl);
+ r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});const s3=await mock('/__state');const evl=Object.values(s3.events).filter(e=>e.summary==='Viagem longa');
+ t('o evento continua com o mesmo intervalo no Google depois de sincronizar de novo (sem duplicar)',evl.length===1&&evl[0].start.date===d0&&evl[0].end.date===d1,evl);
  r=await call('/integrations/google/calendar/limpar-importados',{m:'POST',ck:G,b:{}});s2=await mock('/__state');t('limpar importados remove do sistema sem apagar no Google',r.s===200&&r.j.removidos>=1&&!(await rows('calendario')).some(c=>c.origem==='GOOGLE_AGENDA')&&Object.values(s2.events).some(e=>e.summary==='Visita da inspetora'),r);
  const tar=(await rows('tarefas')).find(c=>c.titulo==='Entregar banner');await call('/data?module=tarefas&id='+tar.id,{m:'DELETE',ck:G});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});s2=await mock('/__state');

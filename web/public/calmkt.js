@@ -209,7 +209,7 @@ async function calMktCarregar(){
  const itens=[];
  [['calendario',cal.rows],['agenda',age.rows]].forEach(([modulo,rows])=>(rows||[]).forEach(r=>{
   const [data,hora]=calMktDataHora(r);if(!data||/CANCEL/i.test(String(r.status||'')))return;
-  itens.push({uid:modulo+':'+r.id,id:r.id,modulo,titulo:r.titulo,data,hora,tipo:calMktTipoDe(r),responsavel:r.responsavel||'',editavel:true,feito:/REALIZ|CONCLU/i.test(String(r.status||'')),raw:r});
+  const fimR=String(r.dataFim||r.fimEm||'').slice(0,10);itens.push({uid:modulo+':'+r.id,id:r.id,modulo,titulo:r.titulo,data,fim:fimR>data?fimR:'',hora,tipo:calMktTipoDe(r),responsavel:r.responsavel||'',editavel:true,feito:/REALIZ|CONCLU/i.test(String(r.status||'')),raw:r});
  }));
  (con.rows||[]).forEach(r=>{
   const v=String(r.publicacaoEm||'');if(!v||/ARQUIV/i.test(String(r.status||'')))return;
@@ -259,6 +259,7 @@ async function calMktForm(it,dataInicial=''){
    <label class="wide">Título *<input class="control" id="fTitulo" maxlength="140" required autocomplete="off" value="${attr(edit?it.titulo:'')}"></label>
    <label>Data *<input class="control" type="date" id="fData" required value="${attr(edit?it.data:dataInicial)}"></label>
    <label>Horário (opcional)<input class="control" type="time" id="fHora" value="${attr(edit?it.hora:'')}"></label>
+   <label>Até (opcional, evento de vários dias)<input class="control" type="date" id="fFim" value="${attr(edit&&it.fim?it.fim:'')}"></label>
    <label>Tipo de atividade<select class="control" id="fTipo">${tipos.map(([k,l])=>`<option value="${k}" ${k===tipoAtual?'selected':''}>${l}</option>`).join('')}</select></label>
    <label>Responsável (opcional)<select class="control" id="fResp"><option value="">Sem responsável</option>${resp.map(n=>`<option value="${attr(n)}" ${n===(edit?it.responsavel:'')?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
    <label>Segmento escolar (opcional)<select class="control" id="fSeg"><option value="">Não se aplica</option>${CAL_SEGMENTOS.map(sg=>`<option value="${attr(sg)}" ${sg===(r.segmento||'')?'selected':''}>${esc(sg==='Geral'?'Toda a escola':sg)}</option>`).join('')}</select></label>
@@ -275,10 +276,12 @@ async function calMktForm(it,dataInicial=''){
   const titulo=$('#fTitulo',o.el).value.trim(),data=$('#fData',o.el).value,hora=$('#fHora',o.el).value;
   if(titulo.length<2){err.textContent='Informe o título.';return}
   if(!data){err.textContent='Escolha a data.';return}
+  const fimSel=$('#fFim',o.el).value;if(fimSel&&fimSel<data){err.textContent='O dia final não pode ser antes do inicial.';return}
   const body={titulo,tipoItem:calMktRotuloTipo($('#fTipo',o.el).value),dataInicio:data,inicioEm:`${data}T${hora||'00:00'}`,fimEm:`${data}T${hora||'00:00'}`,diaInteiro:hora?'Não':'Sim',responsavel:$('#fResp',o.el).value,segmento:$('#fSeg',o.el).value,anexos:anexos.join(' | '),descricao:$('#fObs',o.el).value.trim()};
   if(edit&&r.fimEm&&String(r.fimEm).slice(0,10)!==String(r.inicioEm||r.dataInicio||'').slice(0,10)){ // evento de vários dias: preserva a duração
    const dias=Math.round((CalMotor.dataDe(String(r.fimEm).slice(0,10))-CalMotor.dataDe(String(r.inicioEm||r.dataInicio).slice(0,10)))/86400000);const f=CalMotor.dataDe(data);f.setDate(f.getDate()+Math.max(0,dias));body.fimEm=`${isoDate(f)}T${hora||'00:00'}`}
   else if(edit&&hora&&r.fimEm&&String(r.fimEm).length>10&&String(r.fimEm).slice(11,16)>hora)body.fimEm=`${data}T${String(r.fimEm).slice(11,16)}`;
+  body.dataFim=fimSel&&fimSel>data?fimSel:'';if(body.dataFim)body.fimEm=`${body.dataFim}T${hora||'00:00'}`;
   const btn=$('#fSalvar',o.el);btn.disabled=true;
   try{
    if(edit)await api(`/data?module=${it.modulo}&id=${encodeURIComponent(it.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});

@@ -1,5 +1,5 @@
 const API='/api';
-const VERSION='5.17.42';
+const VERSION='5.17.43';
 const DATA_MODULES=['agenda','aprovacoes','arquivos','calendario','campanhas','configuracoes','conteudos','equipe','eventos','ideias','instagram','integracoes','lixeira','projetos','relatorios','solicitacoes','tarefas','templates','trafego'];
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
