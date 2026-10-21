@@ -258,5 +258,9 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await p.selectOption('#tpVisao',{label:'★ Minha visão'});await p.waitForTimeout(500);
  const colsSalva=await p.$$eval('#tpWrap thead th',e=>e.map(x=>x.innerText.trim()).join('|'));
  t('Salvar visualização cria uma opção com nome e ela reaplica as colunas',opts.includes('★ Minha visão')&&colsSalva===colsAntes,[opts,colsSalva,colsAntes]);
+ await p.evaluate(async()=>{GM2.cfg.visoes.conjunto=[];GM2.cfg.visoes.anuncio=[];await tpCfgSalva()});await p.waitForTimeout(600);
+ await p.reload();await p.waitForTimeout(1500);await ir(p,'gerenciador');
+ const optsOut=[];for(const n of ['conjunto','anuncio']){await p.click('[data-niv="'+n+'"]');await p.waitForTimeout(600);optsOut.push(await p.$$eval('#tpVisao option',e=>e.map(x=>x.textContent)))}
+ t('Visualização salva só em Campanhas aparece também em Conjuntos e Anúncios',optsOut.every(o=>o.includes('★ Minha visão')),optsOut);
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
