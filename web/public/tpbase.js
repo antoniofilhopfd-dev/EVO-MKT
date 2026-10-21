@@ -38,7 +38,7 @@ async function tpArvore(forcar=false){
   const {de,ate}=tpPeriodo();
   if(!forcar&&gmDados&&gmDados.de===de&&gmDados.ate===ate&&Date.now()-(TP.lido||0)<90000)return gmDados;
   if(TP.carregando)return TP.carregando;
-  TP.carregando=api(`/ads/arvore?de=${de}&ate=${ate}&arquivados=1`).then(d=>{gmDados=d;TP.lido=Date.now();return d}).finally(()=>{TP.carregando=null});
+  TP.carregando=api(`/ads/arvore?de=${de}&ate=${ate}&arquivados=1${forcar?'&f=1':''}`).then(d=>{gmDados=d;TP.lido=Date.now();if(d.aviso&&typeof toast==='function')toast(d.aviso,'warn');return d}).finally(()=>{TP.carregando=null});
   return TP.carregando;
 }
 function tpFlat(nivel,d=gmDados){

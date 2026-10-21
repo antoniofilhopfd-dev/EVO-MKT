@@ -19,7 +19,10 @@ function pedido(b: Row): PedidoImpulso {
 }
 const faixa = (v: unknown, min: number, max: number, nome: string) => { const n = Number(v); if (!Number.isFinite(n) || n < min || n > max) fail(400, `${nome} deve estar entre ${min} e ${max}.`); return n; };
 
+const ARVORE_CACHE = new Map<string, { em: number; dados: any }>();
+
 export async function gestaoAnunciosRoute(c: Ctx) {
+  if (c.method !== 'GET') ARVORE_CACHE.clear();
   const { path, method } = c;
   const u = await requireInternal(c);
   // Modo do Tráfego: por padrão SOMENTE LEITURA (métricas). Criar/editar/pausar anúncios só com a chave ligada em Administração → Integrações.
@@ -91,7 +94,18 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     const ate = ymd(c.qs('ate')) || fmtDate(new Date()), de = ymd(c.qs('de')) || fmtDate(addDays(new Date(), -6));
     if (de > ate) fail(400, 'A data inicial é depois da final.');
     if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 400) fail(400, 'O período vai até 400 dias.');
-    try { return json(await arvore(de, ate, c.qs('arquivados') === '1')); } catch (e: any) { return fail(502, e.message); }
+    const chave = `${de}|${ate}|${c.qs('arquivados') === '1'}`, guardado = ARVORE_CACHE.get(chave);
+    if (guardado && c.qs('f') !== '1' && Date.now() - guardado.em < 45000) return json(guardado.dados);
+    try {
+      const dados = await arvore(de, ate, c.qs('arquivados') === '1');
+      ARVORE_CACHE.set(chave, { em: Date.now(), dados });
+      return json(dados);
+    } catch (e: any) {
+      const limite = /limit reached|rate limit|too many calls|\(#(4|17|32|613|80004)\)/i.test(String(e.message));
+      // a Meta limitou as leituras: mostra a última leitura guardada, avisando que pode estar desatualizada
+      if (guardado) return json({ ...guardado.dados, desatualizado: true, aviso: limite ? 'A Meta limitou as consultas por alguns minutos; mostrando a última leitura (' + new Date(guardado.em).toLocaleTimeString('pt-BR', { timeZone: 'America/Recife' }) + ').' : String(e.message) });
+      return fail(502, limite ? 'A Meta limitou temporariamente as consultas (muitas leituras seguidas). Aguarde alguns minutos e clique em Atualizar. Nada foi alterado nas suas campanhas.' : e.message);
+    }
   }
   if (path === '/ads/extras' && method === 'GET') {
     return json({ gestao: completo, regras: await cfgRegras(), relatorioSemanal: (await setting('ads_relatorio_semanal')) === '1', rascunhos: await rascunhos() });
