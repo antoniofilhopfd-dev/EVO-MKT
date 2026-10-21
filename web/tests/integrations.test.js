@@ -116,6 +116,10 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  t('evento de vários dias do Google entra com o último dia (10 a 13), sem ficar só no primeiro',vl&&vl.dataInicio===d0&&vl.dataFim==='2031-03-13',vl);
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});const s3=await mock('/__state');const evl=Object.values(s3.events).filter(e=>e.summary==='Viagem longa');
  t('o evento continua com o mesmo intervalo no Google depois de sincronizar de novo (sem duplicar)',evl.length===1&&evl[0].start.date===d0&&evl[0].end.date===d1,evl);
+ await call('/data?module=calendario',{m:'POST',ck:G,b:{titulo:'Auto sincroniza',tipoItem:'Reunião',dataInicio:'2031-04-02',diaInteiro:'Sim',status:'PLANEJADO'}});
+ await new Promise(x=>setTimeout(x,8000));const s4=await mock('/__state');
+ t('salvar no calendário sincroniza sozinho com o Google em segundos (sem clicar em sincronizar)',Object.values(s4.events).some(e=>e.summary==='Auto sincroniza'),Object.values(s4.events).map(e=>e.summary));
+ r=await call('/integrations/google/calendar/sync?leve=1',{m:'POST',ck:G,b:{}});t('sincronização leve não repete quando acabou de rodar',r.s===200&&r.j.pulou===true,r);
  r=await call('/integrations/google/calendar/limpar-importados',{m:'POST',ck:G,b:{}});s2=await mock('/__state');t('limpar importados remove do sistema sem apagar no Google',r.s===200&&r.j.removidos>=1&&!(await rows('calendario')).some(c=>c.origem==='GOOGLE_AGENDA')&&Object.values(s2.events).some(e=>e.summary==='Visita da inspetora'),r);
  const tar=(await rows('tarefas')).find(c=>c.titulo==='Entregar banner');await call('/data?module=tarefas&id='+tar.id,{m:'DELETE',ck:G});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});s2=await mock('/__state');

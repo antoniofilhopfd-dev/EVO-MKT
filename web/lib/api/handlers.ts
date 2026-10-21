@@ -1,3 +1,4 @@
+import { gCalendarSyncLogo, GCAL_MODULES } from '../integrations/google';
 import { registrarNotificacao } from '../notificacoes';
 import { timingSafeEqual } from 'node:crypto';
 import { Ctx, setCookie } from '../ctx';
@@ -189,8 +190,12 @@ export async function route(c: Ctx): Promise<Out> {
     }
 
     // ---------- dados internos ----------
-    case path === '/data':
-      return dataRoute(c);
+    case path === '/data': {
+      const resp = await dataRoute(c);
+      // cada mudança no calendário (e nos itens que vão para a Agenda do Google) dispara a sincronização em segundo plano
+      if (method !== 'GET' && resp.status < 300 && GCAL_MODULES.includes(c.qs('module'))) gCalendarSyncLogo();
+      return resp;
+    }
     case path === '/search': {
       const u = await requireInternal(c);
       const term = lower(c.qs('q'));

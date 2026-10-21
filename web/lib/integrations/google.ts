@@ -326,3 +326,26 @@ export async function gLimparImportados(): Promise<number> {
   await run("DELETE m FROM google_event_map m JOIN records r ON r.modulo=m.modulo AND r.id=m.id WHERE m.modulo='calendario' AND r.data LIKE ?", [like]);
   return run("DELETE FROM records WHERE modulo='calendario' AND data LIKE ?", [like]);
 }
+
+// Sincronização automática a cada mudança: junta várias mudanças seguidas (5 s) e roda uma vez, sem travar quem salvou.
+let sincTimer: NodeJS.Timeout | null = null, sincRodando = false, sincUltima = 0;
+export function gCalendarSyncLogo(): void {
+  if (sincTimer) return;
+  sincTimer = setTimeout(async () => {
+    sincTimer = null;
+    if (sincRodando) { gCalendarSyncLogo(); return; }
+    sincRodando = true;
+    try {
+      if ((await gConnected()) && (await setting('g_calendar_id'))) { await gCalendarSync(); sincUltima = Date.now(); }
+    } catch (e: any) {
+      try { await intLog('google', 'erro', 'Sincronização automática: ' + String(e?.message ?? e).slice(0, 200)); } catch { /* sem log */ }
+    } finally { sincRodando = false; }
+  }, 5000);
+}
+/** Quem abre o Calendário puxa as mudanças feitas no Google; não repete se rodou há menos de `minSeg` segundos. */
+export async function gCalendarSyncSeNecessario(minSeg: number): Promise<Row> {
+  if (sincRodando || Date.now() - sincUltima < minSeg * 1000) return { pulou: true };
+  if (!(await gConnected()) || !(await setting('g_calendar_id'))) return { pulou: true };
+  sincRodando = true;
+  try { const r = await gCalendarSync(); sincUltima = Date.now(); return r; } finally { sincRodando = false; }
+}

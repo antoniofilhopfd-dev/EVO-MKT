@@ -6,7 +6,7 @@ import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
-import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
+import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
 import { iaConfigurada, IA_MODELO } from '../ia';
 import { relatorioTrafego } from '../integrations/metarelatorio';
 import { adsAnuncios, adsDiario, adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta, pacingMes, saudeConta } from '../integrations/metaads';
@@ -310,7 +310,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     }
     case path === '/integrations/google/calendar/sync' && method === 'POST': {
       await requireInternal(c);
-      try { return json(await gCalendarSync()); } catch (e: any) { return bad('google', e); }
+      try { return json(c.qs('leve') === '1' ? await gCalendarSyncSeNecessario(45) : await gCalendarSync()); } catch (e: any) { return bad('google', e); }
     }
     case path === '/integrations/google/sheets/export' && method === 'POST': {
       await requireInternal(c);

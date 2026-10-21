@@ -85,7 +85,15 @@ const CAL_UNICO=CalMotor.criar({
 });
 /** Abre o Calendário único já filtrado (links antigos para Escolar e Datas Comemorativas). */
 function calUnicoFoco(tipos){CAL_UNICO.mostrarSo(tipos)}
+let calSincTimer=null;
+/** Traz as mudanças feitas direto no Google Agenda: ao abrir o Calendário e a cada 2 minutos enquanto ele estiver aberto. */
+async function calSincGoogle(){
+ try{const r=await api('/integrations/google/calendar/sync?leve=1',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  if(r&&!r.pulou&&((r.do_google||0)+(r.criados||0)+(r.removidos||0))>0&&state.page==='calendario'){invalidate('calendario');invalidate('agenda');CAL_UNICO.recarregar()}}catch{}
+}
 async function renderCalendarUnico(){
  CalMotor.redirecionar=()=>CAL_UNICO.recarregar();
+ clearInterval(calSincTimer);calSincTimer=setInterval(()=>{if(state.page!=='calendario'){clearInterval(calSincTimer);return}calSincGoogle()},120000);
+ setTimeout(calSincGoogle,1500);
  return CAL_UNICO.render();
 }
