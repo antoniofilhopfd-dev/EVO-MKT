@@ -233,6 +233,7 @@ function calMktNovaData(it,nova){
  const ini=String(r.inicioEm||r.dataInicio||'').slice(0,10),fim=String(r.fimEm||'').slice(0,10);
  const patch={dataInicio:nova,inicioEm:nova+suf(r.inicioEm)};
  if(fim){const dias=Math.round((CalMotor.dataDe(fim)-CalMotor.dataDe(ini))/86400000);const f=CalMotor.dataDe(nova);f.setDate(f.getDate()+Math.max(0,dias));patch.fimEm=isoDate(f)+suf(r.fimEm)}
+ if(r.dataFim&&String(r.dataFim).slice(0,10)>ini){const dias=Math.round((CalMotor.dataDe(String(r.dataFim).slice(0,10))-CalMotor.dataDe(ini))/86400000);const f=CalMotor.dataDe(nova);f.setDate(f.getDate()+dias);patch.dataFim=isoDate(f)}
  return patch;
 }
 async function calMktMover(it,nova){

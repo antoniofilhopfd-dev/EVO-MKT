@@ -19,7 +19,8 @@ async function calMktSomente(){
  [['calendario',cal.rows],['agenda',age.rows]].forEach(([modulo,rows])=>(rows||[]).forEach(r=>{
   const [data,hora]=calMktDataHora(r);if(!data||/CANCEL/i.test(String(r.status||'')))return;
   const t=calMktTipoDe(r);
-  itens.push({uid:modulo+':'+r.id,id:r.id,modulo,titulo:r.titulo,data,hora,tipo:t==='COBERTURA'?'COBERTURA':t==='ACAO'?'ACAO':'COMPROMISSO',tipoOrigem:t,responsavel:r.responsavel||'',editavel:true,feito:/REALIZ|CONCLU/i.test(String(r.status||'')),raw:r,origem:'mkt'});
+  const fimR=String(r.dataFim||r.fimEm||'').slice(0,10);
+  itens.push({uid:modulo+':'+r.id,id:r.id,modulo,titulo:r.titulo,data,fim:fimR>data?fimR:'',hora,tipo:t==='COBERTURA'?'COBERTURA':t==='ACAO'?'ACAO':'COMPROMISSO',tipoOrigem:t,responsavel:r.responsavel||'',editavel:true,feito:/REALIZ|CONCLU/i.test(String(r.status||'')),raw:r,origem:'mkt'});
  }));
  return itens;
 }

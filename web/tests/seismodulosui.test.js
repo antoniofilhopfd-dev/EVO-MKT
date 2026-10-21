@@ -262,5 +262,10 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await p.reload();await p.waitForTimeout(1500);await ir(p,'gerenciador');
  const optsOut=[];for(const n of ['conjunto','anuncio']){await p.click('[data-niv="'+n+'"]');await p.waitForTimeout(600);optsOut.push(await p.$$eval('#tpVisao option',e=>e.map(x=>x.textContent)))}
  t('Visualização salva só em Campanhas aparece também em Conjuntos e Anúncios',optsOut.every(o=>o.includes('★ Minha visão')),optsOut);
+ {const dd=new Date(),yy=dd.getFullYear(),mm=String(dd.getMonth()+1).padStart(2,'0');
+  await post('/data?module=calendario',{titulo:'Viagem de Duda',tipoItem:'Compromisso',dataInicio:`${yy}-${mm}-10`,dataFim:`${yy}-${mm}-13`,diaInteiro:'Sim',status:'PLANEJADO',origem:'GOOGLE_AGENDA'});
+  await ir(p,'calendario');await p.click('text=Mês');await p.waitForTimeout(1200);
+  const nv=await p.$$eval('.cm-item',e=>e.filter(x=>/Viagem de Duda/.test(x.innerText)).length);
+  t('evento de mais de um dia aparece em todos os dias do calendário (10 a 13 = 4 dias)',nv===4,nv)}
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
