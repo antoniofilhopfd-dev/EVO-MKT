@@ -239,5 +239,8 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  const cks=await p.$$('[data-sel2]');await cks[0].click();await cks[cks.length-1].click({modifiers:['Shift']});await p.waitForTimeout(400);
  const marc=await p.$$eval('[data-sel2]',e=>e.filter(x=>x.checked).length);
  t('Shift+clique seleciona do primeiro ao último (para pausar todas de uma vez)',nck>=2&&marc===nck,[nck,marc]);
+ await p.click('[data-lote="pausar"]');await p.waitForTimeout(700);
+ const prev=await p.evaluate(()=>document.body.innerText);
+ t('depois do Shift+clique os botões em lote respondem (abre a prévia de Pausar)',/O que muda/.test(prev),prev.slice(0,200));
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

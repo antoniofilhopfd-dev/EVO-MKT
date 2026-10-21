@@ -164,7 +164,7 @@ function tpDesenhaGm(){
 }
 function tpRedesenhaTabela(){
   const w=$('#tpWrap'),sl=w?w.scrollLeft:0,st=w?w.scrollTop:0;
-  $('#tpTabBox').innerHTML=tpTabelaHtml();$('#tpLoteBox').innerHTML=tpBarraSel();tpLigaTabela();
+  $('#tpTabBox').innerHTML=tpTabelaHtml();$('#tpLoteBox').innerHTML=tpBarraSel();tpLigaTabela();tpLigaLote();
   const n=$('#tpWrap');if(n){n.scrollLeft=sl;n.scrollTop=st}
 }
 function tpLigaTabela(){
