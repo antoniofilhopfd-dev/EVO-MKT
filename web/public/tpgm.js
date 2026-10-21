@@ -55,7 +55,7 @@ function tpCfgPadrao(){const c={};for(const [n] of TP_NIVEIS)c[n]={modelo:'padra
 async function tpCfgCarrega(){if(!GM2.cfg){const s=await tpPrefGet('trafego.gm',null);const p=tpCfgPadrao();GM2.cfg=s?{nivel:{...p.nivel,...(s.nivel||{})},visoes:{...p.visoes,...(s.visoes||{})},padrao:s.padrao||{}}:p}if(!GM2.favoritos)GM2.favoritos=await tpPrefGet('trafego.gm.filtros',[]);if(!GM2.nivel)GM2.nivel=await tpPrefGet('trafego.gm.nivel','campanha')}
 const tpCfgSalva=()=>tpPrefSet('trafego.gm',GM2.cfg);
 const tpCfgN=()=>GM2.cfg.nivel[GM2.nivel];
-const tpColsVisiveis=()=>{const c=tpCfgN();const lista=c.cols.filter(k=>TP_COL[k]&&TP_COL[k].niveis.includes(GM2.nivel));const fix=lista.filter(k=>(c.fixas||[]).includes(k)),resto=lista.filter(k=>!fix.includes(k));const ord=[...fix,...resto];if(adsCompleto&&!ord.includes('ligado')){const i=ord.indexOf('nome');ord.splice(i<0?0:i+1,0,'ligado')}return ord.map(k=>TP_COL[k])};
+const tpColsVisiveis=()=>{const c=tpCfgN();const lista=c.cols.filter(k=>TP_COL[k]&&TP_COL[k].niveis.includes(GM2.nivel));const fix=lista.filter(k=>(c.fixas||[]).includes(k)),resto=lista.filter(k=>!fix.includes(k));const ord=[...fix,...resto];if(!ord.includes('ligado')){const i=ord.indexOf('nome');ord.splice(i<0?0:i+1,0,'ligado')}return ord.map(k=>TP_COL[k])};
 const tpLarg=c=>(tpCfgN().larg||{})[c.k]||c.w;
 
 // ---------- filtros ----------
@@ -148,7 +148,7 @@ function tpDesenhaGm(){
   const raiz=$('#tpGm');if(!raiz)return;
   const ativos=tpFiltroAtivo(GM2.filtro),c=tpCfgN();
   const foco=[];if((GM2.foco.camps||[]).length)foco.push(GM2.foco.camps.length+' campanha(s) marcada(s)');if((GM2.foco.conjs||[]).length)foco.push(GM2.foco.conjs.length+' conjunto(s) marcado(s)');if(GM2.foco.campanha){const x=gmDados.campanhas.find(k=>k.id===GM2.foco.campanha);foco.push(x?x.nome:GM2.foco.campanha)}if(GM2.foco.conjunto){const x=tpFlat('conjunto').find(k=>k.id===GM2.foco.conjunto);foco.push(x?x.nome:GM2.foco.conjunto)}
-  raiz.innerHTML=`${tpResumoHtml(tpLista())}<div class="tp-barra"><div class="view-switch" role="tablist" aria-label="Nível">${TP_NIVEIS.map(([k,l])=>`<button type="button" role="tab" data-niv="${k}" class="${GM2.nivel===k?'active':''}" aria-selected="${GM2.nivel===k}">${l}</button>`).join('')}</div>
+  raiz.innerHTML=`${adsCompleto?'':'<div class="tp-modo-aviso" role="status"><span><b>Modo somente leitura.</b> Para ligar, desligar e editar campanhas por aqui, ative o modo completo (usa gasto real na Meta). Só o Administrador pode.</span><button type="button" class="btn" id="tpLigaModo">Ativar modo completo</button></div>'}${tpResumoHtml(tpLista())}<div class="tp-barra"><div class="view-switch" role="tablist" aria-label="Nível">${TP_NIVEIS.map(([k,l])=>`<button type="button" role="tab" data-niv="${k}" class="${GM2.nivel===k?'active':''}" aria-selected="${GM2.nivel===k}">${l}</button>`).join('')}</div>
     <input type="search" class="control tp-busca" id="tpBusca" placeholder="Pesquisar por nome ou código" aria-label="Pesquisar" value="${attr(GM2.filtro.busca||'')}">
     <select class="control" id="tpStatus" aria-label="Status">${Object.entries(TP_STATUS_ROT).map(([k,l])=>`<option value="${k}" ${(GM2.filtro.status||'')===k||(!GM2.filtro.status&&k==='todos'&&false)?'selected':''}>${k==='todos'?'Status: todos':l}</option>`).join('').replace('<option value="todos"','<option value=""')}</select>
     <button type="button" class="softbtn" id="tpFiltros">Filtros${ativos.length?` <b class="tp-n">${ativos.length}</b>`:''}</button>
@@ -192,6 +192,7 @@ function tpLigaGm(){
     }
     tpPrefSet('trafego.gm.nivel',GM2.nivel);tpDesenhaGm()});
   const b=$('#tpBusca');b.oninput=()=>{GM2.filtro={...GM2.filtro,busca:b.value};tpSalvaFiltro();clearTimeout(tpLigaGm.t);tpLigaGm.t=setTimeout(()=>{tpRedesenhaTabela();tpAtualizaChips()},250)};
+  $('#tpLigaModo')&&($('#tpLigaModo').onclick=async()=>{if(!confirm('O modo completo libera criar, editar, ligar e pausar anúncios pelo sistema (gasto real na Meta). Continuar?'))return;try{await gmPost('/ads/modo',{gestao:true});adsCompleto=true;toast('Modo completo ligado');tpDesenhaGm()}catch(e){toast(e.message,'bad')}});
   $('#tpStatus').onchange=e=>{GM2.filtro={...GM2.filtro,status:e.target.value};tpSalvaFiltro();tpDesenhaGm()};
   $('#tpFiltros').onclick=tpPainelFiltros;
   $('#tpFav').onchange=e=>tpFavorito(e.target.value);
@@ -262,7 +263,7 @@ function tpPainelLateral(titulo,html,larg=460){
 }
 // ---------- painel de colunas ----------
 function tpPainelColunas(){
-  const c=tpCfgN(),disp=colsDoNivel(GM2.nivel).filter(x=>!(adsCompleto&&x.k==='ligado')); // o liga/desliga é fixo no modo completo
+  const c=tpCfgN(),disp=colsDoNivel(GM2.nivel).filter(x=>x.k!=='ligado'); // o liga/desliga é fixo no modo completo
   const desenha=()=>{
     const gs=[...new Set(disp.map(x=>x.g))],q=(p.querySelector('#colBusca')||{}).value||'';
     p.querySelector('.tp-lat-corpo').innerHTML=`<input type="search" class="control" id="colBusca" placeholder="Pesquisar métricas" value="${attr(q)}" aria-label="Pesquisar métricas">
