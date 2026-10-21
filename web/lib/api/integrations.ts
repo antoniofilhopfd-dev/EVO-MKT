@@ -7,7 +7,6 @@ import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
-import { iaConfigurada, IA_MODELO } from '../ia';
 import { relatorioTrafego } from '../integrations/metarelatorio';
 import { adsAnuncios, adsDiario, adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta, pacingMes, saudeConta } from '../integrations/metaads';
 import { json } from './handlers';
@@ -64,7 +63,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
         ads: { modoCompleto: (await setting('trafego_gestao')) === '1', limites: await limitesAlerta(), ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
-        ia: { configurada: await iaConfigurada(), guiaVoz: await setting('ia_guia_voz'), modelo: IA_MODELO() },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
       });
@@ -113,8 +111,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const input = await c.body();
       await stepUp(u, input);
       for (const k of ['meta_app_id', 'meta_app_secret', 'g_client_id', 'g_client_secret']) if (input[k] !== undefined && strv(input[k]).trim() !== '') await setSetting(k, strv(input[k]).trim());
-      if (input.anthropic_key !== undefined && strv(input.anthropic_key).trim() !== '') await setSetting('anthropic_key', strv(input.anthropic_key).trim());
-      if (input.ia_guia_voz !== undefined) await setSetting('ia_guia_voz', strv(input.ia_guia_voz).slice(0, 4000));
       if (input.g_importar !== undefined) await setSetting('g_importar', input.g_importar ? '1' : '0');
       if (input.g_auto_drive_entregas !== undefined) await setSetting('g_auto_drive_entregas', input.g_auto_drive_entregas ? '1' : '0');
       if (input.g_sheet_modules !== undefined) await setSetting('g_sheet_modules', strv(input.g_sheet_modules).split(',').map((m) => m.trim()).filter((m) => m in MODULES).join(','));

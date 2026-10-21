@@ -64,15 +64,6 @@ async function gerarLinkAprovacao(id){
  o.el.querySelector('#lnkCopy').onclick=()=>{navigator.clipboard?.writeText(d.url);toast('Link copiado')};
 }
 
-// Rascunho de legendas com IA (a equipe revisa; nada é publicado sozinho)
-async function sugerirLegendas(modulo,id){
- const btn=$('#btnIA');if(btn){btn.disabled=true;btn.textContent='Gerando…'}
- let d;try{d=await api('/ia/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo,id})})}catch(e){if(btn){btn.disabled=false;btn.textContent='✨ Sugerir legendas (IA)'}return toast(e.message,'warn')}
- if(btn){btn.disabled=false;btn.textContent='✨ Sugerir legendas (IA)'}
- const o=adminOverlay(`<h3>Rascunhos de legenda</h3><p class="kpi-note">Revise antes de usar. Trechos [COMPLETAR: …] mostram o que a IA não tinha como saber.</p><div class="origem-list">${d.opcoes.map((x,i)=>`<div class="notif"><div style="white-space:pre-wrap">${esc(x.legenda)}</div><small>${esc(x.hashtags.join(' '))}</small><div><button class="softbtn" data-usar="${i}">Usar esta</button></div></div>`).join('')}</div><div class="actions"><button class="btn soft" data-close>Fechar</button></div>`);
- o.el.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{const x=d.opcoes[+b.dataset.usar];const txt=x.legenda+(x.hashtags.length?'\n\n'+x.hashtags.join(' '):'');const campo=document.querySelector('#formFields [name="legenda"]')||document.querySelector('#formFields [name="descricao"]');if(campo){campo.value=txt;campo.dispatchEvent(new Event('input',{bubbles:true}))}o.close();toast('Legenda colocada no formulário. Revise e salve.')});
-}
-
 // ---------- Painel de trabalho dentro da ficha: comentários, checklist, subtarefas, dependência, estado de publicação ----------
 const POST=(b)=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
 const ESTADO_COR={'PUBLICAÇÃO CONFIRMADA':'ok','FALHA NA PUBLICAÇÃO':'bad','PUBLICADO SEM CONFIRMAÇÃO':'warn','AGENDADO INTERNAMENTE':'warn','ENVIADO À PLATAFORMA':'warn'};

@@ -12,7 +12,7 @@ mariadb -uroot -S /run/mysqld/mysqld.sock -e "CREATE USER IF NOT EXISTS 'evo'@'1
 export DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=evowebtest DB_USER=evo DB_PASSWORD=evopass NODE_ENV=production
 export SESSION_SECRET=segredo-de-teste-sessao-0123456789abcdef APP_KEY=chave-app-de-teste-0123456789 SETUP_KEY=chave-setup-de-teste-123 RECOVERY_KEY=recuperacao-de-teste-0123456789 PUBLIC_URL=http://127.0.0.1:$PORT
 export NOTIFY_TO=gerente@teste.com MAIL_LOG="$D/mail.log" LOGIN_GLOBAL_MAX=12 LOGIN_IP_MAX=30 LOGIN_DELAY_MS=0 CRON_SECRET=cron-de-teste-0123456789 TIMEZONE=America/Recife
-export META_GRAPH_BASE=http://127.0.0.1:8099/graph META_OAUTH_BASE=http://127.0.0.1:8099/graph/dialog/oauth GOOGLE_AUTH_URL=http://127.0.0.1:8099/google/auth GOOGLE_TOKEN_URL=http://127.0.0.1:8099/google/token GOOGLE_API_BASE=http://127.0.0.1:8099/google GOOGLE_SHEETS_BASE=http://127.0.0.1:8099/google IG_POLL_MS=300 ANTHROPIC_BASE_URL=http://127.0.0.1:8099/anthropic
+export META_GRAPH_BASE=http://127.0.0.1:8099/graph META_OAUTH_BASE=http://127.0.0.1:8099/graph/dialog/oauth GOOGLE_AUTH_URL=http://127.0.0.1:8099/google/auth GOOGLE_TOKEN_URL=http://127.0.0.1:8099/google/token GOOGLE_API_BASE=http://127.0.0.1:8099/google GOOGLE_SHEETS_BASE=http://127.0.0.1:8099/google IG_POLL_MS=300
 # a suíte de integrações chama "php cron_integracoes.php <tarefa>": aqui o atalho chama o endpoint de cron do app Next
 cat > "$D/cron_integracoes.php" <<PHP
 <?php

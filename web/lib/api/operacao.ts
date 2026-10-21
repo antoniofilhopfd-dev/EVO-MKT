@@ -1,6 +1,5 @@
 import { Ctx } from '../ctx';
 import { verificarIntegridade } from '../integridade';
-import { gerarLegendas } from '../ia';
 import { rateCheck, rateFail } from '../auth';
 import { melhoresHorarios, proximasDatas, rankingConteudos, saudePorSegmento } from '../insights';
 import { listarNotificacoes } from '../notificacoes';
@@ -89,18 +88,6 @@ export async function operacaoRoute(c: Ctx) {
     if (b.todas) await run(`UPDATE notifications SET lida=1 WHERE ${dest}`, [String(u.nome)]);
     else if (ids.length) await run(`UPDATE notifications SET lida=1 WHERE id IN (${ids.map(() => '?').join(',')}) AND (${dest})`, [...ids, String(u.nome)]);
     return json({ ok: true });
-  }
-  if (path === '/ia/legenda' && c.method === 'POST') {
-    const u = await requireInternal(c);
-    const b = await c.body();
-    const mod = String(b.modulo ?? '');
-    if (!['conteudos', 'ideias', 'solicitacoes'].includes(mod)) fail(400, 'Módulo não permitido.');
-    const reg = (await getRow(mod, String(b.id ?? ''))) ?? fail(404, 'Registro não encontrado.');
-    await rateCheck('ia:' + u.codigo, 12); // no máximo 12 pedidos a cada 15 minutos por pessoa (custo e abuso)
-    await rateFail('ia:' + u.codigo);
-    const opcoes = await gerarLegendas(reg, String(b.instrucao ?? ''));
-    await audit(String(u.codigo), 'ia-legenda', mod, String(reg.id));
-    return json({ opcoes });
   }
   if (path === '/admin/integridade') {
     await requireAdmin(c);

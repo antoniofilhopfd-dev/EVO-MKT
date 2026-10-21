@@ -1,6 +1,6 @@
 # EVO MKT — Operação, configuração e procedimentos
 
-Complementa `DEPLOY_HOSTINGER.md` (publicação) e `GUIA_INTEGRACOES.md` (Meta, Google, IA).
+Complementa `DEPLOY_HOSTINGER.md` (publicação) e `GUIA_INTEGRACOES.md` (Meta e Google).
 
 ## 1. Instalação e execução local
 ```bash
@@ -16,7 +16,7 @@ Requisitos: Node ≥ 20 (testado com 22), MySQL/MariaDB. O disco do app é desca
 ## 2. Variáveis de ambiente
 Obrigatórias: `DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD SESSION_SECRET APP_KEY PUBLIC_URL`. Instalação: `SETUP_KEY` (**remover depois**). Recuperação de acesso: `RECOVERY_KEY` (**remover depois**).
 Opcionais: `NOTIFY_TO MAIL_FROM SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD` (e-mails), `CRON_SECRET` (cron), `TIMEZONE SESSION_HOURS BACKUP_KEEP MAX_UPLOAD_MB LOGIN_IP_MAX LOGIN_GLOBAL_MAX LOGIN_DELAY_MS`, `TRUSTED_PROXY_HOPS` (padrão 1), `FERIADOS`, `LIMITE_SOBRECARGA`, `ANTHROPIC_API_KEY IA_MODEL`, `DB_POOL`.
-Só para testes/simulação: `META_GRAPH_BASE META_OAUTH_BASE GOOGLE_* ANTHROPIC_BASE_URL MAIL_LOG IG_POLL_MS IG_POLL_TRIES`. Exemplo comentado em `.env.example`. A tela **Administração → Integrações → Prontidão** confere o que falta.
+Só para testes/simulação: `META_GRAPH_BASE META_OAUTH_BASE GOOGLE_* MAIL_LOG IG_POLL_MS IG_POLL_TRIES`. Exemplo comentado em `.env.example`. A tela **Administração → Integrações → Prontidão** confere o que falta.
 
 ## 3. Migrações
 `db/migrations/NNN_*.sql` são embutidas em `lib/migrations.generated.ts` (`npm run prebuild`) e aplicadas ao iniciar o app; o que já foi aplicado fica em `schema_migrations`. São idempotentes (`IF NOT EXISTS`; erros 1050/1060/1061/1091 tolerados). Nunca edite uma migração já aplicada em produção: crie a próxima. Testes: instalação nova (toda suíte) e **atualização de instalação existente com dados** (`tests/migracoes.test.js`, 7 verificações). Aplicadas hoje: 001 base · 002 acesso/integrações · 003 arquivos/backups · 004 índices · 005 log de backup · 006 histórico de status · 007 notificações · 008 publicações do Instagram · 009 links de aprovação · 010 comentários, checklists e snapshots de anúncios.
@@ -43,7 +43,7 @@ A interface esconde o que o perfil não usa, mas **não é a barreira**: `tests/
 - Restauração: valida → cria backup de segurança → aplica numa transação (falha desfaz tudo) → IDs nunca voltam atrás → sessões do Portal são encerradas. Testada em ambiente isolado (`backup.test.js`, 28 verificações, incluindo backup corrompido, adulterado, sem Gerência e anterior às tabelas novas). **Nunca teste sobre a produção.** Além disso, faça cópia do banco pelo phpMyAdmin.
 
 ## 7. Testes
-`tests/run-web.sh [suíte…]` (build de produção + MariaDB local + servidores simulados da Meta/Google/Anthropic). Suítes: `api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui ui2 ui3 ui4 ui5 ui6 ui7 ui8 ui9 ui10 contraste seguranca-estatica seguranca xss migracoes responsive`. Auditoria de dependências: `npm audit --omit=dev`.
+`tests/run-web.sh [suíte…]` (build de produção + MariaDB local + servidores simulados da Meta e do Google). Suítes: `api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui ui2 ui3 ui4 ui5 ui6 ui7 ui8 ui9 ui10 contraste seguranca-estatica seguranca xss migracoes responsive`. Auditoria de dependências: `npm audit --omit=dev`.
 
 ## 8. Procedimentos operacionais
 - **Rotina diária:** olhar *Visão geral → Central Operacional* (alertas, SLA, notificações). O resumo por e-mail chega pelo cron `/api/cron/alertas`.

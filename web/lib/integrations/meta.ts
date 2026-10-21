@@ -216,6 +216,7 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
   // Alcance, salvamentos e compartilhamentos das 30 publicações mais recentes (a Meta não traz isso na lista). Falha numa publicação não derruba a sincronização.
   // Visualizações, seguidores gerados e visitas ao perfil de cada post vêm em chamadas separadas (nem todo formato aceita todas as métricas) e o motivo de cada falha fica guardado.
   const colunas = { views: 'visualizacoes', follows: 'seguidores_novos', profile_visits: 'visitas_perfil' } as const;
+  const SQL_METRICA: Record<string, string> = { visualizacoes: 'UPDATE ig_posts SET visualizacoes=? WHERE media_id=?', seguidores_novos: 'UPDATE ig_posts SET seguidores_novos=? WHERE media_id=?', visitas_perfil: 'UPDATE ig_posts SET visitas_perfil=? WHERE media_id=?' };
   const st: Record<string, { ok: number; falhas: number; erro: string }> = { views: { ok: 0, falhas: 0, erro: '' }, follows: { ok: 0, falhas: 0, erro: '' }, profile_visits: { ok: 0, falhas: 0, erro: '' } };
   for (const md of media.slice(0, 30)) {
     try {
@@ -231,7 +232,7 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
         const rm = await metaGet(`/${md.id}/insights`, { metric: metrica });
         const x = (rm.data ?? []).find((m: Row) => m.name === metrica);
         const val = x ? Number(x.values?.[0]?.value ?? x.total_value?.value) : NaN;
-        if (Number.isFinite(val)) { await run(`UPDATE ig_posts SET ${coluna}=? WHERE media_id=?`, [val, String(md.id)]); st[metrica].ok++; }
+        if (Number.isFinite(val)) { await run(SQL_METRICA[coluna], [val, String(md.id)]); st[metrica].ok++; }
         else { st[metrica].falhas++; if (!st[metrica].erro) st[metrica].erro = 'A Meta respondeu sem esse número para a publicação.'; }
       } catch (e3: any) {
         if ((await setting('meta_token_invalido')) === '1') throw e3;

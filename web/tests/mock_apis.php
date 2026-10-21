@@ -15,19 +15,6 @@ if ($m !== 'GET' && !$in && $raw !== '' && !str_contains($_SERVER['CONTENT_TYPE'
 $S['calls'][] = "$m $p";
 if ($p === '/__reset') { $S = ['seq' => 0, 'containers' => [], 'published' => [], 'events' => [], 'folders' => [], 'files' => [], 'sheets' => [], 'values' => [], 'calls' => []]; j(['ok' => true]); }
 if ($p === '/__state') { j($S); }
-// ---------------- ANTHROPIC (simulado) ----------------
-if ($p === '/anthropic/v1/messages') {
-    $k = $_SERVER['HTTP_X_API_KEY'] ?? '';
-    if ($k !== 'sk-ant-teste') j(['type' => 'error', 'error' => ['type' => 'authentication_error', 'message' => 'invalid x-api-key']], 401);
-    $user = json_encode($in['messages'] ?? [], JSON_UNESCAPED_UNICODE);
-    $S['ia_ultimo'] = ['system' => $in['system'] ?? '', 'user' => $user, 'model' => $in['model'] ?? '', 'effort' => $in['output_config']['effort'] ?? ''];
-    $txt = str_contains($user, 'FORMATO_RUIM') ? 'não sei' : json_encode(['opcoes' => [
-        ['legenda' => 'Opção direta: matrículas abertas! [COMPLETAR: data limite]', 'hashtags' => ['#evolucao', '#matriculas', 'sem-hash']],
-        ['legenda' => 'Opção emocional para as famílias.', 'hashtags' => ['#familia']],
-        ['legenda' => 'Opção informativa.', 'hashtags' => []],
-        ['legenda' => 'Quarta opção descartada.', 'hashtags' => []]]]);
-    j(['id' => 'msg_test', 'type' => 'message', 'role' => 'assistant', 'model' => $in['model'] ?? '', 'content' => [['type' => 'text', 'text' => "```json\n$txt\n```"]], 'stop_reason' => 'end_turn', 'stop_sequence' => null, 'usage' => ['input_tokens' => 10, 'output_tokens' => 10]]);
-}
 // ---------------- META ----------------
 if (str_starts_with($p, '/graph')) {
     $g = substr($p, 6);

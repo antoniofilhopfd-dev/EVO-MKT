@@ -20,7 +20,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  [s]=await call('POST','/escolar/salvar',{titulo:'x'},E);t('a equipe tem acesso a cadastrar (dados inválidos dão 400, não 403)',s===400);
  [s]=await call('POST','/data?module=calescolar',base);t('o /data genérico não grava no calendário escolar (validação obrigatória)',s===400);
  [s]=await call('POST','/data?module=calescolar',base,E);t('nem a equipe pelo /data (403)',s===403);
- [s,r]=await call('GET','/escolar/painel',null,E);t('equipe consulta e também edita',s===200&&r.podeEditar===true&&r.opcoes.segmentos.length===7&&r.opcoes.tipos.length===10,r&&r.opcoes);
+ [s,r]=await call('GET','/escolar/painel',null,E);t('equipe consulta e também edita',s===200&&r.podeEditar===true&&r.opcoes.segmentos.length===8&&r.opcoes.tipos.length===10,r&&r.opcoes);
  t('não há nenhum evento fictício cadastrado de fábrica',r.rows.length===0);
 
  // ---- validação no servidor ----

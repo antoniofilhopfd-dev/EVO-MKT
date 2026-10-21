@@ -1,4 +1,4 @@
-// Link de aprovação sem login, NPS e rascunho de legendas com IA. Uso: node extras.test.js <install.out>
+// Link de aprovação sem login e NPS. Uso: node extras.test.js <install.out>
 const fs=require('fs');const {execFileSync}=require('child_process');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const B=(process.env.BASE||'http://127.0.0.1:8080')+'/api';
 let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',JSON.stringify(x).slice(0,600))};
@@ -63,25 +63,5 @@ const sql=q=>execFileSync('mariadb',['--default-character-set=utf8mb4','-uroot',
  t('indicador NPS: 1 promotor e 1 detrator = 0, com lista de origem',nps.valor===0&&nps.ids.includes(a)&&nps.ids.includes(b)&&r.tabelas.npsPorSegmento.some(x=>x.segmento==='Infantil'&&x.respostas>=2),nps);
  const lista=await (await fetch(B+'/portal/requests',{headers:P1})).json();t('o solicitante vê a própria resposta',lista.rows.find(x=>x.id===a).npsNota==='9');
 
- // =============== IA ===============
- const [,ct]=await call('POST','/data?module=conteudos',{titulo:'Matrículas 2027',segmento:'Infantil',formato:'Reels',perfil:'@evolucaopb'});
- [s,r]=await call('POST','/ia/legenda',{modulo:'conteudos',id:ct.id});t('sem chave configurada: 400 explicando',s===400&&/não está configurada/.test(r.error),r);
- [s]=await call('POST','/integrations/settings',{anthropic_key:'sk-ant-teste',ia_guia_voz:'Tom acolhedor e próximo das famílias.'});
- const stt=await call('GET','/integrations/status');
- t('a chave não volta para a tela; status mostra "configurada"',stt[1].ia.configurada===true&&!JSON.stringify(stt[1]).includes('sk-ant-teste'));
- t('a chave é guardada criptografada',!sql("SELECT v FROM integration_settings WHERE k='anthropic_key'").includes('sk-ant-teste'));
- [s,r]=await call('POST','/ia/legenda',{modulo:'conteudos',id:ct.id});
- t('gera 3 rascunhos (a 4ª é descartada) e filtra hashtags inválidas',s===200&&r.opcoes.length===3&&r.opcoes[0].hashtags.join()==='#evolucao,#matriculas'&&/COMPLETAR/.test(r.opcoes[0].legenda),r);
- const ms=await (await fetch('http://127.0.0.1:8099/__state')).json();
- t('a chamada leva o guia de voz, a ficha do conteúdo, o modelo e esforço baixo',/Tom acolhedor/.test(ms.ia_ultimo.system)&&/Matrículas 2027/.test(ms.ia_ultimo.user)&&ms.ia_ultimo.model==='claude-opus-5-5'&&ms.ia_ultimo.effort==='low',ms.ia_ultimo);
- [s]=await call('POST','/ia/legenda',{modulo:'tarefas',id:'TAR-0001'});t('módulo não permitido: 400',s===400);
- [s]=await call('POST','/ia/legenda',{modulo:'conteudos',id:ct.id},P1);t('Portal não usa a IA',[401,403].includes(s));
- const [,ruim]=await call('POST','/data?module=conteudos',{titulo:'FORMATO_RUIM'});
- [s,r]=await call('POST','/ia/legenda',{modulo:'conteudos',id:ruim.id});t('resposta da IA fora do formato: 502 com mensagem clara',s===502&&/formato/.test(r.error),r);
- await call('POST','/integrations/settings',{anthropic_key:'chave-errada'});
- [s,r]=await call('POST','/ia/legenda',{modulo:'conteudos',id:ct.id});t('chave inválida: 502 sem vazar detalhes sensíveis',s===502&&!/chave-errada/.test(JSON.stringify(r)),r);
- await call('POST','/integrations/settings',{anthropic_key:'sk-ant-teste'});
- let limite=0;for(let i=0;i<15;i++){const [x]=await call('POST','/ia/legenda',{modulo:'conteudos',id:ct.id},E);if(x===429){limite=i;break}}
- t('limite de pedidos por pessoa (429 depois de 12)',limite>=10&&limite<=13,limite);
  console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

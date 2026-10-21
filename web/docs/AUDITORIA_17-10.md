@@ -30,3 +30,6 @@ Legenda: **Impl.** implementado e testado com o mock · **Parcial** · **Ext.** 
 - Suítes aposentadas (telas fora da navegação) estão em `tests/obsoletos/` e não rodam.
 - Cobertura de interface que **não** existe para o novo Gerenciador: edição, duplicação e lote contra a Meta (só rota, com o simulador). Nada disso foi exercitado na Meta real.
 - Capturas reais (ambiente de teste com simulador da Meta): `docs/screenshots/v5.17/`.
+
+## Legenda por IA removida (21/10/2026)
+A geração de legendas por IA (rota `/ia/legenda`, botões nos Conteúdos e no Estúdio, cartão em Integrações, chave da Anthropic e dependência `@anthropic-ai/sdk`) foi retirada a pedido. Os modelos de legenda manuais continuam.

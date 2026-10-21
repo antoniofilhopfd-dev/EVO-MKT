@@ -15,7 +15,6 @@
     "gerar:segredos": "node scripts/gerar-segredos.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0",
     "@types/node": "^22.0.0",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.0.0",

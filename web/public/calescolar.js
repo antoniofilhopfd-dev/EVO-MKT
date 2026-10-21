@@ -7,7 +7,7 @@ const ESC_TIPOS=[
  {k:'CULTURAL',rotulo:'Apresentação cultural',glifo:'♪'},{k:'SOLENIDADE',rotulo:'Formatura / solenidade',glifo:'✦'},{k:'INSTITUCIONAL',rotulo:'Atividade institucional',glifo:'▣'},
  {k:'OUTRO',rotulo:'Outra atividade oficial',glifo:'▪'},
 ];
-const ESC_SEG_CURTO={TODOS:'Toda a escola',INFANTIL:'Infantil',FUND1:'Anos Iniciais',FUND2:'Anos Finais',MEDIO:'Ensino Médio',ADMIN:'Administrativo',DIRECAO:'Direção'};
+const ESC_SEG_CURTO={TODOS:'Toda a escola',INFANTIL:'Infantil',ANO1:'1º ano',FUND1:'2º ao 5º ano',FUND2:'Anos Finais',MEDIO:'Ensino Médio',ADMIN:'Administrativo',DIRECAO:'Direção'};
 let ESC_OPC={segmentos:[],tipos:[],acoes:[]},ESC_PODE=false;
 const escPost=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
 const escSegs=e=>String(e.segmentos||'TODOS').split('|').filter(Boolean);

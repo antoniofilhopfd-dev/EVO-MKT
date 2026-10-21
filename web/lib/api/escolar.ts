@@ -13,7 +13,8 @@ import { criarSolicitacaoInterna } from './solicitacoes';
 export const SEGMENTOS_ESCOLARES: [string, string][] = [
   ['TODOS', 'Toda a escola'],
   ['INFANTIL', 'Educação Infantil — Maternais e Jardins'],
-  ['FUND1', 'Ensino Fundamental — Anos Iniciais (1º ao 5º ano)'],
+  ['ANO1', '1º ano'],
+  ['FUND1', 'Ensino Fundamental (2º ao 5º ano)'],
   ['FUND2', 'Ensino Fundamental — Anos Finais (6º ao 9º ano)'],
   ['MEDIO', 'Ensino Médio (1ª à 3ª série)'],
   ['ADMIN', 'Administrativo'],
@@ -25,7 +26,7 @@ export const TIPOS_ESCOLARES: [string, string][] = [
   ['SOLENIDADE', 'Formatura / solenidade'], ['INSTITUCIONAL', 'Atividade institucional'], ['OUTRO', 'Outra atividade oficial'],
 ];
 /** Segmento do módulo Solicitações correspondente (as que não têm correspondente ficam sem segmento). */
-const SEGMENTO_SOLICITACAO: Record<string, string> = { INFANTIL: 'Infantil', FUND1: 'Anos Iniciais', FUND2: 'Anos Finais', MEDIO: 'Ensino Médio' };
+const SEGMENTO_SOLICITACAO: Record<string, string> = { INFANTIL: 'Infantil', ANO1: 'Anos Iniciais', FUND1: 'Anos Iniciais', FUND2: 'Anos Finais', MEDIO: 'Ensino Médio' };
 const ACOES: Record<string, { rotulo: string; antecedenciaDias: number }> = {
   cobertura_foto: { rotulo: 'Cobertura fotográfica', antecedenciaDias: 0 },
   video: { rotulo: 'Produção de vídeo', antecedenciaDias: 0 },

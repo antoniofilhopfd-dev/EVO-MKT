@@ -118,7 +118,7 @@ async function studioCompositor(row,dataIni=''){
    ${igContas.length>1?`<label>Conta do Instagram<select id="sfConta">${igContas.map(c=>`<option value="${attr(c.ig)}" ${(r.contaInstagram||igConta)===c.ig?'selected':''}>@${esc(c.usuario)}</option>`).join('')}</select></label>`:''}
    <div class="st-row"><label>Perfil<select id="sfPerfil">${perfis.map(p=>`<option ${r.perfil===p?'selected':''}>${esc(p)}</option>`).join('')}</select></label><label>Formato<select id="sfFormato">${formatos.map(f=>`<option ${(r.formato||'Feed')===f?'selected':''}>${esc(f)}</option>`).join('')}</select></label></div>
    <label>Legenda <span class="st-cont" id="sfCLeg"></span><textarea id="sfLegenda" rows="6" placeholder="Escreva a legenda…">${esc(r.legenda||'')}</textarea></label>
-   <div class="st-ia"><button type="button" class="softbtn" id="sfIA">✦ Sugerir legendas com IA</button> <button type="button" class="softbtn" id="sfMod">❏ Modelos de legenda</button><small class="kpi-note">As 125 primeiras letras aparecem antes do "mais".</small></div>
+   <div class="st-ia"><button type="button" class="softbtn" id="sfMod">❏ Modelos de legenda</button><small class="kpi-note">As 125 primeiras letras aparecem antes do "mais".</small></div>
    <label>Hashtags <span class="st-cont" id="sfCTag"></span><textarea id="sfTags" rows="2" placeholder="#evolução #colégio">${esc(r.hashtags||'')}</textarea></label>
    <div class="st-grupos" id="sfGrupos"></div>
    <label>Chamada para ação (CTA)<input id="sfCta" maxlength="160" value="${attr(r.cta||'')}" placeholder="Ex.: Link na bio para se inscrever"></label>
@@ -206,12 +206,6 @@ async function studioCompositor(row,dataIni=''){
       ov.el.querySelectorAll('[data-md]').forEach(b=>b.onclick=async()=>{if(!confirm('Excluir este modelo?'))return;lista.splice(+b.dataset.md,1);try{await salva(lista);desenha()}catch(e){toast(e.message,'bad')}});
       ov.el.querySelector('#mdNovo').onclick=async()=>{const leg=g('sfLegenda').value.trim();if(!leg)return toast('Escreva a legenda primeiro','warn');const nome=(prompt('Nome do modelo (ex.: Matrículas abertas)')||'').trim();if(!nome)return;lista.push({nome,legenda:leg,cta:g('sfCta').value,hashtags:g('sfTags').value});try{await salva(lista);desenha();toast('Modelo salvo')}catch(e){toast(e.message,'bad')}};
     };desenha();
-  };
-  g('sfIA').onclick=async()=>{
-    if(!edit)return toast('Salve o rascunho primeiro; a IA usa os dados do post salvo.','warn');
-    try{const d=await api('/ia/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modulo:'conteudos',id:r.id})});
-      const ov=adminOverlay(`<h3>Rascunhos de legenda</h3><p class="kpi-note">Revise antes de usar.</p><div class="origem-list">${d.opcoes.map((x,i)=>`<div class="notif"><div style="white-space:pre-wrap">${esc(x.legenda)}</div><small>${esc(x.hashtags.join(' '))}</small><div><button class="softbtn" data-usar="${i}">Usar esta</button></div></div>`).join('')}</div><div class="actions"><button class="btn soft" data-close>Fechar</button></div>`);
-      ov.el.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{const x=d.opcoes[+b.dataset.usar];g('sfLegenda').value=x.legenda;if(x.hashtags.length)g('sfTags').value=x.hashtags.join(' ');pv();ov.close()})}catch(e){toast(e.message,'warn')}
   };
   if(g('sfLink'))g('sfLink').onclick=async()=>{
     try{const d=await api('/manager/approval-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:r.id,dias:7})});
