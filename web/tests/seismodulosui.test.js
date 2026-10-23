@@ -267,5 +267,12 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
   await ir(p,'calendario');await p.click('text=Mês');await p.waitForTimeout(1200);
   const nv=await p.$$eval('.cm-item',e=>e.filter(x=>/Viagem de Duda/.test(x.innerText)).length);
   t('evento de mais de um dia aparece em todos os dias do calendário (10 a 13 = 4 dias)',nv===4,nv)}
+ await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ await ir(p,'gerenciador');await p.click('[data-niv="campanha"]');await p.waitForTimeout(600);
+ const idEd=await p.$eval('#tpWrap tbody tr[data-id]',e=>e.dataset.id);
+ await p.hover('#tpWrap tbody tr[data-id]');await p.click(`#tpWrap tr[data-id="${idEd}"] td[data-k="nome"] [data-ed]`);
+ await p.fill('.tp-inline','Nome editado na linha');await p.keyboard.press('Enter');await p.waitForTimeout(1200);
+ const nomeNovo=await (async()=>{const st=await (await fetch('http://127.0.0.1:8099/__state')).json();return JSON.stringify((st.edits||{})[idEd]||[])})();
+ t('editar o nome direto na linha (lápis + Enter) grava na Meta',/Nome editado na linha/.test(nomeNovo),nomeNovo);
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

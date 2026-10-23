@@ -118,3 +118,6 @@
 .tp-tab [data-n]{text-align:right}.tp-tab thead [data-n] .tf-ord{text-align:right}.tp-tab td{white-space:nowrap}.tp-tab td:nth-child(2){white-space:normal}.tp-tab tbody td{padding-top:12px;padding-bottom:12px}
 
 .tp-modo-aviso{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#FFF7ED;border:1px solid #FFD7B0;border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:13px}
+
+.tp-tab .tp-inline{width:100%;min-width:0;padding:6px 8px}.tp-tab td[data-k="nome"],.tp-tab td[data-k="orcamento"]{cursor:text}
+.tp-ed{opacity:0;border:0;background:none;color:var(--info,#0A53D6);cursor:pointer;font-size:13px;padding:0 4px;margin-left:4px}.tp-tab tr:hover .tp-ed,.tp-ed:focus{opacity:1}

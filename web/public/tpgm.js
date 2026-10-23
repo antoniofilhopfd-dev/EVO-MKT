@@ -116,7 +116,7 @@ function tpRodape(lista,cols){
   return `<tr class="tot"><td class="tp-ck"></td>${cols.map((c,i)=>`<td ${tpFixaStyle(c,cols)}>${i===0?`Total de ${lista.length} ${GM2.nivel==='campanha'?'campanha(s)':GM2.nivel==='conjunto'?'conjunto(s)':'anúncio(s)'}`:(c.k in fmt&&v[c.k]!==null&&v[c.k]!==undefined?esc(fmt[c.k](v[c.k])):'')}</td>`).join('')}<td></td></tr>`;
 }
 let TP_NUMS=new Set();
-function tpFixaStyle(c,cols){return tpFixaStyle0(c,cols)+(TP_NUMS.has(c.k)?' data-n="1"':'')}
+function tpFixaStyle(c,cols){return tpFixaStyle0(c,cols)+(TP_NUMS.has(c.k)?' data-n="1"':'')+` data-k="${c.k}"`}
 function tpFixaStyle0(c,cols){
   const fix=tpCfgN().fixas||[];if(!fix.includes(c.k))return `style="min-width:${tpLarg(c)}px;width:${tpLarg(c)}px"`;
   let left=40;for(const o of cols){if(o.k===c.k)break;if(fix.includes(o.k))left+=tpLarg(o)}
@@ -128,7 +128,7 @@ function tpTabelaHtml(){
   const th=c=>`<th scope="col" ${tpFixaStyle(c,cols)} aria-sort="${GM2.ordem.k===c.k?(GM2.ordem.d>0?'ascending':'descending'):'none'}"><button type="button" class="tf-ord" data-ord2="${c.k}">${esc(c.r)}${GM2.ordem.k===c.k?(GM2.ordem.d>0?' ▲':' ▼'):''}</button><i class="tp-rz" data-rz="${c.k}" aria-hidden="true"></i></th>`;
   const todos=lista.length&&lista.every(x=>GM2.sel.has(x.id));
   return `<div class="tablewrap tp-wrap" id="tpWrap"><table class="datatable gm-tab tp-tab"><thead><tr><th class="tp-ck"><input type="checkbox" id="tpTodos" aria-label="Selecionar todos" ${todos?'checked':''}></th>${cols.map(th).join('')}<th class="tp-ac">Ações</th></tr></thead>
-   <tbody>${lista.map(x=>`<tr data-id="${attr(x.id)}" class="${GM2.sel.has(x.id)?'sel':''}"><td class="tp-ck"><input type="checkbox" data-sel2="${attr(x.id)}" aria-label="Selecionar ${attr(x.nome)}" ${GM2.sel.has(x.id)?'checked':''}></td>${cols.map(c=>`<td ${tpFixaStyle(c,cols)}>${c.h(x,GM2.nivel)}</td>`).join('')}<td class="tp-ac"><button type="button" class="softbtn" data-painel="${attr(x.id)}">Detalhes</button></td></tr>`).join('')||`<tr><td colspan="${cols.length+2}" class="empty compact">Nada encontrado com estes filtros.</td></tr>`}</tbody>
+   <tbody>${lista.map(x=>`<tr data-id="${attr(x.id)}" class="${GM2.sel.has(x.id)?'sel':''}"><td class="tp-ck"><input type="checkbox" data-sel2="${attr(x.id)}" aria-label="Selecionar ${attr(x.nome)}" ${GM2.sel.has(x.id)?'checked':''}></td>${cols.map(c=>`<td ${tpFixaStyle(c,cols)}>${c.h(x,GM2.nivel)}${adsCompleto&&(c.k==='nome'||(c.k==='orcamento'&&x.orcamento&&x.orcamento.diario))?'<button type="button" class="tp-ed" data-ed title="Editar aqui (ou dê dois cliques)" aria-label="Editar aqui">✎</button>':''}</td>`).join('')}<td class="tp-ac"><button type="button" class="softbtn" data-painel="${attr(x.id)}">Detalhes</button></td></tr>`).join('')||`<tr><td colspan="${cols.length+2}" class="empty compact">Nada encontrado com estes filtros.</td></tr>`}</tbody>
    <tfoot>${tpRodape(lista,cols)}</tfoot></table></div>`;
 }
 function tpBarraSel(){
@@ -168,7 +168,23 @@ function tpRedesenhaTabela(){
   $('#tpTabBox').innerHTML=tpTabelaHtml();$('#tpLoteBox').innerHTML=tpBarraSel();tpLigaTabela();tpLigaLote();
   const n=$('#tpWrap');if(n){n.scrollLeft=sl;n.scrollTop=st}
 }
+/** Edição direto na tabela: duplo clique no nome ou no orçamento diário, Enter salva, Esc cancela. */
+function tpEditaCelula(td){
+  const tr=td.closest('tr[data-id]');if(!tr||!adsCompleto)return;const [o,n]=gmAchar(tr.dataset.id);if(!o)return;
+  const k=td.dataset.k;let valor,campo;
+  if(k==='nome'){valor=o.nome;campo='nome'}
+  else if(k==='orcamento'){if(!o.orcamento||!o.orcamento.diario)return toast('Só dá para editar aqui o orçamento diário. Os demais, pelo botão Detalhes.','warn');valor=o.orcamento.diario;campo='orcamentoDia'}
+  else return;
+  const antes=td.innerHTML,inp=document.createElement('input');inp.className='control tp-inline';inp.value=String(valor);inp.setAttribute('aria-label',campo==='nome'?'Novo nome':'Novo orçamento diário');if(campo==='orcamentoDia'){inp.type='number';inp.min='6';inp.step='0.01'}
+  td.innerHTML='';td.appendChild(inp);inp.focus();inp.select();let feito=false;
+  const sai=async salvar=>{if(feito)return;feito=true;const v=inp.value.trim();
+    if(!salvar||v===String(valor)||!v){td.innerHTML=antes;return}
+    try{await gmPost('/ads/editar',{nivel:n,id:o.id,campos:{[campo]:campo==='nome'?v:Number(v)}});if(campo==='nome')o.nome=v;else o.orcamento={...o.orcamento,diario:Number(v)};toast('Alterado na Meta');tpRedesenhaTabela()}catch(e){td.innerHTML=antes;toast(e.message,'bad')}};
+  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();sai(true)}else if(e.key==='Escape'){e.preventDefault();sai(false)}};inp.onblur=()=>sai(true);
+}
 function tpLigaTabela(){
+  const w=$('#tpWrap');if(w)w.onclick=e=>{const b=e.target.closest('[data-ed]');if(b)tpEditaCelula(b.closest('td[data-k]'))};
+  if(w)w.ondblclick=e=>{const td=e.target.closest('td[data-k]');if(td&&!e.target.closest('button,a,input,label'))tpEditaCelula(td)};
   $$('[data-ord2]').forEach(b=>b.onclick=()=>{const k=b.dataset.ord2;GM2.ordem=GM2.ordem.k===k?{k,d:-GM2.ordem.d}:{k,d:['nome','estado','inicio','criado','fim'].includes(k)?1:-1};tpRedesenhaTabela()});
   $$('[data-sel2]').forEach(i=>i.onclick=e=>{i._sh=e.shiftKey});
   $$('[data-sel2]').forEach(i=>i.onchange=()=>{const ids=GM2.lista.map(x=>x.id),a=ids.indexOf(GM2._ult),b=ids.indexOf(i.dataset.sel2);GM2._ult=i.dataset.sel2;if(i._sh&&a>=0&&b>=0&&a!==b){i._sh=false;ids.slice(Math.min(a,b),Math.max(a,b)+1).forEach(id=>i.checked?GM2.sel.add(id):GM2.sel.delete(id));return tpRedesenhaTabela()}i.checked?GM2.sel.add(i.dataset.sel2):GM2.sel.delete(i.dataset.sel2);i.closest('tr').classList.toggle('sel',i.checked);$('#tpLoteBox').innerHTML=tpBarraSel();tpLigaLote();const t=$('#tpTodos');if(t)t.checked=GM2.lista.length&&GM2.lista.every(x=>GM2.sel.has(x.id))});
