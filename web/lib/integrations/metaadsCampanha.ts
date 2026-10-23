@@ -39,6 +39,30 @@ export const OBJETIVOS: Record<string, Objetivo> = {
 export const MENSAGENS: Record<string, string> = { DIRECT: 'INSTAGRAM_DIRECT', MESSENGER: 'MESSENGER', WHATSAPP: 'WHATSAPP' };
 export const CTAS = ['LEARN_MORE', 'SIGN_UP', 'CONTACT_US', 'APPLY_NOW', 'GET_QUOTE', 'SHOP_NOW', 'INSTALL_MOBILE_APP', 'MESSAGE_PAGE', 'INSTAGRAM_MESSAGE', 'WHATSAPP_MESSAGE', 'NO_BUTTON'];
 export const PLATAFORMAS = ['instagram', 'facebook', 'messenger', 'audience_network'];
+/** Posições de cada plataforma, como no Gerenciador da Meta. Sem posição marcada numa plataforma = todas as posições dela. */
+export const POSICOES: Record<string, { campo: string; opcoes: [string, string][] }> = {
+  facebook: { campo: 'facebook_positions', opcoes: [['feed', 'Feed'], ['video_feeds', 'Feed de vídeos'], ['marketplace', 'Marketplace'], ['story', 'Stories'], ['facebook_reels', 'Reels'], ['right_hand_column', 'Coluna da direita'], ['search', 'Resultados da busca'], ['instream_video', 'Vídeos in-stream']] },
+  instagram: { campo: 'instagram_positions', opcoes: [['stream', 'Feed'], ['story', 'Stories'], ['reels', 'Reels'], ['explore', 'Explorar'], ['explore_home', 'Início do Explorar'], ['profile_feed', 'Feed do perfil'], ['ig_search', 'Busca']] },
+  messenger: { campo: 'messenger_positions', opcoes: [['messenger_home', 'Caixa de entrada'], ['story', 'Stories'], ['sponsored_messages', 'Mensagens patrocinadas']] },
+  audience_network: { campo: 'audience_network_positions', opcoes: [['classic', 'Nativo, banner e intersticial'], ['rewarded_video', 'Vídeo premiado']] },
+};
+/** Aplica {plataforma: [posições]} ao targeting. Plataforma com lista vazia usa todas as posições; objeto vazio volta ao automático. */
+export function aplicarPosicoes(t: Row, pos: unknown): void {
+  if (typeof pos !== 'object' || pos === null || Array.isArray(pos)) throw new Error('Posicionamentos inválidos.');
+  for (const p of Object.values(POSICOES)) delete t[p.campo];
+  const lista = Object.entries(pos as Row);
+  if (!lista.length) { delete t.publisher_platforms; return; }
+  const plats = new Set<string>(Array.isArray(t.publisher_platforms) ? (t.publisher_platforms as string[]) : []);
+  for (const [plat, vals] of lista) {
+    const def = POSICOES[plat];
+    if (!def || !Array.isArray(vals)) throw new Error('Plataforma de veiculação inválida.');
+    const validos = def.opcoes.map((o) => o[0]);
+    if (vals.some((v) => !validos.includes(String(v)))) throw new Error(`Posição inválida em ${plat}.`);
+    plats.add(plat);
+    if (vals.length && vals.length < validos.length) t[def.campo] = vals.map(String);
+  }
+  t.publisher_platforms = [...plats];
+}
 export const EVENTOS = ['PURCHASE', 'LEAD', 'COMPLETE_REGISTRATION', 'CONTACT', 'SUBMIT_APPLICATION', 'ADD_TO_CART', 'INITIATE_CHECKOUT', 'VIEW_CONTENT', 'OTHER'];
 
 export interface Spec {
@@ -248,7 +272,7 @@ export async function opcoesCampanha(): Promise<Row> {
   const seguro = async <T>(f: () => Promise<T>, vazio: T): Promise<T> => { try { return await f(); } catch { return vazio; } };
   return {
     objetivos: Object.fromEntries(Object.entries(OBJETIVOS).map(([k, o]) => [k, { rotulo: o.rotulo, ajuda: o.ajuda, metas: Object.fromEntries(Object.entries(o.metas).map(([mk, m]) => [mk, { rotulo: m.rotulo, ajuda: m.ajuda, exige: m.exige, criativos: m.criativos, cta: m.cta ?? '' }])) }])),
-    ctas: CTAS, eventos: EVENTOS, plataformas: PLATAFORMAS,
+    ctas: CTAS, eventos: EVENTOS, plataformas: PLATAFORMAS, posicoes: POSICOES,
     pixels: await seguro(async () => (await paginar(`/act_${conta}/adspixels`, { fields: 'id,name', limit: 50 }, 2)).map((p) => ({ id: String(p.id), nome: String(p.name ?? p.id) })), []),
     publicos: await seguro(async () => (await paginar(`/act_${conta}/customaudiences`, { fields: 'id,name,approximate_count_lower_bound', limit: 100 }, 2)).map((p) => ({ id: String(p.id), nome: String(p.name ?? p.id) })), []),
     formularios: await seguro(async () => (await paginar(`/${await paginaDoInstagram()}/leadgen_forms`, { fields: 'id,name,status', limit: 100 }, 2)).filter((f) => !f.status || f.status === 'ACTIVE').map((f) => ({ id: String(f.id), nome: String(f.name ?? f.id) })), []),

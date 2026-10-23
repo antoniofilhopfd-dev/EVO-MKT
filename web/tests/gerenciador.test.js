@@ -68,6 +68,9 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  // edição ampliada do conjunto (o que o Gerenciador da Meta também edita)
  [s]=await ed('conjunto','s1',{genero:'mulheres',plataformas:['instagram'],interesses:[{id:'6003107902433',nome:'Educação infantil'}],publicosPersonalizados:['CA1'],cidade:'João Pessoa'});const tg2=JSON.parse(((await edits('s1')).filter(e=>e.targeting).pop()||{targeting:'{}'}).targeting);
  t('editar público: gênero, plataforma, interesse, público personalizado e cidade',s===200&&JSON.stringify(tg2.genders)==='[2]'&&JSON.stringify(tg2.publisher_platforms)==='["instagram"]'&&tg2.flexible_spec[0].interests[0].id==='6003107902433'&&tg2.custom_audiences[0].id==='CA1'&&tg2.geo_locations.cities[0].key==='2430536',tg2);
+ [s]=await ed('conjunto','s1',{posicoes:{facebook:['feed','story'],instagram:['reels']}});const tgP=JSON.parse(((await edits('s1')).filter(e=>e.targeting).pop()||{targeting:'{}'}).targeting);
+ t('posicionamentos manuais por posição (Facebook Feed/Stories, Instagram Reels)',s===200&&JSON.stringify(tgP.facebook_positions)==='["feed","story"]'&&JSON.stringify(tgP.instagram_positions)==='["reels"]'&&tgP.publisher_platforms.includes('facebook')&&tgP.publisher_platforms.includes('instagram'),tgP);
+ [s,r]=await ed('conjunto','s1',{posicoes:{instagram:['xyz']}});t('posição inválida no editar é recusada',s===400&&/inválid/i.test(r.error),r);
  [s]=await ed('conjunto','s1',{genero:'todos',plataformas:[],interesses:[],publicosPersonalizados:[]});const tg3=JSON.parse(((await edits('s1')).filter(e=>e.targeting).pop()||{targeting:'{}'}).targeting);
  t('limpar gênero, plataformas (automático), interesses e públicos personalizados',s===200&&tg3.genders===undefined&&tg3.publisher_platforms===undefined&&tg3.flexible_spec===undefined&&tg3.custom_audiences===undefined,tg3);
  [s]=await ed('conjunto','s1',{plataformas:['tiktok']});t('plataforma inválida é recusada',s===400);

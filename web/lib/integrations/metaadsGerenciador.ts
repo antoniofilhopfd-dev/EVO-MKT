@@ -6,6 +6,7 @@ import { fmtDate, now, parseLocal, Row } from '../util';
 import { ContaAds, paginar } from './metaads';
 import { cfgGestao, resolverCidade } from './metaadsGestao';
 import { metaConnected, metaGet, metaPost } from './meta';
+import { aplicarPosicoes } from './metaadsCampanha';
 
 /**
  * Gerenciador de Anúncios (Etapa A): lê TODA a conta (campanhas, conjuntos e anúncios, não só o que o sistema lançou) e permite editar.
@@ -102,7 +103,7 @@ export async function arvore(de: string, ate: string, arquivados = false): Promi
   const objDe = new Map(camp.map((c) => [String(c.id), String(c.objective ?? '')]));
   const goalDe = new Map(conj.map((c) => [String(c.id), String(c.optimization_goal ?? '')]));
   const orc = (o: Row) => ({ diario: o.daily_budget ? deMenor(o.daily_budget, moeda) : null, total: o.lifetime_budget ? deMenor(o.lifetime_budget, moeda) : null });
-  const pub = (t: Row) => ({ idadeMin: t?.age_min ?? null, idadeMax: t?.age_max ?? null, cidades: (t?.geo_locations?.cities ?? []).map((c: Row) => ({ key: String(c.key), nome: String(c.name ?? ''), raioKm: num(c.radius) })), plataformas: t?.publisher_platforms ?? [], posicionamentos: [...(t?.facebook_positions ?? []).map((x: string) => 'fb:' + x), ...(t?.instagram_positions ?? []).map((x: string) => 'ig:' + x)], generos: (t?.genders ?? []).map((g: number) => (g === 1 ? 'Homens' : g === 2 ? 'Mulheres' : String(g))), regioes: (t?.geo_locations?.regions ?? []).map((r: Row) => String(r.name ?? r.key ?? '')), paises: t?.geo_locations?.countries ?? [], interesses: (t?.flexible_spec ?? []).flatMap((f: Row) => f.interests ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.name ?? i.id) })), personalizados: (t?.custom_audiences ?? []).map((a: Row) => ({ id: String(a.id), nome: String(a.name ?? a.id) })) });
+  const pub = (t: Row) => ({ idadeMin: t?.age_min ?? null, idadeMax: t?.age_max ?? null, cidades: (t?.geo_locations?.cities ?? []).map((c: Row) => ({ key: String(c.key), nome: String(c.name ?? ''), raioKm: num(c.radius) })), plataformas: t?.publisher_platforms ?? [], posicionamentos: [...(t?.facebook_positions ?? []).map((x: string) => 'fb:' + x), ...(t?.instagram_positions ?? []).map((x: string) => 'ig:' + x), ...(t?.messenger_positions ?? []).map((x: string) => 'ms:' + x), ...(t?.audience_network_positions ?? []).map((x: string) => 'an:' + x)], posicoes: { facebook: t?.facebook_positions ?? [], instagram: t?.instagram_positions ?? [], messenger: t?.messenger_positions ?? [], audience_network: t?.audience_network_positions ?? [] }, generos: (t?.genders ?? []).map((g: number) => (g === 1 ? 'Homens' : g === 2 ? 'Mulheres' : String(g))), regioes: (t?.geo_locations?.regions ?? []).map((r: Row) => String(r.name ?? r.key ?? '')), paises: t?.geo_locations?.countries ?? [], interesses: (t?.flexible_spec ?? []).flatMap((f: Row) => f.interests ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.name ?? i.id) })), personalizados: (t?.custom_audiences ?? []).map((a: Row) => ({ id: String(a.id), nome: String(a.name ?? a.id) })) });
   const anuncios = anun.map((x) => ({ id: String(x.id), nome: String(x.name ?? ''), adset: String(x.adset_id ?? ''), campanha: String(x.campaign_id ?? ''), status: String(x.status ?? ''), estado: String(x.effective_status ?? x.status ?? ''), foto: /^https:\/\//.test(String(x.creative?.thumbnail_url ?? '')) ? String(x.creative.thumbnail_url) : '', criado: String(x.created_time ?? ''), atualizado: String(x.updated_time ?? ''), criativo: criativoDe(x.creative), ...metricas(iAn.get(String(x.id)), objDe.get(String(x.campaign_id)) ?? '', goalDe.get(String(x.adset_id)) ?? '') }));
   const conjuntos = conj.map((x) => ({
     id: String(x.id), nome: String(x.name ?? ''), campanha: String(x.campaign_id ?? ''), status: String(x.status ?? ''), estado: String(x.effective_status ?? x.status ?? ''), orcamento: orc(x), inicio: String(x.start_time ?? ''), fim: String(x.end_time ?? ''),
@@ -152,7 +153,7 @@ const dataIso = (v: string, nome: string) => {
   return d.toISOString();
 };
 
-export interface Campos { nome?: string; status?: string; orcamentoDia?: number; orcamentoTotal?: number; inicio?: string; fim?: string; idadeMin?: number; idadeMax?: number; raioKm?: number; cidade?: string; genero?: string; plataformas?: string[]; interesses?: { id: string; nome: string }[]; publicosPersonalizados?: string[]; lance?: { tipo?: string; valor?: number }; criativo?: { texto?: string; titulo?: string; descricao?: string; cta?: string; link?: string } }
+export interface Campos { posicoes?: Record<string, string[]>; nome?: string; status?: string; orcamentoDia?: number; orcamentoTotal?: number; inicio?: string; fim?: string; idadeMin?: number; idadeMax?: number; raioKm?: number; cidade?: string; genero?: string; plataformas?: string[]; interesses?: { id: string; nome: string }[]; publicosPersonalizados?: string[]; lance?: { tipo?: string; valor?: number }; criativo?: { texto?: string; titulo?: string; descricao?: string; cta?: string; link?: string } }
 
 export async function editarObjeto(nivel: Nivel, id: string, c: Campos, confirmou: boolean, quem: string): Promise<Row> {
   if (!NIVEIS.includes(nivel)) throw new Error('Nível inválido.');
@@ -198,7 +199,7 @@ export async function editarObjeto(nivel: Nivel, id: string, c: Campos, confirmo
       if (new Date(String(pedido[k])).getTime() - Date.now() > cfg.diasMax * 86400000 + 86400000 && nivel === 'conjunto') throw new Error(`O término passa da duração máxima (${cfg.diasMax} dias).`);
     }
   }
-  const mexeuPublico = c.idadeMin !== undefined || c.idadeMax !== undefined || c.raioKm !== undefined || c.cidade !== undefined || c.genero !== undefined || c.plataformas !== undefined || c.interesses !== undefined || c.publicosPersonalizados !== undefined;
+  const mexeuPublico = c.idadeMin !== undefined || c.idadeMax !== undefined || c.raioKm !== undefined || c.cidade !== undefined || c.genero !== undefined || c.plataformas !== undefined || c.posicoes !== undefined || c.interesses !== undefined || c.publicosPersonalizados !== undefined;
   if (nivel === 'conjunto' && mexeuPublico) {
     const t: Row = JSON.parse(JSON.stringify(atual.targeting ?? {}));
     const a = c.idadeMin ?? t.age_min ?? cfg.publico.idadeMin, z = c.idadeMax ?? t.age_max ?? cfg.publico.idadeMax;
@@ -222,6 +223,7 @@ export async function editarObjeto(nivel: Nivel, id: string, c: Campos, confirmo
       if (!Array.isArray(c.plataformas) || c.plataformas.some((x) => !['instagram', 'facebook', 'messenger', 'audience_network'].includes(x))) throw new Error('Plataforma de veiculação inválida.');
       if (c.plataformas.length) t.publisher_platforms = c.plataformas; else { delete t.publisher_platforms; delete t.facebook_positions; delete t.instagram_positions; } // vazio = posicionamentos automáticos
     }
+    if (c.posicoes !== undefined) aplicarPosicoes(t, c.posicoes);
     if (c.interesses !== undefined) {
       if (!Array.isArray(c.interesses) || c.interesses.length > 20) throw new Error('Até 20 interesses.');
       if (c.interesses.length) t.flexible_spec = [{ interests: c.interesses.map((i) => ({ id: String(i.id), name: String(i.nome ?? i.id) })) }]; else delete t.flexible_spec;

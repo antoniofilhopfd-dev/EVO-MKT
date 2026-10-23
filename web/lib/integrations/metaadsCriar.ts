@@ -4,7 +4,7 @@ import { now, parseLocal, Row } from '../util';
 import { metaConnected, metaPost } from './meta';
 import { cfgGestao, contaAds, gestaoPermitida, igDoPost, limitesMes, menorUnidade, ORCAMENTO_MIN_DIA, paginaDoInstagram } from './metaadsGestao';
 import { conferirObjeto, registrar } from './metaadsGerenciador';
-import { CTAS, enviarArquivo, enviarImagem, EXT_IMAGEM, EXT_VIDEO, EVENTOS, MENSAGENS, OBJETIVOS, PLATAFORMAS } from './metaadsCampanha';
+import { CTAS, enviarArquivo, enviarImagem, EXT_IMAGEM, EXT_VIDEO, EVENTOS, MENSAGENS, OBJETIVOS, PLATAFORMAS, aplicarPosicoes } from './metaadsCampanha';
 
 /**
  * Criação AVULSA, como no Gerenciador de Anúncios da Meta: uma campanha, um conjunto (dentro de uma campanha existente) ou um anúncio
@@ -81,6 +81,7 @@ async function planejarConjunto(b: Pedido, conta: string, moeda: string): Promis
   if (pb.genero && !['todos', 'mulheres', 'homens'].includes(String(pb.genero))) erros.push('Gênero inválido.');
   const plats = Array.isArray(pb.plataformas) ? (pb.plataformas as string[]) : [];
   if (plats.some((x) => !PLATAFORMAS.includes(x))) erros.push('Plataforma de veiculação inválida.');
+  if (pb.posicoes !== undefined) { try { aplicarPosicoes({}, pb.posicoes); } catch (e: any) { erros.push(e.message); } }
   // orçamento e datas
   const tipo = String((b.orcamento as Row | undefined)?.tipo ?? '').toUpperCase(), valor = Number((b.orcamento as Row | undefined)?.valor);
   const campanhaTemOrcamento = !!(camp.daily_budget || camp.lifetime_budget);
@@ -133,6 +134,7 @@ async function planejarConjunto(b: Pedido, conta: string, moeda: string): Promis
         ...(personalizados.length ? { custom_audiences: personalizados.filter(ID).slice(0, 20).map((id) => ({ id })) } : {}),
         ...(plats.length ? { publisher_platforms: plats } : m.goal === 'CONVERSATIONS' && msg === 'INSTAGRAM_DIRECT' ? { publisher_platforms: ['instagram'] } : {}),
       };
+      if (pb.posicoes && Object.keys(pb.posicoes as Row).length) aplicarPosicoes(targeting, pb.posicoes);
       const cap = lance.tipo === 'LIMITE_CUSTO';
       const payload: Row = {
         name: nome, campaign_id: String(b.campanhaId), status: 'PAUSED', start_time: inicio.toISOString(), end_time: fim!.toISOString(),

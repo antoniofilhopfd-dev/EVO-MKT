@@ -76,11 +76,12 @@ async function tpCriar(nivel,pre={}){
        +criLbl('Resultado *',criSel('crMeta',metas.map(([k,m])=>[k,m.rotulo]),metas.length===1?metas[0][0]:'','Escolha…'),'<span id="crMetaAjuda"></span>')
        +(info.comOrcamentoNaCampanha?'<p class="kpi-note">Esta campanha tem orçamento próprio (na campanha). O conjunto não leva orçamento.</p>':`<div class="cri-2">${criLbl('Orçamento',criSel('crOrcT',[['DIARIO','Diário'],['TOTAL','Total']],'DIARIO'))}${criLbl('Valor (R$) *',`<input class="control" id="crOrcV" type="number" min="1" step="0.01" inputmode="decimal">`)}</div>`)
        +criLbl('Período *',`<button type="button" class="control cm-rng" id="crPer">📅 Escolher o primeiro e o último dia</button>`,`Nada fica aberto para sempre. Máximo de ${(gs.config&&gs.config.diasMax)||14} dias.`)
-       +`<fieldset class="cri-fs"><legend>Público</legend><p class="kpi-note">Cidade: <b>${esc((pub.cidade&&pub.cidade.nome)||'defina em Alertas e automações')}</b></p><div class="cri-2">${criLbl('Raio (km)',`<input class="control" id="crRaio" type="number" min="1" max="80" value="${attr(pub.raioKm||20)}">`)}${criLbl('Gênero',criSel('crGen',[['todos','Todos'],['mulheres','Mulheres'],['homens','Homens']],'todos'))}</div><div class="cri-2">${criLbl('Idade mínima',`<input class="control" id="crIdMin" type="number" min="18" max="65" value="${attr(pub.idadeMin||25)}">`)}${criLbl('Idade máxima',`<input class="control" id="crIdMax" type="number" min="18" max="65" value="${attr(pub.idadeMax||55)}">`)}</div></fieldset>`
+       +`<fieldset class="cri-fs"><legend>Público</legend><p class="kpi-note">Cidade: <b>${esc((pub.cidade&&pub.cidade.nome)||'defina em Alertas e automações')}</b></p><div class="cri-2">${criLbl('Raio (km)',`<input class="control" id="crRaio" type="number" min="1" max="80" value="${attr(pub.raioKm||20)}">`)}${criLbl('Gênero',criSel('crGen',[['todos','Todos'],['mulheres','Mulheres'],['homens','Homens']],'todos'))}</div><div class="cri-2">${criLbl('Idade mínima',`<input class="control" id="crIdMin" type="number" min="18" max="65" value="${attr(pub.idadeMin||25)}">`)}${criLbl('Idade máxima',`<input class="control" id="crIdMax" type="number" min="18" max="65" value="${attr(pub.idadeMax||55)}">`)}</div><div id="crPos"></div></fieldset>`
        +`<div id="crDest"></div>`
        +criLbl('Lance',criSel('crLance',[['MENOR_CUSTO','Menor custo (automático)'],['LIMITE_CUSTO','Limite de custo']],'MENOR_CUSTO'))+`<div id="crLanceV" hidden>${criLbl('Limite de custo (R$)',`<input class="control" id="crLanceN" type="number" min="1" step="0.01">`)}</div>`;
       const pintaDest=()=>{const m=f.querySelector('#crMeta'),mt=info.metas[m.value];f.querySelector('#crMetaAjuda').textContent=mt?mt.ajuda:'';f.querySelector('#crDest').innerHTML=mt?destinoHtml(mt.exige||[],m.value==='CONVERSATIONS'?'CONVERSATIONS':'',mt.cta,op.ctas):'';ligaMsg()};
       f.querySelector('#crMeta').onchange=pintaDest;pintaDest();
+      est.posCampo=tpPosicoesCampo(f.querySelector('#crPos'),op,[],{});
       f.querySelector('#crLance').onchange=e=>{f.querySelector('#crLanceV').hidden=e.target.value!=='LIMITE_CUSTO'};
       f.querySelector('#crPer').onclick=()=>PeriodoPicker.abrir({de:est.inicio.slice(0,10),ate:est.fim.slice(0,10),titulo:'Período do conjunto'},(a,b)=>{const hoje=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);est.inicio=a>hoje?a+'T00:05':'';est.fim=b+'T23:59';f.querySelector('#crPer').textContent='📅 '+(a===b?criDia(a):criDia(a)+' a '+criDia(b));invalida()});
     };
@@ -115,7 +116,7 @@ async function tpCriar(nivel,pre={}){
   const spec=()=>{
     const s={chave:est.chave,nome:g('crNome')};
     if(nivel==='campanha')s.objetivo=g('crObj');
-    if(nivel==='conjunto'){Object.assign(s,{campanhaId:g('crCamp'),meta:g('crMeta'),inicio:est.inicio||undefined,fim:est.fim||undefined,publico:{raioKm:Number(g('crRaio')),idadeMin:Number(g('crIdMin')),idadeMax:Number(g('crIdMax')),genero:g('crGen')},destino:destinoVal(),lance:{tipo:g('crLance'),valor:Number(g('crLanceN'))||undefined}});
+    if(nivel==='conjunto'){Object.assign(s,{campanhaId:g('crCamp'),meta:g('crMeta'),inicio:est.inicio||undefined,fim:est.fim||undefined,publico:{raioKm:Number(g('crRaio')),idadeMin:Number(g('crIdMin')),idadeMax:Number(g('crIdMax')),genero:g('crGen'),...(est.posCampo?(()=>{const n=est.posCampo.get();return n.plataformas.length?{plataformas:n.plataformas,posicoes:n.posicoes}:{}})():{})},destino:destinoVal(),lance:{tipo:g('crLance'),valor:Number(g('crLanceN'))||undefined}});
       if(f.querySelector('#crOrcV'))s.orcamento={tipo:g('crOrcT'),valor:Number(g('crOrcV'))}}
     if(nivel==='anuncio'){const t=g('crTipo');Object.assign(s,{conjuntoId:g('crSet'),destino:destinoVal(),criativo:{tipo:t,midia:t==='POST_IG'?g('crPost'):undefined,conteudoId:t==='IMAGEM'?g('crImg'):undefined,arquivo:t==='ARQUIVO'?est.arq:undefined,texto:g('crTexto')||undefined,titulo:g('crTit')||undefined,descricao:g('crDesc')||undefined,cta:g('crCta')||undefined}})}
     return s;
@@ -142,6 +143,18 @@ async function tpCriar(nivel,pre={}){
 
 
 /** Editor do conjunto: o que o Gerenciador da Meta também edita (cidade, gênero, posicionamentos, interesses, públicos personalizados e lance). */
+
+/** Onde o anúncio aparece: plataformas e, dentro de cada uma, as posições (Feed, Stories, Reels…). Nada marcado = automático. */
+const TP_PLAT=[['instagram','Instagram'],['facebook','Facebook'],['messenger','Messenger'],['audience_network','Audience Network']];
+function tpPosicoesCampo(host,op,plat0,pos0){
+  const plat=new Set(plat0||[]),pos={};TP_PLAT.forEach(([k])=>{pos[k]=new Set((pos0&&pos0[k])||[])});
+  const def=op.posicoes||{};
+  const pinta=()=>{host.innerHTML=`<div class="cri-c"><span>Onde o anúncio aparece</span>${TP_PLAT.map(([k,l])=>`<div class="cri-plat1"><label class="check-row"><input type="checkbox" data-plat="${k}" ${plat.has(k)?'checked':''}><span><b>${l}</b></span></label>${plat.has(k)&&(def[k]||{}).opcoes?`<div class="cri-pos">${def[k].opcoes.map(([v,r])=>`<label class="check-row"><input type="checkbox" data-pos="${k}:${v}" ${pos[k].has(v)?'checked':''}><span>${esc(r)}</span></label>`).join('')}<small class="kpi-note">Nenhuma marcada = todas as posições do ${l}.</small></div>`:''}</div>`).join('')}<small class="kpi-note">Nenhuma plataforma marcada = posicionamentos automáticos (a Meta escolhe, recomendado).</small></div>`;
+    host.querySelectorAll('[data-plat]').forEach(c=>c.onchange=()=>{c.checked?plat.add(c.dataset.plat):plat.delete(c.dataset.plat);pinta()});
+    host.querySelectorAll('[data-pos]').forEach(c=>c.onchange=()=>{const [k,v]=c.dataset.pos.split(':');c.checked?pos[k].add(v):pos[k].delete(v)})};
+  pinta();
+  return {get:()=>({plataformas:[...plat],posicoes:Object.fromEntries([...plat].map(k=>[k,[...pos[k]]]))})};
+}
 async function tpEditorAvancado(ov,o){
   const box=ov.el.querySelector('#geAv');if(!box)return;
   const op=await criOpcoes(),p=o.publico||{};
@@ -152,12 +165,12 @@ async function tpEditorAvancado(ov,o){
   const pintaInt=()=>{box.querySelector('#geInts').innerHTML=est.interesses.map((i,k)=>`<span class="tp-chip">${esc(i.nome)} <button type="button" data-rmint="${k}" aria-label="Remover">×</button></span>`).join('')||'<small class="kpi-note">Nenhum interesse (público amplo).</small>';box.querySelectorAll('[data-rmint]').forEach(b=>b.onclick=()=>{est.interesses.splice(Number(b.dataset.rmint),1);pintaInt()})};
   box.innerHTML=`<fieldset class="cri-fs"><legend>Público e veiculação</legend>
     <div class="cri-2">${criLbl('Trocar a cidade',`<input class="control" id="geCidade" placeholder="${attr(cid0?cid0.nome:'Ex.: João Pessoa')}" autocomplete="off">`,'Deixe em branco para manter.')}${criLbl('Gênero',criSel('geGen',[['todos','Todos'],['mulheres','Mulheres'],['homens','Homens']],gen0))}</div>
-    <div class="cri-c"><span>Onde o anúncio aparece</span><div class="cri-plat">${PLAT.map(([k,l])=>`<label class="check-row"><input type="checkbox" data-plat="${k}" ${est.plat.has(k)?'checked':''}><span>${l}</span></label>`).join('')}</div><small class="kpi-note">Nenhuma marcada = posicionamentos automáticos (a Meta escolhe).</small></div>
+    <div id="gePos"></div>
     <div class="cri-c"><span>Interesses</span><div id="geInts" class="tp-chips"></div><div class="cri-2"><input class="control" id="geIntQ" placeholder="Pesquisar interesse…" autocomplete="off"><button type="button" class="softbtn" id="geIntBusca">Buscar</button></div><div id="geIntRes"></div></div>
     ${(op.publicos||[]).length?`<div class="cri-c"><span>Públicos personalizados</span><div class="cri-plat">${op.publicos.map(x=>`<label class="check-row"><input type="checkbox" data-pers="${attr(x.id)}" ${est.pers.has(x.id)?'checked':''}><span>${esc(x.nome)}</span></label>`).join('')}</div></div>`:''}
     <div class="cri-2">${criLbl('Lance',criSel('geLance',[['MENOR_CUSTO','Menor custo (automático)'],['LIMITE_CUSTO','Limite de custo']],lance0))}${criLbl('Limite de custo (R$)',`<input class="control" id="geLanceV" type="number" min="1" step="0.01" value="${attr(o.lanceValor||'')}">`)}</div></fieldset>`;
   pintaInt();
-  box.querySelectorAll('[data-plat]').forEach(c=>c.onchange=()=>{c.checked?est.plat.add(c.dataset.plat):est.plat.delete(c.dataset.plat)});
+  const posCampo=tpPosicoesCampo(box.querySelector('#gePos'),op,p.plataformas||[],p.posicoes||{});
   box.querySelectorAll('[data-pers]').forEach(c=>c.onchange=()=>{c.checked?est.pers.add(c.dataset.pers):est.pers.delete(c.dataset.pers)});
   box.querySelector('#geIntBusca').onclick=async()=>{const q=box.querySelector('#geIntQ').value.trim();if(q.length<2)return;const r=box.querySelector('#geIntRes');r.innerHTML='<small class="kpi-note">Buscando na Meta…</small>';
     try{const d=await api('/ads/campanha/interesses?q='+encodeURIComponent(q));r.innerHTML=(d.rows||[]).map(i=>`<button type="button" class="softbtn" data-addint="${attr(i.id)}|${attr(i.nome)}">+ ${esc(i.nome)}${i.publico?` <small>(${Number(i.publico).toLocaleString('pt-BR')})</small>`:''}</button>`).join('')||'<small class="kpi-note">Nada encontrado.</small>';
@@ -167,7 +180,8 @@ async function tpEditorAvancado(ov,o){
     const c={},v=id=>{const e=box.querySelector('#'+id);return e?e.value.trim():''};
     if(v('geCidade'))c.cidade=v('geCidade');
     if(v('geGen')!==gen0)c.genero=v('geGen');
-    if(!igual([...est.plat],p.plataformas||[]))c.plataformas=[...est.plat];
+    {const n=posCampo.get(),antes=Object.fromEntries((p.plataformas||[]).map(k=>[k,((p.posicoes||{})[k]||[]).slice().sort()])),depois=Object.fromEntries(Object.entries(n.posicoes).map(([k,v])=>[k,v.slice().sort()]));
+     if(JSON.stringify(antes)!==JSON.stringify(depois)){c.plataformas=n.plataformas;c.posicoes=n.posicoes}}
     if(!igual(est.interesses.map(i=>i.id),(p.interesses||[]).map(i=>i.id)))c.interesses=est.interesses;
     if(!igual([...est.pers],(p.personalizados||[]).map(x=>x.id)))c.publicosPersonalizados=[...est.pers];
     if(v('geLance')!==lance0||(v('geLance')==='LIMITE_CUSTO'&&Number(v('geLanceV'))!==Number(o.lanceValor||0)))c.lance={tipo:v('geLance'),valor:Number(v('geLanceV'))||undefined};

@@ -121,3 +121,4 @@
 
 .tp-tab .tp-inline{width:100%;min-width:0;padding:6px 8px}.tp-tab td[data-k="nome"],.tp-tab td[data-k="orcamento"]{cursor:text}
 .tp-ed{opacity:0;border:0;background:none;color:var(--info,#0A53D6);cursor:pointer;font-size:13px;padding:0 4px;margin-left:4px}.tp-tab tr:hover .tp-ed,.tp-ed:focus{opacity:1}
+.cri-plat1{margin:4px 0}.cri-pos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 12px;margin:2px 0 6px 26px;padding:6px 10px;background:#F8F9FC;border-radius:10px}

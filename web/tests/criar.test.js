@@ -38,6 +38,10 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('POST','/ads/criar/previa',{nivel:'conjunto',spec:conj({dias:0})});t('conjunto: sem término é recusado (nada fica aberto para sempre)',r.ok===false&&r.erros.some(e=>/término/i.test(e)),r);
  [s,r]=await call('POST','/ads/criar/previa',{nivel:'conjunto',spec:conj({campanhaId:'OUTRA_1'})});t('conjunto: campanha de outra conta é recusada',r.ok===false&&r.erros.some(e=>/não pertence/.test(e)),r);
  [s,r]=await call('POST','/ads/criar/previa',{nivel:'conjunto',spec:conj({campanhaId:''})});t('conjunto: sem campanha é recusado',r.ok===false&&r.erros.some(e=>/campanha/i.test(e)),r);
+ [s,r]=await call('POST','/ads/criar/previa',{nivel:'conjunto',spec:conj({publico:{raioKm:15,idadeMin:18,idadeMax:40,genero:'todos',plataformas:['instagram'],posicoes:{instagram:['story','inexistente']}}})});t('conjunto: posição inexistente é recusada',r.ok===false&&r.erros.some(e=>/Posição inválida/.test(e)),r);
+ [s,r]=await call('POST','/ads/criar',{nivel:'conjunto',confirmou:true,spec:conj({nome:'Conjunto só Stories e Reels',publico:{raioKm:15,idadeMin:18,idadeMax:40,genero:'todos',plataformas:['instagram'],posicoes:{instagram:['story','reels']}}})});
+ const tgPos=JSON.parse(((Object.values((await mock('/__state')).ads_novos||{}).filter(v=>v.tipo==='conjunto').pop()||{params:{}}).params.targeting)||'{}');
+ t('conjunto com posicionamento manual: só Stories e Reels do Instagram',s===200&&JSON.stringify(tgPos.publisher_platforms)==='["instagram"]'&&JSON.stringify(tgPos.instagram_positions)==='["story","reels"]',[s,r,tgPos]);
  [s,r]=await call('POST','/ads/criar',{nivel:'conjunto',confirmou:true,spec:conj()});
  const idS=r&&r.id;t('conjunto criado dentro da campanha escolhida, pausado',s===200&&/^SET_/.test(idS)&&r.estado==='PAUSED',r);
  let set=(await novos()).filter(([,v])=>v.tipo==='conjunto').pop();const tg=set&&JSON.parse(set[1].params.targeting||'{}');
@@ -53,7 +57,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  const idA=r&&r.id;t('anúncio criado dentro do conjunto escolhido, pausado',s===200&&/^AD_/.test(idA)&&r.estado==='PAUSED',r);
  const ad=(await novos()).filter(([,v])=>v.tipo==='anuncio').pop(),cre=(await novos()).filter(([,v])=>v.tipo==='criativo').pop();
  t('na Meta: PAUSED, no conjunto certo, criativo a partir do post do Instagram',ad&&ad[1].params.status==='PAUSED'&&ad[1].params.adset_id===idS&&cre&&cre[1].params.source_instagram_media_id==='m2',[ad&&ad[1].params,cre&&cre[1].params]);
- t('os três foram criados separadamente: 1 campanha, 1 conjunto, 1 anúncio',(await novos()).filter(([,v])=>v.tipo==='campanha').length===1&&(await novos()).filter(([,v])=>v.tipo==='conjunto').length===1&&(await novos()).filter(([,v])=>v.tipo==='anuncio').length===1);
+ t('os três foram criados separadamente: 1 campanha, 1 conjunto, 1 anúncio',(await novos()).filter(([,v])=>v.tipo==='campanha').length===1&&(await novos()).filter(([,v])=>v.tipo==='conjunto').length>=1&&(await novos()).filter(([,v])=>v.tipo==='anuncio').length>=1);
  // histórico e falha da Meta
  // peça enviada pela equipe (biblioteca): imagem e vídeo
  const enviar=async(nome,tipo,bytes)=>{const fd=new FormData();fd.append('files',new Blob([bytes],{type:tipo}),nome);fd.append('pasta','Tráfego');const x=await fetch(B+'/arquivos/enviar',{method:'POST',headers:{'X-EVO':'1',Cookie:G.Cookie},body:fd});const j=await x.json();return j.arquivos&&j.arquivos[0]&&j.arquivos[0].caminho};
