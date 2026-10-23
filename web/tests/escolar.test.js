@@ -110,7 +110,9 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  await irA();
  // filtros
  await abre();await p.selectOption('#cmExtra3','MEDIO');await p.waitForTimeout(200);txt=await p.$eval('#cmRaiz',e=>e.innerText);
- t('filtro por segmento (Ensino Médio): tira o do Fundamental, mantém "Toda a escola"',!/Feira de Ciências/.test(txt)&&/Prova bimestral/.test(txt));
+ const semFeira=!/Feira de Ciências/.test(txt);
+ await p.fill('#cmIr',dia(7));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(300);txt=await p.$eval('#cmRaiz',e=>e.innerText); // a prova pode cair em outro mês, conforme o dia do teste
+ t('filtro por segmento (Ensino Médio): tira o do Fundamental, mantém "Toda a escola"',semFeira&&/Prova bimestral/.test(txt));
  await abre();await p.selectOption('#cmExtra3','');await p.waitForTimeout(150);
  await p.fill('#cmBusca','feira');await p.waitForTimeout(250);txt=await p.$eval('#cmRaiz',e=>e.innerText);t('pesquisa pelo título',/Feira de Ciências/.test(txt)&&!/Prova bimestral/.test(txt));await p.fill('#cmBusca','');await p.waitForTimeout(250);
  // criar pelo botão e pelo dia
