@@ -4,7 +4,7 @@ import { notifyMail } from '../mail';
 import { registrarNotificacao } from '../notificacoes';
 import { intLog, setting } from '../settings';
 import { now, parseLocal, Row } from '../util';
-import { metaConnected, metaGet, metaPost } from './meta';
+import { metaConnected, metaGet, metaPost, metaUpload } from './meta';
 import { paginar } from './metaads';
 import { cfgGestao, contaAds, gestaoPermitida, limitesMes, marcar, menorUnidade, ORCAMENTO_MIN_DIA, paginaDoInstagram, igDoPost } from './metaadsGestao';
 
@@ -130,6 +130,35 @@ export async function enviarImagem(conta: string, conteudoId: string): Promise<s
   const hash = String(Object.values(r.images ?? {}).map((x: any) => x?.hash)[0] ?? '');
   if (!hash) throw new Error('A Meta não devolveu o código da imagem.');
   return hash;
+}
+
+export const EXT_IMAGEM = /\.(jpe?g|png)$/i, EXT_VIDEO = /\.(mp4|mov)$/i;
+/** Peça enviada pela equipe (biblioteca de Arquivos): imagem vira `image_hash`; vídeo é enviado, processado e ganha uma miniatura. */
+export async function enviarArquivo(conta: string, caminho: string): Promise<{ tipo: 'imagem' | 'video'; hash?: string; videoId?: string; miniatura?: string }> {
+  const f = await q1('SELECT conteudo,mime FROM arquivos WHERE caminho=?', [caminho]);
+  if (!f) throw new Error('Não achei o arquivo escolhido na biblioteca.');
+  const buf = f.conteudo as Buffer, nome = caminho.split('/').pop() || 'arquivo';
+  if (EXT_IMAGEM.test(caminho)) {
+    const r = await metaPost(`/act_${conta}/adimages`, { bytes: buf.toString('base64') });
+    const hash = String(Object.values(r.images ?? {}).map((x: any) => x?.hash)[0] ?? '');
+    if (!hash) throw new Error('A Meta não devolveu o código da imagem.');
+    return { tipo: 'imagem', hash };
+  }
+  const r = await metaUpload(`/act_${conta}/advideos`, 'source', nome, String(f.mime || 'video/mp4'), buf, { name: nome.slice(0, 100) });
+  const videoId = String(r.id ?? '');
+  if (!videoId) throw new Error('A Meta não devolveu o código do vídeo.');
+  // o vídeo precisa terminar de ser processado antes de virar anúncio (até ~2 minutos)
+  for (let i = 0; i < 24; i++) {
+    const st = await metaGet(`/${videoId}`, { fields: 'status' });
+    const s = String(st.status?.video_status ?? 'ready');
+    if (s === 'ready') break;
+    if (s === 'error') throw new Error('A Meta recusou o vídeo. Confira o formato (MP4 ou MOV) e tente outro arquivo.');
+    if (i === 23) throw new Error('A Meta ainda está processando o vídeo. Aguarde alguns minutos e confira de novo.');
+    await new Promise((x) => setTimeout(x, 5000));
+  }
+  const th = await metaGet(`/${videoId}/thumbnails`, {});
+  const miniatura = String(((th.data ?? []) as Row[]).find((x) => x.is_preferred)?.uri ?? (th.data ?? [])[0]?.uri ?? '');
+  return { tipo: 'video', videoId, miniatura };
 }
 
 /** Os pedidos à Meta. É o único ponto a ajustar se a Meta recusar algum campo. */

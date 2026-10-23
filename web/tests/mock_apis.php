@@ -18,7 +18,7 @@ if ($p === '/__state') { j($S); }
 // ---------------- META ----------------
 if (str_starts_with($p, '/graph')) {
     $g = substr($p, 6);
-    $tok = $_GET['access_token'] ?? ($in['access_token'] ?? '');
+    $tok = $_GET['access_token'] ?? ($in['access_token'] ?? ($_POST['access_token'] ?? ''));
     $IG = '17841400000000000'; $IG2 = '17841499999999999'; $is2 = false;
     if (str_starts_with($g, "/$IG2")) { $g = "/$IG" . substr($g, strlen("/$IG2")); $is2 = true; }
     if ($g === '/oauth/access_token') {
@@ -31,6 +31,9 @@ if (str_starts_with($p, '/graph')) {
     if ($g === '/me/permissions') { $all = ['instagram_basic', 'instagram_manage_insights', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'business_management', 'ads_read', 'ads_management']; $d = []; foreach ($all as $x) { $d[] = ['permission' => $x, 'status' => (($tok === 'LIMITED_TOKEN' && $x === 'instagram_content_publish') || ($tok === 'NOADS_TOKEN' && $x === 'ads_read') || ($tok === 'NOMGMT_TOKEN' && $x === 'ads_management')) ? 'declined' : 'granted']; } j(['data' => $d]); }
     if ($g === '/search' && ($_GET['type'] ?? '') === 'adinterest') j(['data' => [['id' => '6003107902433', 'name' => 'Educação infantil', 'audience_size_upper_bound' => 1200000], ['id' => '6003020834693', 'name' => 'Ensino médio', 'audience_size_upper_bound' => 800000]]]);
     if ($g === '/act_111222333/adimages' && $m === 'POST') { $S['imagens_enviadas'][] = strlen($in['bytes'] ?? ''); j(['images' => ['arte.jpg' => ['hash' => 'HASH_IMG_1']]]); }
+    if ($g === '/act_111222333/advideos' && $m === 'POST') { $S['videos_enviados'][] = $_FILES['source']['size'] ?? 0; j(['id' => 'VID_1']); }
+    if ($g === '/VID_1/thumbnails') j(['data' => [['uri' => 'https://scontent.example/thumb.jpg', 'is_preferred' => true]]]);
+    if ($g === '/VID_1') j(['id' => 'VID_1', 'status' => ['video_status' => 'ready']]);
     if ($g === '/act_111222333/adspixels') j(['data' => [['id' => 'PX1', 'name' => 'Pixel do site']]]);
     if ($g === '/act_111222333/customaudiences') j(['data' => [['id' => 'CA1', 'name' => 'Visitantes do site']]]);
     if ($g === '/p1/leadgen_forms') j(['data' => [['id' => 'LF1', 'name' => 'Matrículas 2027', 'status' => 'ACTIVE'], ['id' => 'LF2', 'name' => 'Antigo', 'status' => 'ARCHIVED']]]);

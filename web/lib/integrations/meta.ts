@@ -31,6 +31,18 @@ export async function metaPost(path: string, params: Row = {}): Promise<Row> {
   await checarTokenInvalido(r, `Meta POST ${path}`);
   return httpOk(r, `Meta POST ${path}`) as Row;
 }
+/** Envia um arquivo (vídeo) em formulário multipart; a Meta não aceita vídeo no formato simples. */
+export async function metaUpload(path: string, campo: string, nome: string, mime: string, dados: Buffer, params: Row = {}): Promise<Row> {
+  const f = new FormData();
+  f.append('access_token', await setting('meta_token'));
+  for (const [k, v] of Object.entries(params)) f.append(k, String(v));
+  f.append(campo, new Blob([new Uint8Array(dados)], { type: mime }), nome);
+  const res = await fetch(metaBase() + path, { method: 'POST', body: f, signal: AbortSignal.timeout(300_000) });
+  const txt = await res.text();
+  let j: any = {}; try { j = JSON.parse(txt); } catch { /* resposta fora do padrão */ }
+  if (!res.ok || j.error) throw new Error(`Meta upload ${path}: ${j?.error?.message ?? 'HTTP ' + res.status}`);
+  return j as Row;
+}
 export async function metaConnected(): Promise<boolean> {
   return (await setting('meta_token')) !== '' && (await setting('ig_user_id')) !== '';
 }

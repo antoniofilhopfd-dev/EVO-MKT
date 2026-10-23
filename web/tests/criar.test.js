@@ -55,6 +55,19 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('na Meta: PAUSED, no conjunto certo, criativo a partir do post do Instagram',ad&&ad[1].params.status==='PAUSED'&&ad[1].params.adset_id===idS&&cre&&cre[1].params.source_instagram_media_id==='m2',[ad&&ad[1].params,cre&&cre[1].params]);
  t('os três foram criados separadamente: 1 campanha, 1 conjunto, 1 anúncio',(await novos()).filter(([,v])=>v.tipo==='campanha').length===1&&(await novos()).filter(([,v])=>v.tipo==='conjunto').length===1&&(await novos()).filter(([,v])=>v.tipo==='anuncio').length===1);
  // histórico e falha da Meta
+ // peça enviada pela equipe (biblioteca): imagem e vídeo
+ const enviar=async(nome,tipo,bytes)=>{const fd=new FormData();fd.append('files',new Blob([bytes],{type:tipo}),nome);fd.append('pasta','Tráfego');const x=await fetch(B+'/arquivos/enviar',{method:'POST',headers:{'X-EVO':'1',Cookie:G.Cookie},body:fd});const j=await x.json();return j.arquivos&&j.arquivos[0]&&j.arquivos[0].caminho};
+ const cVid=await enviar('depoimento.mp4','video/mp4',Buffer.concat([Buffer.from([0,0,0,24]),Buffer.from('ftypmp42'),Buffer.alloc(200)]));
+ const cImg=await enviar('arte.jpg','image/jpeg',Buffer.concat([Buffer.from([0xff,0xd8,0xff,0xe0]),Buffer.alloc(200)]));
+ t('envia vídeo e imagem para a biblioteca',!!cVid&&!!cImg,[cVid,cImg]);
+ [s,r]=await call('POST','/ads/criar/previa',{nivel:'anuncio',spec:an({criativo:{tipo:'ARQUIVO',arquivo:'BIBLIOTECA/Tráfego/nao-existe.mp4',texto:'x'}})});t('anúncio com arquivo inexistente é recusado',r.ok===false,r);
+ [s,r]=await call('POST','/ads/criar/previa',{nivel:'anuncio',spec:an({criativo:{tipo:'ARQUIVO',arquivo:cVid,texto:''}})});t('anúncio com vídeo sem texto é recusado',r.ok===false,r);
+ [s,r]=await call('POST','/ads/criar',{nivel:'anuncio',confirmou:true,spec:an({nome:'Vídeo Campanha de Matrículas',criativo:{tipo:'ARQUIVO',arquivo:cVid,texto:'Matrículas abertas!',titulo:'Venha conhecer'}})});
+ const st1=await mock('/__state');const cr1=Object.values(st1.ads_novos||{}).filter(v=>v.tipo==='criativo').map(v=>v.params.object_story_spec||'').find(x=>/video_data/.test(x));
+ t('anúncio com vídeo vira criativo de vídeo (video_id e miniatura) e o anúncio nasce pausado',s===200&&!!cr1&&/"video_id":"VID_1"/.test(cr1)&&/thumb\.jpg/.test(cr1)&&(st1.videos_enviados||[]).length===1,[s,r,cr1]);
+ [s,r]=await call('POST','/ads/criar',{nivel:'anuncio',confirmou:true,spec:an({nome:'Imagem enviada',criativo:{tipo:'ARQUIVO',arquivo:cImg,texto:'Texto'}})});
+ const st2=await mock('/__state');const cr2=Object.values(st2.ads_novos||{}).filter(v=>v.tipo==='criativo').map(v=>v.params.object_story_spec||'').find(x=>/image_hash/.test(x)&&/HASH_IMG_1/.test(x));
+ t('anúncio com imagem enviada usa o código da imagem na Meta',s===200&&!!cr2,[s,r]);
  [s,r]=await call('GET','/ads/acoes');t('o histórico registra as três criações',s===200&&['campanha','conjunto','anuncio'].every(nv=>r.rows.some(x=>x.acao==='criar'&&x.nivel===nv&&x.resultado==='OK')),r.rows&&r.rows.slice(0,4));
  await call('POST','/integrations/meta/token',{token:'FAILSET_TOKEN'});
  [s,r]=await call('POST','/ads/criar',{nivel:'conjunto',confirmou:true,spec:conj()});t('se a Meta recusa, o erro aparece (502) e fica no histórico como ERRO',s===502&&/Meta recusou/.test(r.error),r);

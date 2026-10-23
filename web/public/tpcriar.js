@@ -79,13 +79,20 @@ async function tpCriar(nivel,pre={}){
       if(!id){box.innerHTML='';return}
       box.innerHTML='<small class="kpi-note">Lendo o conjunto…</small>';
       try{est.info=await api('/ads/criar/info?nivel=conjunto&id='+encodeURIComponent(id))}catch(e){box.innerHTML=`<div class="cri-msg err">${esc(e.message)}</div>`;return}
-      const info=est.info,tipos=(info.criativos||[]).map(x=>x==='POST_IG'?['POST_IG','Publicação do Instagram']:['IMAGEM','Imagem nova (do Estúdio)']);
+      const info=est.info,tipos=[...(info.criativos||[]).map(x=>x==='POST_IG'?['POST_IG','Publicação do Instagram']:['IMAGEM','Imagem nova (do Estúdio)']),...((info.criativos||[]).includes('IMAGEM')?[['ARQUIVO','Imagem ou vídeo (biblioteca ou computador)']]:[])];
       box.innerHTML=`<p class="kpi-note">Campanha: <b>${esc(info.campanha||'')}</b> · Resultado: <b>${esc(info.metaRotulo||'')}</b>.</p>`
        +criLbl('Criativo *',criSel('crTipo',tipos,tipos.length===1?tipos[0][0]:'','Escolha…'))+'<div id="crCri"></div><div id="crDest"></div>';
       const pinta=()=>{const t=f.querySelector('#crTipo').value;
         f.querySelector('#crCri').innerHTML=t==='POST_IG'?criLbl('Publicação *',criSel('crPost',(op.posts||[]).map(p=>[p.id,`${(p.legenda||'(sem legenda)').slice(0,60)} · ${p.tipo}`]),'','Escolha…'),'Anuncia um post já publicado (curtidas e comentários contam).')
+          :t==='ARQUIVO'?`<div class="cri-c"><span>Imagem ou vídeo *</span><div class="cri-arq"><button type="button" class="softbtn" id="crArqBib">Escolher da biblioteca</button> <button type="button" class="softbtn" id="crArqPc">Enviar do computador</button><input type="file" id="crArqFile" accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" hidden></div><small class="kpi-note" id="crArqNome">${est.arq?esc(est.arq.split('/').pop()):'Nenhum arquivo escolhido. Imagem JPG/PNG ou vídeo MP4/MOV.'}</small></div>`+criLbl('Texto do anúncio *',`<textarea class="control" id="crTexto" rows="3" maxlength="2000"></textarea>`)+criLbl('Título',`<input class="control" id="crTit" maxlength="255">`)+criLbl('Descrição',`<input class="control" id="crDesc" maxlength="255">`)
           :t==='IMAGEM'?criLbl('Imagem *',criSel('crImg',(op.imagens||[]).map(p=>[p.id,p.titulo]),'','Escolha…'),'JPEG anexado a um post do Estúdio.')+criLbl('Texto do anúncio *',`<textarea class="control" id="crTexto" rows="3" maxlength="2000"></textarea>`)+criLbl('Título',`<input class="control" id="crTit" maxlength="255">`)+criLbl('Descrição',`<input class="control" id="crDesc" maxlength="255">`):'';
-        f.querySelector('#crDest').innerHTML=destinoHtml(info.exige||[],'',info.cta,op.ctas)+(t==='IMAGEM'?criLbl('Botão',criSel('crCta',(op.ctas||[]).map(x=>[x,x]),info.cta||'','Padrão do resultado')):'');ligaMsg()};
+        f.querySelector('#crDest').innerHTML=destinoHtml(info.exige||[],'',info.cta,op.ctas)+(t==='IMAGEM'||t==='ARQUIVO'?criLbl('Botão',criSel('crCta',(op.ctas||[]).map(x=>[x,x]),info.cta||'','Padrão do resultado')):'');ligaMsg();
+        if(t==='ARQUIVO'){const nm=f.querySelector('#crArqNome'),mostra=c=>{est.arq=c;nm.textContent=c.split('/').pop()};
+          f.querySelector('#crArqBib').onclick=async()=>{try{const r=await arquivosEscolher({tipos:['imagem','video']});if(r&&r[0])mostra(r[0])}catch(e){toast(e.message,'warn')}};
+          f.querySelector('#crArqPc').onclick=()=>f.querySelector('#crArqFile').click();
+          f.querySelector('#crArqFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(!/\.(jpe?g|png|mp4|mov)$/i.test(file.name)){toast('Use JPG, PNG, MP4 ou MOV.','warn');return}
+            const fd=new FormData();fd.append('files',file);fd.append('pasta','Tráfego');nm.textContent='Enviando…';
+            try{const r=await api('/arquivos/enviar',{method:'POST',body:fd});const c=((r.salvos||r.arquivos||[])[0]||{}).caminho||(r.caminhos||[])[0];if(!c)throw new Error('Não consegui identificar o arquivo enviado.');mostra(c);toast('Arquivo enviado')}catch(x){nm.textContent='Falha no envio.';toast(x.message,'bad')}}}};
       f.querySelector('#crTipo').onchange=pinta;pinta();
     };
     f.querySelector('#crSet').onchange=dinAn;if(setIni)dinAn();
@@ -97,7 +104,7 @@ async function tpCriar(nivel,pre={}){
     if(nivel==='campanha')s.objetivo=g('crObj');
     if(nivel==='conjunto'){Object.assign(s,{campanhaId:g('crCamp'),meta:g('crMeta'),inicio:est.inicio||undefined,fim:est.fim||undefined,publico:{raioKm:Number(g('crRaio')),idadeMin:Number(g('crIdMin')),idadeMax:Number(g('crIdMax')),genero:g('crGen')},destino:destinoVal(),lance:{tipo:g('crLance'),valor:Number(g('crLanceN'))||undefined}});
       if(f.querySelector('#crOrcV'))s.orcamento={tipo:g('crOrcT'),valor:Number(g('crOrcV'))}}
-    if(nivel==='anuncio'){const t=g('crTipo');Object.assign(s,{conjuntoId:g('crSet'),destino:destinoVal(),criativo:{tipo:t,midia:t==='POST_IG'?g('crPost'):undefined,conteudoId:t==='IMAGEM'?g('crImg'):undefined,texto:g('crTexto')||undefined,titulo:g('crTit')||undefined,descricao:g('crDesc')||undefined,cta:g('crCta')||undefined}})}
+    if(nivel==='anuncio'){const t=g('crTipo');Object.assign(s,{conjuntoId:g('crSet'),destino:destinoVal(),criativo:{tipo:t,midia:t==='POST_IG'?g('crPost'):undefined,conteudoId:t==='IMAGEM'?g('crImg'):undefined,arquivo:t==='ARQUIVO'?est.arq:undefined,texto:g('crTexto')||undefined,titulo:g('crTit')||undefined,descricao:g('crDesc')||undefined,cta:g('crCta')||undefined}})}
     return s;
   };
   f.querySelector('#crConf').onclick=async()=>{

@@ -4,7 +4,7 @@ import { now, parseLocal, Row } from '../util';
 import { metaConnected, metaPost } from './meta';
 import { cfgGestao, contaAds, gestaoPermitida, igDoPost, limitesMes, menorUnidade, ORCAMENTO_MIN_DIA, paginaDoInstagram } from './metaadsGestao';
 import { conferirObjeto, registrar } from './metaadsGerenciador';
-import { CTAS, enviarImagem, EVENTOS, MENSAGENS, OBJETIVOS, PLATAFORMAS } from './metaadsCampanha';
+import { CTAS, enviarArquivo, enviarImagem, EXT_IMAGEM, EXT_VIDEO, EVENTOS, MENSAGENS, OBJETIVOS, PLATAFORMAS } from './metaadsCampanha';
 
 /**
  * Criação AVULSA, como no Gerenciador de Anúncios da Meta: uma campanha, um conjunto (dentro de uma campanha existente) ou um anúncio
@@ -156,9 +156,14 @@ async function planejarAnuncio(b: Pedido, conta: string): Promise<Plano> {
   if (info.nome && !mt) erros.push('Não consegui identificar o resultado desse conjunto. Crie o anúncio pelo Gerenciador da Meta.');
   const cr = (b.criativo ?? {}) as Row, d = (b.destino ?? {}) as Row, tc = String(cr.tipo ?? '').toUpperCase();
   if (mt) {
-    if (!mt.criativos.includes(tc as 'POST_IG' | 'IMAGEM')) erros.push(`Para esse conjunto o anúncio deve usar ${mt.criativos.map((x) => (x === 'POST_IG' ? 'uma publicação do Instagram' : 'uma imagem nova')).join(' ou ')}.`);
+    if (!mt.criativos.includes((tc === 'ARQUIVO' ? 'IMAGEM' : tc) as 'POST_IG' | 'IMAGEM')) erros.push(`Para esse conjunto o anúncio deve usar ${mt.criativos.map((x) => (x === 'POST_IG' ? 'uma publicação do Instagram' : 'uma imagem nova')).join(' ou ')}.`);
     else if (tc === 'POST_IG') { if (!(await q1('SELECT 1 FROM ig_posts WHERE media_id=?', [String(cr.midia ?? '')]))) erros.push('Essa publicação não foi lida do Instagram conectado. Atualize o Desempenho e tente de novo.'); }
-    else {
+    else if (tc === 'ARQUIVO') {
+      const a = await q1('SELECT tamanho FROM arquivos WHERE caminho=?', [String(cr.arquivo ?? '')]);
+      if (!a) erros.push('Escolha um arquivo da biblioteca ou envie um do computador.');
+      else if (!EXT_IMAGEM.test(String(cr.arquivo)) && !EXT_VIDEO.test(String(cr.arquivo))) erros.push('O arquivo precisa ser imagem (JPG ou PNG) ou vídeo (MP4 ou MOV).');
+      if (!String(cr.texto ?? '').trim()) erros.push('Escreva o texto do anúncio.');
+    } else {
       const c = await q1('SELECT data FROM records WHERE modulo=? AND id=?', ['conteudos', String(cr.conteudoId ?? '')]);
       const rel = c ? String(JSON.parse(String(c.data)).midiaInstagram ?? '') : '';
       if (!/\.jpe?g$/i.test(rel)) erros.push('Escolha uma imagem JPEG anexada a um post do Estúdio.');
@@ -170,7 +175,7 @@ async function planejarAnuncio(b: Pedido, conta: string): Promise<Plano> {
     if (cr.cta && !CTAS.includes(String(cr.cta))) erros.push('Botão de chamada inválido.');
   }
   return {
-    erros, avisos, resumo: { nivel: 'anuncio', nome, conjunto: info.nome ?? '', campanha: info.campanha ?? '', resultado: info.metaRotulo ?? '', criativo: tc === 'POST_IG' ? 'Publicação do Instagram' : 'Imagem nova', estado: 'Pausado (você ativa depois de conferir)' },
+    erros, avisos, resumo: { nivel: 'anuncio', nome, conjunto: info.nome ?? '', campanha: info.campanha ?? '', resultado: info.metaRotulo ?? '', criativo: tc === 'POST_IG' ? 'Publicação do Instagram' : tc === 'ARQUIVO' ? (EXT_VIDEO.test(String(cr.arquivo ?? '')) ? 'Vídeo enviado' : 'Imagem enviada') : 'Imagem nova', estado: 'Pausado (você ativa depois de conferir)' },
     montar: async () => {
       const m = mt!, destino = String(info.destino ?? ''), msg = ['INSTAGRAM_DIRECT', 'MESSENGER', 'WHATSAPP'].includes(destino) ? destino : '';
       const ig = await igDoPost(tc === 'POST_IG' ? String(cr.midia) : ''), pagina = await paginaDoInstagram(ig);
@@ -178,6 +183,15 @@ async function planejarAnuncio(b: Pedido, conta: string): Promise<Plano> {
       let criativo: Row;
       if (tc === 'POST_IG') {
         criativo = { name: `${nome} · criativo`, object_id: pagina, instagram_user_id: ig, source_instagram_media_id: cr.midia, ...(m.goal === 'CONVERSATIONS' ? { call_to_action: JSON.stringify({ type: msg === 'WHATSAPP' ? 'WHATSAPP_MESSAGE' : msg === 'MESSENGER' ? 'MESSAGE_PAGE' : 'INSTAGRAM_MESSAGE' }) } : {}) };
+      } else if (tc === 'ARQUIVO') {
+        const peca = await enviarArquivo(conta, String(cr.arquivo));
+        const link = m.exige.includes('site') ? String(d.siteUrl) : m.exige.includes('app') ? String(d.lojaUrl) : `https://www.facebook.com/${pagina}`;
+        const valor: Row = m.goal === 'LEAD_GENERATION' ? { lead_gen_form_id: d.formId } : m.goal === 'CONVERSATIONS' ? { app_destination: destino } : { link };
+        const botao = cta !== 'NO_BUTTON' ? { call_to_action: { type: cta, value: valor } } : {};
+        const spec = peca.tipo === 'video'
+          ? { page_id: pagina, video_data: { video_id: peca.videoId, ...(peca.miniatura ? { image_url: peca.miniatura } : {}), message: String(cr.texto ?? '').slice(0, 2000), ...(cr.titulo ? { title: String(cr.titulo).slice(0, 255) } : {}), ...(cr.descricao ? { link_description: String(cr.descricao).slice(0, 255) } : {}), ...botao } }
+          : { page_id: pagina, link_data: { image_hash: peca.hash, link, message: String(cr.texto ?? '').slice(0, 2000), ...(cr.titulo ? { name: String(cr.titulo).slice(0, 255) } : {}), ...(cr.descricao ? { description: String(cr.descricao).slice(0, 255) } : {}), ...botao } };
+        criativo = { name: `${nome} · criativo`, instagram_user_id: ig, object_story_spec: JSON.stringify(spec) };
       } else {
         const hash = await enviarImagem(conta, String(cr.conteudoId));
         const link = m.exige.includes('site') ? String(d.siteUrl) : m.exige.includes('app') ? String(d.lojaUrl) : `https://www.facebook.com/${pagina}`;
