@@ -6,6 +6,7 @@ import { setSetting, setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { metaConnected } from '../integrations/meta';
 import { cfgRegras, enviarRelatorioSemanal, excluirRascunho, rascunhos, rodarRegras, salvarRascunho, salvarRegras } from '../integrations/metaadsExtras';
+import { criarPublico, editarPublico, excluirPublico } from '../integrations/metaadsPublicos';
 import { atividadeMeta, avaliarLimitesGasto, previaAnuncio, publicosConta, quebra, resumoConta, salvarLimitesGasto, saudeMeta, serieObjeto } from '../integrations/metaadsAnalise';
 import { cfgGestao, gestaoPermitida, lancarImpulso, listarLancamentos, ORCAMENTO_MIN_DIA, PADRAO_GESTAO, whatsOk, numWhats, pausarLancamento, pausarTudo, previaImpulso, resolverCidade, retomarLancamento, PedidoImpulso } from '../integrations/metaadsGestao';
 import { acoesRecentes, arvore, duplicarObjeto, editarObjeto, Nivel, vincularConteudo } from '../integrations/metaadsGerenciador';
@@ -38,7 +39,7 @@ export async function gestaoAnunciosRoute(c: Ctx) {
     }
     return json({ gestao: completo });
   }
-  const ESCRITA = ['/ads/criar', '/ads/criar/previa', '/ads/criar/info', '/ads/gestao/config', '/ads/previa', '/ads/impulsionar', '/ads/pausar', '/ads/retomar', '/ads/pausar-tudo', '/ads/editar', '/ads/duplicar', '/ads/campanha/opcoes', '/ads/campanha/interesses', '/ads/campanha/previa', '/ads/campanha/lancar', '/ads/regras', '/ads/regras/simular', '/ads/rascunhos'];
+  const ESCRITA = ['/ads/criar', '/ads/criar/previa', '/ads/criar/info', '/ads/gestao/config', '/ads/previa', '/ads/impulsionar', '/ads/pausar', '/ads/retomar', '/ads/pausar-tudo', '/ads/editar', '/ads/duplicar', '/ads/campanha/opcoes', '/ads/campanha/interesses', '/ads/campanha/previa', '/ads/campanha/lancar', '/ads/regras', '/ads/regras/simular', '/ads/rascunhos', '/ads/publicos/criar', '/ads/publicos/editar', '/ads/publicos/excluir'];
   if (!completo && ESCRITA.includes(path)) fail(403, 'O Tráfego está em modo somente leitura (só métricas). Para criar ou editar anúncios pelo sistema, ligue o modo completo em Administração → Integrações.');
   if (path === '/ads/gestao' && method === 'GET') {
     let permissao = false;
@@ -147,6 +148,14 @@ export async function gestaoAnunciosRoute(c: Ctx) {
   }
   if (path === '/ads/publicos' && method === 'GET') {
     try { return json({ rows: await publicosConta() }); } catch (e: any) { return fail(502, e.message); }
+  }
+  if (method === 'POST' && ['/ads/publicos/criar', '/ads/publicos/editar', '/ads/publicos/excluir'].includes(path)) {
+    const b = await c.body();
+    try {
+      if (path === '/ads/publicos/criar') { if (String(b.tipo).toUpperCase() === 'CONTATOS') await requireAdmin(c); return json({ ok: true, ...(await criarPublico(b, String(u.codigo))) }); }
+      if (path === '/ads/publicos/editar') return json({ ok: true, ...(await editarPublico(b, String(u.codigo))) });
+      return json({ ok: true, ...(await excluirPublico(b, String(u.codigo))) });
+    } catch (e: any) { return fail(/^A Meta|Meta /.test(e.message) ? 502 : 400, e.message); }
   }
   if (path === '/ads/saude' && method === 'GET') return json(await saudeMeta());
   if (path === '/ads/previa-anuncio' && method === 'GET') {

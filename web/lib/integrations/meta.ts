@@ -25,6 +25,11 @@ export async function metaGet(path: string, params: Row = {}): Promise<Row> {
   await checarTokenInvalido(r, `Meta GET ${path}`);
   return httpOk(r, `Meta GET ${path}`) as Row;
 }
+export async function metaDelete(path: string): Promise<Row> {
+  const r = await httpCall('DELETE', `${metaBase()}${path}?${qsOf({ access_token: await setting('meta_token') })}`);
+  await checarTokenInvalido(r, `Meta DELETE ${path}`);
+  return httpOk(r, `Meta DELETE ${path}`) as Row;
+}
 export async function metaPost(path: string, params: Row = {}): Promise<Row> {
   params.access_token = await setting('meta_token');
   const r = await httpCall('POST', metaBase() + path, { 'Content-Type': 'application/x-www-form-urlencoded' }, qsOf(params));

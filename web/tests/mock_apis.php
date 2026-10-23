@@ -35,6 +35,10 @@ if (str_starts_with($p, '/graph')) {
     if ($g === '/VID_1/thumbnails') j(['data' => [['uri' => 'https://scontent.example/thumb.jpg', 'is_preferred' => true]]]);
     if ($g === '/VID_1') j(['id' => 'VID_1', 'status' => ['video_status' => 'ready']]);
     if ($g === '/act_111222333/adspixels') j(['data' => [['id' => 'PX1', 'name' => 'Pixel do site']]]);
+    if ($g === '/act_111222333/customaudiences' && $m === 'POST') { $id = nid('CA_'); $S['publicos_novos'][$id] = $in; j(['id' => $id]); }
+    if (preg_match('#^/(CA_\w+|CA1)/users$#', $g, $mm) && $m === 'POST') { $S['publicos_usuarios'][$mm[1]][] = json_decode($in['payload'] ?? '{}', true); j(['audience_id' => $mm[1], 'num_received' => 1]); }
+    if (preg_match('#^/(CA_\w+|CA1)$#', $g, $mm) && $m === 'DELETE') { $S['publicos_excluidos'][] = $mm[1]; j(['success' => true]); }
+    if (preg_match('#^/(CA_\w+|CA1)$#', $g, $mm) && $m === 'POST') { $S['publicos_edits'][$mm[1]][] = $in; j(['success' => true]); }
     if ($g === '/act_111222333/customaudiences') j(['data' => [['id' => 'CA1', 'name' => 'Visitantes do site']]]);
     if ($g === '/p1/leadgen_forms') j(['data' => [['id' => 'LF1', 'name' => 'Matrículas 2027', 'status' => 'ACTIVE'], ['id' => 'LF2', 'name' => 'Antigo', 'status' => 'ARCHIVED']]]);
     if ($g === '/search') { $qq = $_GET['q'] ?? ''; j(['data' => str_contains($qq, 'Naolandia') ? [] : [['key' => '2430536', 'name' => $qq === '' ? 'Cidade' : (str_contains($qq, 'Jo') ? 'João Pessoa' : $qq), 'region' => 'Paraíba', 'country_code' => 'BR']]]); }

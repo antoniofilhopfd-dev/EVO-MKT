@@ -68,6 +68,23 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('POST','/ads/criar',{nivel:'anuncio',confirmou:true,spec:an({nome:'Imagem enviada',criativo:{tipo:'ARQUIVO',arquivo:cImg,texto:'Texto'}})});
  const st2=await mock('/__state');const cr2=Object.values(st2.ads_novos||{}).filter(v=>v.tipo==='criativo').map(v=>v.params.object_story_spec||'').find(x=>/image_hash/.test(x)&&/HASH_IMG_1/.test(x));
  t('anúncio com imagem enviada usa o código da imagem na Meta',s===200&&!!cr2,[s,r]);
+ // ---- públicos personalizados
+ const pub=async()=>(await mock('/__state'));
+ [s,r]=await call('POST','/ads/publicos/criar',{tipo:'SITE',nome:'Visitantes matrícula',pixelId:'PX1',dias:30,url:'/matriculas'});t('público de site exige confirmação (400)',s===400,r);
+ [s,r]=await call('POST','/ads/publicos/criar',{tipo:'SITE',nome:'Visitantes matrícula',pixelId:'PX1',dias:30,url:'/matriculas',confirmou:true});const stP=await pub();const pS=Object.values(stP.publicos_novos||{}).find(x=>x.subtype==='WEBSITE');
+ t('cria público de visitantes do site com pixel e prazo',s===200&&!!pS&&/"PX1"/.test(pS.rule)&&/\/matriculas/.test(pS.rule)&&pS.retention_days==='30',[s,r,pS]);
+ [s,r]=await call('POST','/ads/publicos/criar',{tipo:'CONTATOS',nome:'Responsáveis 2027',contatos:'ana@exemplo.com\n(83) 99999-1234',confirmou:true});t('lista de contatos exige a confirmação de autorização (LGPD)',s===400&&/LGPD/.test(r.error),r);
+ [s,r]=await call('POST','/ads/publicos/criar',{tipo:'CONTATOS',nome:'Responsáveis 2027',contatos:'ana@exemplo.com',autorizacao:true,confirmou:true},E);t('Equipe não envia lista de contatos: só o Administrador',[400,403].includes(s)&&/apenas/.test(r.error||''),[s,r]);
+ [s,r]=await call('POST','/ads/publicos/criar',{tipo:'CONTATOS',nome:'Responsáveis 2027',contatos:'Ana@Exemplo.com\n(83) 99999-1234\nlixo',autorizacao:true,confirmou:true});const stC=await pub();
+ const us=Object.values(stC.publicos_usuarios||{}).flat();const txtU=JSON.stringify(us);
+ t('contatos vão à Meta só em SHA-256 (nunca em texto), com 1 e-mail e 1 telefone; o inválido é ignorado',s===200&&r.enviados===2&&r.ignorados===1&&us.length===2&&!/exemplo|99999/i.test(txtU)&&/EMAIL_SHA256/.test(txtU)&&/PHONE_SHA256/.test(txtU)&&us.every(u=>u.data.every(h=>/^[0-9a-f]{64}$/.test(h))),[s,r,txtU.slice(0,200)]);
+ const idCA=r.id;
+ [s,r]=await call('POST','/ads/publicos/criar',{tipo:'SEMELHANTE',nome:'Parecido 1%',origemId:idCA,percentual:1,confirmou:true});const pL=Object.values((await pub()).publicos_novos||{}).find(x=>x.subtype==='LOOKALIKE');
+ t('cria público semelhante (1%) a partir de outro',s===200&&!!pL&&pL.origin_audience_id===idCA&&/"ratio":0.01/.test(pL.lookalike_spec),[s,r,pL]);
+ [s,r]=await call('POST','/ads/publicos/criar',{tipo:'INSTAGRAM',nome:'Quem interagiu',dias:90,confirmou:true});t('cria público de interação com o Instagram',s===200&&Object.values((await pub()).publicos_novos||{}).some(x=>x.subtype==='ENGAGEMENT'),[s,r]);
+ [s]=await call('POST','/ads/publicos/editar',{id:idCA,nome:'Responsáveis renomeado'});t('renomeia o público na Meta',s===200&&JSON.stringify((await pub()).publicos_edits||{}).includes('Responsáveis renomeado'));
+ [s]=await call('POST','/ads/publicos/excluir',{id:idCA});t('excluir público exige confirmação (400)',s===400);
+ [s]=await call('POST','/ads/publicos/excluir',{id:idCA,confirmou:true});t('exclui o público na Meta',s===200&&((await pub()).publicos_excluidos||[]).includes(idCA));
  [s,r]=await call('GET','/ads/acoes');t('o histórico registra as três criações',s===200&&['campanha','conjunto','anuncio'].every(nv=>r.rows.some(x=>x.acao==='criar'&&x.nivel===nv&&x.resultado==='OK')),r.rows&&r.rows.slice(0,4));
  await call('POST','/integrations/meta/token',{token:'FAILSET_TOKEN'});
  [s,r]=await call('POST','/ads/criar',{nivel:'conjunto',confirmou:true,spec:conj()});t('se a Meta recusa, o erro aparece (502) e fica no histórico como ERRO',s===502&&/Meta recusou/.test(r.error),r);

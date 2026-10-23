@@ -95,7 +95,7 @@ TP_PAGINAS.tfpublicos=async function(){
     $$('[data-pbd]').forEach(b=>b.onclick=()=>{const e=l[Number(b.dataset.pbd)];adminOverlay(`<h3>${esc(e.txt)}</h3><p class="kpi-note">Conjuntos que usam este público e as campanhas a que pertencem.</p><div class="tablewrap"><table class="datatable"><thead><tr><th>Conjunto</th><th>Campanha</th><th>Status</th><th>Investimento</th><th>Conversas</th></tr></thead><tbody>${e.conj.map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c._pai)}</td><td>${gmBadge(c.estado)}</td><td>${esc(gmBrl(c.gasto))}</td><td>${gmN(c.conversas)}</td></tr>`).join('')}</tbody></table></div><div class="actions"><span class="cm-esp"></span><button class="btn soft" data-close>Fechar</button></div>`)});
     $$('[data-pbs]').forEach(b=>b.onclick=()=>{const e=l[Number(b.dataset.pbs)];const nome=prompt('Nome do modelo de público:',e.segTxt!=='não identificado'?e.segTxt:'');if(!nome)return;const nl=[...salvos,{id:'P'+Date.now().toString(36),nome:nome.slice(0,60),txt:e.txt,seg:e.segTxt==='não identificado'?'':e.segTxt}];salvos.length=0;salvos.push(...nl);tpPrefSet('trafego.publicos.salvos',nl);toast('Modelo salvo');desenha()});
     $$('[data-pdel]').forEach(b=>b.onclick=()=>{const nl=salvos.filter(s=>s.id!==b.dataset.pdel);salvos.length=0;salvos.push(...nl);tpPrefSet('trafego.publicos.salvos',nl);desenha()});
-    $('#pbCustom').onclick=async()=>{const o=adminOverlay('<h3>Públicos personalizados e semelhantes</h3><div id="pcBody"><div class="loading"><span></span><b>Consultando a Meta…</b></div></div><div class="actions"><span class="cm-esp"></span><button class="btn soft" data-close>Fechar</button></div>');try{const r=await api('/ads/publicos');o.el.querySelector('#pcBody').innerHTML=r.rows.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>Nome</th><th>Tipo</th><th>Tamanho aproximado</th><th>Status</th></tr></thead><tbody>${r.rows.map(a=>`<tr><td>${esc(a.nome)}</td><td>${esc(a.tipo)}</td><td>${a.minimo!==null?`${gmN(a.minimo)}${a.maximo?' a '+gmN(a.maximo):''}`:'—'}</td><td>${esc(a.status||'—')}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">Só nome, tipo e tamanho aproximado: nenhuma pessoa ou contato é listado.</p>`:'<p>A conta não tem públicos personalizados ou semelhantes.</p>'}catch(e){o.el.querySelector('#pcBody').innerHTML=`<p class="int-warn">A Meta não liberou a leitura de públicos personalizados para este acesso: ${esc(e.message)}</p>`}};
+    $('#pbCustom').onclick=()=>tpPublicosMeta();
   };
   desenha();
 };
@@ -157,3 +157,45 @@ TP_PAGINAS.tfanalises=async function(){
   if(TPA.comparar)await carregaAnterior();
   desenha();
 };
+
+// ================= Públicos personalizados da Meta (listar, criar, renomear, excluir) =================
+const TP_PUB_TIPO={CUSTOM:'Lista de contatos',WEBSITE:'Visitantes do site',ENGAGEMENT:'Interação (Instagram/Facebook)',LOOKALIKE:'Semelhante',APP:'Aplicativo',OFFLINE_CONVERSION:'Conversões offline'};
+async function tpPublicosMeta(){
+  const o=adminOverlay('<h3>Públicos personalizados e semelhantes</h3><div id="pcBody"><div class="loading"><span></span><b>Consultando a Meta…</b></div></div><div class="actions"><button class="btn" id="pcNovo" type="button">+ Novo público</button><span class="cm-esp"></span><button class="btn soft" data-close>Fechar</button></div>');
+  o.el.querySelector('.admin-box').classList.add('st-box');
+  const corpo=o.el.querySelector('#pcBody');let rows=[];
+  const lista=async()=>{
+    corpo.innerHTML='<div class="loading"><span></span><b>Consultando a Meta…</b></div>';
+    try{rows=(await api('/ads/publicos')).rows}catch(e){corpo.innerHTML=`<p class="int-warn">A Meta não liberou a leitura de públicos para este acesso: ${esc(e.message)}</p>`;return}
+    corpo.innerHTML=rows.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>Nome</th><th>Tipo</th><th>Tamanho aproximado</th><th>Status</th>${adsCompleto?'<th></th>':''}</tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(a.nome)}<br><small>${esc(a.id)}</small></td><td>${esc(TP_PUB_TIPO[a.tipo]||a.tipo)}</td><td>${a.minimo!==null?`${gmN(a.minimo)}${a.maximo?' a '+gmN(a.maximo):''}`:'—'}</td><td>${esc(a.status||'—')}</td>${adsCompleto?`<td><button class="softbtn" data-pren="${attr(a.id)}">Renomear</button> <button class="softbtn" data-pexc="${attr(a.id)}">Excluir</button></td>`:''}</tr>`).join('')}</tbody></table></div><p class="kpi-note">Só nome, tipo e tamanho aproximado: nenhuma pessoa ou contato é listado.</p>`:'<p>A conta não tem públicos personalizados ou semelhantes.</p>';
+    corpo.querySelectorAll('[data-pren]').forEach(b=>b.onclick=async()=>{const a=rows.find(x=>x.id===b.dataset.pren);const n=prompt('Novo nome:',a.nome);if(!n)return;try{await gmPost('/ads/publicos/editar',{id:a.id,nome:n});toast('Público renomeado na Meta');lista()}catch(e){toast(e.message,'bad')}});
+    corpo.querySelectorAll('[data-pexc]').forEach(b=>b.onclick=async()=>{const a=rows.find(x=>x.id===b.dataset.pexc);if(!confirm(`Excluir o público "${a.nome}" na Meta? Conjuntos que o usam podem parar de entregar.`))return;try{await gmPost('/ads/publicos/excluir',{id:a.id,confirmou:true});toast('Público excluído');lista()}catch(e){toast(e.message,'bad')}});
+  };
+  const nb=o.el.querySelector('#pcNovo');
+  if(!adsCompleto)nb.outerHTML='<small class="kpi-note">Para criar ou editar públicos, ligue o modo completo do Tráfego.</small>';
+  else nb.onclick=()=>tpNovoPublico(rows,lista);
+  lista();
+}
+async function tpNovoPublico(rows,depois){
+  const op=await criOpcoes();
+  const o=adminOverlay(`<h3>Novo público</h3><form id="npForm" class="cm-form cri-form" novalidate>
+   ${criLbl('Tipo *',criSel('npTipo',[['CONTATOS','Lista de contatos (e-mails e telefones)'],['SITE','Visitantes do site (pixel)'],['INSTAGRAM','Quem interagiu com o Instagram'],['SEMELHANTE','Semelhante a um público']],'','Escolha…'))}
+   ${criLbl('Nome *','<input class="control" id="npNome" maxlength="100" autocomplete="off">')}
+   <div id="npExtra"></div><div id="npMsg" class="cri-rev" aria-live="polite"></div>
+   <div class="tp-ff-acoes"><button class="softbtn" type="button" data-close>Cancelar</button><button class="btn" type="submit">Criar público</button></div></form>`);
+  const f=o.el,g=id=>{const e=f.querySelector('#'+id);return e?e.value:''};
+  f.querySelector('#npTipo').onchange=()=>{const t=g('npTipo');f.querySelector('#npExtra').innerHTML=
+    t==='CONTATOS'?criLbl('Contatos *','<textarea class="control" id="npCont" rows="6" placeholder="Um e-mail ou telefone por linha"></textarea>','Os dados são embaralhados (SHA-256) aqui no servidor antes de ir à Meta e não ficam guardados no sistema.')+`<label class="check-row"><input type="checkbox" id="npAut"> Confirmo que essas pessoas autorizaram receber comunicação do Colégio (LGPD).</label>`
+    :t==='SITE'?criLbl('Pixel *',criSel('npPix',(op.pixels||[]).map(x=>[x.id,x.nome]),'','Escolha…'))+criLbl('Últimos dias (1 a 180)','<input class="control" id="npDias" type="number" min="1" max="180" value="30">')+criLbl('Endereço contém (opcional)','<input class="control" id="npUrl" placeholder="/matriculas">')
+    :t==='INSTAGRAM'?criLbl('Últimos dias (1 a 365)','<input class="control" id="npDias" type="number" min="1" max="365" value="90">','Pessoas que visitaram o perfil, curtiram, comentaram, salvaram ou mandaram mensagem.')
+    :t==='SEMELHANTE'?criLbl('Público de origem *',criSel('npOri',rows.filter(r=>r.tipo!=='LOOKALIKE').map(r=>[r.id,r.nome]),'','Escolha…'))+criLbl('Semelhança (1% = mais parecido, 10% = mais amplo)','<input class="control" id="npPct" type="number" min="1" max="10" value="1">'):''};
+  f.querySelector('#npForm').onsubmit=async e=>{e.preventDefault();const t=g('npTipo'),msg=f.querySelector('#npMsg');msg.textContent='';
+    if(!t){msg.textContent='Escolha o tipo.';return}
+    const b={tipo:t,nome:g('npNome'),confirmou:true};
+    if(t==='CONTATOS'){b.contatos=g('npCont');b.autorizacao=!!f.querySelector('#npAut').checked}
+    if(t==='SITE'){b.pixelId=g('npPix');b.dias=Number(g('npDias'));b.url=g('npUrl')}
+    if(t==='INSTAGRAM'){b.dias=Number(g('npDias'))}
+    if(t==='SEMELHANTE'){b.origemId=g('npOri');b.percentual=Number(g('npPct'))}
+    const bt=f.querySelector('button[type=submit]');bt.disabled=true;
+    try{const r=await gmPost('/ads/publicos/criar',b);o.close();toast(r.enviados?`Público criado com ${r.enviados} contato(s)${r.ignorados?` (${r.ignorados} ignorado(s) por formato inválido)`:''}`:'Público criado na Meta');depois()}catch(x){bt.disabled=false;msg.innerHTML=`<div class="cri-msg err">${esc(x.message)}</div>`}};
+}
