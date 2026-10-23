@@ -9,12 +9,15 @@ const criLbl=(t,corpo,dica='')=>`<label class="cri-c"><span>${t}</span>${corpo}$
 const criDia=iso=>iso?iso.split('-').reverse().join('/'):'';
 
 /** Pergunta o que criar. O nível da aba aberta vem em destaque. */
-function tpMenuCriar(){
-  const atual=GM2.nivel;
+async function tpMenuCriar(){
+  const atual=GM2.nivel;let rasc=[];try{rasc=((await api('/ads/extras')).rascunhos||[]).filter(r=>r.dados&&r.dados.criar)}catch{}
   const o=adminOverlay(`<h3>O que você quer criar?</h3><p class="kpi-note">Cada item é criado separado, como no Gerenciador da Meta, e <b>nasce pausado</b>: você confere e ativa depois.</p>
    <div class="cri-esc">${[['campanha','Campanha','Define o objetivo (conversas, tráfego, alcance…).'],['conjunto','Conjunto de anúncios','Dentro de uma campanha: público, orçamento, datas e onde veicular.'],['anuncio','Anúncio','Dentro de um conjunto: a arte ou a publicação do Instagram.']].map(([k,t,d])=>`<button type="button" class="cri-op ${atual===k?'on':''}" data-cri="${k}"><b>${t}</b><small>${d}</small></button>`).join('')}
     <button type="button" class="cri-op" data-cri="assistente"><b>Campanha completa (assistente)</b><small>Cria campanha, conjunto e anúncio de uma vez, em passos guiados. Vai ao ar ativa.</small></button></div>
+   ${rasc.length?`<h4>Rascunhos salvos</h4><div class="cri-rasc">${rasc.map(r=>`<div class="notif"><span>${esc(r.nome)} <small>${esc(({campanha:'campanha',conjunto:'conjunto',anuncio:'anúncio'})[r.dados.nivel]||'')} · ${esc(fmtDateTime?fmtDateTime(r.salvoEm):r.salvoEm)}</small></span><span><button type="button" class="softbtn" data-ro="${attr(r.id)}">Continuar</button> <button type="button" class="softbtn" data-rx="${attr(r.id)}">Excluir</button></span></div>`).join('')}</div>`:''}
    <div class="tp-ff-acoes"><button class="softbtn" type="button" data-close>Cancelar</button></div>`);
+  o.el.querySelectorAll('[data-ro]').forEach(b=>b.onclick=()=>{const r=rasc.find(x=>x.id===b.dataset.ro);if(!r)return;o.close();tpCriar(r.dados.nivel,{rascunho:r})});
+  o.el.querySelectorAll('[data-rx]').forEach(b=>b.onclick=async()=>{if(!confirm('Excluir este rascunho?'))return;try{await gmPost('/ads/rascunhos',{excluir:b.dataset.rx});o.close();tpMenuCriar()}catch(e){toast(e.message,'bad')}});
   o.el.querySelectorAll('[data-cri]').forEach(b=>b.onclick=()=>{o.close();b.dataset.cri==='assistente'?novaCampanha():tpCriar(b.dataset.cri)});
 }
 
@@ -33,11 +36,21 @@ async function tpCriar(nivel,pre={}){
   if(nivel==='anuncio')corpo=criLbl('Conjunto de anúncios *',criSel('crSet',sets.map(c=>[c.id,`${c.nome} — ${(gmDados.campanhas.find(k=>k.id===c._campanha)||{}).nome||''}`]),setIni,'Escolha o conjunto…'))+corpoNome+'<div id="crDin"></div>';
   const o=adminOverlay(`<h3>${rot}</h3><form id="crForm" class="cm-form cri-form" novalidate>${corpo}
     <div id="crRev" class="cri-rev" aria-live="polite"></div>
-    <div class="tp-ff-acoes"><button class="softbtn" type="button" data-close>Cancelar</button><button class="softbtn" type="button" id="crConf">Conferir</button><button class="btn" type="submit" id="crOk" disabled>Criar (pausado)</button></div></form>`);
+    <div class="tp-ff-acoes"><button class="softbtn" type="button" data-close>Cancelar</button><button class="softbtn" type="button" id="crRasc">Salvar rascunho</button><button class="softbtn" type="button" id="crConf">Conferir</button><button class="btn" type="submit" id="crOk" disabled>Criar (pausado)</button></div></form>`);
   const f=o.el,g=id=>{const e=f.querySelector('#'+id);return e?e.value:''};
   const rev=(h,cls='')=>{f.querySelector('#crRev').innerHTML=h?`<div class="cri-msg ${cls}">${h}</div>`:''};
   const invalida=()=>{f.querySelector('#crOk').disabled=true;rev('')};
   f.addEventListener('input',invalida);f.addEventListener('change',e=>{if(e.target.id!=='crCamp'&&e.target.id!=='crSet')invalida()});
+  // ---- rascunho: guarda o que está preenchido, sem enviar nada à Meta ----
+  const rascId=(pre.rascunho&&pre.rascunho.id)||'';
+  f.querySelector('#crRasc').onclick=async()=>{
+    const campos={};f.querySelectorAll('#crForm input,#crForm select,#crForm textarea').forEach(e=>{if(!e.id||e.type==='file')return;campos[e.id]=e.type==='checkbox'?(e.checked?'1':''):e.value});
+    const nome=(prompt('Nome do rascunho:',(campos.crNome||'').slice(0,60))||'').trim();if(!nome)return;
+    try{await gmPost('/ads/rascunhos',{nome,id:rascId||undefined,dados:{criar:true,nivel,campos,inicio:est.inicio||'',fim:est.fim||'',arq:est.arq||''}});toast('Rascunho salvo. Continue depois em + Criar.')}catch(e){toast(e.message,'bad')}};
+  if(pre.rascunho){const d=pre.rascunho.dados;est.inicio=d.inicio||'';est.fim=d.fim||'';est.arq=d.arq||'';
+    // os campos aparecem em etapas (o conjunto/campanha escolhido carrega o resto): preenche de novo algumas vezes
+    const preenche=()=>Object.entries(d.campos||{}).forEach(([id,v])=>{const e=f.querySelector('#'+id);if(!e||e.type==='file')return;if(e.type==='checkbox')e.checked=!!v;else if(e.value!==v){e.value=v;e.dispatchEvent(new Event('change',{bubbles:true}))}});
+    [50,500,1500,3000].forEach(ms=>setTimeout(()=>{if(document.body.contains(f)){preenche();f.querySelector('#crOk').disabled=true}},ms))}
 
   // ---- campos dinâmicos ----
   const destinoHtml=(exige,goal,cta,ctas)=>{

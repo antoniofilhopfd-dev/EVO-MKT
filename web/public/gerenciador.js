@@ -115,7 +115,7 @@ async function novaCampanha(){
   let op,cfg;try{[op,cfg]=await Promise.all([api('/ads/campanha/opcoes'),api('/ads/gestao')])}catch(e){return toast(e.message,'bad')}
   if(!cfg.config.ativa)return toast('Ligue a gestão de anúncios em Tráfego → Gestor de anúncios antes de criar campanhas.','warn');
   const chave=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');
-  let rascs=[];try{rascs=(await api('/ads/extras')).rascunhos||[]}catch{}
+  let rascs=[];try{rascs=((await api('/ads/extras')).rascunhos||[]).filter(r=>!(r.dados&&r.dados.criar))}catch{}
   let rascId='';
   const pub=cfg.config.publico;
   const w={passo:1,objetivo:'',meta:'',nome:'',publico:{cidade:pub.cidade,raioKm:pub.raioKm,idadeMin:pub.idadeMin,idadeMax:pub.idadeMax,genero:'todos',interesses:[],publicosPersonalizados:[],plataformas:[]},modo:'AUTO',

@@ -274,5 +274,14 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await p.fill('.tp-inline','Nome editado na linha');await p.keyboard.press('Enter');await p.waitForTimeout(1200);
  const nomeNovo=await (async()=>{const st=await (await fetch('http://127.0.0.1:8099/__state')).json();return JSON.stringify((st.edits||{})[idEd]||[])})();
  t('editar o nome direto na linha (lápis + Enter) grava na Meta',/Nome editado na linha/.test(nomeNovo),nomeNovo);
+ await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ await ir(p,'gerenciador');await p.click('#tpNova');await p.waitForSelector('[data-cri="campanha"]');await p.click('[data-cri="campanha"]');await p.waitForSelector('#crNome');
+ await p.fill('#crNome','Campanha em rascunho');await p.selectOption('#crObj',{index:1});await p.evaluate(()=>{window.prompt=()=>'Rascunho de teste'});await p.click('#crRasc');await p.waitForTimeout(900);
+ await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ await p.click('#tpNova');await p.waitForSelector('[data-ro]');
+ const temR=await p.$$eval('.cri-rasc .notif',e=>e.map(x=>x.innerText).join('|'));
+ await p.click('[data-ro]');await p.waitForSelector('#crNome');await p.waitForTimeout(900);
+ const nomeR=await p.$eval('#crNome',e=>e.value),objR=await p.$eval('#crObj',e=>e.value);
+ t('rascunho de campanha: salva sem enviar à Meta, aparece em + Criar e volta com o que foi preenchido',/Rascunho de teste/.test(temR)&&nomeR==='Campanha em rascunho'&&!!objR,[temR,nomeR,objR]);
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
