@@ -89,6 +89,16 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s]=await call('POST','/ads/publicos/editar',{id:idCA,nome:'Responsáveis renomeado'});t('renomeia o público na Meta',s===200&&JSON.stringify((await pub()).publicos_edits||{}).includes('Responsáveis renomeado'));
  [s]=await call('POST','/ads/publicos/excluir',{id:idCA});t('excluir público exige confirmação (400)',s===400);
  [s]=await call('POST','/ads/publicos/excluir',{id:idCA,confirmou:true});t('exclui o público na Meta',s===200&&((await pub()).publicos_excluidos||[]).includes(idCA));
+ // ---- testes A/B, pixel e catálogos
+ const fut=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,16);
+ [s,r]=await call('POST','/ads/testes/criar',{nome:'Teste de público',nivel:'conjunto',ids:['s1'],inicio:fut(1),fim:fut(5),confirmou:true});t('teste A/B precisa de pelo menos 2 itens',s===400&&/2 a 5/.test(r.error),r);
+ [s,r]=await call('POST','/ads/testes/criar',{nome:'Teste de público',nivel:'conjunto',ids:['s1','s2'],inicio:fut(-1),fim:fut(5),confirmou:true});t('teste A/B que começa no passado é recusado',s===400&&/no futuro/.test(r.error),r);
+ [s,r]=await call('POST','/ads/testes/criar',{nome:'Teste de público',nivel:'conjunto',ids:['s1','s2'],inicio:fut(1),fim:fut(40),confirmou:true});t('teste A/B com mais de 30 dias é recusado',s===400&&/1 a 30/.test(r.error),r);
+ [s,r]=await call('POST','/ads/testes/criar',{nome:'Teste de público',nivel:'conjunto',ids:['s1','s2'],inicio:fut(1),fim:fut(8)});t('teste A/B sem confirmação é recusado',s===400,r);
+ [s,r]=await call('POST','/ads/testes/criar',{nome:'Teste de público',nivel:'conjunto',ids:['s1','s2'],inicio:fut(1),fim:fut(8),confirmou:true});const estudo=Object.values((await mock('/__state')).estudos||{})[0]||{};
+ t('cria o teste A/B dividindo 50/50 entre dois conjuntos',s===200&&estudo.type==='SPLIT_TEST'&&JSON.parse(estudo.cells||'[]').map(c=>c.treatment_percentage).join()==='50,50'&&JSON.parse(estudo.cells).every(c=>c.adsets.length===1),[s,r,estudo]);
+ [s,r]=await call('GET','/ads/testes');t('lista os testes da Meta com situação e células',s===200&&r.rows.length===1&&r.rows[0].situacao==='Agendado'&&r.rows[0].celulas.length===2,r);
+ [s,r]=await call('GET','/ads/eventos');t('pixel (último disparo e eventos dos últimos 7 dias) e catálogos, só leitura',s===200&&r.pixels[0].nome==='Pixel do site'&&r.pixels[0].eventos[0].nome==='PageView'&&r.pixels[0].eventos[0].total===120&&r.catalogos[0].nome==='Catálogo de cursos',r);
  [s,r]=await call('GET','/ads/acoes');t('o histórico registra as três criações',s===200&&['campanha','conjunto','anuncio'].every(nv=>r.rows.some(x=>x.acao==='criar'&&x.nivel===nv&&x.resultado==='OK')),r.rows&&r.rows.slice(0,4));
  await call('POST','/integrations/meta/token',{token:'FAILSET_TOKEN'});
  [s,r]=await call('POST','/ads/criar',{nivel:'conjunto',confirmou:true,spec:conj()});t('se a Meta recusa, o erro aparece (502) e fica no histórico como ERRO',s===502&&/Meta recusou/.test(r.error),r);

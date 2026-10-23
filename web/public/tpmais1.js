@@ -199,3 +199,51 @@ async function tpNovoPublico(rows,depois){
     const bt=f.querySelector('button[type=submit]');bt.disabled=true;
     try{const r=await gmPost('/ads/publicos/criar',b);o.close();toast(r.enviados?`Público criado com ${r.enviados} contato(s)${r.ignorados?` (${r.ignorados} ignorado(s) por formato inválido)`:''}`:'Público criado na Meta');depois()}catch(x){bt.disabled=false;msg.innerHTML=`<div class="cri-msg err">${esc(x.message)}</div>`}};
 }
+
+// ================= Testes A/B =================
+TP_PAGINAS.tftestes=async function(){
+  state.module=null;
+  $('#content').innerHTML=tpCabecalho('Testes A/B','Compare públicos, posicionamentos ou criativos com divisão controlada pela Meta.','<button class="btn" id="ttNovo" type="button">+ Novo teste</button>')+'<div id="tpPg"><div class="loading"><span></span><b>Consultando a Meta…</b></div></div>';
+  tpPosCabecalho(()=>TP_PAGINAS.tftestes());
+  const d=await tpCarregaOuErro('tftestes');if(!d)return;
+  let rows=[],erro='';
+  try{rows=(await api('/ads/testes')).rows}catch(e){erro=e.message}
+  const SIT={Agendado:'warn','Em andamento':'ok',Encerrado:''};
+  $('#tpPg').innerHTML=erro?`<div class="empty-rich"><strong>Não foi possível ler os testes</strong><p>${esc(erro)}</p></div>`
+   :rows.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>Teste</th><th>Situação</th><th>Período</th><th>Versões comparadas</th></tr></thead><tbody>${rows.map(t=>`<tr><td><b>${esc(t.nome)}</b>${t.descricao?`<br><small>${esc(t.descricao)}</small>`:''}</td><td><span class="badge ${SIT[t.situacao]||''}">${esc(t.situacao)}</span></td><td>${t.inicio?esc(fmtDate(t.inicio.slice(0,10))):'—'} a ${t.fim?esc(fmtDate(t.fim.slice(0,10))):'—'}</td><td>${t.celulas.map(c=>`<div>${esc(c.nome)} <small>(${c.percentual}%)</small></div>`).join('')}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">O resultado do teste (qual versão venceu) é calculado pela Meta e aparece no Gerenciador de Anúncios deles quando o teste termina.</p>`
+   :'<div class="empty-rich"><strong>Nenhum teste A/B ainda</strong><p>Crie um para comparar dois conjuntos de anúncios (por exemplo, dois públicos) com a mesma verba.</p></div>';
+  $('#ttNovo').onclick=()=>{if(!adsCompleto)return toast('Ligue o modo completo do Tráfego para criar testes.','warn');tpNovoTeste(()=>TP_PAGINAS.tftestes())};
+};
+function tpNovoTeste(depois){
+  const conj=tpFlat('conjunto').filter(x=>tpEstadoDe(x)!=='ARCHIVED'),camp=gmDados.campanhas.filter(x=>tpEstadoDe(x)!=='ARCHIVED');
+  const est={nivel:'conjunto',ids:new Set(),ini:'',fim:''};
+  const o=adminOverlay(`<h3>Novo teste A/B</h3><form id="ttForm" class="cm-form cri-form" novalidate>
+    ${criLbl('Nome *','<input class="control" id="ttNome" maxlength="100" autocomplete="off" placeholder="Ex.: Público amplo × interesses">')}
+    ${criLbl('O que comparar',criSel('ttNivel',[['conjunto','Conjuntos de anúncios'],['campanha','Campanhas']],'conjunto'))}
+    <div class="cri-c"><span>Escolha de 2 a 5 itens *</span><div id="ttLista" class="cri-plat" style="max-height:220px;overflow:auto"></div><small class="kpi-note">A Meta divide o público entre as versões sem sobreposição, para o resultado ser justo.</small></div>
+    ${criLbl('Descrição (a hipótese)','<input class="control" id="ttDesc" maxlength="500" placeholder="Ex.: Interesses trazem conversas mais baratas">')}
+    ${criLbl('Período *','<button type="button" class="control cm-rng" id="ttPer">📅 Escolher o primeiro e o último dia</button>','De 1 a 30 dias, começando amanhã ou depois.')}
+    <div id="ttMsg" class="cri-rev" aria-live="polite"></div>
+    <div class="tp-ff-acoes"><button class="softbtn" type="button" data-close>Cancelar</button><button class="btn" type="submit">Criar teste</button></div></form>`);
+  const f=o.el,g=id=>f.querySelector('#'+id).value;
+  const lista=()=>{const l=est.nivel==='campanha'?camp:conj;f.querySelector('#ttLista').innerHTML=l.map(x=>`<label class="check-row"><input type="checkbox" data-tt="${attr(x.id)}" ${est.ids.has(x.id)?'checked':''}><span>${esc(x.nome)}</span></label>`).join('')||'<small class="kpi-note">Nada disponível.</small>';
+    f.querySelectorAll('[data-tt]').forEach(c=>c.onchange=()=>{c.checked?est.ids.add(c.dataset.tt):est.ids.delete(c.dataset.tt)})};
+  lista();f.querySelector('#ttNivel').onchange=e=>{est.nivel=e.target.value;est.ids.clear();lista()};
+  f.querySelector('#ttPer').onclick=()=>PeriodoPicker.abrir({de:est.ini,ate:est.fim,titulo:'Período do teste',max:'2099-12-31'},(a,b)=>{est.ini=a;est.fim=b;f.querySelector('#ttPer').textContent=`📅 ${fmtDate(a)} a ${fmtDate(b)}`});
+  f.querySelector('#ttForm').onsubmit=async e=>{e.preventDefault();const msg=f.querySelector('#ttMsg');msg.textContent='';
+    if(!est.ini||!est.fim){msg.textContent='Escolha o período.';return}
+    const bt=f.querySelector('button[type=submit]');bt.disabled=true;
+    try{await gmPost('/ads/testes/criar',{nome:g('ttNome'),nivel:est.nivel,ids:[...est.ids],descricao:g('ttDesc'),inicio:est.ini+'T00:00',fim:est.fim+'T23:59',confirmou:true});o.close();toast('Teste criado na Meta');depois()}catch(x){bt.disabled=false;msg.innerHTML=`<div class="cri-msg err">${esc(x.message)}</div>`}};
+}
+
+// ================= Pixel e catálogos (só leitura) =================
+TP_PAGINAS.tfeventos=async function(){
+  state.module=null;
+  $('#content').innerHTML=tpCabecalho('Pixel e catálogos','O que o pixel está recebendo e os catálogos da conta. Só leitura: a configuração continua no Gerenciador de Eventos da Meta.')+'<div id="tpPg"><div class="loading"><span></span><b>Consultando a Meta…</b></div></div>';
+  tpPosCabecalho(()=>TP_PAGINAS.tfeventos());
+  let d;try{d=await api('/ads/eventos')}catch(e){$('#tpPg').innerHTML=`<div class="empty-rich"><strong>Não foi possível ler</strong><p>${esc(e.message)}</p></div>`;return}
+  const op=await criOpcoes();
+  $('#tpPg').innerHTML=`<section class="card"><div class="card-title"><div><small>PIXEL</small><h3>Eventos dos últimos 7 dias</h3></div></div>${d.pixels.length?d.pixels.map(p=>`<div class="notif"><div><b>${esc(p.nome)}</b> <small>${esc(p.id)}</small><br><small>${p.indisponivel?'<span class="badge bad">indisponível</span> ':''}Último disparo: ${p.ultimoDisparo?esc(fmtDateTime(p.ultimoDisparo)):'nunca'}</small></div><div>${p.eventos.length?p.eventos.map(e=>`<span class="tp-chip">${esc(e.nome)} <b>${gmN(e.total)}</b></span>`).join(' '):'<small class="kpi-note">Nenhum evento recebido nos últimos 7 dias.</small>'}</div></div>`).join(''):'<p class="kpi-note">A conta não tem pixel.</p>'}</section>
+   <section class="card" style="margin-top:12px"><div class="card-title"><div><small>CATÁLOGOS</small><h3>Catálogos de produtos</h3></div></div>${d.catalogos.length?`<div class="tablewrap"><table class="datatable"><thead><tr><th>Catálogo</th><th>Tipo</th><th>Produtos</th></tr></thead><tbody>${d.catalogos.map(c=>`<tr><td>${esc(c.nome)}<br><small>${esc(c.id)}</small></td><td>${esc(c.tipo||'—')}</td><td>${c.produtos!==null?gmN(c.produtos):'—'}</td></tr>`).join('')}</tbody></table></div>`:`<p class="kpi-note">${esc((d.aviso||[])[0]||'Nenhum catálogo na conta.')}</p>`}</section>
+   <section class="card" style="margin-top:12px"><div class="card-title"><div><small>FORMULÁRIOS</small><h3>Formulários instantâneos</h3></div></div>${(op.formularios||[]).length?`<ul class="tp-lista">${op.formularios.map(x=>`<li><b>${esc(x.nome)}</b> <small>${esc(x.id)}</small></li>`).join('')}</ul>`:'<p class="kpi-note">Nenhum formulário instantâneo encontrado.</p>'}</section>`;
+};

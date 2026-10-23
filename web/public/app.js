@@ -1,5 +1,5 @@
 const API='/api';
-const VERSION='5.17.53';
+const VERSION='5.17.54';
 const DATA_MODULES=['agenda','aprovacoes','arquivos','calendario','campanhas','configuracoes','conteudos','equipe','eventos','ideias','instagram','integracoes','lixeira','projetos','relatorios','solicitacoes','tarefas','templates','trafego'];
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -21,7 +21,7 @@ const INTERNAL_USERS=[
  {code:'ALU-3304',name:'Aluizo Junior',role:'team',label:'Equipe de Marketing'},
  {code:'EDU-3305',name:'Maria Eduarda',role:'team',label:'Equipe de Marketing'}
 ];
-const TEAM_ALLOWED=['hoje','calendario','igvisao','studio','conteudos','editorial','ideias','aprovacoes','templates','instagram','igposts','igranking','trafego','gerenciador','tfcriativos','tfanalises','tfpublicos','tforcamentos','tfalertas','tfrelatorios','tfhistorico','arquivos','configuracoes'];
+const TEAM_ALLOWED=['hoje','calendario','igvisao','studio','conteudos','editorial','ideias','aprovacoes','templates','instagram','igposts','igranking','trafego','gerenciador','tfcriativos','tfanalises','tfpublicos','tftestes','tfeventos','tforcamentos','tfalertas','tfrelatorios','tfhistorico','arquivos','configuracoes'];
 let internalSession=null;
 function loadInternalSession(){try{const x=JSON.parse(sessionStorage.getItem('evo.internal.session')||'null');if(x&&INTERNAL_USERS.some(u=>u.code===x.code&&u.name===x.name))return x}catch{}return null}
 function canAccess(page){if(!internalSession)return false;return TEAM_ALLOWED.includes(page)}
@@ -159,7 +159,7 @@ const AREAS=[
  {k:'visao',label:'Dashboard',icon:'◉',pages:['hoje']},
  {k:'calendario',label:'Calendário',icon:'▤',pages:['calendario']},
  {k:'instagramarea',label:'Instagram',icon:'◎',pages:['igvisao','studio','conteudos','instagram','editorial','ideias','aprovacoes','templates','igposts','igranking'],main:['igvisao','studio','conteudos','instagram','igposts','igranking']},
- {k:'trafego',label:'Tráfego Pago',icon:'↗',pages:['trafego','gerenciador','tfcriativos','tfanalises','tfpublicos','tforcamentos','tfalertas','tfrelatorios','tfhistorico'],main:['trafego','gerenciador','tfcriativos','tfanalises']},
+ {k:'trafego',label:'Tráfego Pago',icon:'↗',pages:['trafego','gerenciador','tfcriativos','tfanalises','tfpublicos','tftestes','tfeventos','tforcamentos','tfalertas','tfrelatorios','tfhistorico'],main:['trafego','gerenciador','tfcriativos','tfanalises']},
  {k:'arquivos',label:'Arquivos',icon:'▱',pages:['arquivos']},
  {k:'configuracoes',label:'Configurações',icon:'⚙',pages:['configuracoes']},
 ];
@@ -172,7 +172,7 @@ function renderNav(){
  $$('.navitem',nav).forEach(b=>b.onclick=()=>go(b.dataset.page));
  $('#version').textContent=`v${VERSION}`;
 }
-const SUBLABEL={igvisao:'Visão geral',studio:'Estúdio',conteudos:'Publicações',instagram:'Análises',editorial:'Planejamento editorial',ideias:'Ideias',aprovacoes:'Aprovações',templates:'Modelos',igposts:'Desempenho',igranking:'Ranking',trafego:'Visão geral',gerenciador:'Gerenciador de anúncios',tfcriativos:'Criativos',tfanalises:'Análises',tfpublicos:'Públicos',tforcamentos:'Orçamentos',tfalertas:'Alertas e automações',tfrelatorios:'Relatórios',tfhistorico:'Histórico'};
+const SUBLABEL={igvisao:'Visão geral',studio:'Estúdio',conteudos:'Publicações',instagram:'Análises',editorial:'Planejamento editorial',ideias:'Ideias',aprovacoes:'Aprovações',templates:'Modelos',igposts:'Desempenho',igranking:'Ranking',trafego:'Visão geral',gerenciador:'Gerenciador de anúncios',tfcriativos:'Criativos',tfanalises:'Análises',tfpublicos:'Públicos',tftestes:'Testes A/B',tfeventos:'Pixel e catálogos',tforcamentos:'Orçamentos',tfalertas:'Alertas e automações',tfrelatorios:'Relatórios',tfhistorico:'Histórico'};
 /** Abas principais da área; as demais ficam no menu "Mais" (menos abas horizontais, nada fica inacessível). */
 function montarSubtabs(){
  const box=$('#subtabs');if(!box)return;const a=areaOf(state.page);const ok=a?a.pages.filter(canAccess):[];

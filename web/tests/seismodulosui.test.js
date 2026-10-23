@@ -283,5 +283,15 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getT
  await p.click('[data-ro]');await p.waitForSelector('#crNome');await p.waitForTimeout(900);
  const nomeR=await p.$eval('#crNome',e=>e.value),objR=await p.$eval('#crObj',e=>e.value);
  t('rascunho de campanha: salva sem enviar à Meta, aparece em + Criar e volta com o que foi preenchido',/Rascunho de teste/.test(temR)&&nomeR==='Campanha em rascunho'&&!!objR,[temR,nomeR,objR]);
+ await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ await ir(p,'tfeventos');await p.waitForTimeout(1500);
+ const txtEv=await p.evaluate(()=>document.querySelector('#content').innerText);
+ t('Pixel e catálogos: mostra o pixel com eventos, o catálogo e os formulários',/Pixel do site/.test(txtEv)&&/PageView/.test(txtEv)&&/Catálogo de cursos/.test(txtEv),txtEv.slice(0,300));
+ await ir(p,'tftestes');await p.waitForTimeout(1200);await p.click('#ttNovo');await p.waitForSelector('#ttForm');
+ await p.fill('#ttNome','Teste de públicos');const nl=await p.$$eval('[data-tt]',e=>e.length);
+ t('Testes A/B: o formulário lista os conjuntos para escolher e o período',nl>=2&&!!(await p.$('#ttPer')),nl);
+ await p.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
+ await ir(p,'tfpublicos');await p.waitForTimeout(800);await p.click('#pbCustom');await p.waitForSelector('#pcNovo',{timeout:8000});await p.waitForSelector('[data-pren]',{timeout:8000}).catch(()=>{});
+ t('Públicos: a tela mostra o botão + Novo público e as ações Renomear/Excluir',!!(await p.$('#pcNovo'))&&!!(await p.$('[data-pren]')),null);
  await b.close();console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

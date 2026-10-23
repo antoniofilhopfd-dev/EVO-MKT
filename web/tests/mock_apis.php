@@ -34,7 +34,24 @@ if (str_starts_with($p, '/graph')) {
     if ($g === '/act_111222333/advideos' && $m === 'POST') { $S['videos_enviados'][] = $_FILES['source']['size'] ?? 0; j(['id' => 'VID_1']); }
     if ($g === '/VID_1/thumbnails') j(['data' => [['uri' => 'https://scontent.example/thumb.jpg', 'is_preferred' => true]]]);
     if ($g === '/VID_1') j(['id' => 'VID_1', 'status' => ['video_status' => 'ready']]);
-    if ($g === '/act_111222333/adspixels') j(['data' => [['id' => 'PX1', 'name' => 'Pixel do site']]]);
+    if ($g === '/act_111222333/adspixels') j(['data' => [['id' => 'PX1', 'name' => 'Pixel do site', 'last_fired_time' => '2026-10-22T10:00:00+0000', 'is_unavailable' => false]]]);
+    if ($g === '/PX1/stats') j(['data' => [['aggregation' => 'event', 'data' => [['value' => 'PageView', 'count' => 120], ['value' => 'Lead', 'count' => 3]]]]]);
+    if ($g === '/BIZ1/owned_product_catalogs') j(['data' => [['id' => 'CAT1', 'name' => 'Catálogo de cursos', 'product_count' => 12, 'vertical' => 'commerce']]]);
+    if ($g === '/BIZ1/ad_studies' && $m === 'POST') { $id = nid('STUDY_'); $S['estudos'][$id] = $in + ['id' => $id]; j(['id' => $id]); }
+    if ($g === '/BIZ1/ad_studies') {
+        $out = [];
+        foreach (($S['estudos'] ?? []) as $e) {
+            $cells = [];
+            foreach (json_decode($e['cells'], true) as $c) {
+                $itens = [];
+                foreach (($c['adsets'] ?? []) as $i) $itens[] = ['id' => $i, 'name' => 'Conjunto ' . $i];
+                $cells[] = ['name' => $c['name'], 'treatment_percentage' => $c['treatment_percentage'], 'adsets' => ['data' => $itens]];
+            }
+            $out[] = ['id' => $e['id'], 'name' => $e['name'], 'type' => 'SPLIT_TEST', 'description' => $e['description'] ?? '', 'start_time' => (int)$e['start_time'], 'end_time' => (int)$e['end_time'], 'cells' => ['data' => $cells]];
+        }
+        j(['data' => $out]);
+    }
+
     if ($g === '/act_111222333/customaudiences' && $m === 'POST') { $id = nid('CA_'); $S['publicos_novos'][$id] = $in; j(['id' => $id]); }
     if (preg_match('#^/(CA_\w+|CA1)/users$#', $g, $mm) && $m === 'POST') { $S['publicos_usuarios'][$mm[1]][] = json_decode($in['payload'] ?? '{}', true); j(['audience_id' => $mm[1], 'num_received' => 1]); }
     if (preg_match('#^/(CA_\w+|CA1)$#', $g, $mm) && $m === 'DELETE') { $S['publicos_excluidos'][] = $mm[1]; j(['success' => true]); }
@@ -72,7 +89,7 @@ if (str_starts_with($p, '/graph')) {
     }
     if (preg_match('#^/([a]\d+)/previews$#', $g)) j(['data' => [['body' => '<iframe src="https://www.facebook.com/ads/api/preview_iframe.php?d=abc&amp;t=1" width="320" height="540"></iframe>']]]);
     if ($g === '/act_111222333/activities') j(['data' => [['event_time' => '2026-10-17T12:00:00+0000', 'actor_name' => 'Maria Gestora', 'event_type' => 'update_campaign_budget', 'translated_event_type' => 'Orçamento da campanha atualizado', 'object_name' => 'Matrículas 2027', 'object_type' => 'CAMPAIGN']]]);
-    if ($g === '/act_111222333' && $m === 'GET') j(['account_status' => ($tok === 'BADACCT_TOKEN' ? 3 : 1), 'spend_cap' => '1000000', 'amount_spent' => '950000', 'balance' => '12345', 'name' => 'Conta Colégio', 'timezone_name' => 'America/Fortaleza', 'currency' => 'BRL', 'funding_source_details' => ['display_string' => 'Visa 4242']]);
+    if ($g === '/act_111222333' && $m === 'GET') j(['business' => ['id' => 'BIZ1'], 'account_status' => ($tok === 'BADACCT_TOKEN' ? 3 : 1), 'spend_cap' => '1000000', 'amount_spent' => '950000', 'balance' => '12345', 'name' => 'Conta Colégio', 'timezone_name' => 'America/Fortaleza', 'currency' => 'BRL', 'funding_source_details' => ['display_string' => 'Visa 4242']]);
     if ($g === '/act_111222333/adsets') j(['data' => [
         ['id' => 's1', 'name' => 'Conjunto matrículas', 'campaign_id' => 'c1', 'status' => 'ACTIVE', 'effective_status' => 'CAMPAIGN_PAUSED', 'daily_budget' => '5000', 'optimization_goal' => 'LEAD_GENERATION', 'destination_type' => 'ON_AD', 'targeting' => ['age_min' => 25, 'age_max' => 55, 'geo_locations' => ['cities' => [['key' => '2430536', 'name' => 'João Pessoa', 'radius' => 15, 'distance_unit' => 'kilometer']]], 'publisher_platforms' => ['instagram']]],
         ['id' => 's2', 'name' => 'Conjunto open day', 'campaign_id' => 'c2', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'daily_budget' => '2000', 'optimization_goal' => 'POST_ENGAGEMENT', 'destination_type' => 'ON_POST', 'targeting' => ['age_min' => 18, 'age_max' => 65]]]]);

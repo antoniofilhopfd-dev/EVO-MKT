@@ -20,11 +20,14 @@ Nada disto foi exercitado na Meta real: o primeiro uso de cada escrita deve ser 
 | Prévia oficial do anúncio (Feed, Stories, Reels, Facebook) | Feito (iframe da Meta) | Painel do anúncio |
 | Cabeçalho da conta: gasto total, limite, saldo, pagamento, estado | Feito (só leitura) | Gerenciador |
 | Histórico de atividade (inclui o feito direto na Meta) | Feito | Tráfego › Histórico |
-| Públicos personalizados (lista) | Parcial: só leitura | Tráfego › Públicos |
-| Criar/editar públicos personalizados e semelhantes | Falta | — |
-| Rascunhos de criação | Falta (existe só no assistente completo) | — |
-| Edição inline na tabela (nome, orçamento) | Falta | — |
-| Posicionamentos manuais por posição (feed, stories, reels…) | Parcial: só por plataforma | — |
-| Teste A/B, estudos de lift, otimização por conversões personalizadas | Falta | — |
-| Pixel/eventos (Gerenciador de Eventos), catálogos, formulários | Falta | — |
+| Públicos personalizados (lista) | Feito | Tráfego › Públicos › Públicos personalizados |
+| Criar públicos (lista de contatos com SHA-256 e LGPD, visitantes do site, interação com o Instagram, semelhante), renomear e excluir | Feito (contatos só o Administrador) | Tráfego › Públicos |
+| Rascunhos de criação | Feito (campanha, conjunto, anúncio e assistente) | + Criar |
+| Edição inline na tabela (nome, orçamento diário) | Feito | Gerenciador (lápis ou duplo clique) |
+| Posicionamentos manuais por posição (Feed, Stories, Reels…) | Feito, ao criar e ao editar o conjunto | + Criar › Conjunto / Editar |
+| Teste A/B (2 a 5 conjuntos ou campanhas, divisão igual, 1 a 30 dias) | Feito (cria e lista; o vencedor aparece na Meta) | Tráfego › Testes A/B |
+| Estudos de lift, otimização por conversões personalizadas | Falta | — |
+| Pixel (eventos dos 7 dias), catálogos e formulários | Feito, só leitura | Tráfego › Pixel e catálogos |
 | Faturamento (pagar, adicionar forma de pagamento) | Fora do escopo (só a Meta) | — |
+
+| Anúncio com imagem ou vídeo da biblioteca/computador | Feito (vídeo é enviado, processado e ganha miniatura) | + Criar › Anúncio |
