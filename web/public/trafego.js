@@ -76,7 +76,7 @@ function tfResumoLista(d,anuncios=false) {
  <label>Ordenar <select class="control" data-tf-ordem="${tipo}">${campos.map(([k,v])=>`<option value="${k}" ${f.ordem===k?'selected':''}>${v}</option>`).join('')}</select></label>
  ${anuncios&&f.campanha?`<button class="btn soft" data-tf-limpar>Limpar campanha: ${esc(f.campanha)} ×</button>`:''}</div>
  <div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${anuncios?'<th>Foto</th>':''}<th>${anuncios?'Anúncio':'Campanha'}</th><th>Status</th><th class="num">Investimento</th><th class="num">Conversas</th><th class="num">Custo/conversa</th></tr></thead><tbody>${shown.length?shown.map((r,i)=>`<tr>${anuncios?`<td class="tf-fotocel">${tfFotoAnuncio(r)}</td>`:''}<td><button class="btn soft" type="button" data-tf-${anuncios?'detalhe':'campanha'}="${i}">${esc(r.nome)}</button>${anuncios?`<br><small>${esc(r.campanha)}</small>`:''}</td><td>${tfBadge(r)}</td><td class="num">${money(r.investimento)}</td><td class="num">${fmtN(r.conversas)}</td><td class="num">${r.custoConversa===null?'—':money(r.custoConversa)}</td></tr>`).join(''):'<tr><td colspan="7">Nenhum registro corresponde aos filtros.</td></tr>'}</tbody></table></div>
- <div class="tf-vis-rodape"><small class="kpi-note">${shown.length} de ${rows.length} registros</small>${rows.length>6?`<button class="btn soft" data-tf-expand="${tipo}">${f.expandido?'Mostrar seis':'Ver todos nesta seção'}</button>`:''}</div>`;
+ <div class="tf-vis-rodape"><small class="kpi-note">${shown.length} de ${rows.length} registros</small><button class="btn soft" data-tf-csv="${tipo}">Exportar CSV filtrado</button><button class="btn soft" data-tf-pdf="${tipo}">PDF filtrado</button>${rows.length>6?`<button class="btn soft" data-tf-expand="${tipo}">${f.expandido?'Mostrar seis':'Ver todos nesta seção'}</button>`:''}</div>`;
 }
 function tfLigarVisao(d) {
  const render=tipo=>{
@@ -87,9 +87,26 @@ function tfLigarVisao(d) {
  const ligar=tipo=>{
   const sec=document.getElementById(tipo==='campanhas'?'tfVisCampanhas':'tfVisAnuncios');if(!sec)return;
   const f=TF_VIS_FILTRO[tipo];
-  const busca=sec.querySelector('[data-tf-busca]');busca.onchange=()=>{f.busca=busca.value;render(tipo);};
+  const busca=sec.querySelector('[data-tf-busca]');busca.oninput=()=>{if(f._timer)clearTimeout(f._timer);f._timer=setTimeout(()=>{f.busca=busca.value;render(tipo);const novo=sec.querySelector('[data-tf-busca]');if(novo){novo.focus();novo.setSelectionRange(novo.value.length,novo.value.length);}},250);};
   sec.querySelector('[data-tf-status]').onchange=e=>{f.status=e.target.value;render(tipo);};
   sec.querySelector('[data-tf-ordem]').onchange=e=>{f.ordem=e.target.value;render(tipo);};
+  const csv=sec.querySelector('[data-tf-csv]');
+  if(csv)csv.onclick=()=>{
+    const rows=tfVisLinhas(d,tipo);
+    const header=['Nome','Campanha','Status','Investimento','Impressões','Cliques','Conversas','Custo por conversa','CTR'];
+    const cel=v=>'"'+String(v===null||v===undefined?'':v).replace(/"/g,'""')+'"';
+    const linhas=[header,...rows.map(r=>[r.nome,tipo==='anuncios'?r.campanha:'',r.statusRotulo||r.status,r.investimento,r.impressoes,r.cliques,r.conversas,r.custoConversa,r.ctr])];
+    const conteudo='\\uFEFF'+linhas.map(l=>l.map(cel).join(';')).join('\\r\\n');
+    const url=URL.createObjectURL(new Blob([conteudo],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='evo-mkt-'+tipo+'-'+d.periodo.de+'-'+d.periodo.ate+'.csv';a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  const pdf=sec.querySelector('[data-tf-pdf]');
+  if(pdf)pdf.onclick=()=>{
+    const q=new URLSearchParams({de:d.periodo.de,ate:d.periodo.ate,visao:tipo,busca:f.busca,status:f.status,ordem:f.ordem});
+    if(tipo==='anuncios'&&f.campanha)q.set('campanha',f.campanha);
+    window.open('/relatorio-trafego.html?'+q.toString(),'_blank','noopener');
+  };
   const exp=sec.querySelector('[data-tf-expand]');if(exp)exp.onclick=()=>{f.expandido=!f.expandido;render(tipo);};
   const limpar=sec.querySelector('[data-tf-limpar]');if(limpar)limpar.onclick=()=>{f.campanha='';render(tipo);};
   sec.querySelectorAll('[data-tf-campanha]').forEach(btn=>btn.onclick=()=>{
