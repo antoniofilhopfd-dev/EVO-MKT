@@ -66,6 +66,7 @@ const { t, fim } = U.contador();
     await foto(p, `configuracoes-integracoes-${nome}`);
     await p.click('[data-cfg-conf="google"]'); await p.waitForTimeout(1200); tx = await U.textoConteudo(p);
     t(`${nome}: Configurar abre o Google Agenda com trilha e as agendas`, /Google Agenda/.test(tx) && /Agendas Google|agendas/i.test(tx) && (await p.$$('[data-cfg-sec="integracoes"]')).length >= 1);
+    t(`${nome}: Google sem o bloco antigo de agenda sincronizada (a lista fica só em Agendas Google)`, !/Agenda sincronizada|Sincronizar agora|Remover eventos importados|Importar para o Calendário/.test(tx) && /Client ID/.test(tx) && /Agendas Google/.test(tx) && (await p.$$('#gCalSel, #gSync, #gImp, #gLimpa')).length === 0);
     await p.click('.cfg-voltar'); await p.waitForTimeout(700);
     await p.click('[data-cfg-conf="drive"]'); await p.waitForTimeout(600); tx = await U.textoConteudo(p); t(`${nome}: Drive explica que a conexão não existe`, /não tem conexão com contas do Google Drive/.test(tx));
     tx = await abre('seguranca'); t(`${nome}: Segurança › Autenticação mostra só o que existe (2FA indisponível)`, /Verificação em duas etapas/.test(tx) && /Indisponível/.test(tx) && /Limite de tentativas/.test(tx));
