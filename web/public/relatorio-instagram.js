@@ -68,8 +68,7 @@ function html(d){
   <p class="nota">Dados lidos da Meta (somente leitura). Alcance, visualizações e impressões são métricas diferentes e não são somadas entre si nem entre meses. Seguidores do fim do mês vêm do último registro sincronizado.</p></div>
   <footer class="rodape"><img src="/api/public/logo" alt="Colégio Evolução"><span>Relatório Mensal — Instagram · Período: ${DMA(per.de)} a ${DMA(per.ate)} · Gerado em ${esc(agora)}</span></footer></article>`;
 }
-const contaQ=()=>new URLSearchParams(location.search).get('conta')||'';
-const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+(contaQ()?'&conta='+encodeURIComponent(contaQ()):'');
+const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+($('#perfil').value?'&conta='+encodeURIComponent($('#perfil').value):'');
 let pedido=0;
 async function carregar(){
   const meu=++pedido;$('#rel').innerHTML='<div class="msg">Carregando…</div>';$('#baixar').disabled=true;
@@ -95,5 +94,15 @@ async function baixar(){
 {
   const h=new Date(),q=new URLSearchParams(location.search);
   $('#mes').value=/^\d{4}-\d\d$/.test(q.get('mes')||'')?q.get('mes'):`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}`;
-  $('#atualiza').onclick=carregar;$('#mes').onchange=carregar;$('#baixar').onclick=baixar;carregar();
+  $('#atualiza').onclick=carregar;$('#mes').onchange=carregar;$('#perfil').onchange=carregar;$('#baixar').onclick=baixar;
+  // perfis monitorados (só consulta): escolhe pelo ?conta= (id), ?perfil= (@usuário) ou o perfil principal
+  (async()=>{
+    try{
+      const r=await fetch('/api/instagram/contas',{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'');
+      const cs=d.contas||[],norm=x=>String(x||'').replace(/^@/,'').replace(/[._]/g,'').toLowerCase();
+      const alvo=q.get('conta')||(cs.find(c=>norm(c.usuario)===norm(q.get('perfil')))||{}).ig||d.principal||(cs[0]||{}).ig||'';
+      $('#perfil').innerHTML=cs.length?cs.map(c=>`<option value="${esc(c.ig)}" ${c.ig===alvo?'selected':''}>@${esc(String(c.usuario).replace(/^@/,''))}</option>`).join(''):'<option value="">Nenhum perfil conectado</option>';
+    }catch{$('#perfil').innerHTML='<option value="">Perfil principal</option>'}
+    carregar();
+  })();
 }
