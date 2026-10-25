@@ -110,3 +110,7 @@ ins{background:#D7F2E1;text-decoration:none;border-radius:3px}del{background:#FA
 
 /* Navegação da coleção: controles visíveis também em telas estreitas. */
 .ig-paginacao{align-items:center;justify-content:center;margin-top:16px}.ig-paginacao .btn{width:auto;flex:0 0 auto}.ig-paginacao span{text-align:center;overflow-wrap:anywhere}
+
+.tf-tabela{margin-top:12px}.tf-tabela summary{cursor:pointer;padding:10px 0}
+
+.tf-fotocel{width:80px}.tf-foto{display:block;width:68px;min-height:84px;padding:2px;border:1px solid var(--line);background:#F3F5F9;border-radius:8px;cursor:zoom-in;color:var(--ink-3);font:inherit;font-size:11px}.tf-foto img{width:64px;height:80px;object-fit:contain;display:block;border-radius:5px}.tf-foto:focus-visible{outline:2px solid #063996;outline-offset:3px}.tf-foto:disabled{cursor:default}.tf-foto-ampliada{display:block;max-width:100%;width:auto;max-height:70vh;object-fit:contain;margin:16px auto}

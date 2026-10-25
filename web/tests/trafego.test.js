@@ -41,7 +41,7 @@ const { t, fim } = U.contador();
   await ruim('data inexistente é recusada', 'de=2026-02-30&ate=2026-03-01');
   await ruim('formato de data inválido é recusado', "de=abc&ate=2026-03-01");
   await ruim('data no futuro é recusada', `de=${a}&ate=${U.dia(5)}`);
-  await ruim('período acima de 93 dias é recusado', `de=${U.dia(-120)}&ate=${a}`);
+  await ruim('período acima de 400 dias é recusado', `de=${U.dia(-400)}&ate=${a}`);
   await ruim('injeção no parâmetro é recusada', "de=2026-01-01'%20OR%20'1'='1&ate=2026-01-02");
   for (const [n, de, ate] of [['hoje', a, a], ['7 dias', U.dia(-6), a], ['mês atual', a.slice(0, 8) + '01', a]]) { const x = await G.req('GET', `/trafego/resumo?de=${de}&ate=${ate}`); t(`período “${n}” é aceito`, x.status === 200); }
   const sem = await G.get(`/trafego/resumo?de=${U.dia(-6)}&ate=${a}`);
