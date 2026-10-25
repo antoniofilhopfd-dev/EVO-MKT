@@ -1,6 +1,10 @@
 /* Instagram › Conteúdos: da ideia à publicação, com revisão e aprovação internas (sem Portal e sem link externo).
    Fluxo: Ideia → Rascunho → Em produção → Em revisão → Aprovado → Agendado → Publicado. */
 const IG_ETAPAS = ['IDEIA', 'RASCUNHO', 'EM PRODUÇÃO', 'EM REVISÃO', 'APROVADO', 'AGENDADO', 'PUBLICADO'];
+/* Auxiliares que antes ficavam no Dashboard. */
+const ESTADO_ROTULO = { IDEIA: 'Ideia', RASCUNHO: 'Rascunho', 'EM PRODUÇÃO': 'Em produção', 'EM REVISÃO': 'Em revisão', APROVADO: 'Aprovado', AGENDADO: 'Agendado', PUBLICADO: 'Publicado', ARQUIVADO: 'Arquivado' };
+const estadoClasse = s => ({ APROVADO: 'ok', AGENDADO: 'info', PUBLICADO: 'ok', 'EM REVISÃO': 'warn', ARQUIVADO: 'mute' }[s] || '');
+function abrirRegistros(ids, titulo) { window.IG_FOCO = { ids, titulo }; go('igconteudos'); }
 const IG_ESTADO_ROTULO = { ...ESTADO_ROTULO };
 const IG_PAPEIS = { referencia: 'Referência', producao: 'Arquivo em produção', final: 'Arquivo final', miniatura: 'Miniatura' };
 const SEG_NOMES = SEG_LISTA.filter(s => s[0]).map(s => s[1]).concat(['Todos']);
