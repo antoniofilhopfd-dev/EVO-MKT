@@ -1,5 +1,5 @@
 /* EVO MKT: cache apenas de imagens/fontes estáticas. JS/HTML/CSS pela rede, sem substituição indevida por index.html. */
-const CACHE='evo-static-v6-20261025-10';
+const CACHE='evo-static-v6-20261025-11';
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil(
   caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))

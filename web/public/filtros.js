@@ -97,15 +97,15 @@ async function montarFiltros() {
 
 /* ---------------- origem dos dados ---------------- */
 /** Botão "Origem" que explica de onde vem um indicador: fonte, período, atualização e natureza. */
-function origem(o, rotulo = 'Origem') {
+function origem(o, rotulo = 'Fonte') {
   if (!o) return '';
-  return `<button type="button" class="origem-btn" data-origem="${attr(JSON.stringify(o))}" title="${attr(`${o.fonte || ''}${o.periodo ? ' · ' + o.periodo : ''}`)}" aria-label="Origem dos dados: ${attr(o.fonte || '')}">ⓘ ${esc(rotulo)}</button>`;
+  return `<button type="button" class="origem-btn" data-origem="${attr(JSON.stringify(o))}" title="${attr(`${o.fonte || ''}${o.periodo ? ' · ' + o.periodo : ''}`)}" aria-label="Fonte dos dados: ${attr(o.fonte || '')}">ⓘ ${esc(rotulo)}</button>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('.origem-btn'); if (!b) return;
   let o; try { o = JSON.parse(b.dataset.origem); } catch { return; }
   const linha = (r, v) => (v ? `<div class="ori-lin"><b>${r}</b><span>${esc(v)}</span></div>` : '');
-  dialogo(`<h3>Origem dos dados</h3>${linha('Fonte', o.fonte)}${linha('Período', o.periodo)}${linha('Natureza', o.natureza)}${linha('Atualizado em', o.atualizadoEm ? fmtDateTime(o.atualizadoEm) : '')}${linha('Sincronização', o.sincronizacao)}${linha('Versão da API', o.versaoApi)}${o.aviso ? `<p class="kpi-note ori-aviso">${esc(o.aviso)}</p>` : ''}<div class="actions"><span class="cm-esp"></span><button class="btn" data-close>Fechar</button></div>`);
+  dialogo(`<h3>Fonte dos dados</h3>${linha('Fonte', o.fonte)}${linha('Período', o.periodo)}${linha('Natureza', o.natureza)}${linha('Atualizado em', o.atualizadoEm ? fmtDateTime(o.atualizadoEm) : '')}${linha('Sincronização', o.sincronizacao)}${linha('Versão da API', o.versaoApi)}${o.aviso ? `<p class="kpi-note ori-aviso">${esc(o.aviso)}</p>` : ''}<div class="actions"><span class="cm-esp"></span><button class="btn" data-close>Fechar</button></div>`);
 });
 
 /** Pequena seta/variação de um indicador em relação ao período anterior. `bomSubir`: false quando subir é ruim (custos). */

@@ -177,3 +177,4 @@ main{background:#f5f7fc}
 .ig-body{padding:10px 12px;display:flex;flex-direction:column;gap:6px}.ig-meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;flex-wrap:wrap}.ig-meta span{color:var(--ink-3)}
 .ig-body p{margin:0;font-size:13px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .ig-body dl{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px;margin:0}.ig-body dl div{display:flex;justify-content:space-between;gap:6px;font-size:12px;border-bottom:1px solid var(--line,#e3e7ef);padding:2px 0}.ig-body dt{color:var(--ink-3)}.ig-body dd{margin:0}
+.igr-mensal th.num,.igr-mensal td.num{text-align:right;white-space:nowrap}.igr-mensal td small{font-size:11px}.tg-bom{color:#14783a}.tg-ruim{color:#b42318}

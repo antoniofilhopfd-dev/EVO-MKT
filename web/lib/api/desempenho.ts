@@ -6,7 +6,7 @@ import { setting } from '../settings';
 import { addDays, fail, fmtDate, now, parseLocal, Row, strv } from '../util';
 import { chaveSegmento, rotuloSegmento } from '../segmentos';
 import { Filtros, lerFiltros } from '../filtros';
-import { melhorPost, organico, PostFiltrado, resumoOrganico } from '../painel';
+import { contasDoPerfil, melhorPost, organico, PostFiltrado, resumoOrganico } from '../painel';
 import { json } from './handlers';
 
 /** Instagram orgânico: visão geral e desempenho por dimensão, sempre a partir de publicações já sincronizadas. */
@@ -47,6 +47,45 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
     return json({
       filtros: f, rows: posts, contas: o.contas.map((x) => x.usuario), ultimaSync: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'),
       origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'publicações já postadas (não inclui anúncios)' },
+    });
+  }
+  if (c.path === '/instagram/mensal') {
+    /** Informações mensais e anuais da conta (seguidores, alcance, visualizações, interações e publicações), do perfil escolhido. */
+    const contas = await contasDoPerfil(f.perfil), ids = contas.map((x) => x.ig), principal = (await setting('ig_user_id')) || ids[0] || '';
+    const n = (v: unknown) => Number(v || 0), mes = (v: unknown) => strv(v).slice(0, 7);
+    const marca = ids.map(() => '?').join(',') || "''";
+    const CAMPOS = ['alcance', 'impressoes', 'visitasPerfil', 'interacoes', 'curtidas', 'comentarios', 'compartilhamentos', 'salvamentos', 'posts', 'reels'] as const;
+    const meses = new Map<string, Row>();
+    const get = (m: string): Row => meses.get(m) ?? (meses.set(m, { periodo: m, seguidores: null, ...Object.fromEntries(CAMPOS.map((k) => [k, null])) }), meses.get(m)!);
+    const somar = (o: Row, k: string, v: number) => { o[k] = (o[k] === null || o[k] === undefined ? 0 : Number(o[k])) + v; };
+    for (const r of await listRows('instagram')) {
+      if (r.origem !== 'INSTAGRAM_API' || !/^\d{4}-\d{2}$/.test(strv(r.periodo)) || !ids.includes(strv(r.idExterno) || principal)) continue;
+      const o = get(strv(r.periodo));
+      for (const k of CAMPOS) if (k !== 'posts' && k !== 'reels' && strv(r[k]) !== '') somar(o, k, n(r[k]));
+      if (strv(r.seguidores) !== '') somar(o, '_segRegistro', n(r.seguidores));
+    }
+    const snaps = ids.length ? await q(`SELECT conta,dia,seguidores FROM ig_seguidores WHERE conta IN (${marca}) ORDER BY dia`, ids) : [];
+    const ultimoPorConta = new Map<string, Map<string, number>>();
+    for (const sn of snaps) { const m = mes(sn.dia); (ultimoPorConta.get(m) ?? ultimoPorConta.set(m, new Map()).get(m)!).set(strv(sn.conta), n(sn.seguidores)); }
+    for (const [m, porConta] of ultimoPorConta) get(m).seguidores = [...porConta.values()].reduce((a, b) => a + b, 0);
+    const posts = ids.length ? await q(`SELECT tipo,publicado_em FROM ig_posts WHERE conta IN (${marca})`, ids) : [];
+    for (const p of posts) { const o = get(mes(p.publicado_em)); somar(o, strv(p.tipo).toUpperCase() === 'REELS' ? 'reels' : 'posts', 1); }
+    const ordem = [...meses.keys()].sort();
+    for (const m of ordem) { const o = meses.get(m)!; if (o.seguidores === null && o._segRegistro !== undefined) o.seguidores = o._segRegistro; delete o._segRegistro; }
+    const mensal: Row[] = ordem.map((m, i): Row => { const o = meses.get(m)!, ant = i ? meses.get(ordem[i - 1])! : null; return { ...o, variacao: ant && o.seguidores !== null && ant.seguidores !== null ? Number(o.seguidores) - Number(ant.seguidores) : null }; });
+    const anos = new Map<string, Row>();
+    for (const o of mensal) {
+      const a = strv(o.periodo).slice(0, 4);
+      const y = anos.get(a) ?? (anos.set(a, { periodo: a, seguidores: null, meses: 0, ...Object.fromEntries(CAMPOS.map((k) => [k, null])) }), anos.get(a)!);
+      for (const k of CAMPOS) if (o[k] !== null && o[k] !== undefined) somar(y, k, Number(o[k]));
+      if (o.seguidores !== null) y.seguidores = o.seguidores;
+      y.meses = Number(y.meses) + 1;
+    }
+    const anual: Row[] = [...anos.values()].map((y, i, todos): Row => ({ ...y, variacao: i && y.seguidores !== null && todos[i - 1].seguidores !== null ? Number(y.seguidores) - Number(todos[i - 1].seguidores) : null }));
+    return json({
+      mensal, anual, contas: contas.map((x) => x.usuario), atual: snaps.length ? mensal.filter((o) => o.seguidores !== null).slice(-1)[0]?.seguidores ?? null : null,
+      primeiroRegistro: snaps[0] ? strv(snaps[0].dia) : '', ultimaSync: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'),
+      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: 'todos os meses sincronizados', atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'métricas da conta por mês; seguidores só existem desde a primeira sincronização' },
     });
   }
   if (c.path === '/instagram/visao') {
