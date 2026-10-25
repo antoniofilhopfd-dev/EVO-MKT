@@ -97,7 +97,7 @@ async function montarFiltros() {
 
 /* ---------------- origem dos dados ---------------- */
 /** Botão "Origem" que explica de onde vem um indicador: fonte, período, atualização e natureza. */
-function origem(o, rotulo = 'Fonte') {
+function origem(o, rotulo = '') {
   if (!o) return '';
   return `<button type="button" class="origem-btn" data-origem="${attr(JSON.stringify(o))}" title="${attr(`${o.fonte || ''}${o.periodo ? ' · ' + o.periodo : ''}`)}" aria-label="Fonte dos dados: ${attr(o.fonte || '')}">ⓘ ${esc(rotulo)}</button>`;
 }
