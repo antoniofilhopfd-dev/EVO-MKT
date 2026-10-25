@@ -56,6 +56,7 @@ const FILTROS_PAGINA = {
   igvisao: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
   igconteudos: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'Esta lista mostra todas as publicações; use os filtros da lista para a data.' } },
   igplan: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O planejamento navega por mês.' } },
+  igcalendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O calendário tem a própria navegação por mês, semana e dia.' } },
   igdesempenho: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
   igranking: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
   trafego: { aplica: ['periodo'], motivo: { perfil: 'A Meta Ads não separa por perfil do Instagram.', segmento: 'A Meta Ads não informa o segmento (ele só aparece no nome da campanha).', formato: 'Os anúncios não têm o formato das publicações do EVO MKT.', campanha: 'A campanha editorial é do EVO MKT; a Meta tem as próprias campanhas.' } },

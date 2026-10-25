@@ -32,6 +32,23 @@ const SO_VINCULADAS: Dim[] = ['segmento', 'tema', 'objetivo', 'campanha'];
 export async function desempenhoRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   const f = lerFiltros(c);
+  if (c.path === '/instagram/ranking') {
+    /** Todas as publicações do Instagram (sincronizadas com a Meta) do período e perfil escolhidos, com as métricas de cada uma. */
+    const o = await organico(f);
+    const usuario = new Map(o.contas.map((x) => [x.ig, '@' + x.usuario.replace(/^@/, '')]));
+    const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const posts = o.posts.slice(0, 1000).map((p) => ({
+      id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda), miniatura: strv(p.miniatura), link: strv(p.permalink),
+      perfil: usuario.get(p.conta) ?? p.conta, curtidas: num(p.curtidas), comentarios: num(p.comentarios), salvos: num(p.salvos), compartilhamentos: num(p.compartilhamentos),
+      alcance: num(p.alcance), visualizacoes: num(p.visualizacoes), interacoes: p.interacoes,
+      engajamento: num(p.alcance) ? Math.round((p.interacoes / Number(p.alcance)) * 1000) / 10 : null,
+      conteudoId: p.conteudo ? strv(p.conteudo.id) : '', titulo: p.conteudo ? strv(p.conteudo.titulo) : '',
+    }));
+    return json({
+      filtros: f, rows: posts, contas: o.contas.map((x) => x.usuario), ultimaSync: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'),
+      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'publicações já postadas (não inclui anúncios)' },
+    });
+  }
   if (c.path === '/instagram/visao') {
     const o = await organico(f), oAnt = await organico(anterior(f));
     const resumo = resumoOrganico(o), resumoAnt = resumoOrganico(oAnt);

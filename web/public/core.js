@@ -140,7 +140,7 @@ function renderInternalUser() {
 const PAGINAS = {}; // página → função que desenha (registrada pelos outros arquivos)
 const ROTULOS = {
   hoje: 'Dashboard', calendario: 'Calendário',
-  igvisao: 'Visão geral', igconteudos: 'Conteúdos', igplan: 'Planejamento', igdesempenho: 'Desempenho', igranking: 'Ranking',
+  igvisao: 'Visão geral', igconteudos: 'Conteúdos', igplan: 'Planejamento', igcalendario: 'Calendário', igdesempenho: 'Desempenho', igranking: 'Ranking',
   trafego: 'Visão geral', tfcampanhas: 'Campanhas', tfanuncios: 'Anúncios',
   configuracoes: 'Configurações',
 };
@@ -148,14 +148,14 @@ const DESCRICOES = {
   hoje: 'Decisões do Marketing: publicações, calendário, Instagram e tráfego em um só lugar.',
   calendario: 'Publicações, planejamento editorial, calendário escolar, datas comemorativas e Google Agenda.',
   igvisao: 'Desempenho orgânico dos perfis do Instagram.', igconteudos: 'Da ideia à publicação, com revisão e aprovação.',
-  igplan: 'Calendário editorial, ideias, campanhas editoriais e modelos.', igdesempenho: 'O que funcionou, por perfil, segmento, formato, tema e horário.',
+  igplan: 'Pauta do mês, ideias, campanhas editoriais e modelos.', igcalendario: 'Publicações programadas e já postadas no Instagram, com status, horário e perfil.', igranking: 'As melhores publicações do período, por alcance, interações, engajamento e visualizações.', igdesempenho: 'O que funcionou, por perfil, segmento, formato, tema e horário.',
   trafego: 'Anúncios da Meta: somente consulta. Criar e editar anúncios continua no Gerenciador de Anúncios da Meta.', tfcampanhas: 'Resumo por campanha.', tfanuncios: 'Detalhamento por anúncio.',
   configuracoes: 'Acessos, integrações, backup, auditoria e prontidão do sistema.',
 };
 const AREAS = [
   { k: 'visao', label: 'Dashboard', icon: '◉', pages: ['hoje'] },
   { k: 'calendario', label: 'Calendário', icon: '▤', pages: ['calendario'] },
-  { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igplan', 'igdesempenho', 'igranking'] },
+  { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igplan', 'igcalendario', 'igdesempenho', 'igranking'] },
   { k: 'trafego', label: 'Tráfego Pago', icon: '↗', pages: ['trafego', 'tfcampanhas', 'tfanuncios'] },
   { k: 'configuracoes', label: 'Configurações', icon: '⚙', pages: ['configuracoes'] },
 ];
@@ -184,6 +184,7 @@ function montarSubtabs() {
 }
 function montarPerfilCabecalho() {
  const area = $('#headerIgProfile'); if (!area || typeof Filtros === 'undefined') return;
+ area.hidden = !String(state.page).startsWith('ig');
  const opcoes = [['','Todos os perfis'],['@evolucaopb','@evolucaopb'],['@geracaoevolucao','@geracaoevolucao']];
  const perfil = Filtros.get().perfil;
  area.innerHTML = `<label for="igPerfilCabecalho">Perfil do Instagram</label><select class="control" id="igPerfilCabecalho" aria-label="Perfil do Instagram">${opcoes.map(([v,l])=>`<option value="${attr(v)}" ${perfil===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
