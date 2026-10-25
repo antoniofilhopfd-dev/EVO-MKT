@@ -155,13 +155,13 @@ const DESCRICOES = {
 const AREAS = [
   { k: 'visao', label: 'Dashboard', icon: '◉', pages: ['hoje'] },
   { k: 'calendario', label: 'Calendário', icon: '▤', pages: ['calendario'] },
-  { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igplan', 'igcalendario', 'igdesempenho', 'igranking'] },
+  { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igcalendario', 'igdesempenho', 'igranking'] },
   { k: 'trafego', label: 'Tráfego Pago', icon: '↗', pages: ['trafego', 'tfcampanhas', 'tfanuncios'] },
   { k: 'configuracoes', label: 'Configurações', icon: '⚙', pages: ['configuracoes'] },
 ];
 const areaOf = p => AREAS.find(a => a.pages.includes(p));
 /** Endereços antigos que ainda podem estar salvos nos favoritos do navegador. */
-const REDIRECIONA = { studio: 'igconteudos', conteudos: 'igconteudos', ideias: 'igplan', editorial: 'igplan', templates: 'igplan', instagram: 'igdesempenho', igposts: 'igdesempenho', gerenciador: 'tfcampanhas', tfcriativos: 'tfanuncios', tfanalises: 'trafego', tfrelatorios: 'trafego', calescolar: 'calendario', datacom: 'calendario', agenda: 'calendario', dashboard: 'hoje' };
+const REDIRECIONA = { studio: 'igconteudos', conteudos: 'igconteudos', ideias: 'igconteudos', editorial: 'igconteudos', templates: 'igconteudos', igplan: 'igconteudos', instagram: 'igdesempenho', igposts: 'igdesempenho', gerenciador: 'tfcampanhas', tfcriativos: 'tfanuncios', tfanalises: 'trafego', tfrelatorios: 'trafego', calescolar: 'calendario', datacom: 'calendario', agenda: 'calendario', dashboard: 'hoje' };
 const canAccess = p => !!internalSession && !!ROTULOS[p];
 
 function renderNav() {
@@ -226,7 +226,7 @@ async function buscaGlobal(q) {
   q = q.trim(); if (!q) return;
   const rows = await api('/search?q=' + encodeURIComponent(q));
   const ROT = { conteudos: 'Publicação', ideias: 'Ideia', calendario: 'Calendário', campanhas: 'Campanha editorial', templates: 'Modelo', calescolar: 'Calendário escolar', datacom: 'Data comemorativa' };
-  const ALVO = { conteudos: 'igconteudos', ideias: 'igplan', campanhas: 'igplan', templates: 'igplan', calendario: 'calendario', calescolar: 'calendario', datacom: 'calendario' };
+  const ALVO = { conteudos: 'igconteudos', ideias: 'igconteudos', campanhas: 'igconteudos', templates: 'igconteudos', calendario: 'calendario', calescolar: 'calendario', datacom: 'calendario' };
   const lista = rows.filter(r => ALVO[r.module]);
   setTitle('Busca', `${lista.length} resultado(s) para “${q}”`);
   $('#content').innerHTML = `<div class="search-results-head"><div><small>BUSCA</small><h1>${lista.length} resultado(s)</h1></div></div>` + (lista.length

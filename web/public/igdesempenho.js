@@ -1,6 +1,6 @@
 /* Instagram › Desempenho: o que funcionou, por perfil, segmento, formato, tema, objetivo, campanha editorial, dia e horário. */
-const IGD_DIMS = [['formato', 'Formato'], ['perfil', 'Perfil'], ['segmento', 'Segmento'], ['tema', 'Tema'], ['objetivo', 'Objetivo'], ['campanha', 'Campanha editorial'], ['dia', 'Dia da semana'], ['horario', 'Horário']];
-const IGD = { dim: pref('igdDim', 'formato'), todas: false, ordem: pref('igdOrdem', 'quando') };
+const IGD_DIMS = [['formato', 'Formato'], ['perfil', 'Perfil'], ['dia', 'Dia da semana'], ['horario', 'Horário']];
+const IGD = { dim: ['formato', 'perfil', 'dia', 'horario'].includes(pref('igdDim', 'formato')) ? pref('igdDim', 'formato') : 'formato', todas: false, ordem: pref('igdOrdem', 'quando') };
 const IGD_ORDEM = [['quando', 'Mais recentes'], ['interacoes', 'Interações'], ['alcance', 'Alcance'], ['engajamento', 'Engajamento'], ['visualizacoes', 'Visualizações']];
 const igdN = v => (v === null || v === undefined ? '—' : fmtN(v));
 /** Cartão de uma postagem com imagem e todas as métricas que a Meta informou. */
@@ -11,6 +11,7 @@ PAGINAS.igdesempenho = async function () {
   const minimo = d.minimo;
   const melhor = d.rows.filter(r => r.publicacoes >= minimo).sort((a, b) => b.mediaInteracoes - a.mediaInteracoes)[0];
   $('#content').innerHTML = `${abasInstagramAcoes()}
+    ${igdMesAMes(posts)}
     <div class="pills" role="tablist" aria-label="Analisar por">${IGD_DIMS.map(([k, l]) => `<button type="button" role="tab" class="pill ${IGD.dim === k ? 'on' : ''}" data-dim="${k}" aria-selected="${IGD.dim === k}">${l}</button>`).join('')}</div>
     <section class="card"><div class="db-tit"><h2>Desempenho por ${esc(IGD_DIMS.find(x => x[0] === IGD.dim)[1].toLowerCase())}</h2>${origem(d.origem)}<small>${esc(Filtros.descricao())}</small></div>
       ${d.aviso ? `<p class="foco-chip">${esc(d.aviso)}</p>` : ''}
@@ -24,6 +25,7 @@ PAGINAS.igdesempenho = async function () {
       <div class="est-linha"><button type="button" class="btn soft" id="vincBtn">Vincular um anúncio a uma publicação</button><small class="kpi-note">A comparação só existe quando uma pessoa confirma o vínculo; o sistema nunca adivinha qual anúncio impulsionou qual publicação.</small></div>
     </section>`;
   $$('[data-igd-ordem]').forEach(x => { x.onchange = () => { IGD.ordem = x.value; setPref('igdOrdem', IGD.ordem); PAGINAS.igdesempenho(); }; });
+  igdMesAMesLiga(posts);
   const mais = $('#igdMais'); if (mais) mais.onclick = () => { IGD.todas = true; PAGINAS.igdesempenho(); };
   $$('[data-dim]').forEach(b => { b.onclick = () => { IGD.dim = b.dataset.dim; setPref('igdDim', IGD.dim); go('igdesempenho'); }; });
   if (d.rows.length) EvoCharts.barras($('#chDim'), { itens: d.rows.map(r => ({ nome: r.rotulo, v: r.mediaInteracoes, sub: `${r.publicacoes} publicação(ões)` })), fmt: v => fmtN(v) + ' interações', rotuloAcessivel: 'Média de interações por publicação' });
@@ -42,4 +44,31 @@ function igdPostagens(posts) {
   const lista = IGD.todas ? rows : rows.slice(0, 24);
   return `<section class="card"><div class="db-tit"><h2>Desempenho de cada postagem</h2>${origem(posts.origem)}<label class="igr-ord">Ordenar por <select class="control" data-igd-ordem aria-label="Ordenar postagens">${IGD_ORDEM.map(([k, l]) => `<option value="${k}" ${IGD.ordem === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
     ${rows.length ? `<p class="kpi-note">${rows.length} postagem(ns) · ${esc(Filtros.descricao())}. O que a Meta não informa aparece como “—”, nunca como zero.</p><div class="ig-grade">${lista.map(igdCartao).join('')}</div>${rows.length > lista.length ? `<button type="button" class="btn soft" id="igdMais">Ver todas as ${rows.length} postagens</button>` : ''}` : '<div class="empty compact">Nenhuma postagem neste período com os filtros escolhidos. Amplie o período ou sincronize em Configurações › Instagram.</div>'}</section>`;
+}
+
+/** Mês a mês: interações de cada formato por mês e a tabela do mês com publicações, alcance, visualizações e seguidores adquiridos. */
+function igdMeses(posts) {
+  const meses = new Map();
+  (posts.rows || []).forEach(p => {
+    const m = igcalQuando(p.quando).dia.slice(0, 7), o = meses.get(m) || { periodo: m, publicacoes: 0, interacoes: 0, alcance: 0, visualizacoes: 0, visitas: 0, seguidores: 0, porFormato: {} };
+    o.publicacoes++; o.interacoes += p.interacoes || 0; o.alcance += p.alcance || 0; o.visualizacoes += p.visualizacoes || 0; o.visitas += p.visitasPerfil || 0; o.seguidores += p.seguidoresNovos || 0;
+    o.porFormato[p.formato] = (o.porFormato[p.formato] || 0) + (p.interacoes || 0);
+    meses.set(m, o);
+  });
+  return [...meses.values()].sort((a, b) => a.periodo.localeCompare(b.periodo));
+}
+function igdMesAMes(posts) {
+  const meses = igdMeses(posts);
+  if (!meses.length) return '';
+  const rot = m => { const t = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(m + '-01T12:00:00Z')); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const linhas = [...meses].reverse().map(o => `<tr><td><b>${esc(rot(o.periodo))}</b></td><td class="num">${fmtN(o.publicacoes)}</td><td class="num">${fmtN(o.interacoes)}</td><td class="num">${fmtN(Math.round(o.interacoes / o.publicacoes))}</td><td class="num">${fmtN(o.alcance)}</td><td class="num">${fmtN(o.visualizacoes)}</td><td class="num">${fmtN(o.visitas)}</td><td class="num">+${fmtN(o.seguidores)}</td></tr>`).join('');
+  return `<section class="card"><div class="db-tit"><h2>Mês a mês</h2>${origem(posts.origem)}<small>interações por formato · ${esc(Filtros.descricao())}</small></div>
+    <div id="chMes"></div>${meses.length < 2 ? '<p class="kpi-note">Escolha “Últimos 12 meses” ou “Este ano” no filtro de período para comparar vários meses.</p>' : ''}
+    <div class="tablewrap"><table class="datatable"><thead><tr><th>Mês</th><th class="num">Publicações</th><th class="num">Interações</th><th class="num">Média por publicação</th><th class="num">Alcance</th><th class="num">Visualizações</th><th class="num">Visitas ao perfil</th><th class="num">Seguidores adquiridos</th></tr></thead><tbody>${linhas}</tbody></table></div></section>`;
+}
+function igdMesAMesLiga(posts) {
+  const meses = igdMeses(posts), el = $('#chMes');
+  if (!el || !meses.length) return;
+  const formatos = [...new Set(meses.flatMap(o => Object.keys(o.porFormato)))];
+  EvoCharts.linha(el, { dados: meses.map(o => ({ x: new Intl.DateTimeFormat('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(o.periodo + '-01T12:00:00Z')).replace(/\.? de /, '/').replace('.', ''), ...Object.fromEntries(formatos.map(f => [f, o.porFormato[f] || 0])) })), series: formatos.map(f => ({ k: f, nome: f })), rotuloAcessivel: 'Interações por formato, mês a mês' });
 }
