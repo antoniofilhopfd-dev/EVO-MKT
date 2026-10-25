@@ -165,22 +165,15 @@ function calNovo(data) {
   });
 }
 
-/* Calendário exclusivamente escolar. Publicações e planejamento ficam no Instagram. */
-async function calCarregarSomenteEscolar() {
-  const e=await escCarregar();
-  const f=Filtros.get();
-  const itens=(e.itens||[]).filter(i=>!f.segmento||i.segmentos?.includes(f.segmento)||i.segmentos?.includes('TODOS'))
-    .map(i=>calEncurta({...i,origem:'esc',tipoOrigem:i.tipo,tipo:'ESCOLAR'}));
-  return {itens,opcoes:e.opcoes||{responsaveis:[]},eu:e.eu||{nome:'',role:''},podeEditar:true};
-}
-async function calNovoEscolar(data) { await escCarregar();return escForm(null,data); }
 const CAL_UNICO = CalMotor.criar({
- chave:'calendario.escolar',tituloPagina:'Calendário escolar',eyebrow:'CALENDÁRIO ESCOLAR',rotuloNovo:'+ Evento escolar',
- descricao:'Eventos e datas escolares do Colégio Evolução. Clique no dia para criar um evento escolar.',
- tipos:CAL_TIPOS.filter(t=>t.k==='ESCOLAR'), carregar:calCarregarSomenteEscolar,
- novo:calNovoEscolar,abrir:calAbrir,mover:calMover,porAno:true,
- modos:[['month','Mês'],['week','Semana'],['day','Dia'],['list','Lista']],modoPadrao:'month',listaEscopo:'ano',busca:true,
- detalhe:i=>'Calendário escolar do Colégio Evolução'
+  chave: 'calendario', tituloPagina: 'Calendário', eyebrow: 'CALENDÁRIO', rotuloNovo: '+ Criar',
+  descricao: 'Publicações, planejamento editorial, calendário escolar, datas comemorativas e Google Agenda em um só lugar. Clique em um dia para criar; arraste para reagendar.',
+  tipos: CAL_TIPOS, carregar: calCarregar, novo: calNovo, abrir: calAbrir, mover: calMover, porAno: true,
+  modos: [['month', 'Mês'], ['week', 'Semana'], ['day', 'Dia'], ['list', 'Lista']], modoPadrao: 'month', listaEscopo: 'ano', busca: true,
+  faixa: () => `<div class="cal-topo"><button type="button" class="btn soft" id="calLink">Link de leitura para a direção</button></div><p class="cal-nota">Os filtros de perfil, formato e campanha valem para as publicações; o de segmento vale para publicações e para o calendário escolar. Datas comemorativas, feriados e a Google Agenda não têm esses filtros.</p>`,
+  aoDesenhar: () => { const b = $('#calLink'); if (b) b.onclick = calLinkLeitura; },
+  detalhe: i => `Fonte: ${(CAL_TIPOS.find(t => t.k === i.tipo) || {}).fonte || ''}`,
+  classeDia: lista => (lista.some(i => i.tipo === 'FERIADO') ? 'feriado' : ''),
 });
 
 let calSincTimer = null;
@@ -194,6 +187,8 @@ async function calSincGoogle() {
 PAGINAS.calendario = async function () {
   CalMotor.redirecionar = () => CAL_UNICO.recarregar();
   clearInterval(calSincTimer);
+  calSincTimer = setInterval(() => { if (state.page !== 'calendario') { clearInterval(calSincTimer); return; } calSincGoogle(); }, 120000);
+  setTimeout(calSincGoogle, 1500);
   return CAL_UNICO.render();
 };
 

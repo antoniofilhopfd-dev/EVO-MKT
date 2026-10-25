@@ -71,9 +71,9 @@ PAGINAS.hoje = async function () {
     
   </div>`;
   bindGoButtons();
-  $('[data-db-seg]').forEach(b=>b.onclick=()=>{
+  $$('[data-db-seg]').forEach(b=>b.onclick=()=>{
     DB_SEG_MODO=b.dataset.dbSeg;
-    $('[data-db-seg]').forEach(x=>x.classList.toggle('on',x.dataset.dbSeg===DB_SEG_MODO));
+    $$('[data-db-seg]').forEach(x=>x.classList.toggle('on',x.dataset.dbSeg===DB_SEG_MODO));
     $('#dbSegTabela').innerHTML=dbSegTabela(serieSeguidores,DB_SEG_MODO);
   });
 };
