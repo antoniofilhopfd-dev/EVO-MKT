@@ -147,3 +147,9 @@ main{background:#f5f7fc}
 .ig-perfil-proprio{display:flex;gap:10px;align-items:center;margin-left:auto;color:var(--ink-2);font-weight:650;font-size:12px}
 .ig-perfil-proprio select{min-width:184px;max-width:230px;background:#fff;border:1px solid #cbd6e6;border-radius:8px;color:#063996;font-weight:700}
 @media(max-width:760px){.subtabs:has(.ig-perfil-proprio){align-items:stretch}.subtabs-links{overflow-x:auto;flex-wrap:nowrap;max-width:100%}.ig-perfil-proprio{margin:0;width:100%;justify-content:space-between}.ig-perfil-proprio select{flex:1;max-width:none}}
+
+/* Seletor de perfil restaurado no cabeçalho superior, sempre visível. */
+.ig-header-profile{display:flex;align-items:center;gap:7px;min-width:0}
+.ig-header-label{font-size:12px;font-weight:650;color:#4a5163}
+.ig-header-profile select{min-width:150px;max-width:205px;min-height:38px!important;border-radius:9px;font-weight:700;color:#063996;background:#fff;border:1px solid #d4ddeb}
+@media(max-width:900px){.ig-header-label{display:none}.ig-header-profile select{min-width:125px;max-width:150px}}
