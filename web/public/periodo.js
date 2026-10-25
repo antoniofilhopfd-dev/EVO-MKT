@@ -30,7 +30,7 @@ const PeriodoPicker=(()=>{
   const fechar=()=>{ov.remove();document.removeEventListener('keydown',tecla)};
   const tecla=e=>{if(e.key==='Escape')fechar()};document.addEventListener('keydown',tecla);
   ov.onclick=e=>{if(e.target===ov)fechar()};
-  const pre=[['Hoje',()=>[hoje,hoje]],['7 dias',()=>{const d=new Date();d.setDate(d.getDate()-6);return [iso(d),hoje]}],['30 dias',()=>{const d=new Date();d.setDate(d.getDate()-29);return [iso(d),hoje]}],['Este mês',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth(),1,12)),hoje]}],['Esta semana',()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());return [iso(d),hoje]}],['Semana passada',()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()-7);const f=new Date(d);f.setDate(f.getDate()+6);return [iso(d),iso(f)]}],['Mês anterior',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth()-1,1,12)),iso(new Date(d.getFullYear(),d.getMonth(),0,12))]}]];
+  const pre=[['Hoje',()=>[hoje,hoje]],['7 dias',()=>{const d=new Date();d.setDate(d.getDate()-6);return [iso(d),hoje]}],['30 dias',()=>{const d=new Date();d.setDate(d.getDate()-29);return [iso(d),hoje]}],['Este mês',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth(),1,12)),hoje]}],['Esta semana',()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());return [iso(d),hoje]}],['Semana anterior',()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()-7);const f=new Date(d);f.setDate(f.getDate()+6);return [iso(d),iso(f)]}],['Mês anterior',()=>{const d=new Date();return [iso(new Date(d.getFullYear(),d.getMonth()-1,1,12)),iso(new Date(d.getFullYear(),d.getMonth(),0,12))]}]];
   function desenha(){
    const ano=base.getFullYear(),mes=base.getMonth(),primeiro=new Date(ano,mes,1,12).getDay(),dias=new Date(ano,mes+1,0).getDate();
    let g=['D','S','T','Q','Q','S','S'].map(x=>`<i>${x}</i>`).join('');
@@ -54,7 +54,7 @@ const PeriodoPicker=(()=>{
   document.body.appendChild(ov);desenha();
  }
   /* Períodos prontos (iguais aos do Gerenciador da Meta; semana de domingo a sábado) compartilhados por Tráfego, Dashboard e Instagram. */
- const PRESETS=[['hoje','Hoje'],['ontem','Ontem'],['hoje_ontem','Hoje e ontem'],['3','Últimos 3 dias'],['7','Últimos 7 dias'],['14','Últimos 14 dias'],['28','Últimos 28 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['semana','Esta semana'],['semana_ant','Semana passada'],['mes','Este mês'],['mes_ant','Mês anterior'],['trim','Este trimestre'],['ano','Este ano'],['ano_ant','Ano passado'],['x','Personalizado']];
+ const PRESETS=[['hoje','Hoje'],['ontem','Ontem'],['hoje_ontem','Hoje e ontem'],['3','Últimos 3 dias'],['7','Últimos 7 dias'],['14','Últimos 14 dias'],['28','Últimos 28 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['semana','Esta semana'],['semana_ant','Semana anterior'],['mes','Este mês'],['mes_ant','Mês anterior'],['trim','Este trimestre'],['ano','Este ano'],['ano_ant','Ano passado'],['x','Personalizado']];
  function intervalo(p,de,ate){
   const h=new Date();h.setHours(12,0,0,0);const dia=n=>{const d=new Date(h);d.setDate(d.getDate()+n);return iso(d)};
   if(p==='tudo')return ['',''];
