@@ -52,7 +52,7 @@ const Filtros = (() => {
 /** Quais filtros cada página aceita e, para os que não aceita, por quê. */
 const FILTROS_PAGINA = {
   hoje: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
-  calendario: { aplica: ['segmento'], motivo: { periodo: 'O calendário tem a própria navegação.', perfil: 'O calendário é exclusivamente escolar.', formato: 'O calendário é exclusivamente escolar.', campanha: 'O calendário é exclusivamente escolar.' } },
+  calendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O calendário tem a própria navegação por mês, semana e dia.' } },
   igvisao: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
   igconteudos: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'Esta lista mostra todas as publicações; use os filtros da lista para a data.' } },
   igplan: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O planejamento navega por mês.' } },
