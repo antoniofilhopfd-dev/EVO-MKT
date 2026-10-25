@@ -8,7 +8,7 @@ function abrirRegistros(ids, titulo) { window.IG_FOCO = { ids, titulo }; go('igc
 const IG_ESTADO_ROTULO = { ...ESTADO_ROTULO };
 const IG_PAPEIS = { referencia: 'Referência', producao: 'Arquivo em produção', final: 'Arquivo final', miniatura: 'Miniatura' };
 const SEG_NOMES = SEG_LISTA.filter(s => s[0]).map(s => s[1]).concat(['Todos']);
-const IGC = { rows: [], estados: new Map(), busca: '', status: '', resp: '', vista: pref('igVista', 'lista') };
+const IGC = { rows: [], estados: new Map(), busca: '', status: '', resp: '', vista: pref('igVista', 'lista'), mes: hojeBR().slice(0, 7) };
 
 const qDoPub = r => `${r.titulo || ''} ${r.legenda || ''} ${r.hashtags || ''}`.toLowerCase();
 const stLimpo = s => ({ BRIEFING: 'RASCUNHO', 'PRODUÇÃO': 'EM PRODUÇÃO', 'REVISÃO': 'EM REVISÃO', PROGRAMADO: 'AGENDADO' }[String(s || '').toUpperCase()] || String(s || '').toUpperCase());
@@ -39,10 +39,11 @@ PAGINAS.igconteudos = async function () {
   const foco = window.IG_FOCO;
   const desenha = () => {
     const rows = filtrarConteudos().sort((a, b) => String(b.publicacaoEm || '').localeCompare(String(a.publicacaoEm || '')));
-    const corpo = rows.length ? (IGC.vista === 'quadro' ? quadro(rows) : lista(rows)) : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>${IGC.rows.length ? 'Nenhuma publicação combina com os filtros. Limpe os filtros para ver todas.' : 'Comece pela primeira ideia de publicação.'}</p>${botaoNova()}</div>`;
+    const corpo = rows.length ? (IGC.vista === 'quadro' ? quadro(rows) : IGC.vista === 'calendario' ? calendarioIG(rows) : lista(rows)) : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>${IGC.rows.length ? 'Nenhuma publicação combina com os filtros. Limpe os filtros para ver todas.' : 'Comece pela primeira ideia de publicação.'}</p>${botaoNova()}</div>`;
     $('#igcLista').innerHTML = corpo;
     $('#igcCont').textContent = `${rows.length} de ${IGC.rows.length} publicação(ões)`;
     $$('[data-pub]', $('#igcLista')).forEach(el => { const abre = () => editarPublicacao(el.dataset.pub); el.onclick = abre; el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abre(); } }; });
+    $$('[data-mes]', $('#igcLista')).forEach(b => { b.onclick = () => { IGC.mes = b.dataset.mes === 'hoje' ? hojeBR().slice(0, 7) : somaMes(IGC.mes, +b.dataset.mes); desenha(); }; });
     ligaNova($('#igcLista'));
   };
   $('#content').innerHTML = `${abasInstagramAcoes()}
@@ -51,7 +52,7 @@ PAGINAS.igconteudos = async function () {
       <input type="search" class="control" id="igcBusca" placeholder="Buscar por título, legenda ou hashtag" aria-label="Buscar publicações" value="${attr(IGC.busca)}">
       <select class="control" id="igcSt" aria-label="Estado"><option value="">Todos os estados</option>${IG_ETAPAS.concat(['ARQUIVADO']).map(s => `<option value="${s}" ${IGC.status === s ? 'selected' : ''}>${IG_ESTADO_ROTULO[s]}</option>`).join('')}</select>
       <select class="control" id="igcResp" aria-label="Responsável"><option value="">Todos os responsáveis</option>${equipe.map(n => `<option ${IGC.resp === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-      <div class="view-switch" role="group" aria-label="Vista"><button type="button" data-vista="lista" class="${IGC.vista === 'lista' ? 'active' : ''}" aria-pressed="${IGC.vista === 'lista'}">Lista</button><button type="button" data-vista="quadro" class="${IGC.vista === 'quadro' ? 'active' : ''}" aria-pressed="${IGC.vista === 'quadro'}">Quadro</button></div>
+      <div class="view-switch" role="group" aria-label="Vista"><button type="button" data-vista="lista" class="${IGC.vista === 'lista' ? 'active' : ''}" aria-pressed="${IGC.vista === 'lista'}">Lista</button><button type="button" data-vista="quadro" class="${IGC.vista === 'quadro' ? 'active' : ''}" aria-pressed="${IGC.vista === 'quadro'}">Quadro</button><button type="button" data-vista="calendario" class="${IGC.vista === 'calendario' ? 'active' : ''}" aria-pressed="${IGC.vista === 'calendario'}">Calendário</button></div>
       <span class="kpi-note" id="igcCont" aria-live="polite"></span>
     </div><div id="igcLista"></div>`;
   $('#igcBusca').oninput = debounce(e => { IGC.busca = e.target.value; desenha(); }, 200);
@@ -337,4 +338,18 @@ async function abrirEstudio(row, opc = {}) {
   window.addEventListener('beforeunload', e => { if (sujo && dlg.el.isConnected) { e.preventDefault(); e.returnValue = ''; } }, { once: true });
   setTimeout(() => $('#fTitulo', dlg.el)?.focus(), 40);
   return dlg;
+}
+
+/** Vista de calendário mensal das publicações do Instagram (postadas, agendadas e planejadas). */
+function calendarioIG(rows) {
+  const ym = IGC.mes, [y, m] = ym.split('-').map(Number);
+  const dias = new Map(); rows.forEach(r => { const k = String(r.publicacaoEm || '').slice(0, 10); if (k.slice(0, 7) === ym) (dias.get(k) || dias.set(k, []).get(k)).push(r); });
+  const ini = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), total = new Date(Date.UTC(y, m, 0)).getUTCDate(), hoje = hojeBR();
+  const cel = []; for (let i = 0; i < ini; i++) cel.push('<div class="igcal-dia vazio"></div>');
+  for (let d = 1; d <= total; d++) {
+    const k = `${ym}-${String(d).padStart(2, '0')}`, rs = dias.get(k) || [];
+    cel.push(`<div class="igcal-dia ${k === hoje ? 'hoje' : ''}"><b>${d}</b>${rs.map(r => `<button type="button" class="igcal-item ${estadoClasse(stLimpo(r.status))}" data-pub="${attr(r.id)}" title="${attr(r.titulo)}">${esc(r.perfil ? r.perfil.replace('@', '').slice(0, 4) + ' · ' : '')}${esc(r.titulo || '(sem título)')}</button>`).join('')}</div>`);
+  }
+  return `<div class="ig-barra"><button type="button" class="btn soft" data-mes="-1" aria-label="Mês anterior">‹</button><b class="mes-rot">${esc(mesRotulo(ym))}</b><button type="button" class="btn soft" data-mes="1" aria-label="Próximo mês">›</button><button type="button" class="btn soft" data-mes="hoje">Hoje</button></div>
+  <div class="igcal">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(x => `<div class="igcal-cab">${x}</div>`).join('')}${cel.join('')}</div>`;
 }
