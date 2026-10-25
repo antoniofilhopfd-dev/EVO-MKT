@@ -2,7 +2,7 @@
    Leads, matrículas e funil comercial não aparecem aqui: pertencem ao EVO CRM. */
 const TF_STATUS = [['todos', 'Todos os status'], ['ativos', 'Ativos'], ['pausados', 'Pausados'], ['analise', 'Em análise'], ['problemas', 'Com problemas ou reprovados'], ['arquivados', 'Arquivados ou excluídos'], ['desconhecidos', 'Status indisponível']];
 const tfNivel = () => state.page === 'tfcampanhas' ? 'campanhas' : state.page === 'tfanuncios' ? 'anuncios' : '';
-const tfStatus = () => { const v = pref('tfStatus.' + tfNivel(), 'todos'); return TF_STATUS.some(x => x[0] === v) ? v : 'todos'; };
+const tfStatus = () => { const v = Filtros.localGet({ status: 'todos' }).status; return TF_STATUS.some(x => x[0] === v) ? v : 'todos'; };
 const tfParametrosStatus = () => tfNivel() ? `&nivel=${tfNivel()}&status=${tfStatus()}` : '';
 const TF_CACHE = { chave: '', dados: null, estado: null };
 const TF_INDICADORES = [['investimento', 'Investimento', money, true], ['impressoes', 'Impressões', fmtN, true], ['alcance', 'Alcance', fmtN, true], ['cliques', 'Cliques', fmtN, true], ['ctr', 'CTR médio', pct, true], ['cpc', 'CPC médio', money, false], ['conversas', 'Conversas iniciadas', fmtN, true], ['custoConversa', 'Custo por conversa', money, false]];
@@ -50,7 +50,7 @@ async function tfPagina(corpo) {
       const foto = dlg.el.querySelector('img'); foto.onerror = () => { foto.replaceWith(Object.assign(document.createElement('p'), { textContent: 'A Meta não disponibilizou esta imagem agora. Atualize os dados e tente novamente.' })); };
     };
   });
-  const status = $('#tfStatus'); if (status) status.onchange = () => { setPref('tfStatus.' + tfNivel(), status.value); go(state.page); };
+  const status = $('#tfStatus'); if (status) status.onchange = () => { Filtros.localSet({ status: status.value }); go(state.page); };
   const periodo = $('#tfPeriodo'); if (periodo) periodo.onclick = () => PeriodoPicker.abrir({ de: d.periodo.de, ate: d.periodo.ate, titulo: 'Período de veiculação', max: hojeBR() }, (de, ate) => Filtros.set({ p: 'x', de, ate }));
   const b = $('#tfAtualiza'); if (b) b.onclick = async () => { b.disabled = true; try { await tfCarregar(true); toast('Dados atualizados'); go(state.page); } catch (e) { toast(e.message, 'warn'); b.disabled = false; } };
   return d;

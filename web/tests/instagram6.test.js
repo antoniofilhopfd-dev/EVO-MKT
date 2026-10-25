@@ -26,7 +26,7 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   t('Instagram tem cinco seções, sem Planejamento', (await p.$$eval('#subtabs .subtab', e => e.map(x => x.innerText.trim()))).join('|') === 'Visão geral|Conteúdos|Calendário|Desempenho|Ranking');
   t('seletor de perfil no cabeçalho com as três opções', (await p.$$eval('#igPerfilCabecalho option', e => e.map(x => x.value))).join('|') === '|@evolucaopb|@geracaoevolucao');
   t('sem filtros de segmento e campanha editorial no Instagram', (await p.$$('#fbSeg')).length === 0 && (await p.$$('#fbCamp')).length === 0);
-  t('o período tem os meses um por um', (await p.$$eval('#fbP option', e => e.map(x => x.value))).filter(v => v.startsWith('m:')).length === 12);
+  t('o período tem os meses um por um', (await p.$$eval('#fbMes option', e => e.map(x => x.value))).filter(v => v.startsWith('m:')).length === 12 && (await p.$$('[data-fbp]')).length === 4);
   t('o seletor não se repete nos filtros do Instagram', (await p.$$('#fbPerfil')).length === 0);
   t('Visão geral: seguidores, engajamento e melhores conteúdos', /engajamento/i.test(await p.innerText('#content')) && /melhores conteúdos/i.test(await p.innerText('#content')), (await p.innerText('#content')).slice(0, 700));
   t('sem botão “Nova publicação” repetido nas abas (só o do cabeçalho)', (await p.$$('#content [data-nova]')).length === 0 && (await p.$$('#newBtn')).length === 1);

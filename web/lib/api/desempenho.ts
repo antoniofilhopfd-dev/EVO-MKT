@@ -19,7 +19,18 @@ const partesBR = (iso: string) => {
   const w: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return { dia: w[p.find((x) => x.type === 'weekday')!.value], hora: +p.find((x) => x.type === 'hour')!.value };
 };
+const diasDoMes = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).getUTCDate();
+const dois = (n: number) => String(n).padStart(2, '0');
+/** Período de comparação: mês (ou ano) a partir do dia 1 compara com o mês (ou ano) anterior até o mesmo dia; os demais, com a janela anterior do mesmo tamanho. */
 const anterior = (f: Filtros): Filtros => {
+  const [a, m, d] = f.ate.split('-').map(Number);
+  if (f.de.slice(8) === '01' && f.de.slice(0, 7) === f.ate.slice(0, 7)) {
+    const pm = m === 1 ? 12 : m - 1, pa = m === 1 ? a - 1 : a;
+    return { ...f, de: `${pa}-${dois(pm)}-01`, ate: `${pa}-${dois(pm)}-${dois(Math.min(d, diasDoMes(pa, pm)))}` };
+  }
+  if (f.de.slice(5) === '01-01' && f.de.slice(0, 4) === f.ate.slice(0, 4)) {
+    return { ...f, de: `${a - 1}-01-01`, ate: `${a - 1}-${dois(m)}-${dois(Math.min(d, diasDoMes(a - 1, m)))}` };
+  }
   const ate = fmtDate(addDays(parseLocal(f.de + 'T12:00:00'), -1));
   return { ...f, de: fmtDate(addDays(parseLocal(ate + 'T12:00:00'), -(f.dias - 1))), ate };
 };

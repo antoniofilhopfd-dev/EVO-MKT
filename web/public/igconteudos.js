@@ -35,6 +35,7 @@ const badgeEstado = r => { const s = stLimpo(r.status); return `<span class="bad
 const faltasDe = r => (IGC.estados.get(r.id)?.pendencias || []).map(p => p.texto);
 
 PAGINAS.igconteudos = async function () {
+  Object.assign(IGC, Filtros.localGet({ busca: '', status: '', resp: '', vista: pref('igVista', 'lista') }));
   await carregarConteudos();
   await igcCarregaMeta();
   const equipe = (await api('/team').catch(() => ({ rows: [] }))).rows.map(x => x.nome);
@@ -57,10 +58,10 @@ PAGINAS.igconteudos = async function () {
       <div class="view-switch" role="group" aria-label="Vista"><button type="button" data-vista="lista" class="${IGC.vista === 'lista' ? 'active' : ''}" aria-pressed="${IGC.vista === 'lista'}">Lista</button><button type="button" data-vista="quadro" class="${IGC.vista === 'quadro' ? 'active' : ''}" aria-pressed="${IGC.vista === 'quadro'}">Quadro</button></div>
       <span class="kpi-note" id="igcCont" aria-live="polite"></span>
     </div><div id="igcLista"></div>`;
-  $('#igcBusca').oninput = debounce(e => { IGC.busca = e.target.value; desenha(); }, 200);
-  $('#igcSt').onchange = e => { IGC.status = e.target.value; desenha(); };
-  $('#igcResp').onchange = e => { IGC.resp = e.target.value; desenha(); };
-  $$('[data-vista]').forEach(b => { b.onclick = () => { IGC.vista = b.dataset.vista; setPref('igVista', IGC.vista); $$('[data-vista]').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', x === b); }); desenha(); }; });
+  $('#igcBusca').oninput = debounce(e => { IGC.busca = e.target.value; Filtros.localSet({ busca: IGC.busca }); desenha(); }, 200);
+  $('#igcSt').onchange = e => { IGC.status = e.target.value; Filtros.localSet({ status: IGC.status }); desenha(); };
+  $('#igcResp').onchange = e => { IGC.resp = e.target.value; Filtros.localSet({ resp: IGC.resp }); desenha(); };
+  $$('[data-vista]').forEach(b => { b.onclick = () => { IGC.vista = b.dataset.vista; Filtros.localSet({ vista: IGC.vista }); $$('[data-vista]').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', x === b); }); desenha(); }; });
   const lf = $('#igcLimparFoco'); if (lf) lf.onclick = () => { window.IG_FOCO = null; go('igconteudos'); };
   desenha(); ligaNova();
   if (window.IG_ABRIR) { const id = window.IG_ABRIR; window.IG_ABRIR = null; editarPublicacao(id); }

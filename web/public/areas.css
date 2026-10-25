@@ -199,3 +199,6 @@ main{background:#f5f7fc}
 .igr-tab td.num,.igr-mensal td.num{white-space:nowrap}.igr-mensal th,.igr-mensal td{padding:8px 7px}.igr-mensal th{white-space:nowrap}
 .tablewrap{overflow-x:auto}
 a.btn,a.btn:hover{text-decoration:none}
+/* Filtros por aba: botões rápidos da Visão Geral do Instagram */
+.fb-rapidos{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end}.fb-rapidos .pill{min-height:36px;padding:6px 12px;font-size:13px}
+@media (max-width:640px){.fb-rapidos{width:100%}.fb-rapidos .pill{flex:1 1 calc(50% - 6px)}}

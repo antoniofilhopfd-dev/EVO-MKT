@@ -1,6 +1,6 @@
 /* Instagram › Ranking: as melhores publicações do período (já postadas, lidas da Meta), com imagem e classificação por métrica. */
 const IGR_ORDEM = [['alcance', 'Alcance'], ['interacoes', 'Interações'], ['engajamento', 'Engajamento'], ['visualizacoes', 'Visualizações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['salvos', 'Salvamentos'], ['compartilhamentos', 'Compartilhamentos']];
-const IGR = { ordem: pref('igrOrdem', 'interacoes'), visao: pref('igrVisao', 'mes') };
+const IGR = { ordem: 'interacoes', visao: 'mes' };
 const IGR_COLS = [['seguidores', 'Seguidores'], ['variacao', 'Variação'], ['posts', 'Posts'], ['reels', 'Reels'], ['alcance', 'Alcance'], ['impressoes', 'Visualizações'], ['visitasPerfil', 'Visitas ao perfil'], ['interacoes', 'Interações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['compartilhamentos', 'Compartilh.'], ['salvamentos', 'Salvamentos']];
 const igrRotulo = per => (per.length === 4 ? per : new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(per + '-01T12:00:00Z')));
 const igrEmAndamento = per => hojeBR().startsWith(per);
@@ -8,6 +8,7 @@ const igrN = v => (v === null || v === undefined ? '—' : fmtN(v));
 const igrCorta = (t, n = 110) => { const s = String(t || '(sem legenda)').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n).replace(/\s+\S*$/, '') + '…' : s; };
 
 PAGINAS.igranking = async function () {
+  Object.assign(IGR, Filtros.localGet({ ordem: 'interacoes', visao: 'mes' }));
   const [d, mens] = await Promise.all([api('/instagram/ranking?' + Filtros.query()), api('/instagram/mensal?' + Filtros.query()).catch(() => null)]);
   const todas = d.rows || [];
   // só oferece a classificação por métricas que a Meta realmente informou para alguma publicação
@@ -29,7 +30,7 @@ PAGINAS.igranking = async function () {
     <p class="kpi-note">Engajamento = interações ÷ alcance. Visualizações, alcance e salvamentos aparecem só quando a Meta os informa para a publicação; o que a Meta não informa fica “—”, nunca zero.</p></section>`
     : `<div class="empty-rich"><strong>Nenhuma publicação neste período</strong><p>Conecte o perfil em Configurações › Instagram e sincronize, ou amplie o período nos Filtros.</p><button class="btn soft" data-go="configuracoes">Abrir Configurações</button></div>`}`;
   bindGoButtons(); igrMensalLiga(mens);
-  const sel = $('#igrOrdem'); if (sel) sel.onchange = () => { IGR.ordem = sel.value; setPref('igrOrdem', IGR.ordem); PAGINAS.igranking(); };
+  const sel = $('#igrOrdem'); if (sel) sel.onchange = () => { IGR.ordem = sel.value; Filtros.localSet({ ordem: IGR.ordem }); PAGINAS.igranking(); };
 };
 
 /** Informações mensais e anuais da conta: seguidores, alcance, visualizações, interações e publicações de cada período. */
@@ -53,7 +54,7 @@ function igrMensalHtml(m) {
     <p class="kpi-note">Alcance, visualizações e visitas somam os meses carregados; no ano, pessoas alcançadas em meses diferentes podem se repetir. Seguidores: a Meta não informa o passado; o sistema guarda uma foto por sincronização${m.primeiroRegistro ? ` desde ${esc(fmtDate(m.primeiroRegistro))}` : ''}, então meses anteriores ficam “—” até a primeira foto (ou até você informar o número). Posts e reels vêm das publicações lidas.</p></section>`;
 }
 function igrMensalLiga(m) {
-  $$('[data-igr-visao]').forEach(b => { b.onclick = () => { IGR.visao = b.dataset.igrVisao; setPref('igrVisao', IGR.visao); PAGINAS.igranking(); }; });
+  $$('[data-igr-visao]').forEach(b => { b.onclick = () => { IGR.visao = b.dataset.igrVisao; Filtros.localSet({ visao: IGR.visao }); PAGINAS.igranking(); }; });
   const h = $('#igrHist');
   if (h) h.onclick = async () => { h.disabled = true; h.textContent = 'Carregando… pode levar 1 minuto'; try { await post('/integrations/instagram/sync', { meses: 12 }); toast('Histórico carregado'); PAGINAS.igranking(); } catch (e) { toast(e.message, 'bad'); h.disabled = false; h.textContent = 'Carregar histórico (12 meses)'; } };
   const sm = $('#igrSegManual');
