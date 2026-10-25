@@ -3,7 +3,7 @@ import { audit, getRow, insertRow, listRows, saveRow, updateRow } from '../recor
 import { intLog, setSetting, setting } from '../settings';
 import { notifyMail } from '../mail';
 import { registrarNotificacao } from '../notificacoes';
-import { env, fail, fmtDate, localParts, now, parseLocal, Row, strv } from '../util';
+import { addDays, env, fail, fmtDate, localParts, now, parseLocal, Row, strv } from '../util';
 import { httpCall, httpOk, publicUrl, qsOf, signState, signedMediaUrl } from './http';
 
 const metaBase = () => env('META_GRAPH_BASE', 'https://graph.facebook.com/v21.0').replace(/\/+$/, '');
@@ -203,7 +203,7 @@ export async function igSync(months = 2): Promise<number> {
   const cs = await contasMonitoradas();
   let n = 0, ultimo: any = null, falhas = 0;
   for (const c of cs) {
-    try { n += await igSyncConta(c.ig, c.usuario, months, cs.length > 1); } catch (e: any) {
+    try { n += await igSyncConta(c.ig, c.usuario, months, cs.length > 1); await igSyncSemanas(c.ig).catch((e: any) => intLog('instagram', 'aviso', `@${c.usuario}: semanas não sincronizadas: ${e.message}`)); } catch (e: any) {
       if ((await setting('meta_token_invalido')) === '1') {
         await setSetting('ig_sync_warning', 'Acesso à Meta expirado ou revogado. Reconecte o Instagram em Configurações.');
         throw e;
@@ -217,6 +217,22 @@ export async function igSync(months = 2): Promise<number> {
   if (cs.length && falhas === cs.length) throw ultimo;
   if (cs.length && !falhas) await setSetting('ig_last_sync', now());
   return n;
+}
+/** Primeira semana exibida no Ranking de Contas (Semana 41 de 2026: 04/10 a 10/10). Antes disso o sistema não guarda histórico semanal. */
+export const IG_SEMANAS_DESDE = '2026-10-04';
+/** Lê da Meta as métricas das últimas semanas (domingo a sábado) da conta e guarda cada uma; a semana em andamento é atualizada a cada sincronização. */
+async function igSyncSemanas(ig: string, quantas = 12): Promise<void> {
+  const hoje = now().slice(0, 10), dow = new Date(hoje + 'T12:00:00Z').getUTCDay();
+  const dom = (d: string, n: number) => fmtDate(addDays(parseLocal(d + 'T12:00:00'), n));
+  for (let i = 0; i < quantas; i++) {
+    const inicio = dom(hoje, -dow - 7 * i), fim = dom(inicio, 6);
+    if (inicio < IG_SEMANAS_DESDE) break;
+    const m = await igMetricasJanela(ig, inicio, fim < hoje ? fim : hoje);
+    if (!Object.keys(m).length) continue;
+    const v = (k: string) => (m[k] === undefined ? null : Number(m[k]));
+    await run('INSERT INTO ig_conta_semana(conta,inicio,fim,alcance,visualizacoes,visitas_perfil,interacoes,curtidas,comentarios,compartilhamentos,salvamentos,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE fim=VALUES(fim),alcance=VALUES(alcance),visualizacoes=VALUES(visualizacoes),visitas_perfil=VALUES(visitas_perfil),interacoes=VALUES(interacoes),curtidas=VALUES(curtidas),comentarios=VALUES(comentarios),compartilhamentos=VALUES(compartilhamentos),salvamentos=VALUES(salvamentos),atualizado_em=VALUES(atualizado_em)',
+      [ig, inicio, fim, v('reach'), v('views'), v('profile_views'), v('total_interactions'), v('likes'), v('comments'), v('shares'), v('saves'), now()]);
+  }
 }
 async function igSyncConta(ig: string, usuario: string, months: number, varias: boolean): Promise<number> {
   const profile = await metaGet(`/${ig}`, { fields: 'followers_count,follows_count,media_count,username' });

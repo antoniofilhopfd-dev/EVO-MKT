@@ -19,7 +19,18 @@ const partesBR = (iso: string) => {
   const w: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return { dia: w[p.find((x) => x.type === 'weekday')!.value], hora: +p.find((x) => x.type === 'hour')!.value };
 };
+const diasDoMes = (a: number, m: number) => new Date(Date.UTC(a, m, 0)).getUTCDate();
+const dois = (n: number) => String(n).padStart(2, '0');
+/** Período de comparação: mês (ou ano) a partir do dia 1 compara com o mês (ou ano) anterior até o mesmo dia; os demais, com a janela anterior do mesmo tamanho. */
 const anterior = (f: Filtros): Filtros => {
+  const [a, m, d] = f.ate.split('-').map(Number);
+  if (f.de.slice(8) === '01' && f.de.slice(0, 7) === f.ate.slice(0, 7)) {
+    const pm = m === 1 ? 12 : m - 1, pa = m === 1 ? a - 1 : a;
+    return { ...f, de: `${pa}-${dois(pm)}-01`, ate: `${pa}-${dois(pm)}-${dois(Math.min(d, diasDoMes(pa, pm)))}` };
+  }
+  if (f.de.slice(5) === '01-01' && f.de.slice(0, 4) === f.ate.slice(0, 4)) {
+    return { ...f, de: `${a - 1}-01-01`, ate: `${a - 1}-${dois(m)}-${dois(Math.min(d, diasDoMes(a - 1, m)))}` };
+  }
   const ate = fmtDate(addDays(parseLocal(f.de + 'T12:00:00'), -1));
   return { ...f, de: fmtDate(addDays(parseLocal(ate + 'T12:00:00'), -(f.dias - 1))), ate };
 };
@@ -41,7 +52,7 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
     const posts = o.posts.slice(0, 1000).map((p) => ({
       id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda), miniatura: strv(p.miniatura), link: strv(p.permalink),
       perfil: usuario.get(p.conta) ?? p.conta, curtidas: num(p.curtidas), comentarios: num(p.comentarios), salvos: num(p.salvos), compartilhamentos: num(p.compartilhamentos),
-      alcance: num(p.alcance), visualizacoes: num(p.visualizacoes), interacoes: p.interacoes,
+      alcance: num(p.alcance), visualizacoes: num(p.visualizacoes), visitasPerfil: num(p.visitas_perfil), seguidoresNovos: num(p.seguidores_novos), interacoes: p.interacoes,
       engajamento: num(p.alcance) ? Math.round((p.interacoes / Number(p.alcance)) * 1000) / 10 : null,
       conteudoId: p.conteudo ? strv(p.conteudo.id) : '', titulo: p.conteudo ? strv(p.conteudo.titulo) : '',
     }));
@@ -87,6 +98,110 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
       mensal, anual, contas: contas.map((x) => x.usuario), atual: snaps.length ? mensal.filter((o) => o.seguidores !== null).slice(-1)[0]?.seguidores ?? null : null,
       primeiroRegistro: snaps[0] ? strv(snaps[0].dia) : '', ultimaSync: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'),
       origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: 'todos os meses sincronizados', atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'métricas da conta por mês; seguidores só existem desde a primeira sincronização' },
+    });
+  }
+  if (c.path === '/instagram/geral') {
+    /** Visão Geral do Instagram: indicadores, comparação das contas, formatos e melhores publicações. Nada é inventado: sem dado vira null. */
+    const o = await organico(f), oAnt = await organico(anterior(f));
+    const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const somaN = (ps: PostFiltrado[], k: string) => (ps.some((x) => x[k] !== null && x[k] !== undefined) ? ps.reduce((a, x) => a + (Number(x[k]) || 0), 0) : null);
+    const kp = (ps: PostFiltrado[]) => {
+      const alcance = somaN(ps, 'alcance'), interacoes = ps.reduce((a, x) => a + x.interacoes, 0);
+      return { publicacoes: ps.length, alcance, visualizacoes: somaN(ps, 'visualizacoes'), visitasPerfil: somaN(ps, 'visitas_perfil'), interacoes, curtidas: somaN(ps, 'curtidas'), comentarios: somaN(ps, 'comentarios'), compartilhamentos: somaN(ps, 'compartilhamentos'), salvamentos: somaN(ps, 'salvos'), seguidoresGerados: somaN(ps, 'seguidores_novos'), engajamento: alcance ? Math.round((interacoes / alcance) * 1000) / 10 : null };
+    };
+    const ids = o.contas.map((x) => x.ig);
+    const snaps = ids.length ? await q(`SELECT conta,dia,seguidores FROM ig_seguidores WHERE conta IN (${ids.map(() => '?').join(',')}) AND dia<=? ORDER BY dia`, [...ids, f.ate]) : [];
+    const porContaSeg = (ig: string) => {
+      const l = snaps.filter((x) => strv(x.conta) === ig);
+      const atual = l.length ? Number(l[l.length - 1].seguidores) : null;
+      const antes = l.filter((x) => strv(x.dia) < f.de), dentro = l.filter((x) => strv(x.dia) >= f.de);
+      const base = antes.length ? antes[antes.length - 1] : dentro[0];
+      return { atual, base: base ? Number(base.seguidores) : null, desde: base ? strv(base.dia) : '', completo: antes.length > 0 };
+    };
+    const contas = o.contas.map((x) => {
+      const ps = o.posts.filter((p) => p.conta === x.ig), sg = porContaSeg(x.ig);
+      return { usuario: x.usuario, ...kp(ps), seguidores: sg.atual, novosSeguidores: sg.atual !== null && sg.base !== null ? sg.atual - sg.base : null, novosDesde: sg.desde, novosCompleto: sg.completo };
+    });
+    const total = kp(o.posts), totalAnt = kp(oAnt.posts);
+    const sgTot = contas.every((x) => x.seguidores !== null) && contas.length ? contas.reduce((a, x) => a + Number(x.seguidores), 0) : null;
+    const novosTot = contas.length && contas.every((x) => x.novosSeguidores !== null) ? contas.reduce((a, x) => a + Number(x.novosSeguidores), 0) : null;
+    const baseTot = sgTot !== null && novosTot !== null ? sgTot - novosTot : null;
+    const serieSeg = new Map<string, number>();
+    for (const sn of snaps) if (strv(sn.dia) >= f.de) serieSeg.set(strv(sn.dia), (serieSeg.get(strv(sn.dia)) ?? 0) + Number(sn.seguidores));
+    const porDia = new Map<string, { alcance: number; visualizacoes: number; interacoes: number }>();
+    for (const p of o.posts) { const d = diaLocal(p.publicado_em), x = porDia.get(d) ?? { alcance: 0, visualizacoes: 0, interacoes: 0 }; x.alcance += Number(p.alcance) || 0; x.visualizacoes += Number(p.visualizacoes) || 0; x.interacoes += p.interacoes; porDia.set(d, x); }
+    const formatos = new Map<string, number>(); for (const p of o.posts) formatos.set(p.formato, (formatos.get(p.formato) ?? 0) + 1);
+    const melhores = [...o.posts].sort((a, b) => b.interacoes - a.interacoes).slice(0, 3).map((p) => ({ id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda).slice(0, 110), titulo: p.conteudo ? strv(p.conteudo.titulo) : '', miniatura: strv(p.miniatura), link: strv(p.permalink), perfil: o.contas.find((x) => x.ig === p.conta)?.usuario ?? '', alcance: n(p.alcance), interacoes: p.interacoes, comentarios: n(p.comentarios), salvamentos: n(p.salvos), curtidas: n(p.curtidas) }));
+    return json({
+      filtros: f, anteriorPeriodo: { de: anterior(f).de, ate: anterior(f).ate }, naoDeduplicado: contas.length > 1,
+      atual: total, anterior: totalAnt,
+      seguidores: { atual: sgTot, novos: novosTot, base: baseTot, desde: contas.map((x) => x.novosDesde).filter(Boolean).sort()[0] ?? '', completo: contas.length > 0 && contas.every((x) => x.novosCompleto), serie: [...serieSeg.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, seguidores]) => ({ dia, seguidores })) },
+      contas, formatos: [...formatos.entries()].map(([formato, publicacoes]) => ({ formato, publicacoes })).sort((a, b) => b.publicacoes - a.publicacoes),
+      porDia: [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, x]) => ({ dia, ...x })), melhores,
+      ultimaSync: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'),
+      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'publicações do período (não inclui anúncios); seguidores desde a primeira sincronização' },
+    });
+  }
+  if (c.path === '/instagram/ranking-contas') {
+    /** Histórico das contas, semana a semana (domingo a sábado), mês a mês ou ano a ano, só com leituras reais. Sem dado: null ("Sem dados"). */
+    const visao = ['semana', 'mes', 'ano'].includes(c.qs('visao')) ? c.qs('visao') : 'semana';
+    const hoje = now().slice(0, 10), anoAtual = Number(hoje.slice(0, 4));
+    const ano = /^\d{4}$/.test(c.qs('ano')) ? Number(c.qs('ano')) : anoAtual;
+    if (ano < 2020 || ano > anoAtual + 1) fail(400, 'Ano inválido.');
+    const contas = await contasDoPerfil(f.perfil), ids = contas.map((x) => x.ig), principal = (await setting('ig_user_id')) || ids[0] || '';
+    const marcas = ids.map(() => '?').join(',') || "''";
+    const num = (v: unknown) => (v === null || v === undefined || strv(v) === '' ? null : Number(v));
+    const snaps = ids.length ? await q(`SELECT conta,dia,seguidores FROM ig_seguidores WHERE conta IN (${marcas}) ORDER BY dia`, ids) : [];
+    const segEm = (ig: string, de: string, ate: string) => { const l = snaps.filter((x) => strv(x.conta) === ig && strv(x.dia) >= de && strv(x.dia) <= ate); return l.length ? Number(l[l.length - 1].seguidores) : null; };
+    const semanas = ids.length ? await q(`SELECT * FROM ig_conta_semana WHERE conta IN (${marcas})`, ids) : [];
+    const mensais = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && /^\d{4}-\d{2}$/.test(strv(r.periodo)) && ids.includes(strv(r.idExterno) || principal));
+    const celula = (m: Row | null, seg: number | null, segAnt: number | null) => {
+      const alcance = m ? num(m.alcance) : null, interacoes = m ? num(m.interacoes) : null;
+      return { seguidores: seg, novos: seg !== null && segAnt !== null ? seg - segAnt : null, alcance, visualizacoes: m ? num(m.visualizacoes) : null, visitasPerfil: m ? num(m.visitasPerfil) : null, interacoes, engajamento: alcance && interacoes !== null ? Math.round((interacoes / alcance) * 1000) / 10 : null };
+    };
+    const vazia = (cs: { seguidores: number | null; alcance: number | null; interacoes: number | null; visualizacoes: number | null }[]) => cs.every((x) => x.seguidores === null && x.alcance === null && x.interacoes === null && x.visualizacoes === null);
+    const dom = (d: string, n: number) => fmtDate(addDays(parseLocal(d + 'T12:00:00'), n));
+    const periodos: Row[] = [];
+    if (visao === 'semana') {
+      // Semana 1 do ano é a que contém 1º de janeiro (domingo a sábado): Semana 41 de 2026 = 04/10 a 10/10.
+      const jan1 = `${ano}-01-01`, s1 = dom(jan1, -new Date(jan1 + 'T12:00:00Z').getUTCDay());
+      for (let n = 1, ini = s1; ini <= `${ano}-12-31` && ini <= hoje; n++, ini = dom(ini, 7)) {
+        const fim = dom(ini, 6), ant = dom(ini, -7);
+        const cs = contas.map((ct) => {
+          const m = semanas.find((x) => strv(x.conta) === ct.ig && strv(x.inicio) === ini) ?? null;
+          const seg = segEm(ct.ig, ini, fim < hoje ? fim : hoje), segAnt = segEm(ct.ig, ant, dom(ini, -1));
+          return { usuario: ct.usuario, ...celula(m ? { alcance: m.alcance, visualizacoes: m.visualizacoes, visitasPerfil: m.visitas_perfil, interacoes: m.interacoes } : null, seg, segAnt) };
+        });
+        periodos.push({ chave: ini, rotulo: `Semana ${n}`, inicio: ini, fim, parcial: fim >= hoje, vazia: vazia(cs), contas: cs });
+      }
+    } else if (visao === 'mes') {
+      for (let m = 1; m <= 12; m++) {
+        const per = `${ano}-${String(m).padStart(2, '0')}`, ini = `${per}-01`, fim = fmtDate(new Date(Date.UTC(ano, m, 0, 12))), mAnt = m === 1 ? `${ano - 1}-12` : `${ano}-${String(m - 1).padStart(2, '0')}`;
+        const cs = contas.map((ct) => {
+          const reg = mensais.find((r) => strv(r.periodo) === per && (strv(r.idExterno) || principal) === ct.ig) ?? null;
+          const seg = segEm(ct.ig, ini, fim), segAnt = segEm(ct.ig, `${mAnt}-01`, dom(ini, -1));
+          return { usuario: ct.usuario, ...celula(reg ? { alcance: reg.alcance, visualizacoes: reg.impressoes ?? reg.visualizacoes, visitasPerfil: reg.visitasPerfil, interacoes: reg.interacoes } : null, seg, segAnt) };
+        });
+        periodos.push({ chave: per, rotulo: String(m), inicio: ini, fim, parcial: ini <= hoje && fim >= hoje, futuro: ini > hoje, vazia: vazia(cs), contas: cs });
+      }
+    } else {
+      const anos = new Set<number>([anoAtual]);
+      for (const r of mensais) anos.add(Number(strv(r.periodo).slice(0, 4)));
+      for (const sn of snaps) anos.add(Number(strv(sn.dia).slice(0, 4)));
+      for (const a of [...anos].sort((x, y) => x - y)) {
+        const ini = `${a}-01-01`, fim = `${a}-12-31`;
+        const cs = contas.map((ct) => {
+          const regs = mensais.filter((r) => strv(r.periodo).startsWith(String(a)) && (strv(r.idExterno) || principal) === ct.ig);
+          const soma = (k: string) => (regs.some((r) => num(r[k]) !== null) ? regs.reduce((t, r) => t + (num(r[k]) ?? 0), 0) : null);
+          const seg = segEm(ct.ig, ini, fim < hoje ? fim : hoje), segAnt = segEm(ct.ig, `${a - 1}-01-01`, `${a - 1}-12-31`);
+          return { usuario: ct.usuario, ...celula(regs.length ? { alcance: soma('alcance'), visualizacoes: soma('impressoes') ?? soma('visualizacoes'), visitasPerfil: soma('visitasPerfil'), interacoes: soma('interacoes') } : null, seg, segAnt) };
+        });
+        periodos.push({ chave: String(a), rotulo: String(a), inicio: ini, fim, parcial: a === anoAtual, vazia: vazia(cs), contas: cs });
+      }
+    }
+    return json({
+      visao, ano, anos: Array.from({ length: anoAtual - 2025 + 1 }, (_, i) => 2025 + i), periodos, contas: contas.map((x) => x.usuario), ultimaSync: await setting('ig_last_sync'),
+      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: visao === 'ano' ? 'todos os anos com dados' : `ano ${ano}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'alcance de cada conta é único por conta (não se soma entre contas); seguidores só existem desde a primeira sincronização; semanas desde 04/10/2026; no ano, alcance e visualizações são a soma dos meses' },
     });
   }
   if (c.path === '/instagram/visao') {

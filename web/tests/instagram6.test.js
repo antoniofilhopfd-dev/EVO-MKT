@@ -23,30 +23,28 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   const b = await U.abrir(); const p = await U.pagina(b, 'NAT-3301', G.nova);
   const dir = process.env.CAPTURAS; const foto = async n => { if (dir) { fs.mkdirSync(dir, { recursive: true }); await p.screenshot({ path: `${dir}/${n}.png`, fullPage: true }); } };
   await U.ir(p, 'igvisao', 900);
-  t('Instagram tem cinco seções, sem Planejamento', (await p.$$eval('#subtabs .subtab', e => e.map(x => x.innerText.trim()))).join('|') === 'Visão geral|Conteúdos|Calendário|Desempenho|Ranking');
+  t('Instagram tem cinco seções, sem Planejamento', (await p.$$eval('#subtabs .subtab', e => e.map(x => x.innerText.trim()))).join('|') === 'Visão geral|Publicações|Calendário|Desempenho|Ranking');
   t('seletor de perfil no cabeçalho com as três opções', (await p.$$eval('#igPerfilCabecalho option', e => e.map(x => x.value))).join('|') === '|@evolucaopb|@geracaoevolucao');
   t('sem filtros de segmento e campanha editorial no Instagram', (await p.$$('#fbSeg')).length === 0 && (await p.$$('#fbCamp')).length === 0);
-  t('o período tem os meses um por um', (await p.$$eval('#fbP option', e => e.map(x => x.value))).filter(v => v.startsWith('m:')).length === 12);
+  t('o período tem os meses um por um', (await p.$$eval('#fbMes option', e => e.map(x => x.value))).filter(v => v.startsWith('m:')).length === 12 && (await p.$$('[data-fbp]')).length === 4);
   t('o seletor não se repete nos filtros do Instagram', (await p.$$('#fbPerfil')).length === 0);
-  t('Visão geral: seguidores, engajamento e melhores conteúdos', /engajamento/i.test(await p.innerText('#content')) && /melhores conteúdos/i.test(await p.innerText('#content')), (await p.innerText('#content')).slice(0, 700));
+  t('Visão geral: seguidores, engajamento e melhores conteúdos', /engajamento/i.test(await p.innerText('#content')) && /melhores publicações/i.test(await p.innerText('#content')), (await p.innerText('#content')).slice(0, 700));
   t('sem botão “Nova publicação” repetido nas abas (só o do cabeçalho)', (await p.$$('#content [data-nova]')).length === 0 && (await p.$$('#newBtn')).length === 1);
   await foto('instagram-visao-geral');
   await U.ir(p, 'igconteudos', 900);
-  t('Conteúdos lista as publicações do EVO MKT e as já postadas na Meta', (await p.$$('#igcLista tbody tr')).length === 2 && (await p.$$('.igc-meta .ig-post')).length === 3, [(await p.$$('#igcLista tbody tr')).length, (await p.$$('.igc-meta .ig-post')).length, (await p.innerText('#content')).slice(0, 500)]);
+  t('Publicações lista as do EVO MKT e as já postadas na Meta (3 da Meta + 2 do EVO MKT)', (await p.$$('.igl tbody tr')).length === 5 && /Reels da feira/.test(await p.innerText('.igl')) && /Rascunho com data/.test(await p.innerText('.igl')), [(await p.$$('.igl tbody tr')).length, (await p.innerText('#content')).slice(0, 300)]);
   await foto('instagram-conteudos');
   await U.ir(p, 'igcalendario', 900);
   t('Calendário: mês mostra programadas, em preparação e postadas', (await p.$$('.igcal-item')).length >= 4 && /Rascunho com data/.test(await p.innerText('#content')) && (await p.$$('.igcal-meta')).length >= 1 && (await p.$$('.igcal-hora')).length >= 4);
   await foto('instagram-calendario-mes');
-  for (const m of ['semana', 'dia', 'lista']) { await p.click(`[data-modo="${m}"]`); await p.waitForTimeout(300); t('Calendário: visão ' + m + ' abre sem erro', (await p.$$('#igcalCorpo')).length === 1); if (m === 'lista') { t('Calendário: lista traz miniatura, horário e status', (await p.$$('.igcal-lista .igcal-item')).length >= 4 && (await p.$$('.igcal-lista .badge')).length >= 4); await foto('instagram-calendario-lista'); } }
+  for (const m of ['semana', 'dia']) { await p.click(`[data-modo="${m}"]`); await p.waitForTimeout(300); t('Calendário: visão ' + m + ' abre sem erro', (await p.$$('#igcalCorpo')).length === 1); if (m === 'dia') await foto('instagram-calendario-dia'); }
   t('Calendário do Instagram não traz o calendário escolar', !/feriado|prova bimestral/i.test(await p.innerText('#igcalCorpo')), ((await p.innerText('#content')).match(/.{0,60}(Calendário escolar|Feriado).{0,60}/i) || [])[0]);
   await U.ir(p, 'igdesempenho', 900); await foto('instagram-desempenho');
-  t('Desempenho carrega e traz cada postagem com seus dados', (await p.$$('[data-dim]')).length >= 1 && (await p.$$('.ig-card')).length === 3 && (await p.$$('#chMes svg')).length >= 1 && (await p.$$('[data-dim]')).length === 4 && /visualizações/i.test(await p.innerText('.ig-card')) && /engajamento/i.test(await p.innerText('.ig-card')));
+  t('Desempenho: comparativo, gráficos, comparação das contas e tabela ordenável com miniaturas', (await p.$$('[data-dim]')).length === 4 && (await p.$$('#chMes svg')).length >= 1 && (await p.$$('#chAlc svg')).length === 1 && (await p.$$('.igd-tab tbody tr')).length === 3 && (await p.$$('.igd-tab img')).length === 3 && /comparação entre contas/i.test(await p.innerText('#content')) && /novos seguidores/i.test(await p.innerText('.igd-tab thead')));
   await U.ir(p, 'igranking', 900);
   t('Ranking carrega com as publicações, imagens e classificação', (await p.$$('.igr-tab tbody tr')).length === 3 && (await p.$$('.igr-podio')).length === 3 && (await p.$$('.igr-tab img')).length === 3);
   t('Ranking: 1º por interações é a publicação do Reels', /Reels da feira/.test(await p.innerText('.igr-tab tbody tr')));
-  t('Ranking traz as informações mensais da conta (mês e ano) com histórico e seguidores manuais', /informações mensais da conta/i.test(await p.innerText('#content')) && (await p.$$('.igr-mensal tbody tr')).length >= 1 && (await p.$('#igrHist')) !== null && (await p.$('#igrSegManual')) !== null);
-  await p.click('[data-igr-visao="ano"]'); await p.waitForTimeout(400);
-  t('informações mensais: visão por ano', /Ano/.test(await p.innerText('.igr-mensal thead')) && (await p.$$('.igr-mensal tbody tr')).length >= 1);
+  t('Ranking tem as abas Publicações e Contas', (await p.$$eval('[data-igr-aba]', e => e.map(x => x.innerText.trim()))).join('|') === 'Publicações|Contas');
   await p.selectOption('#igrOrdem', 'alcance'); await p.waitForTimeout(400);
   t('Ranking reclassifica por alcance e por visualizações', /Reels da feira/.test(await p.innerText('.igr-tab tbody tr')) && (await p.$$eval('#igrOrdem option', e => e.map(x => x.value))).includes('visualizacoes'));
   await foto('instagram-ranking');

@@ -17,10 +17,22 @@ function PERIODOS_MESES() {
 const PERIODOS = [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['365', 'Últimos 12 meses'], ['semana', 'Esta semana'], ['semana_ant', 'Semana anterior'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano'], ['prox7', 'Próximos 7 dias'], ['prox30', 'Próximos 30 dias'], ...PERIODOS_MESES(), ['x', 'Personalizado…']];
 
 const Filtros = (() => {
+  /* Cada aba tem os próprios filtros, guardados à parte no navegador (`filtros.<aba>`). Só o perfil do Instagram é
+     compartilhado entre as abas do Instagram (`filtros.instagram.perfil`). Mudar o filtro de uma aba não toca nas outras. */
+  const CHAVES = { hoje: 'dashboard', calendario: 'calendario', igvisao: 'instagram.visao', igconteudos: 'instagram.conteudos', igplan: 'instagram.planejamento', igcalendario: 'instagram.calendario', igdesempenho: 'instagram.desempenho', igranking: 'instagram.ranking', trafego: 'trafego.visao', tfcampanhas: 'trafego.campanhas', tfanuncios: 'trafego.anuncios' };
+  const chaveDe = pg => CHAVES[pg] || 'geral';
+  const ehIg = chave => chave.startsWith('instagram.');
   const PADRAO = { p: '30', de: '', ate: '', perfil: '', segmento: '', formato: '', campanha: '' };
-  let est = { ...PADRAO, ...(pref('filtros', {}) || {}) };
+  const CAMPOS = Object.keys(PADRAO);
+  /** Padrões próprios de cada aba (a lista de Publicações mostra os últimos 12 meses). */
+  const PADRAO_P = { 'instagram.conteudos': '365' };
+  const padraoDe = chave => ({ ...PADRAO, p: PADRAO_P[chave] || PADRAO.p });
+  const memoria = {};
   const ouvintes = [];
   let campanhas = null;
+  /** Perfil do Instagram compartilhado. Na primeira vez aproveita o perfil que estava no filtro único antigo (que continua guardado, sem ser apagado). */
+  let perfilIg = pref('filtros.instagram.perfil', null);
+  if (perfilIg === null) { const antigo = pref('filtros', null); perfilIg = antigo && typeof antigo.perfil === 'string' ? antigo.perfil : ''; setPref('filtros.instagram.perfil', perfilIg); }
 
   function intervalo(p, de, ate) {
     const h = hojeBR();
@@ -30,22 +42,33 @@ const Filtros = (() => {
     if (p === 'hoje') return [h, h];
     if (p === 'semana') { const d = new Date(h + 'T12:00:00Z').getUTCDay(); return [somaDias(h, -d), h]; }
     if (p === 'semana_ant') { const d = new Date(h + 'T12:00:00Z').getUTCDay(); return [somaDias(h, -d - 7), somaDias(h, -d - 1)]; }
+    if (/^a:\d{4}$/.test(p)) { const y = p.slice(2); return [y + '-01-01', y + '-12-31' > h ? h : y + '-12-31']; }
     if (/^m:\d{4}-\d{2}$/.test(p)) { const ym = p.slice(2), fim = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).toISOString().slice(0, 10); return [ym + '-01', fim > h ? h : fim]; }
     if (p === 'mes') return [h.slice(0, 8) + '01', h];
     if (p === 'ano') return [h.slice(0, 4) + '-01-01', h];
     if (p === 'mes_ant') { const ult = somaDias(h.slice(0, 8) + '01', -1); return [ult.slice(0, 8) + '01', ult]; }
     const n = Number(p) || 30; return [somaDias(h, -(n - 1)), h];
   }
-  /** No Instagram não existem filtros de segmento e campanha editorial: nunca entram na consulta nem na lista. */
-  const noInstagram = () => typeof state !== 'undefined' && String(state.page || '').startsWith('ig');
-  const calc = () => { const [de, ate] = intervalo(est.p, est.de, est.ate); return { ...est, de, ate, ...(noInstagram() ? { segmento: '', campanha: '' } : {}) }; };
-  const salvar = () => setPref('filtros', { p: est.p, de: est.de, ate: est.ate, perfil: est.perfil, segmento: est.segmento, formato: est.formato, campanha: est.campanha });
-  const disparar = () => { salvar(); ouvintes.forEach(f => f(calc())); };
+
+  const carregar = chave => {
+    if (!memoria[chave]) { const g = pref('filtros.' + chave, null) || {}; memoria[chave] = Object.fromEntries(CAMPOS.map(k => [k, typeof g[k] === 'string' ? g[k] : padraoDe(chave)[k]])); }
+    return memoria[chave];
+  };
+  const chaveAtual = () => chaveDe(typeof state !== 'undefined' ? state.page : '');
+  const salvar = chave => setPref('filtros.' + chave, carregar(chave));
+  /** Valores efetivos da aba atual (ou da aba `pg`). No Instagram o perfil é o compartilhado e segmento/campanha não existem. */
+  const calc = pg => {
+    const chave = pg ? chaveDe(pg) : chaveAtual(), e = carregar(chave), [de, ate] = intervalo(e.p, e.de, e.ate);
+    return { ...e, de, ate, ...(ehIg(chave) ? { perfil: perfilIg, segmento: '', campanha: '' } : {}) };
+  };
+  const disparar = () => { if (typeof state !== 'undefined') state.epoca = (state.epoca || 0) + 1; ouvintes.forEach(f => f(calc())); };
 
   const api_ = {
     get: calc,
-    ativos: () => { const f = calc(); return ['perfil', 'segmento', 'formato', 'campanha'].filter(k => f[k]).length + (est.p !== PADRAO.p ? 1 : 0); },
-    /** Parâmetros para a consulta ao servidor. `campos` limita aos filtros que a tela aceita. */
+    chave: chaveAtual,
+    /** Quantos filtros da aba atual fogem do padrão (o perfil compartilhado do Instagram não conta). */
+    ativos: () => { const f = calc(), chave = chaveAtual(); return ['perfil', 'segmento', 'formato', 'campanha'].filter(k => f[k] && !(k === 'perfil' && ehIg(chave))).length + (carregar(chave).p !== padraoDe(chave).p ? 1 : 0); },
+    /** Parâmetros para a consulta ao servidor, da aba atual. `campos` limita aos filtros que a tela aceita. */
     query(campos = ['periodo', 'perfil', 'segmento', 'formato', 'campanha']) {
       const f = calc(), q = new URLSearchParams();
       if (campos.includes('periodo')) { q.set('de', f.de); q.set('ate', f.ate); }
@@ -53,8 +76,18 @@ const Filtros = (() => {
       return q.toString();
     },
     descricao() { const f = calc(); return `${fmtDate(f.de)} a ${fmtDate(f.ate)}`; },
-    set(patch) { est = { ...est, ...patch }; disparar(); },
-    limpar() { est = { ...PADRAO }; disparar(); },
+    set(patch) {
+      const chave = chaveAtual(), e = carregar(chave), resto = { ...patch };
+      if ('perfil' in resto && ehIg(chave)) { perfilIg = String(resto.perfil || ''); setPref('filtros.instagram.perfil', perfilIg); delete resto.perfil; }
+      for (const k of CAMPOS) if (k in resto) e[k] = String(resto[k] ?? '');
+      salvar(chave); disparar();
+    },
+    /** Restaura os padrões da aba atual. Não mexe nas outras abas nem no perfil compartilhado do Instagram. */
+    limpar() { const chave = chaveAtual(); memoria[chave] = padraoDe(chave); salvar(chave); setPref('filtros.' + chave + '.local', {}); disparar(); },
+    /** Filtros próprios de uma tela (status, busca, ordenação…): ficam guardados na aba e voltam ao padrão em "Limpar filtros". */
+    localGet(padrao) { const l = pref('filtros.' + chaveAtual() + '.local', null) || {}; return Object.fromEntries(Object.keys(padrao).map(k => [k, k in l ? l[k] : padrao[k]])); },
+    localSet(patch) { const c = chaveAtual(); setPref('filtros.' + c + '.local', { ...(pref('filtros.' + c + '.local', null) || {}), ...patch }); },
+    temLocal() { const l = pref('filtros.' + chaveAtual() + '.local', null) || {}; return Object.keys(l).length > 0; },
     aoMudar(fn) { ouvintes.push(fn); return () => { const i = ouvintes.indexOf(fn); if (i >= 0) ouvintes.splice(i, 1); }; },
     async campanhasEditoriais() { if (!campanhas) { try { campanhas = (await getRows('campanhas')).rows || []; } catch { campanhas = []; } } return campanhas; },
     esquecerCampanhas() { campanhas = null; },
@@ -62,45 +95,57 @@ const Filtros = (() => {
   return api_;
 })();
 
-/** Quais filtros cada página aceita e, para os que não aceita, por quê. */
+/** Filtros que cada aba oferece. A barra só mostra os que funcionam na aba; o perfil do Instagram fica no cabeçalho. */
 const FILTROS_PAGINA = {
-  hoje: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
-  calendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O calendário tem a própria navegação por mês, semana e dia.' } },
-  igvisao: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
-  igconteudos: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'Esta lista mostra todas as publicações; use os filtros da lista para a data.' } },
-  igplan: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O planejamento navega por mês.' } },
-  igcalendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O calendário tem a própria navegação por mês, semana e dia.' } },
-  igdesempenho: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
-  igranking: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
-  trafego: { aplica: ['periodo'], motivo: { perfil: 'A Meta Ads não separa por perfil do Instagram.', segmento: 'A Meta Ads não informa o segmento (ele só aparece no nome da campanha).', formato: 'Os anúncios não têm o formato das publicações do EVO MKT.', campanha: 'A campanha editorial é do EVO MKT; a Meta tem as próprias campanhas.' } },
-  tfcampanhas: { aplica: ['periodo'], motivo: { perfil: 'A Meta Ads não separa por perfil do Instagram.', segmento: 'A Meta Ads não informa o segmento.', formato: 'Os anúncios não têm o formato das publicações.', campanha: 'A campanha editorial é do EVO MKT; a Meta tem as próprias campanhas.' } },
-  tfanuncios: { aplica: ['periodo'], motivo: { perfil: 'A Meta Ads não separa por perfil do Instagram.', segmento: 'A Meta Ads não informa o segmento.', formato: 'Os anúncios não têm o formato das publicações.', campanha: 'A campanha editorial é do EVO MKT; a Meta tem as próprias campanhas.' } },
+  hoje: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'] },
+  calendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'] },
+  igvisao: { aplica: ['periodo', 'formato'] },
+  igconteudos: { aplica: ['periodo', 'formato'] },
+  igplan: { aplica: ['formato'] },
+  igcalendario: { aplica: ['formato'] },
+  igdesempenho: { aplica: ['periodo', 'formato'] },
+  igranking: { aplica: ['periodo', 'formato'] },
+  trafego: { aplica: ['periodo'] },
+  tfcampanhas: { aplica: ['periodo'] },
+  tfanuncios: { aplica: ['periodo'] },
   configuracoes: null,
 };
+const PERIODOS_RAPIDOS = [['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['semana', 'Esta semana'], ['mes', 'Este mês']];
 
 async function montarFiltros() {
   const box = $('#filtros'); if (!box) return;
-  const cfg = FILTROS_PAGINA[state.page];
-  if (!cfg) { box.hidden = true; box.innerHTML = ''; return; }
+  const pagina = state.page, cfg = FILTROS_PAGINA[pagina];
+  if (!cfg || !cfg.aplica.length) { box.hidden = true; box.innerHTML = ''; return; }
+  const tem = k => cfg.aplica.includes(k), ig = pagina.startsWith('ig');
+  const camps = tem('campanha') ? await Filtros.campanhasEditoriais() : [];
+  if (state.page !== pagina) return; // a pessoa já foi para outra aba
   box.hidden = false;
-  const f = Filtros.get(), camps = await Filtros.campanhasEditoriais();
-  const dis = k => !cfg.aplica.includes(k);
-  const dica = k => (dis(k) ? ` title="${attr(cfg.motivo[k] || 'Não se aplica a esta tela.')}"` : '');
-  const sel = (id, k, rot, opcoes) => `<label class="fb-campo ${dis(k) ? 'fb-off' : ''}"${dica(k)}><span>${rot}</span><select class="control" id="${id}" ${dis(k) ? 'disabled' : ''} aria-label="${rot}">${opcoes.map(([v, l]) => `<option value="${attr(v)}" ${String(f[k]) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+  const f = Filtros.get();
+  const sel = (id, k, rot, opcoes) => `<label class="fb-campo"><span>${rot}</span><select class="control" id="${id}" aria-label="${rot}">${opcoes.map(([v, l]) => `<option value="${attr(v)}" ${String(f[k]) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
   const rotP = f.p === 'x' ? `${fmtDate(f.de)} – ${fmtDate(f.ate)}` : (PERIODOS.find(p => p[0] === f.p) || [, ''])[1];
-  const semEfeito = ['periodo', 'perfil', 'segmento', 'formato', 'campanha'].filter(k => dis(k) && (k === 'periodo' ? false : f[k]));
+  /* Visão Geral do Instagram: Mês e Ano como seleção principal, mais quatro botões rápidos; o botão ativo é o período realmente aplicado. */
+  const anoAtual = +hojeBR().slice(0, 4);
+  const periodoVisao = () => `<label class="fb-campo"><span>Mês</span><select class="control" id="fbMes" aria-label="Mês"><option value="">Escolha o mês</option>${PERIODOS_MESES().map(([v, l]) => `<option value="${v}" ${f.p === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+    <label class="fb-campo"><span>Ano</span><select class="control" id="fbAno" aria-label="Ano"><option value="">Escolha o ano</option>${[anoAtual, anoAtual - 1, anoAtual - 2].map(y => `<option value="a:${y}" ${f.p === 'a:' + y ? 'selected' : ''}>${y}</option>`).join('')}</select></label>
+    <div class="fb-rapidos" role="group" aria-label="Períodos rápidos">${PERIODOS_RAPIDOS.map(([v, l]) => `<button type="button" class="pill ${f.p === v ? 'on' : ''}" data-fbp="${v}" aria-pressed="${f.p === v}">${l}</button>`).join('')}</div>`;
+  const periodoLista = () => `<label class="fb-campo"><span>Período</span><select class="control" id="fbP" aria-label="Período">${PERIODOS.map(([v, l]) => `<option value="${v}" ${f.p === v ? 'selected' : ''}>${v === 'x' && f.p === 'x' ? esc(rotP) : esc(l)}</option>`).join('')}</select></label>`;
   const n = Filtros.ativos(), aberto = window.innerWidth >= 860;
-  box.innerHTML = `<details class="fb-det" ${aberto ? 'open' : ''}><summary>Filtros${n ? ` · ${n} ativo(s)` : ''} <small>${esc(dis('periodo') ? 'período próprio da tela' : Filtros.descricao())}</small></summary><div class="fb-linha">
-    <label class="fb-campo ${dis('periodo') ? 'fb-off' : ''}"${dica('periodo')}><span>Período</span><select class="control" id="fbP" ${dis('periodo') ? 'disabled' : ''} aria-label="Período">${PERIODOS.map(([v, l]) => `<option value="${v}" ${f.p === v ? 'selected' : ''}>${v === 'x' && f.p === 'x' ? esc(rotP) : esc(l)}</option>`).join('')}</select></label>
-    ${!state.page.startsWith('ig') ? sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA) : ''}${!state.page.startsWith('ig') ? sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA) : ''}
-    ${sel('fbFmt', 'formato', 'Formato', [['', 'Todos os formatos'], ...FORMATO_LISTA.map(x => [x, x])])}
-    ${!state.page.startsWith('ig') ? sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])]) : ''}
-    <button type="button" class="btn soft fb-limpar" id="fbLimpar" ${Filtros.ativos() ? '' : 'disabled'}>Limpar filtros</button>
+  box.innerHTML = `<details class="fb-det" ${aberto ? 'open' : ''}><summary>Filtros${n ? ` · ${n} ativo(s)` : ''} ${tem('periodo') ? `<small>${esc(Filtros.descricao())}</small>` : ''}</summary><div class="fb-linha">
+    ${tem('periodo') ? (pagina === 'igvisao' ? periodoVisao() : periodoLista()) : ''}
+    ${tem('perfil') && !ig ? sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA) : ''}${tem('segmento') ? sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA) : ''}
+    ${tem('formato') ? sel('fbFmt', 'formato', 'Formato', [['', 'Todos os formatos'], ...FORMATO_LISTA.map(x => [x, x])]) : ''}
+    ${tem('campanha') ? sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])]) : ''}
+    <button type="button" class="btn soft fb-limpar" id="fbLimpar" ${n || Filtros.temLocal() ? '' : 'disabled'}>Limpar filtros</button>
   </div>
-  <div class="fb-info" id="fbInfo">${state.page.startsWith('ig') ? `<span class="fb-perfil-atual">Perfil: <b>${esc((PERFIL_LISTA.find(x=>x[0]===f.perfil)||PERFIL_LISTA[0])[1])}</b></span> · ` : ''}<b>${dis('periodo') ? 'Período: navegação própria desta tela' : 'Período: ' + esc(Filtros.descricao())}</b>${f.p !== 'x' && !dis('periodo') ? ' · fuso America/Fortaleza' : ''}${semEfeito.length ? ` · <span class="fb-aviso">Sem efeito aqui: ${semEfeito.map(k => ({ perfil: 'perfil', segmento: 'segmento', formato: 'formato', campanha: 'campanha editorial' }[k])).join(', ')} (${esc(cfg.motivo[semEfeito[0]] || '')})</span>` : ''}</div></details>`;
+  ${tem('periodo') ? `<div class="fb-info" id="fbInfo"><b>Período: ${esc(Filtros.descricao())}</b></div>` : ''}</details>`;
   const liga = (id, k) => { const e = $('#' + id, box); if (e) e.onchange = () => Filtros.set({ [k]: e.value }); };
   liga('fbPerfil', 'perfil'); liga('fbSeg', 'segmento'); liga('fbFmt', 'formato'); liga('fbCamp', 'campanha');
-  $('#fbP', box).onchange = e => {
+  const mes = $('#fbMes', box), ano = $('#fbAno', box);
+  if (mes) mes.onchange = () => { if (mes.value) Filtros.set({ p: mes.value, de: '', ate: '' }); };
+  if (ano) ano.onchange = () => { if (ano.value) Filtros.set({ p: ano.value, de: '', ate: '' }); };
+  $$('[data-fbp]', box).forEach(b => { b.onclick = () => Filtros.set({ p: b.dataset.fbp, de: '', ate: '' }); });
+  const lista = $('#fbP', box);
+  if (lista) lista.onchange = e => {
     const v = e.target.value;
     if (v === 'x') { e.target.value = f.p; PeriodoPicker.abrir({ de: f.de, ate: f.ate, titulo: 'Escolha o período', max: hojeBR() }, (a, b) => Filtros.set({ p: 'x', de: a, ate: b })); return; }
     Filtros.set({ p: v, de: '', ate: '' });

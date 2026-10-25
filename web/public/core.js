@@ -27,13 +27,18 @@ const setPref = (key, v) => { try { localStorage.setItem(`evo.${key}`, JSON.stri
 function toast(msg, type = 'ok') { const t = $('#toast'); if (!t) return; t.textContent = msg; t.className = `toast ${type}`; clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 3600); }
 function setTitle(title, sub = '') { $('#pageTitle').textContent = title; $('#pageSub').textContent = sub; document.title = `${title} · EVO MKT`; }
 
+/** Consultas de leitura de uma tela que já não é a atual (a pessoa mudou de aba ou de filtro) ficam sem resposta: nunca sobrescrevem a tela mais recente. */
+const API_SEM_EPOCA = /^\/(notificacoes|auth|team|search|admin|integrations\/status)/;
 async function api(path, opt = {}) {
+  const leitura = !opt.method || String(opt.method).toUpperCase() === 'GET', epoca = state.epoca || 0;
   opt = { ...opt, credentials: 'same-origin', headers: { ...(opt.headers || {}), 'X-EVO': '1' } };
   const r = await fetch(API + path, opt);
   if (r.status === 401 && !path.startsWith('/auth/login')) { sessionStorage.removeItem('evo.internal.session'); toast('Sessão expirada. Entre novamente.', 'warn'); setTimeout(() => location.reload(), 900); throw new Error('Sessão expirada'); }
   if (!r.ok) { let msg = `Erro ${r.status}`; try { const j = await r.json(); msg = j.error || j.message || msg; } catch { /* sem corpo */ } const e = new Error(msg); e.status = r.status; throw e; }
   const ct = r.headers.get('content-type') || '';
-  return ct.includes('json') ? r.json() : r.text();
+  const corpo = ct.includes('json') ? await r.json() : await r.text();
+  if (leitura && epoca !== (state.epoca || 0) && !API_SEM_EPOCA.test(path)) return new Promise(() => {});
+  return corpo;
 }
 const post = (path, body) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
 const put = (path, body) => api(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
@@ -140,14 +145,14 @@ function renderInternalUser() {
 const PAGINAS = {}; // página → função que desenha (registrada pelos outros arquivos)
 const ROTULOS = {
   hoje: 'Dashboard', calendario: 'Calendário',
-  igvisao: 'Visão geral', igconteudos: 'Conteúdos', igplan: 'Planejamento', igcalendario: 'Calendário', igdesempenho: 'Desempenho', igranking: 'Ranking',
+  igvisao: 'Visão geral', igconteudos: 'Publicações', igplan: 'Planejamento', igcalendario: 'Calendário', igdesempenho: 'Desempenho', igranking: 'Ranking',
   trafego: 'Visão geral', tfcampanhas: 'Campanhas', tfanuncios: 'Anúncios',
   configuracoes: 'Configurações',
 };
 const DESCRICOES = {
   hoje: 'Decisões do Marketing: publicações, calendário, Instagram e tráfego em um só lugar.',
   calendario: 'Publicações, planejamento editorial, calendário escolar, datas comemorativas e Google Agenda.',
-  igvisao: 'Desempenho orgânico dos perfis do Instagram.', igconteudos: 'Da ideia à publicação, com revisão e aprovação.',
+  igvisao: 'Desempenho orgânico dos perfis do Instagram.', igconteudos: 'Rascunhos, agendadas e já postadas no Instagram, com publicar agora e agendar.',
   igplan: 'Pauta do mês, ideias, campanhas editoriais e modelos.', igcalendario: 'Publicações programadas e já postadas no Instagram, com status, horário e perfil.', igranking: 'As melhores publicações do período, por alcance, interações, engajamento e visualizações.', igdesempenho: 'O que funcionou, por perfil, segmento, formato, tema e horário.',
   trafego: 'Anúncios da Meta: somente consulta. Criar e editar anúncios continua no Gerenciador de Anúncios da Meta.', tfcampanhas: 'Resumo por campanha.', tfanuncios: 'Detalhamento por anúncio.',
   configuracoes: 'Acessos, integrações, backup, auditoria e prontidão do sistema.',
@@ -197,7 +202,7 @@ async function go(page) {
   if (REDIRECIONA[page]) page = REDIRECIONA[page];
   if (!ROTULOS[page] || !canAccess(page)) page = 'hoje';
   clearInterval(go._timer);
-  state.page = page; history.replaceState(null, '', `?page=${encodeURIComponent(page)}`);
+  state.page = page; state.epoca = (state.epoca || 0) + 1; history.replaceState(null, '', `?page=${encodeURIComponent(page)}`);
   renderNav(); updateHeader(); montarFiltros();
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
   try {
