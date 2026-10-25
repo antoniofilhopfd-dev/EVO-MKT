@@ -64,3 +64,11 @@ tfoot .tot td{background:#F1F4FA;border-top:2px solid var(--navy)}
 :host{display:block}
 .sec.det table{font-size:9.5px}.sec.det th{font-size:9.5px;padding:6px 2px}.sec.det td{padding:5px 2px;font-size:9.5px}.sec.det td.foto{width:52px;padding:3px}.sec.det td img{width:46px;height:58px}.sec.det td.l{min-width:80px;max-width:110px}
 .tw{overflow-x:auto}
+.graf2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.graf2 h3{margin:0 0 4px;font-size:12px;color:var(--navy)}.graf2 svg{margin-top:0}.leg{font-size:10px;display:flex;gap:6px;align-items:center;color:#444}.leg i{display:inline-block;width:9px;height:9px;border-radius:2px}
+.kpis small.up{color:#2E9F5B;font-weight:700}.kpis small.down{color:#C0392B;font-weight:700}
+.cab .logo{height:auto;max-height:44px;max-width:150px;width:auto;object-fit:contain}
+.vazio{padding:20px;text-align:center;color:#5E6678;font-size:12px}
+@media(max-width:700px){.graf2{grid-template-columns:1fr}}
+/* tabelas do relatório: cabeçalhos podem quebrar em duas linhas e nada passa da borda (nem na prévia nem na tela cheia) */
+.sec table{table-layout:auto;width:100%}.sec th{white-space:normal;line-height:1.15;word-break:normal}.sec td{white-space:normal}.sec.det td.foto{width:46px}.sec.det td.l{min-width:70px;max-width:120px}
+.sec.det table,.sec.det th,.sec.det td{font-size:9px}.sec.det th{padding:5px 2px}.sec.det td{padding:4px 2px}.tw{overflow-x:visible}

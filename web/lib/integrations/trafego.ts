@@ -48,24 +48,10 @@ export function validarPeriodo(de: string, ate: string): void {
   if (Math.round((utc(ate) - utc(de)) / DIA) + 1 > MAX_DIAS) fail(400, `O período máximo é de ${MAX_DIAS} dias.`);
 }
 
-/** Período anterior equivalente: semana → mesma janela 7 dias antes; mês até hoje → mesmo número de dias do mês anterior; demais → período de mesmo tamanho logo antes. */
+/** Período anterior de MESMA duração, sem sobreposição: a janela de igual tamanho imediatamente antes de `de` (datas inclusivas).
+ *  Semana (domingo a hoje ou domingo a sábado): os mesmos dias da semana anterior, que também têm a mesma duração. */
 export function periodoAnterior(de: string, ate: string, tipo = ''): { de: string; ate: string } {
-  if (tipo === 'semana') return { de: ymd(utc(de) - 7 * DIA), ate: ymd(utc(ate) - 7 * DIA) };
-  if (tipo === 'mes' && de.slice(8) === '01') {
-    const y = Number(de.slice(0, 4)), m = Number(de.slice(5, 7));
-    const ini = Date.UTC(y, m - 2, 1), ultimo = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
-    const dia = Math.min(Number(ate.slice(8)), ultimo);
-    return { de: ymd(ini), ate: ymd(Date.UTC(y, m - 2, dia)) };
-  }
-  if (tipo === 'mes_ant') {
-    const y = Number(de.slice(0, 4)), m = Number(de.slice(5, 7));
-    return { de: ymd(Date.UTC(y, m - 2, 1)), ate: ymd(Date.UTC(y, m - 1, 0)) };
-  }
-  if (tipo === 'semana_ant') return { de: ymd(utc(de) - 7 * DIA), ate: ymd(utc(ate) - 7 * DIA) };
-  if (tipo === 'ano' || /^a:\d{4}$/.test(tipo)) {
-    const y = Number(de.slice(0, 4)) - 1, fimAnt = ate.slice(5) === '02-29' ? '02-28' : ate.slice(5);
-    return { de: `${y}-${de.slice(5)}`, ate: `${y}-${fimAnt}` };
-  }
+  if (tipo === 'semana' || tipo === 'semana_ant') return { de: ymd(utc(de) - 7 * DIA), ate: ymd(utc(ate) - 7 * DIA) };
   const dias = Math.round((utc(ate) - utc(de)) / DIA) + 1;
   const fim = utc(de) - DIA;
   return { de: ymd(fim - (dias - 1) * DIA), ate: ymd(fim) };
@@ -201,8 +187,8 @@ export async function resumoTrafego(de: string, ate: string, tipo = '', forcar =
   const idx = new Map(dias.map((d, i) => [d, i]));
   for (const l of dia.linhas) { const i = idx.get(String(l.date_start ?? '').slice(0, 10)); const s = series.find((x) => x.nome === String(l.campaign_name ?? l.campaign_id ?? 'Sem identificação')); if (i !== undefined && s) s.valores[i] += num(l.spend); }
   const total = dias.map((_, i) => series.reduce((s, x) => s + x.valores[i], 0));
-  const conversasDia = dias.map(() => 0);
-  for (const l of dia.linhas) { const i = idx.get(String(l.date_start ?? '').slice(0, 10)); if (i !== undefined) conversasDia[i] += conversasIniciadas(l.actions); }
+  const conversasDia = dias.map(() => 0), impressoesDia = dias.map(() => 0), cliquesDia = dias.map(() => 0);
+  for (const l of dia.linhas) { const i = idx.get(String(l.date_start ?? '').slice(0, 10)); if (i !== undefined) { conversasDia[i] += conversasIniciadas(l.actions); impressoesDia[i] += num(l.impressions); cliquesDia[i] += num(l.clicks); } }
   // investimento e resultado por segmento (o segmento é deduzido do nome da campanha; sem segmento reconhecido entra em "Sem segmento")
   const porSeg = new Map<string, { segmento: string; investimento: number; conversas: number; campanhas: number }>();
   for (const c of campanhas) { const k = c.segmento || 'SEM'; const x = porSeg.get(k) ?? { segmento: k, investimento: 0, conversas: 0, campanhas: 0 }; x.investimento += c.investimento; x.conversas += c.conversas; x.campanhas++; porSeg.set(k, x); }
@@ -211,7 +197,7 @@ export async function resumoTrafego(de: string, ate: string, tipo = '', forcar =
   const dados: Row = {
     periodo: { de, ate, dias: dias.length }, anterior: ant, atual, anteriorTotais: anterior,
     variacoes: Object.fromEntries((['investimento', 'impressoes', 'alcance', 'cliques', 'ctr', 'cpc', 'conversas', 'custoConversa'] as const).map((k) => [k, variacao(atual[k], anterior[k])])),
-    campanhas, conjuntos, anuncios, segmentos, diario: { dias, series, total, conversas: conversasDia },
+    campanhas, conjuntos, anuncios, segmentos, diario: { dias, series, total, conversas: conversasDia, impressoes: impressoesDia, cliques: cliquesDia },
     destaques: {
       melhorCampanha: comConversa.length ? [...comConversa].sort((a, b) => (a.custoConversa ?? 0) - (b.custoConversa ?? 0))[0] : null,
       piorCampanha: comConversa.length > 1 ? [...comConversa].sort((a, b) => (b.custoConversa ?? 0) - (a.custoConversa ?? 0))[0] : null,

@@ -6,6 +6,8 @@ import { lerFiltros } from '../filtros';
 import { listarNotificacoes } from '../notificacoes';
 import { run } from '../db';
 import { q, q1 } from '../db';
+import { respostaPdf } from '../pdf';
+import { relatorioInstagramPdf } from '../igPdf';
 import { requireInternal, requireAdmin } from '../auth';
 import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
@@ -101,8 +103,9 @@ export async function operacaoRoute(c: Ctx) {
     await audit(String(u.codigo), 'ig-seguidores-manual', 'instagram', mes);
     return json({ ok: true });
   }
-  if (path === '/instagram/relatorio') {
+  if (path === '/instagram/relatorio' || path === '/instagram/relatorio.pdf') {
     await requireInternal(c);
+    if (c.method !== 'GET') return fail(405, 'O relatório é somente consulta.');
     const lp = localParts(new Date());
     const mes = /^\d{4}-\d{2}$/.test(c.qs('mes')) ? c.qs('mes') : `${lp.y}-${String(lp.m).padStart(2, '0')}`;
     const [y, m] = mes.split('-').map(Number);
@@ -112,7 +115,18 @@ export async function operacaoRoute(c: Ctx) {
     const pega = (per: string) => linhas.find((r) => r.periodo === per) ?? null;
     const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,seguidores_novos,visitas_perfil,miniatura,permalink FROM ig_posts WHERE conta=? AND publicado_em LIKE ? ORDER BY publicado_em DESC', [conta, mes + '%'])).map((p) => ({ ...p, interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos) }));
     const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [conta, per + '%']))?.seguidores ?? null;
-    return json({ mes, anterior: ant, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' });
+    // série diária de seguidores do mês e semanas (dom–sáb) que tocam o mês; nada é estimado: sem leitura, a lista vem vazia
+    const serieSeguidores = (await q('SELECT dia,seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia', [conta, mes + '%'])).map((r) => ({ dia: String(r.dia), seguidores: Number(r.seguidores) }));
+    const ultimoDia = new Date(Date.UTC(y, m, 0)).getUTCDate(), iniMes = `${mes}-01`, fimMes = `${mes}-${String(ultimoDia).padStart(2, '0')}`;
+    const semanas = (await q('SELECT inicio,fim,alcance,visualizacoes,interacoes FROM ig_conta_semana WHERE conta=? AND fim>=? AND inicio<=? ORDER BY inicio', [conta, iniMes, fimMes])).map((r) => ({ inicio: String(r.inicio), fim: String(r.fim), alcance: r.alcance === null ? null : Number(r.alcance), visualizacoes: r.visualizacoes === null ? null : Number(r.visualizacoes), interacoes: r.interacoes === null ? null : Number(r.interacoes) }));
+    const hojeDia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date());
+    const parcial = hojeDia >= iniMes && hojeDia < fimMes;
+    const dados = { mes, anterior: ant, periodo: { de: iniMes, ate: parcial ? hojeDia : fimMes, parcial, futuro: hojeDia < iniMes }, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), serieSeguidores, semanas, posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' };
+    if (path === '/instagram/relatorio.pdf') {
+      const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
+      return respostaPdf(await relatorioInstagramPdf(dados, quando), `Relatorio-Mensal-Instagram_${mes}.pdf`);
+    }
+    return json(dados);
   }
   if (path === '/instagram/periodo') {
     await requireInternal(c);

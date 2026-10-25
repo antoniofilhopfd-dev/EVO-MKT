@@ -15,7 +15,7 @@ const csp = [
 const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
-  serverExternalPackages: ['mysql2', 'bcryptjs', 'nodemailer'],
+  serverExternalPackages: ['mysql2', 'bcryptjs', 'nodemailer', 'pdfkit', 'sharp'],
   async headers() {
     return [
       {

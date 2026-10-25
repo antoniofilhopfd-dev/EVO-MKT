@@ -6,6 +6,8 @@ import { saudeConta } from '../integrations/metaads';
 import { metaConnected } from '../integrations/meta';
 import { filtrarTabelaTrafego, validarFiltroStatus, hojeFortaleza, resumoTrafego, ultimaSincronizacao, versaoApi } from '../integrations/trafego';
 import { json } from './handlers';
+import { respostaPdf } from '../pdf';
+import { relatorioTrafegoPdf } from '../trafegoPdf';
 
 /**
  * Tráfego Pago: SOMENTE CONSULTA. Qualquer método diferente de GET devolve 405; rotas de criação/edição que existiram antes não existem mais (404).
@@ -33,6 +35,20 @@ export async function trafegoRoute(c: Ctx): Promise<Response> {
   }
   if (path === '/trafego/resumo' || path === '/trafego/relatorio') {
     try { return json(recortar(await resumoTrafego(c.qs('de'), c.qs('ate'), c.qs('tipo'), c.qs('forcar') === '1'))); } catch (e: any) { if (e.status) throw e; return fail(502, String(e.message).replace(/access_token=[^&\s"]+/g, 'access_token=***')); }
+  }
+  if (path === '/trafego/relatorio.pdf') {
+    // Download direto do PDF (gerado aqui, sem impressão do navegador). Mesmos filtros da pré-visualização.
+    const stat = c.qs('status') || 'todos', seg = c.qs('segmento'), camp = c.qs('campanha');
+    validarFiltroStatus(stat, 'campanhas');
+    if (seg && !['INFANTIL', 'FUND1', 'FUND2', 'MEDIO', 'SEM'].includes(seg)) fail(400, 'Segmento inválido.');
+    if (camp && !/^[A-Za-z0-9_-]{1,40}$/.test(camp)) fail(400, 'Campanha inválida.');
+    let d: Row;
+    try { d = await resumoTrafego(c.qs('de'), c.qs('ate'), c.qs('tipo')); } catch (e: any) { if (e.status) throw e; return fail(502, String(e.message).replace(/access_token=[^&\s"]+/g, 'access_token=***')); }
+    const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
+    const buf = await relatorioTrafegoPdf(d, { tipoPeriodo: c.qs('tipo'), status: stat, segmento: seg, campanha: camp, semanal: c.qs('semanal') === '1' && (d.periodo as Row).dias as number >= 7 }, quando);
+    const p = d.periodo as Row;
+    const dd = (iso: string) => `${iso.slice(8, 10)}-${iso.slice(5, 7)}-${iso.slice(0, 4)}`;
+    return respostaPdf(buf, `Relatorio-Trafego-Pago_${dd(String(p.de))}_a_${dd(String(p.ate))}.pdf`);
   }
   if (path === '/trafego/csv') {
     let d: Row;

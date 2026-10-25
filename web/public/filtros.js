@@ -107,7 +107,7 @@ const FILTROS_PAGINA = {
   igranking: { aplica: ['periodo', 'formato'] },
   trafego: { aplica: ['periodo'] },
   tfdesempenho: { aplica: ['periodo'] },
-  tfrelatorios: { aplica: ['periodo'] },
+  tfrelatorios: { aplica: [] },
   configuracoes: null,
 };
 const PERIODOS_TRAFEGO = [['semana', 'Esta semana'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano']];
