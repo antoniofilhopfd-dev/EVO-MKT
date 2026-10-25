@@ -11,7 +11,7 @@ import { json } from './handlers';
  * Calendário editorial em modo leitura, por link (para a direção). Só o hash do token fica guardado.
  * Mostra apenas posts já encaminhados (aprovação, aprovado, agendado, publicado): rascunhos e ideias nunca saem daqui.
  */
-const VISIVEIS = /^(REVISÃO|APROVADO|PROGRAMADO|PUBLICADO)$/i;
+const VISIVEIS = /^(EM REVISÃO|APROVADO|AGENDADO|PUBLICADO)$/i;
 
 export async function calendarioPublicoRoute(c: Ctx) {
   const { path, method } = c;

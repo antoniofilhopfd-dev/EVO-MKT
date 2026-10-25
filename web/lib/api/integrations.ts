@@ -7,8 +7,7 @@ import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gFinishConnect } from '../integrations/google';
-import { relatorioTrafego } from '../integrations/metarelatorio';
-import { adsAnuncios, adsDiario, adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta, pacingMes, saudeConta } from '../integrations/metaads';
+import { adsPermitido, ContaAds, listarContasAds, adsSync } from '../integrations/metaads';
 import { json } from './handlers';
 
 const redirect = (to: string) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store' } });
@@ -60,7 +59,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
           ultimaAgenda: await setting('g_last_cal_sync'),
           calendarioId: await setting('g_calendar_id'), importar: (await setting('g_importar')) !== '0',
         },
-        ads: { modoCompleto: (await setting('trafego_gestao')) === '1', limites: await limitesAlerta(), ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
+        ads: { ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
       });
@@ -94,7 +93,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       add('g_conn', await gConnected(), 'erro', 'Google: conta conectada (Agenda)', 'Clique em "Conectar com Google" e aceite as permissões.');
       const recente = async (k: string) => { const v = await setting(k); return v !== '' && Date.now() - new Date(v).getTime() < 2 * 86400000; };
       add('cron_roda', (!metaOn || (await recente('ig_last_sync'))) && (!(await gConnected()) || (await recente('g_last_cal_sync'))), 'aviso', 'Sincronização rodou nos últimos 2 dias', 'Crie o cron da Hostinger (comando abaixo) ou use os botões "Sincronizar agora".');
-      const agendados = metaOn ? (await listRows('conteudos')).filter((r) => r.publicarInstagram === 'SIM' && !r.instagramMediaId && r.midiaInstagram && /APROVADO|PROGRAMADO/i.test(String(r.status ?? ''))).length : 0;
+      const agendados = metaOn ? (await listRows('conteudos')).filter((r) => r.publicarInstagram === 'SIM' && !r.instagramMediaId && r.midiaInstagram && /AGENDADO/i.test(String(r.status ?? ''))).length : 0;
       const ultPub = await setting('ig_last_publish_run');
       add('cron_publicar', agendados === 0 || (ultPub !== '' && Date.now() - new Date(ultPub.replace(' ', 'T')).getTime() < 30 * 60000), 'aviso', 'Publicação automática: o cron rodou nos últimos 30 minutos', `Há ${agendados} post(s) agendado(s) para sair sozinhos, mas o cron de publicação não rodou. Crie o cron da Hostinger a cada 10 minutos (comando "cronPublicar" abaixo).`);
       return json({
@@ -137,16 +136,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await audit(u.codigo, 'instagram-token-manual');
       return json({ ok: true });
     }
-    case path === '/integrations/ads/config' && method === 'POST': {
-      const u = await requireAdmin(c);
-      const b = await c.body();
-      if ('ativar' in b) await setSetting('meta_ads_ativar', b.ativar ? '1' : '0');
-      for (const [k, cfg] of [['ctrMin', 'ads_ctr_min'], ['frequenciaMax', 'ads_freq_max'], ['gastoSemResultado', 'ads_gasto_sem_resultado'], ['impressoesMin', 'ads_impr_min']] as const) {
-        if (k in b) { const v = Number(b[k]); if (!Number.isFinite(v) || v <= 0 || v > 1_000_000) fail(400, `Valor inválido para ${k}.`); await setSetting(cfg, String(v)); }
-      }
-      await audit(u.codigo, 'ads-config', '', b.ativar ? 'ativado' : 'desativado');
-      return json({ ok: true });
-    }
     case path === '/integrations/ads/accounts': {
       await requireAdmin(c);
       try { return json({ contas: await listarContasAds() }); } catch (e: any) { return fail(502, e.message); }
@@ -163,40 +152,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/ads/sync' && method === 'POST': {
       await requireInternal(c);
       try { return json({ linhas: await adsSync() }); } catch (e: any) { await intLog('instagram', 'erro', 'Meta Ads: ' + e.message); return fail(502, e.message); }
-    }
-    case path === '/integrations/ads/orcamento' && method === 'POST': {
-      const u = await requireInternal(c);
-      const v = Number((await c.body()).valor);
-      if (!Number.isFinite(v) || v < 0 || v > 100_000_000) fail(400, 'Informe um valor válido (0 remove o orçamento).');
-      await setSetting('ads_orcamento_mensal', v > 0 ? String(v) : '');
-      await audit(u.codigo, 'ads-orcamento', '', v > 0 ? String(v) : 'removido');
-      return json({ ok: true });
-    }
-    case path === '/traffic/semanal': {
-      await requireInternal(c);
-      const ymd = (v: string) => (/^\d{4}-\d\d-\d\d$/.test(v) && !isNaN(new Date(v + 'T12:00:00').getTime()) ? v : '');
-      const de = ymd(c.qs('de')), ate = ymd(c.qs('ate'));
-      if (!de || !ate) fail(400, 'Informe as datas (de e ate) no formato AAAA-MM-DD.');
-      if (de > ate) fail(400, 'A data inicial é depois da final.');
-      if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 31) fail(400, 'O período do relatório vai até 31 dias.');
-      try { return json(await relatorioTrafego(de, ate)); } catch (e: any) { await intLog('instagram', 'erro', 'Relatório de tráfego: ' + e.message); return fail(502, e.message); }
-    }
-    case path === '/traffic/painel': {
-      await requireInternal(c);
-      const lp = new Date(), per = `${lp.getFullYear()}-${String(lp.getMonth() + 1).padStart(2, '0')}`;
-      const ant = new Date(lp.getFullYear(), lp.getMonth() - 1, 1), perAnt = `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`;
-      const soma = async (p: string) => (await q1('SELECT COALESCE(SUM(gasto),0) gasto,COALESCE(SUM(impressoes),0) impressoes,COALESCE(SUM(alcance),0) alcance,COALESCE(SUM(cliques),0) cliques,COALESCE(SUM(resultados),0) resultados,COALESCE(SUM(conversas),0) conversas,COUNT(*) n,MAX(moeda) moeda FROM ads_snapshots WHERE periodo=?', [p])) ?? {};
-      const num = (r: Row) => ({ gasto: Number(r.gasto ?? 0), impressoes: Number(r.impressoes ?? 0), alcance: Number(r.alcance ?? 0), cliques: Number(r.cliques ?? 0), resultados: Number(r.resultados ?? 0), conversas: Number(r.conversas ?? 0), n: Number(r.n ?? 0), moeda: String(r.moeda ?? '') });
-      return json({
-        periodo: per, anterior: perAnt, mes: num(await soma(per)), mesAnterior: num(await soma(perAnt)), saude: await saudeConta(), pacing: await pacingMes(),
-        diario: (await adsDiario(30)).map((d) => ({ dia: d.dia, gasto: Number(d.gasto), resultados: Number(d.resultados), conversas: Number(d.conversas), cliques: Number(d.cliques), impressoes: Number(d.impressoes) })),
-        anuncios: (await adsAnuncios(per)).map((a) => ({ ...a, gasto: Number(a.gasto), impressoes: Number(a.impressoes), alcance: Number(a.alcance), cliques: Number(a.cliques), resultados: Number(a.resultados), conversas: Number(a.conversas) })),
-        orcamentoMensal: Number(await setting('ads_orcamento_mensal')) || 0, ultimaSync: await setting('meta_ads_ultima_sync'),
-      });
-    }
-    case path === '/traffic/snapshots': {
-      await requireInternal(c);
-      return json({ alertas: await alertasTrafego(), limites: await limitesAlerta(), rows: await adsSnapshots(c.qs('periodo') || undefined), ultimaSync: await setting('meta_ads_ultima_sync'), conta: await setting('meta_ads_conta'), fonte: 'Meta Ads (leitura)' });
     }
     case path === '/integrations/meta/account' && method === 'POST': {
       const u = await requireAdmin(c);
@@ -272,7 +227,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const u = await requireInternal(c);
       const id = strv((await c.body()).id);
       const alvo = await getRow('conteudos', id);
-      if (alvo && !/^(APROVADO|PROGRAMADO|PUBLICADO)$/i.test(strv(alvo.status))) fail(409, 'Só conteúdos APROVADOS ou PROGRAMADOS podem ser publicados no Instagram.');
+      if (alvo && !/^(APROVADO|AGENDADO)$/i.test(strv(alvo.status))) fail(409, 'Só publicações APROVADAS ou AGENDADAS podem ser enviadas ao Instagram.');
       try {
         const r = await igPublish(id, u.codigo);
         await audit(u.codigo, 'instagram-publicado', 'conteudos', id);

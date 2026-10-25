@@ -23,7 +23,7 @@ import { operacaoRoute } from './operacao';
 import { comentariosRoute } from './comentarios';
 import { conteudoRoute } from './conteudo';
 import { calendarioPublicoRoute } from './calendarioPublico';
-import { gestaoAnunciosRoute } from './gestaoAnuncios';
+import { trafegoRoute } from './trafego';
 import { escolarRoute } from './escolar';
 import { datacomRoute } from './datacom';
 import { dashboardRoute } from './dashboard';
@@ -50,8 +50,8 @@ export async function route(c: Ctx): Promise<Out> {
   switch (true) {
     case path === '/manager/calendario-link' || path === '/public/calendario':
       return calendarioPublicoRoute(c);
-    case path.startsWith('/ads/'):
-      return gestaoAnunciosRoute(c);
+    case path.startsWith('/ads/') || path.startsWith('/trafego/'):
+      return trafegoRoute(c);
     case path.startsWith('/escolar/'):
       return escolarRoute(c);
     case path.startsWith('/datacom/'):
@@ -229,7 +229,7 @@ export async function route(c: Ctx): Promise<Out> {
     }
 
     // ---------- Integrações (Instagram / Google) ----------
-    case path.startsWith('/integrations/') || path === '/public/media' || path === '/traffic/snapshots' || path === '/traffic/painel' || path === '/traffic/semanal':
+    case path.startsWith('/integrations/') || path === '/public/media':
       return integrationsRoute(c);
 
     case path === '/admin/users': {

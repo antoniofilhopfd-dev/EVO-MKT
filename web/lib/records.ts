@@ -1,5 +1,6 @@
 import { q, q1, run, withTx } from './db';
 import { cleanInput, currentIp, fail, lower, now, Row, strv } from './util';
+import { registrarVersaoTexto, segmentoNormalizado, sincronizarMidia, statusAtual, validarStatusPorEdicao } from './conteudo';
 import { env, envInt } from './util';
 
 export const EVO_VERSION = '6.0.0-web';
@@ -77,9 +78,14 @@ export async function insertRow(mod: string, input: Row, ator: string): Promise<
   const clean = cleanInput(input);
   delete clean.id;
   await validarVinculosGenericos(clean);
+  if (mod === 'conteudos') {
+    if (clean.status !== undefined) { const e = validarStatusPorEdicao('', String(clean.status)); if (e) fail(400, e); clean.status = statusAtual(clean.status); }
+    if (clean.segmento !== undefined) clean.segmento = segmentoNormalizado(clean.segmento);
+  }
   const id = await newId(mod);
   const t = now();
   const row: Row = { id, ...clean, criadoEm: t, atualizadoEm: t, criadoPor: ator };
+  if (mod === 'conteudos' && Array.isArray(row.materiais)) sincronizarMidia(row);
   // registro, cabeçalhos e status inicial: tudo ou nada
   await withTx(async (c) => {
     await c.query('INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES(?,?,?,?,?)', [mod, id, JSON.stringify(row), t, t]);
@@ -113,13 +119,19 @@ export async function modifyRow(mod: string, id: string, fn: (cur: Row, c: any) 
   await mergeHeaders(mod, Object.keys(nw));
   return nw;
 }
-export async function updateRow(mod: string, id: string, patchIn: Row, ator: string): Promise<Row> {
+/** `interno`: chamada das integrações/rotas próprias (podem mudar status e campos protegidos da publicação). */
+export async function updateRow(mod: string, id: string, patchIn: Row, ator: string, opts: { interno?: boolean } = {}): Promise<Row> {
   const patch = cleanInput(patchIn);
   for (const k of ['id', 'criadoEm', 'criadoPor', 'atualizadoPor']) delete patch[k];
   const motivoInformado = strv(patch.motivoTransicao);
   delete patch.motivoTransicao;
   await validarVinculosGenericos(patch);
   const nw = await modifyRow(mod, id, async (cur, c) => {
+    if (mod === 'conteudos' && !opts.interno) {
+      if (patch.status !== undefined) { const e = validarStatusPorEdicao(String(cur.status ?? ''), String(patch.status)); if (e) fail(409, e); patch.status = statusAtual(patch.status); }
+      if (patch.segmento !== undefined) patch.segmento = segmentoNormalizado(patch.segmento);
+      for (const k of ['materiais', 'versoes', 'aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'instagramMediaId', 'instagramLink', 'publicadoConfirmadoEm', 'publicadoConfirmadoPor']) delete patch[k]; // só as rotas próprias mudam estes campos
+    }
     if (patch.status !== undefined && String(patch.status) !== String(cur.status ?? ''))
       await logStatus(c, mod, id, String(cur.status ?? ''), String(patch.status), ator, motivoInformado.trim());
     if (patch.responsavel !== undefined && String(patch.responsavel).trim() !== String(cur.responsavel ?? '').trim() && String(cur.responsavel ?? '').trim() !== '')
@@ -127,7 +139,9 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
     for (const campo of ['prazo', 'publicacaoEm']) {
       if (patch[campo] !== undefined && strv(patch[campo]) !== strv(cur[campo]) && strv(cur[campo]) !== '') await logStatus(c, mod, id, strv(cur[campo]), strv(patch[campo]), ator, motivoInformado.trim(), campo);
     }
-    return { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
+    const merged: Row = { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
+    if (mod === 'conteudos') { if (patch.status !== undefined) merged.status = statusAtual(patch.status); registrarVersaoTexto(cur, merged, ator); }
+    return merged;
   });
   await audit(ator, 'editar', mod, id);
   return nw;

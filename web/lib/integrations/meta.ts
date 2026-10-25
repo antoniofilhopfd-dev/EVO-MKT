@@ -190,7 +190,7 @@ async function conciliarAgendados(ig: string): Promise<void> {
     const melhor = cands.filter((c) => c.ok).sort((a, b) => a.d - b.d)[0] ?? (!base && cands.length === 1 ? cands[0] : undefined);
     if (!melhor) continue;
     usados.add(strv(melhor.p.media_id));
-    await updateRow('conteudos', String(r.id), { status: 'PUBLICADO', instagramMediaId: strv(melhor.p.media_id), instagramLink: strv(melhor.p.permalink), publicadoEm: strv(melhor.p.publicado_em) }, 'integracao:instagram');
+    await updateRow('conteudos', String(r.id), { status: 'PUBLICADO', instagramMediaId: strv(melhor.p.media_id), instagramLink: strv(melhor.p.permalink), publicadoEm: strv(melhor.p.publicado_em) }, 'integracao:instagram', { interno: true });
   }
 }
 
@@ -408,7 +408,7 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
     try { await metaPost(`/${mediaId}/comments`, { message: (tags.match(/#[\p{L}\p{N}_]+/gu) ?? []).join(' ').slice(0, 2200) }); }
     catch (e: any) { await intLog('instagram', 'erro', `${id}: publicado, mas o comentário das hashtags falhou: ${e.message}`); }
   }
-  await updateRow('conteudos', id, { status: 'PUBLICADO', instagramMediaId: mediaId, instagramLink: link, publicadoEm: now() }, ator);
+  await updateRow('conteudos', id, { status: 'PUBLICADO', instagramMediaId: mediaId, instagramLink: link, publicadoEm: now() }, ator, { interno: true });
   await intLog('instagram', 'ok', `Publicado: ${id} → ${link}`);
   return { status: 'PUBLICADO', link };
 }
@@ -419,7 +419,7 @@ export async function igPublishDue(): Promise<number> {
   let n = 0;
   for (const r of await listRows('conteudos')) {
     if (r.publicarInstagram !== 'SIM' || r.instagramMediaId || !r.midiaInstagram) continue;
-    if (!/APROVADO|PROGRAMADO/i.test(String(r.status ?? ''))) continue;
+    if (!/^AGENDADO$/i.test(String(r.status ?? ''))) continue;
     const prev = await q1('SELECT status FROM ig_publish WHERE conteudo_id=?', [r.id]);
     if (prev?.status === 'ERRO') continue; // falhou antes: só tenta de novo quando alguém clicar em "Publicar agora"
     const when = String(r.publicacaoEm ?? '');

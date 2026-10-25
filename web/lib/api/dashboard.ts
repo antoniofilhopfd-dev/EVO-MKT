@@ -4,7 +4,7 @@ import { q, q1 } from '../db';
 import { listRows } from '../records';
 import { setting } from '../settings';
 import { addDays, fail, fmtDate, parseLocal, Row, strv } from '../util';
-import { alertasTrafego, saudeConta } from '../integrations/metaads';
+import { saudeConta } from '../integrations/metaads';
 import { contasMonitoradas, igContaValida } from '../integrations/meta';
 import { ocorrencias } from './datacom';
 import { json } from './handlers';
@@ -103,7 +103,7 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
     .sort((a, b) => a.data.localeCompare(b.data)).slice(0, 5).map((d) => ({ id: d.id, nome: d.nome, data: d.data, categoria: d.categoria }));
 
   // alertas e integrações
-  const alertas = (await alertasTrafego().catch(() => [])).slice(0, 5).map((a) => ({ regra: a.regra, campanha: a.campanha, severidade: a.severidade, mensagem: a.mensagem }));
+  const alertas: Row[] = [];
   const integ: Row[] = [];
   if ((await setting('meta_token_invalido')) === '1') integ.push({ nome: 'Meta (Instagram e anúncios)', msg: 'O acesso expirou ou foi revogado. Reconecte em Configurações → Integrações.' });
   const sync = await setting('ig_last_sync');
