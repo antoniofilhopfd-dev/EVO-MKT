@@ -5,14 +5,14 @@ set -u
 HERE=$(cd "$(dirname "$0")" && pwd); WEB=$(cd "$HERE/.." && pwd); T="$HERE"
 D=${EVO_TEST_DIR:-/tmp/evo-web-test}; mkdir -p "$D"; PORT=${PORT:-8080}
 FALHOU=''
-SUITES=${*:-api acesso codigo recover integrations instagram contas backup integridade notificacoes conteudo fluxo removidos trafego trafego-comum-unit trafego-filtros-unit cinco calendario-geral dashboard configuracoes instagram6 prints-instagram instagram-auditoria filtros-abas migracoes escolar datacom auditoria seguranca-estatica seguranca contraste responsive desempenho insights}; rc=0
+SUITES=${*:-api acesso codigo recover integrations instagram contas backup integridade notificacoes conteudo fluxo removidos trafego trafego-comum-unit trafego-filtros-unit cinco calendario-geral dashboard configuracoes relatorio-instagram instagram6 prints-instagram instagram-auditoria filtros-abas migracoes escolar datacom auditoria seguranca-estatica seguranca contraste responsive desempenho insights}; rc=0
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 || { (mysqld_safe --user=mysql >/dev/null 2>&1 &); for i in $(seq 30); do mariadb -uroot -S /run/mysqld/mysqld.sock -e "select 1" >/dev/null 2>&1 && break; sleep 1; done; }
 mariadb -uroot -S /run/mysqld/mysqld.sock -e "CREATE USER IF NOT EXISTS 'evo'@'127.0.0.1' IDENTIFIED BY 'evopass'; GRANT ALL ON *.* TO 'evo'@'127.0.0.1';" 2>/dev/null
 [ -n "${SKIP_BUILD:-}" ] || (cd "$WEB" && npm run build >"$D/build.log" 2>&1) || { echo "build falhou (ver $D/build.log)"; exit 2; }
 export DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=evowebtest DB_USER=evo DB_PASSWORD=evopass NODE_ENV=production
 export SESSION_SECRET=segredo-de-teste-sessao-0123456789abcdef APP_KEY=chave-app-de-teste-0123456789 SETUP_KEY=chave-setup-de-teste-123 RECOVERY_KEY=recuperacao-de-teste-0123456789 PUBLIC_URL=http://127.0.0.1:$PORT
 export NOTIFY_TO=gerente@teste.com MAIL_LOG="$D/mail.log" LOGIN_GLOBAL_MAX=12 LOGIN_IP_MAX=30 LOGIN_DELAY_MS=0 CRON_SECRET=cron-de-teste-0123456789 TIMEZONE=America/Fortaleza ANTHROPIC_API_BASE=http://127.0.0.1:8099/anthropic
-export META_GRAPH_BASE=http://127.0.0.1:8099/graph META_OAUTH_BASE=http://127.0.0.1:8099/graph/dialog/oauth GOOGLE_AUTH_URL=http://127.0.0.1:8099/google/auth GOOGLE_TOKEN_URL=http://127.0.0.1:8099/google/token GOOGLE_API_BASE=http://127.0.0.1:8099/google GOOGLE_SHEETS_BASE=http://127.0.0.1:8099/google IG_POLL_MS=300
+export META_IMG_BASE=http://127.0.0.1:8099/img META_GRAPH_BASE=http://127.0.0.1:8099/graph META_OAUTH_BASE=http://127.0.0.1:8099/graph/dialog/oauth GOOGLE_AUTH_URL=http://127.0.0.1:8099/google/auth GOOGLE_TOKEN_URL=http://127.0.0.1:8099/google/token GOOGLE_API_BASE=http://127.0.0.1:8099/google GOOGLE_SHEETS_BASE=http://127.0.0.1:8099/google IG_POLL_MS=300
 # a suíte de integrações chama "php cron_integracoes.php <tarefa>": aqui o atalho chama o endpoint de cron do app Next
 cat > "$D/cron_integracoes.php" <<PHP
 <?php

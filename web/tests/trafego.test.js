@@ -110,26 +110,69 @@ const { t, fim } = U.contador();
   await p.click('#tfdLimpar'); await p.waitForTimeout(200);
   await p.click('[data-tf-ord="investimento"]'); await p.waitForTimeout(200);
   t('ordenação por coluna (crescente depois de clicar de novo)', (await p.$eval('[data-tf-ord="investimento"]', e => e.closest('th').getAttribute('aria-sort'))) === 'ascending');
-  // ---- Relatórios ----
+  // ---- Relatórios (somente Relatório Geral) ----
   await U.ir(p, 'tfrelatorios', 1500); txt = await U.textoConteudo(p);
-  t('Relatórios: tipos, filtros e pré-visualização antes de imprimir', ['Relatório geral', 'Relatório por campanha', 'Relatório por conjunto', 'Relatório por anúncio', 'Relatório por segmento'].every(k => txt.includes(k)) && (await p.$('#tfrPrevia')) !== null && /Imprimir/.test(txt));
-  const quadro = async () => { await p.waitForFunction(() => { const r = document.querySelector('#tfrPrevia')?.shadowRoot; return r && r.querySelector('.pg'); }, null, { timeout: 20000 }); return { evaluate: fn => p.evaluate(() => document.querySelector('#tfrPrevia').shadowRoot.querySelector('.previa-pg').innerText) }; };
-  const fr = await quadro();
-  const ftxt = await fr.evaluate();
-  t('pré-visualização traz indicadores, gráfico diário, resumo por campanha e detalhamento por anúncio', /Indicadores do período/.test(ftxt) && /Investimento diário/.test(ftxt) && /Resumo por campanha/.test(ftxt) && /Detalhamento por anúncio/.test(ftxt));
-  t('a pré-visualização usa datas em pt-BR, reais (R$) e % com vírgula', /R\$ [\d.]+,\d{2}/.test(ftxt) && /\d+,\d{2}%/.test(ftxt) && /\d{2}\/\d{2}\/\d{4}/.test(ftxt));
-  await p.click('input[value="segmento"]'); await p.waitForTimeout(1500);
-  const fr2 = await quadro();
-  t('relatório por segmento mostra a tabela por segmento', /Resumo por segmento/.test(await fr2.evaluate()));
-  await p.click('input[value="geral"]'); await p.waitForTimeout(800);
-  await p.selectOption('#tfrStatus', 'ativos'); await p.waitForTimeout(1500);
-  const fr3 = await quadro();
-  t('o filtro de status vale na pré-visualização (recorte filtrado avisado)', /Recorte filtrado/.test(await fr3.evaluate()));
+  t('Relatórios: sem seletor de tipos (só o Relatório Geral)', !/Relatório por (campanha|conjunto|anúncio|segmento)/.test(txt) && (await p.$$('input[name="tfRelTipo"]')).length === 0 && /Relatório geral/.test(txt));
+  t('Relatórios: Período do relatório no formulário com os cinco períodos', JSON.stringify(await p.$$eval('.tfr-per .pill', e => e.map(x => x.textContent))) === JSON.stringify(['Esta semana', 'Este mês', 'Mês anterior', 'Este ano', 'Personalizado']) && /Data inicial/.test(txt) && /Data final/.test(txt));
+  t('Relatórios: datas em dd/mm/aaaa e comparação de mesma duração', /^\d{2}\/\d{2}\/\d{4}$/.test(await p.inputValue('#tfrDe')) && /^\d{2}\/\d{2}\/\d{4}$/.test(await p.inputValue('#tfrAte')) && /período anterior de mesma duração|Comparação com o período anterior de mesma duração/.test(txt));
+  const quadro = async () => { await p.waitForFunction(() => { const r = document.querySelector('#tfrPrevia')?.shadowRoot; return r && r.querySelector('.pg'); }, null, { timeout: 20000 }); return { evaluate: () => p.evaluate(() => document.querySelector('#tfrPrevia').shadowRoot.querySelector('.previa-pg').innerText) }; };
+  const fr = await quadro(); const ftxt = await fr.evaluate();
+  t('prévia: indicadores, evolução, resumo das campanhas e detalhamento dos anúncios', /Indicadores do período/.test(ftxt) && /Evolução no período/.test(ftxt) && /Resumo das campanhas/.test(ftxt) && /Detalhamento dos anúncios/.test(ftxt));
+  t('prévia: datas pt-BR, reais e % com vírgula, dois intervalos visíveis', /R\$ [\d.]+,\d{2}/.test(ftxt) && /\d+,\d{2}%/.test(ftxt) && /Comparado a \d{2}\/\d{2}\/\d{4} a \d{2}\/\d{2}\/\d{4}/.test(ftxt));
+  t('sem “Imprimir”, “Salvar como PDF” nem window.print na aba', !/Imprimir|Salvar como PDF/i.test(await U.textoConteudo(p)) && (await p.$('#tfrPdf')) !== null);
+  // datas editáveis: validação e período personalizado
+  await p.fill('#tfrDe', '31/02/2026'); await p.click('#tfrAplicar'); await p.waitForTimeout(300);
+  t('data inexistente é recusada com mensagem', /dd\/mm\/aaaa/.test(await p.innerText('#tfrErro')));
+  await p.fill('#tfrDe', '10/10/2026'); await p.fill('#tfrAte', '05/10/2026'); await p.click('#tfrAplicar'); await p.waitForTimeout(300);
+  t('início depois do fim é recusado', /não pode ser depois/.test(await p.innerText('#tfrErro')));
+  await p.fill('#tfrAte', '30/12/2099'); await p.click('#tfrAplicar'); await p.waitForTimeout(300);
+  t('data final no futuro é recusada', /futuro/.test(await p.innerText('#tfrErro')));
+  const d1 = U.dia(-20).split('-').reverse().join('/'), d2 = U.dia(-4).split('-').reverse().join('/');
+  await p.fill('#tfrDe', d1); await p.fill('#tfrAte', d2); await p.click('#tfrAplicar'); await p.waitForTimeout(1500);
+  t('datas válidas viram período personalizado e a prévia acompanha', (await p.$eval('#tfrPers', e => e.classList.contains('on'))) && (await p.inputValue('#tfrDe')) === d1 && (await p.inputValue('#tfrAte')) === d2 && new RegExp(d1.replace(/\//g, '\\/') + ' a ' + d2.replace(/\//g, '\\/')).test(await p.innerText('.tf-rel-previa .db-tit')));
+  // recorte semanal: habilitado com 7 dias ou mais
+  t('recorte semanal habilitado em 17 dias', (await p.$eval('#tfrSem', e => !e.disabled)));
+  await p.check('#tfrSem'); await p.waitForTimeout(1200); await quadro();
+  const semTxt = await p.evaluate(() => document.querySelector('#tfrPrevia').shadowRoot.querySelector('.previa-pg').innerText);
+  t('recorte semanal: tabela de semanas (dom–sáb) com total igual ao do período', /Recorte semanal/.test(semTxt) && /Semana \d+/.test(semTxt));
+  const dSem = await G.get(`/trafego/resumo?de=${U.dia(-20)}&ate=${U.dia(-4)}&tipo=x`);
+  const totSemana = (semTxt.match(/TOTAL[^\n]*\n?[^\n]*/g) || []).join(' ');
+  t('o recorte semanal não muda os totais do período', semTxt.includes(dSem.atual.investimento.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })), dSem.atual.investimento);
+  await p.fill('#tfrDe', U.dia(-3).split('-').reverse().join('/')); await p.fill('#tfrAte', U.dia(-1).split('-').reverse().join('/')); await p.click('#tfrAplicar'); await p.waitForTimeout(1500);
+  t('com menos de 7 dias o recorte semanal fica desabilitado e explica o motivo', (await p.$eval('#tfrSem', e => e.disabled)) && /a partir de 7 dias/.test(await U.textoConteudo(p)));
+  await p.click('[data-tfr-p="mes"]'); await p.waitForTimeout(1500); await quadro();
+  await p.selectOption('#tfrStatus', 'ativos'); await p.waitForTimeout(1200);
+  await p.waitForTimeout(1500); const fr3 = await quadro(); const t3 = await fr3.evaluate();
+  t('o filtro de status vale na pré-visualização (recorte filtrado avisado)', /Recorte filtrado/.test(t3) && /com filtros/.test(await p.innerText('.tf-rel-previa .db-tit')), [/Recorte filtrado/.test(t3), await p.innerText('.tf-rel-previa .db-tit'), t3.slice(-300)]);
+  await p.selectOption('#tfrStatus', 'todos'); await p.waitForTimeout(800);
+  // ---- Baixar PDF: download direto, sem impressão ----
+  await p.evaluate(() => { window.__imprimiu = 0; window.print = () => { window.__imprimiu++; }; });
+  const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 30000 }), p.click('#tfrPdf')]);
+  const arq = require('os').tmpdir() + '/rel-trafego.pdf'; await dl.saveAs(arq);
+  t('Baixar PDF baixa um arquivo .pdf com nome legível e datas, sem abrir impressão', /^Relatorio-Trafego-Pago_\d{2}-\d{2}-\d{4}_a_\d{2}-\d{2}-\d{4}\.pdf$/.test(dl.suggestedFilename()) && (await p.evaluate(() => window.__imprimiu)) === 0, dl.suggestedFilename());
+  const bufPdf = require('fs').readFileSync(arq);
+  t('o arquivo é um PDF A4 de verdade', bufPdf.subarray(0, 5).toString() === '%PDF-' && /MediaBox \[0 0 595\.28 841\.89\]/.test(bufPdf.toString('latin1')));
+  const sh = (c) => require('child_process').execFileSync('bash', ['-c', c], { encoding: 'utf8' });
+  const pdfTxt = sh(`pdftotext -layout ${arq} -`); const pdfInfo = sh(`pdfinfo ${arq}`);
+  t('PDF: título, período, comparação, indicadores, campanhas e anúncios com fotos', /Relatório geral/.test(pdfTxt) && /Comparado a \d{2}\/\d{2}\/\d{4} a \d{2}\/\d{2}\/\d{4}/.test(pdfTxt) && /Investimento/.test(pdfTxt) && /Resumo das campanhas/.test(pdfTxt) && /Detalhamento dos anúncios/.test(pdfTxt) && /Vídeo depoimento/.test(pdfTxt) && /Pages:\s+\d+/.test(pdfInfo), pdfTxt.slice(0, 300));
+  t('PDF: acentuação correta, R$ e datas em pt-BR, página X de Y', /Conversas iniciadas/.test(pdfTxt) && /R\$ [\d.]+,\d{2}/.test(pdfTxt) && /Página 1 de \d+/.test(pdfTxt.replace(/Pagina/g, 'Página')));
+  const nImg = sh(`pdfimages -list ${arq} | tail -n +3 | wc -l`).trim();
+  t('PDF: logo e fotos reais dos anúncios embutidas como imagens (não só texto)', Number(nImg) >= 2, nImg);
+  // servidor: mesmos filtros, validação e permissões
+  const pdfApi = async (q, h = G.H) => fetch(U.B + '/trafego/relatorio.pdf?' + q, { headers: h });
+  const qBase = `de=${f}&ate=${a}&tipo=x`;
+  const rA = await pdfApi(qBase + '&semanal=1&status=ativos'); const bA = Buffer.from(await rA.arrayBuffer());
+  t('API do PDF: 200, application/pdf, anexo com nome e sem cache', rA.status === 200 && /application\/pdf/.test(rA.headers.get('content-type')) && /attachment; filename="Relatorio-Trafego-Pago_/.test(rA.headers.get('content-disposition')) && rA.headers.get('cache-control') === 'no-store' && bA.subarray(0, 5).toString() === '%PDF-');
+  require('fs').writeFileSync(require('os').tmpdir() + '/rel-filtrado.pdf', bA); t('API do PDF: com filtro de status o recorte é avisado no arquivo', /Recorte filtrado/.test(sh(`pdftotext ${require('os').tmpdir()}/rel-filtrado.pdf -`)));
+  t('API do PDF: filtros inválidos 400, sem login 401, Equipe consulta 200', (await pdfApi(qBase + '&status=xx')).status === 400 && (await pdfApi(qBase + '&segmento=XX')).status === 400 && (await pdfApi(qBase + '&campanha=a%27b')).status === 400 && (await fetch(U.B + '/trafego/relatorio.pdf?' + qBase)).status === 401 && (await pdfApi(qBase, E.H)).status === 200);
+  t('API do PDF: POST recusado (somente leitura)', (await fetch(U.B + '/trafego/relatorio.pdf?' + qBase, { method: 'POST', headers: G.H, body: '{}' })).status === 405);
+  t('API do PDF: período inválido 400 (futuro)', (await pdfApi(`de=${a}&ate=${U.dia(5)}&tipo=x`)).status === 400);
   t('o PDF A4 abre com o período escolhido', (await p.evaluate(async () => (await fetch('/relatorio-trafego.html')).status)) === 200);
   // ---- capturas reais (desktop e tablet) quando CAPTURAS=pasta ----
   if (process.env.CAPTURAS) {
     const fs = require('fs'); fs.mkdirSync(process.env.CAPTURAS, { recursive: true });
     const foto = async (pg, nome) => { await pg.addStyleTag({ content: 'html,body{height:auto!important;overflow:visible!important}#app,main,.main,#content{height:auto!important;max-height:none!important;overflow:visible!important}' }); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.screenshot({ path: `${process.env.CAPTURAS}/${nome}.png`, fullPage: true }); };
+    sh(`pdftoppm -r 70 -png ${arq} ${process.env.CAPTURAS}/pdf-trafego`);
     const b2 = await U.abrir();
     for (const [nome, vp] of [['desktop', { width: 1440, height: 900 }], ['tablet', { width: 820, height: 1180 }]]) {
       const q = await U.pagina(b2, 'NAT-3301', G.nova, vp);

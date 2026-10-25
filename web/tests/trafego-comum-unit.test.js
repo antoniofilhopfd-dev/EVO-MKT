@@ -37,8 +37,10 @@ const sf = ctx.tfSerieFiltrada(dia, [d.campanhas[0]]); t('série diária restrit
 const pa = exp.periodoAnterior;
 t('semana → mesma janela 7 dias antes', JSON.stringify(pa('2026-10-18', '2026-10-24', 'semana')) === JSON.stringify({ de: '2026-10-11', ate: '2026-10-17' }));
 t('semana parcial (domingo a hoje) compara com os mesmos dias da anterior', JSON.stringify(pa('2026-10-18', '2026-10-21', 'semana')) === JSON.stringify({ de: '2026-10-11', ate: '2026-10-14' }));
-t('mês anterior → o mês antes dele, inteiro', JSON.stringify(pa('2026-09-01', '2026-09-30', 'mes_ant')) === JSON.stringify({ de: '2026-08-01', ate: '2026-08-31' }) && JSON.stringify(pa('2026-03-01', '2026-03-31', 'mes_ant')) === JSON.stringify({ de: '2026-02-01', ate: '2026-02-28' }));
-t('este mês → mesmos dias do mês anterior', JSON.stringify(pa('2026-10-01', '2026-10-25', 'mes')) === JSON.stringify({ de: '2026-09-01', ate: '2026-09-25' }));
-t('este ano → mesmo intervalo do ano anterior', JSON.stringify(pa('2026-01-01', '2026-10-25', 'ano')) === JSON.stringify({ de: '2025-01-01', ate: '2025-10-25' }));
+const dur = (x) => Math.round((Date.parse(x.ate + 'T12:00:00Z') - Date.parse(x.de + 'T12:00:00Z')) / 86400000) + 1;
+const sem = (de, ate, tipo) => { const a = pa(de, ate, tipo); return dur(a) === dur({ de, ate }) && a.ate < de; };
+t('comparação com a MESMA duração e sem sobreposição: mês anterior, este mês, este ano, personalizado e virada de ano', sem('2026-09-01', '2026-09-30', 'mes_ant') && sem('2026-03-01', '2026-03-31', 'mes_ant') && sem('2026-10-01', '2026-10-25', 'mes') && sem('2026-01-01', '2026-10-25', 'ano') && sem('2026-01-01', '2026-01-10', 'x') && sem('2026-02-10', '2026-03-05', 'x'));
+t('mês anterior (setembro) compara com os 30 dias antes, inclusivo', JSON.stringify(pa('2026-09-01', '2026-09-30', 'mes_ant')) === JSON.stringify({ de: '2026-08-02', ate: '2026-08-31' }));
+t('virada de ano: 1 a 10/1 compara com 22 a 31/12', JSON.stringify(pa('2026-01-01', '2026-01-10', 'x')) === JSON.stringify({ de: '2025-12-22', ate: '2025-12-31' }));
 t('período personalizado → mesma duração logo antes', JSON.stringify(pa('2026-10-10', '2026-10-19', 'x')) === JSON.stringify({ de: '2026-09-30', ate: '2026-10-09' }));
 console.log(`OK: ${ok} verificações das funções puras do Tráfego.`);

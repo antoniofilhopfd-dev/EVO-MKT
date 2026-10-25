@@ -1,14 +1,10 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Relatório mensal — Instagram</title><link rel="icon" type="image/png" href="/icons/favicon-64.png"><link rel="stylesheet" href="relatorio-trafego.css"></head><body>
-<div class="barra no-print">
-  <div class="campos">
-    <label>Mês <input type="month" id="mes"></label>
-    <label class="larga">Subtítulo <input id="sub" maxlength="120"></label>
-    <button id="atualiza" class="bt">Atualizar</button>
-    <button id="imprime" class="bt pri">Imprimir / salvar PDF</button>
-  </div>
-  <label class="obs">Observações (saem no fim do relatório; pode editar)<textarea id="obs" rows="3" maxlength="1200"></textarea></label>
-  <p class="dica">No diálogo de impressão escolha <b>Salvar como PDF</b>, papel <b>A4</b> e marque <b>Gráficos de segundo plano</b>. Os números vêm da Meta (somente leitura). Para ter histórico de meses antigos, use “Carregar histórico” em Instagram → Ranking.</p>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Relatório mensal — Instagram</title><link rel="icon" type="image/png" href="/icons/favicon-64.png"><link rel="stylesheet" href="relatorio-instagram.css?v=20261025-ri3"></head><body>
+<a class="x" id="fechar" href="/?page=igvisao" aria-label="Fechar e voltar ao EVO MKT" title="Voltar ao EVO MKT">✕</a>
+<div class="barra">
+  <label>Mês <input type="month" id="mes"></label>
+  <button type="button" id="atualiza" class="bt">Atualizar</button>
+  <button type="button" id="baixar" class="bt pri">Baixar PDF</button>
+  <span class="dica" id="msg" role="status"></span>
 </div>
-<main id="rel"><div class="msg">Carregando…</div></main>
-<footer class="rodape"><img src="/api/public/logo" alt="Colégio Evolução"></footer>
-<script src="relatorio-instagram.js"></script></body></html>
+<main id="rel" aria-live="polite"><div class="msg">Carregando…</div></main>
+<script src="relatorio-instagram.js?v=20261025-ri3"></script></body></html>
