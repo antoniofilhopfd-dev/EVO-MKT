@@ -1,7 +1,7 @@
 import { q } from './db';
 import { Filtros, conteudoCabe, filtrosSemEfeito } from './filtros';
 import { listRows } from './records';
-import { Row, strv } from './util';
+import { addDays, fmtDate, parseLocal, Row, strv } from './util';
 import { contasMonitoradas, MetaConta } from './integrations/meta';
 
 /**
@@ -12,6 +12,12 @@ export const formatoDoPost = (tipo: unknown): string => {
   const t = strv(tipo).toUpperCase();
   return t === 'REELS' ? 'Reels' : t === 'STORY' ? 'Stories' : t === 'CAROUSEL_ALBUM' ? 'Carrossel' : t === 'VIDEO' ? 'Vídeo' : 'Feed';
 };
+const FMT_DIA_BR = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza', year: 'numeric', month: '2-digit', day: '2-digit' });
+/** Dia (America/Fortaleza) de um horário da Meta (ex.: 2026-09-01T02:00:00+0000 é 31/08 em Fortaleza). */
+export function diaLocal(iso: unknown): string {
+  const t = strv(iso), d = new Date(t.replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+  return isNaN(d.getTime()) ? t.slice(0, 10) : FMT_DIA_BR.format(d);
+}
 const semArroba = (s: string) => s.replace(/^@/, '').replace(/[._]/g, '').toLowerCase();
 
 export async function contasDoPerfil(perfil: string): Promise<MetaConta[]> {
@@ -26,7 +32,8 @@ export async function organico(f: Filtros): Promise<Organico> {
   const contas = await contasDoPerfil(f.perfil);
   const ids = contas.map((c) => c.ig);
   if (!ids.length) return { posts: [], contas, vinculadas: !!(f.segmento || f.campanha), semEfeito: [], todos: [] };
-  const rows = await q(`SELECT conta,media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,seguidores_novos,permalink,miniatura FROM ig_posts WHERE conta IN (${ids.map(() => '?').join(',')}) AND SUBSTR(publicado_em,1,10)>=? AND SUBSTR(publicado_em,1,10)<=? ORDER BY publicado_em DESC`, [...ids, f.de, f.ate]);
+  const rows = (await q(`SELECT conta,media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,seguidores_novos,permalink,miniatura FROM ig_posts WHERE conta IN (${ids.map(() => '?').join(',')}) AND SUBSTR(publicado_em,1,10)>=? AND SUBSTR(publicado_em,1,10)<=? ORDER BY publicado_em DESC`, [...ids, fmtDate(addDays(parseLocal(f.de + 'T12:00:00'), -1)), fmtDate(addDays(parseLocal(f.ate + 'T12:00:00'), 1))]))
+    .filter((p) => { const d = diaLocal(p.publicado_em); return d >= f.de && d <= f.ate; });
   const conteudos = await listRows('conteudos');
   const porMidia = new Map(conteudos.filter((r) => strv(r.instagramMediaId)).map((r) => [strv(r.instagramMediaId), r]));
   let todos: PostFiltrado[] = rows.map((p) => ({ ...p, media_id: strv(p.media_id), conta: strv(p.conta), publicado_em: strv(p.publicado_em), tipo: strv(p.tipo), formato: formatoDoPost(p.tipo), interacoes: Number(p.curtidas) + Number(p.comentarios) + Number(p.salvos) + Number(p.compartilhamentos), conteudo: porMidia.get(strv(p.media_id)) }));

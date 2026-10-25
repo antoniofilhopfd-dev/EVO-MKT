@@ -6,7 +6,7 @@ import { setting } from '../settings';
 import { addDays, fail, fmtDate, now, parseLocal, Row, strv } from '../util';
 import { chaveSegmento, rotuloSegmento } from '../segmentos';
 import { Filtros, lerFiltros } from '../filtros';
-import { contasDoPerfil, melhorPost, organico, PostFiltrado, resumoOrganico } from '../painel';
+import { contasDoPerfil, diaLocal, melhorPost, organico, PostFiltrado, resumoOrganico } from '../painel';
 import { json } from './handlers';
 
 /** Instagram orgânico: visão geral e desempenho por dimensão, sempre a partir de publicações já sincronizadas. */
@@ -31,6 +31,7 @@ const SO_VINCULADAS: Dim[] = ['segmento', 'tema', 'objetivo', 'campanha'];
 
 export async function desempenhoRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
+  if (c.path !== '/instagram/vinculo' && c.method !== 'GET') fail(405, 'Método não permitido.');
   const f = lerFiltros(c);
   if (c.path === '/instagram/ranking') {
     /** Todas as publicações do Instagram (sincronizadas com a Meta) do período e perfil escolhidos, com as métricas de cada uma. */
@@ -53,7 +54,7 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
     /** Informações mensais e anuais da conta (seguidores, alcance, visualizações, interações e publicações), do perfil escolhido. */
     const contas = await contasDoPerfil(f.perfil), ids = contas.map((x) => x.ig), principal = (await setting('ig_user_id')) || ids[0] || '';
     const n = (v: unknown) => Number(v || 0), mes = (v: unknown) => strv(v).slice(0, 7);
-    const marca = ids.map(() => '?').join(',') || "''";
+    const marcas = ids.map(() => '?').join(',') || "''";
     const CAMPOS = ['alcance', 'impressoes', 'visitasPerfil', 'interacoes', 'curtidas', 'comentarios', 'compartilhamentos', 'salvamentos', 'posts', 'reels'] as const;
     const meses = new Map<string, Row>();
     const get = (m: string): Row => meses.get(m) ?? (meses.set(m, { periodo: m, seguidores: null, ...Object.fromEntries(CAMPOS.map((k) => [k, null])) }), meses.get(m)!);
@@ -64,12 +65,12 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
       for (const k of CAMPOS) if (k !== 'posts' && k !== 'reels' && strv(r[k]) !== '') somar(o, k, n(r[k]));
       if (strv(r.seguidores) !== '') somar(o, '_segRegistro', n(r.seguidores));
     }
-    const snaps = ids.length ? await q(`SELECT conta,dia,seguidores FROM ig_seguidores WHERE conta IN (${marca}) ORDER BY dia`, ids) : [];
+    const snaps = ids.length ? await q(`SELECT conta,dia,seguidores FROM ig_seguidores WHERE conta IN (${marcas}) ORDER BY dia`, ids) : [];
     const ultimoPorConta = new Map<string, Map<string, number>>();
     for (const sn of snaps) { const m = mes(sn.dia); (ultimoPorConta.get(m) ?? ultimoPorConta.set(m, new Map()).get(m)!).set(strv(sn.conta), n(sn.seguidores)); }
     for (const [m, porConta] of ultimoPorConta) get(m).seguidores = [...porConta.values()].reduce((a, b) => a + b, 0);
-    const posts = ids.length ? await q(`SELECT tipo,publicado_em FROM ig_posts WHERE conta IN (${marca})`, ids) : [];
-    for (const p of posts) { const o = get(mes(p.publicado_em)); somar(o, strv(p.tipo).toUpperCase() === 'REELS' ? 'reels' : 'posts', 1); }
+    const posts = ids.length ? await q(`SELECT tipo,publicado_em FROM ig_posts WHERE conta IN (${marcas})`, ids) : [];
+    for (const p of posts) { const o = get(diaLocal(p.publicado_em).slice(0, 7)); somar(o, strv(p.tipo).toUpperCase() === 'REELS' ? 'reels' : 'posts', 1); }
     const ordem = [...meses.keys()].sort();
     for (const m of ordem) { const o = meses.get(m)!; if (o.seguidores === null && o._segRegistro !== undefined) o.seguidores = o._segRegistro; delete o._segRegistro; }
     const mensal: Row[] = ordem.map((m, i): Row => { const o = meses.get(m)!, ant = i ? meses.get(ordem[i - 1])! : null; return { ...o, variacao: ant && o.seguidores !== null && ant.seguidores !== null ? Number(o.seguidores) - Number(ant.seguidores) : null }; });
@@ -96,7 +97,7 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
     for (const s of seg) porDia.set(String(s.dia), (porDia.get(String(s.dia)) ?? 0) + Number(s.seguidores));
     const serie = [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, seguidores]) => ({ dia, seguidores }));
     const serieInteracoes = new Map<string, number>();
-    for (const p of o.posts) serieInteracoes.set(p.publicado_em.slice(0, 10), (serieInteracoes.get(p.publicado_em.slice(0, 10)) ?? 0) + p.interacoes);
+    for (const p of o.posts) serieInteracoes.set(diaLocal(p.publicado_em), (serieInteracoes.get(diaLocal(p.publicado_em)) ?? 0) + p.interacoes);
     return json({
       filtros: f, anteriorPeriodo: { de: anterior(f).de, ate: anterior(f).ate }, resumo, resumoAnterior: resumoAnt, contas: o.contas.map((x) => x.usuario),
       seguidores: serie.length ? { atual: serie[serie.length - 1].seguidores, variacao: serie.length > 1 ? serie[serie.length - 1].seguidores - serie[0].seguidores : null, serie } : null,
