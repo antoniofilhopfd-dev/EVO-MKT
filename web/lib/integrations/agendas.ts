@@ -11,8 +11,7 @@ import { gApiStatus, gConnected } from './google';
 import { qsOf } from './http';
 
 export const GRUPOS: [string, string, string][] = [
-  ['MATERNAIS', 'Maternais (Infantil 1, 2 e 3)', '#793A8C'],
-  ['JARDINS', 'Jardins (Infantil 4, 5 e 1º ano)', '#00A1F3'],
+  ['INFANTIL', 'Educação Infantil (Maternais e Jardins)', '#00A1F3'],
   ['INICIAIS', 'Anos Iniciais (2º ao 5º ano)', '#FAB900'],
   ['FINAIS', 'Anos Finais (6º ao 9º ano)', '#FF7800'],
   ['MEDIO', 'Ensino Médio (1ª à 3ª série)', '#00275F'],
@@ -83,8 +82,7 @@ const podeAlterar = (a: Agenda) => !!a.ativa && !!a.editavel && escreve(a.papel)
 export const agendaPublica = (a: Agenda) => ({ id: a.calendar_id, nome: a.nome, grupo: a.grupo, cor: corDosGrupos([a.grupo]), papel: a.papel, permissao: podeAlterar(a) ? 'edicao' : 'leitura', editavel: !!a.editavel, ativa: !!a.ativa, status: a.status, erro: a.erro, ultimaSync: a.ultima_sync });
 const grupoPeloNome = (nome: string): string => {
   const t = nome.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  if (/matern/.test(t)) return 'MATERNAIS';
-  if (/jardin|jardim/.test(t)) return 'JARDINS';
+  if (/matern|jardin|jardim|infantil/.test(t)) return 'INFANTIL';
   if (/iniciais/.test(t)) return 'INICIAIS';
   if (/finais/.test(t)) return 'FINAIS';
   if (/medio/.test(t)) return 'MEDIO';
@@ -202,18 +200,6 @@ export async function eventosAgendas(de: string, ate: string): Promise<{ itens: 
   }));
   itens.sort((x, y) => (String(x.dia) + (x.horaInicio || '00:00')).localeCompare(String(y.dia) + (y.horaInicio || '00:00')));
   return { itens, avisos };
-}
-/** Eventos escolares antigos guardados no EVO MKT (módulo anterior): continuam visíveis, só para leitura, até serem levados ao Google. */
-export async function eventosLegado(de: string, ate: string): Promise<Row[]> {
-  const mapa: Record<string, string[]> = { INFANTIL: ['MATERNAIS', 'JARDINS'], FUND1: ['INICIAIS', 'JARDINS'], FUND2: ['FINAIS'], MEDIO: ['MEDIO'], ADMIN: ['GERAL'], DIRECAO: ['GERAL'], TODOS: ['GERAL'] };
-  const out: Row[] = [];
-  for (const r of await listRows('calescolar')) {
-    const d1 = strv(r.dataInicio).slice(0, 10), d2 = strv(r.dataFim).slice(0, 10) || d1;
-    if (!d1 || d2 < de || d1 > ate) continue;
-    const gs = [...new Set(strv(r.segmentos).split('|').flatMap((s) => mapa[s] ?? ['GERAL']))];
-    out.push({ id: `legado|${r.id}`, legado: true, calendarId: '', eventId: '', serieId: '', recorrente: false, titulo: strv(r.titulo), dia: d1, diaFim: d2, diaInteiro: !strv(r.horaInicio), horaInicio: strv(r.horaInicio), horaFim: strv(r.horaFim), local: strv(r.local), descricao: strv(r.descricao), segmentos: gs, cor: corDosGrupos(gs), participantes: [], anexos: [], agenda: 'Calendário escolar anterior (somente leitura)', agendaGrupo: gs[0] ?? 'GERAL', podeAlterar: false, link: '', criadoPor: '' });
-  }
-  return out;
 }
 
 // ---------- criar, editar e excluir (só agenda editável, com escrita real no Google) ----------

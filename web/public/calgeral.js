@@ -1,8 +1,8 @@
 /* Calendário Geral: SOMENTE eventos e atividades escolares, lidos do Google Agenda (agendas cadastradas em Configurações › Agendas Google).
    Mês, Semana e Dia (domingo a sábado). Criar, editar e excluir só na agenda do Marketing (o servidor confere a permissão a cada alteração).
    Nada de publicações, campanhas ou anúncios aqui: isso mora no Instagram. */
-const CG_GRUPOS = [['MATERNAIS', 'Maternais', '#793A8C'], ['JARDINS', 'Jardins', '#00A1F3'], ['INICIAIS', 'Anos Iniciais', '#FAB900'], ['FINAIS', 'Anos Finais', '#FF7800'], ['MEDIO', 'Ensino Médio', '#00275F'], ['GERAL', 'Geral', '#063996']];
-const CG_NOMES = { MATERNAIS: 'Maternais – Infantil 1, 2 e 3', JARDINS: 'Jardins – Infantil 4, 5 e 1º ano', INICIAIS: 'Anos Iniciais – 2º ao 5º ano', FINAIS: 'Anos Finais – 6º ao 9º ano', MEDIO: 'Ensino Médio – 1ª à 3ª série', GERAL: 'Geral / institucional' };
+const CG_GRUPOS = [['INFANTIL', 'Educação Infantil', '#00A1F3'], ['INICIAIS', 'Anos Iniciais', '#FAB900'], ['FINAIS', 'Anos Finais', '#FF7800'], ['MEDIO', 'Ensino Médio', '#00275F'], ['GERAL', 'Geral', '#063996']];
+const CG_NOMES = { INFANTIL: 'Educação Infantil – Maternais e Jardins', INICIAIS: 'Anos Iniciais – 2º ao 5º ano', FINAIS: 'Anos Finais – 6º ao 9º ano', MEDIO: 'Ensino Médio – 1ª à 3ª série', GERAL: 'Geral / institucional' };
 const CG_MODELOS = [
   ['Reunião com pais', 'Reunião com os responsáveis para apresentar informações importantes do período, esclarecer dúvidas e alinhar combinados.\nPauta: \nLocal e horário de chegada: '],
   ['Formação', 'Formação para a equipe com foco em prática pedagógica.\nObjetivo: \nPúblico: \nMaterial necessário: '],
@@ -42,7 +42,7 @@ const cgFundo = cor => cor + '26';
 const cgHora = e => (e.diaInteiro ? 'Dia inteiro' : `${e.horaInicio} – ${e.horaFim}`);
 
 function cgChip(e) {
-  return `<button type="button" class="cg-ev" data-ev="${attr(e.id)}" style="--c:${e.cor};background:${cgFundo(e.cor)}" title="${attr(`${e.titulo} · ${cgHora(e)} · ${e.agenda}`)}"><i></i>${e.diaInteiro ? '' : `<b>${esc(e.horaInicio)}</b> `}<span>${esc(e.titulo)}</span>${e.legado ? '<em>só leitura</em>' : ''}</button>`;
+  return `<button type="button" class="cg-ev" data-ev="${attr(e.id)}" style="--c:${e.cor};background:${cgFundo(e.cor)}" title="${attr(`${e.titulo} · ${cgHora(e)} · ${e.agenda}`)}"><i></i>${e.diaInteiro ? '' : `<b>${esc(e.horaInicio)}</b> `}<span>${esc(e.titulo)}</span></button>`;
 }
 function cgMes(itens) {
   const [de, ate] = cgJanela(), ym = CG.ref.slice(0, 7), hoje = hojeBR(), cel = [];
@@ -126,7 +126,7 @@ function cgDetalhes(e, recarrega) {
       ${e.descricao ? `<h4>Descrição</h4><div class="cg-desc">${esc(e.descricao).replace(/\n/g, '<br>')}</div>` : ''}
       ${e.participantes.length ? `<h4>Participantes (${e.participantes.length})</h4><ul class="cg-lista">${e.participantes.map(p => `<li>${esc(p.nome || p.email)}${p.nome ? `<small>${esc(p.email)}</small>` : ''}</li>`).join('')}</ul>` : ''}
       ${e.anexos.length ? `<h4>Anexos</h4><ul class="cg-lista">${e.anexos.map(a => `<li><a href="${attr(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.titulo)}</a></li>`).join('')}</ul>` : ''}</div>
-      <aside class="cg-det-lado"><div class="cg-origem"><small>Agenda de origem</small><b>${esc(e.agenda)}</b></div><div class="cg-perm ${e.podeAlterar ? 'ok' : ''}"><small>Permissão</small><b>${e.podeAlterar ? 'Leitura e edição' : 'Somente leitura'}</b><span>${e.legado ? 'Evento do calendário escolar anterior: fica só para consulta.' : e.podeAlterar ? 'Você pode editar e excluir eventos desta agenda.' : 'Só a agenda do Marketing aceita alterações no EVO MKT.'}</span></div>
+      <aside class="cg-det-lado"><div class="cg-origem"><small>Agenda de origem</small><b>${esc(e.agenda)}</b></div><div class="cg-perm ${e.podeAlterar ? 'ok' : ''}"><small>Permissão</small><b>${e.podeAlterar ? 'Leitura e edição' : 'Somente leitura'}</b><span>${e.podeAlterar ? 'Você pode editar e excluir eventos desta agenda.' : 'Só a agenda do Marketing aceita alterações no EVO MKT.'}</span></div>
       ${e.criadoPor ? `<p class="kpi-note">Criado no EVO MKT por ${esc(e.criadoPor)}</p>` : ''}${e.link ? `<a class="btn soft" href="${attr(e.link)}" target="_blank" rel="noopener noreferrer">Abrir no Google Agenda</a>` : ''}</aside></div>
     <div class="cg-rodape"><button type="button" class="btn soft" data-close>Fechar</button></div></div>`, { larga: true });
   const ed = $('#cgEd', dlg.el); if (ed) ed.onclick = () => { dlg.close(); cgForm(e, {}, recarrega); };

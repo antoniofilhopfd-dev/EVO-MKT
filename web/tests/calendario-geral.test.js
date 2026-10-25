@@ -25,7 +25,7 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   t('a agenda Marketing nasce liberada para edição', mk.http === 201 && mk.agenda.permissao === 'edicao' && mk.agenda.editavel === true, mk);
   for (const id of ['cal_mat', 'cal_jar', 'cal_ini', 'cal_fin', 'cal_err', 'cal_gone']) await add(id);
   const lista = (await G.get('/agendas')).agendas;
-  t('as demais agendas entram só para leitura, mesmo com o segmento certo', ['cal_mat', 'cal_jar', 'cal_ini', 'cal_fin'].every(id => { const a = lista.find(x => x.id === id); return a && a.permissao === 'leitura' && a.editavel === false; }) && lista.find(x => x.id === 'cal_mat').grupo === 'MATERNAIS' && lista.find(x => x.id === 'cal_jar').grupo === 'JARDINS' && lista.find(x => x.id === 'cal_ini').grupo === 'INICIAIS' && lista.find(x => x.id === 'cal_fin').grupo === 'FINAIS', lista.map(a => [a.id, a.grupo, a.permissao]));
+  t('as demais agendas entram só para leitura, mesmo com o segmento certo', ['cal_mat', 'cal_jar', 'cal_ini', 'cal_fin'].every(id => { const a = lista.find(x => x.id === id); return a && a.permissao === 'leitura' && a.editavel === false; }) && lista.find(x => x.id === 'cal_mat').grupo === 'INFANTIL' && lista.find(x => x.id === 'cal_jar').grupo === 'INFANTIL' && lista.find(x => x.id === 'cal_ini').grupo === 'INICIAIS' && lista.find(x => x.id === 'cal_fin').grupo === 'FINAIS', lista.map(a => [a.id, a.grupo, a.permissao]));
   t('agenda duplicada: 409', (await add('cal1')).http === 409);
   t('agenda inexistente: 404 com mensagem clara', (await add('cal_naoexiste')).http === 404);
   t('ID inválido: 400', (await add('com espaço')).http === 400);
@@ -46,20 +46,20 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   t('evento cancelado não aparece; horário respeita o fuso da escola', !ev.itens.some(x => x.titulo === 'Cancelado') && (ev.itens.find(x => x.titulo === 'Reunião noturna') || {}).dia === dia(2) && (ev.itens.find(x => x.titulo === 'Reunião noturna') || {}).horaInicio === '22:30');
   const prov = ev.itens.find(x => x.titulo === 'Semana de provas');
   t('dia inteiro: o fim exclusivo do Google vira o último dia real', prov && prov.diaInteiro && prov.dia === dia(4) && prov.diaFim === dia(6), prov);
-  t('cada evento tem a cor fixa do segmento da agenda', (ev.itens.find(x => x.titulo.startsWith('Reunião de pais')) || {}).cor === '#793A8C' && (ev.itens.find(x => x.titulo.startsWith('Projeto Leitura')) || {}).cor === '#FAB900' && prov.cor === '#FF7800');
+  t('cada evento tem a cor fixa do segmento da agenda', (ev.itens.find(x => x.titulo.startsWith('Reunião de pais')) || {}).cor === '#00A1F3' && (ev.itens.find(x => x.titulo.startsWith('Projeto Leitura')) || {}).cor === '#FAB900' && prov.cor === '#FF7800');
   const ags = (await G.get('/agendas')).agendas;
   t('o status das agendas reflete a leitura (erro e sem acesso ficam marcados)', ags.find(a => a.id === 'cal_err').status === 'ERRO' && ags.find(a => a.id === 'cal_gone').status === 'SEM_ACESSO' && ags.find(a => a.id === 'cal_ini').status === 'SINCRONIZADA');
   t('janela grande demais é recusada (400)', (await G.req('GET', `/agenda/eventos?de=2020-01-01&ate=2026-12-31`)).status === 400);
 
   // ---- permissões de escrita ----
-  const base = { calendarId: 'cal1', titulo: 'Feira de Ciências – 4º ano', dia: dia(5), diaFim: dia(5), diaInteiro: false, horaInicio: '08:00', horaFim: '10:00', segmentos: ['JARDINS'], descricao: 'Feira com apresentações.', local: 'Quadra', participantes: ['prof@colegio.test'], lembretes: [30] };
+  const base = { calendarId: 'cal1', titulo: 'Feira de Ciências – 4º ano', dia: dia(5), diaFim: dia(5), diaInteiro: false, horaInicio: '08:00', horaFim: '10:00', segmentos: ['INFANTIL'], descricao: 'Feira com apresentações.', local: 'Quadra', participantes: ['prof@colegio.test'], lembretes: [30] };
   const cria = await E.post('/agenda/evento', base);
   t('a Equipe de Marketing cria evento na agenda do Marketing (sucesso só com a resposta do Google)', cria.http === 201 && cria.evento.eventId && cria.evento.calendarId === 'cal1' && cria.evento.cor === '#00A1F3' && cria.evento.podeAlterar === true, cria);
   const naoMarketing = await E.post('/agenda/evento', { ...base, calendarId: 'cal_mat' });
   t('nas outras agendas ninguém altera: criar em Maternais é recusado no servidor (403)', naoMarketing.http === 403 && /somente leitura/.test(naoMarketing.error || ''), naoMarketing);
   t('editar e excluir em agenda somente leitura também é recusado (403)', (await E.req('PUT', '/agenda/evento', { ...base, calendarId: 'cal_mat', eventId: 'm1' })).status === 403 && (await E.post('/agenda/evento/excluir', { calendarId: 'cal_mat', eventId: 'm1', confirmar: true })).http === 403);
   const lido = (await G.get(`/agenda/eventos?de=${dia(0)}&ate=${dia(10)}`)).itens.find(x => x.eventId === cria.evento.eventId);
-  t('o evento criado aparece na lista, com o segmento e quem criou', lido && lido.titulo === base.titulo && lido.segmentos.join() === 'JARDINS' && lido.criadoPor, lido);
+  t('o evento criado aparece na lista, com o segmento e quem criou', lido && lido.titulo === base.titulo && lido.segmentos.join() === 'INFANTIL' && lido.criadoPor, lido);
   const dois = await E.post('/agenda/evento', { ...base, titulo: 'Reunião institucional', segmentos: ['INICIAIS', 'FINAIS'] });
   t('evento com mais de um segmento usa a cor institucional', dois.evento.cor === '#063996', dois.evento && dois.evento.cor);
   const inteiro = await E.post('/agenda/evento', { ...base, titulo: 'Recesso escolar', diaInteiro: true, dia: dia(8), diaFim: dia(9), horaInicio: '', horaFim: '' });
@@ -104,7 +104,7 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
       await p.click('[data-modo="dia"]'); await espera(); t('dia: uma coluna', (await p.$$('.cg-th')).length === 1); if (dir) await p.screenshot({ path: `${dir}/calendario-dia-${nome}.png` });
       await p.click('[data-modo="mes"]'); await espera();
       await p.fill('#cgBusca', 'Maternal'); await p.waitForTimeout(500); t('busca filtra os eventos', (await p.$$('.cg-ev')).length === 1); await p.fill('#cgBusca', ''); await p.waitForTimeout(400);
-      await p.click('.cg-segs summary'); await p.click('[data-seg="MATERNAIS"]'); await p.waitForTimeout(400);
+      await p.click('.cg-segs summary'); await p.click('[data-seg="INFANTIL"]'); await p.waitForTimeout(400);
       t('filtro de segmentos esconde o segmento desmarcado', !/Reunião de pais – Maternal 3/.test(await p.innerText('.cg-grade'))); await p.click('[data-seg-todos]'); await p.waitForTimeout(300);
       // detalhes de evento somente leitura: sem Editar nem Excluir
       await p.locator('.cg-ev', { hasText: 'Reunião de pais – Maternal 3' }).first().click(); await p.waitForSelector('.cg-det');
@@ -113,7 +113,7 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
       // novo evento: modal central, só a agenda do Marketing, sem tipo de evento e sem cor
       await p.click('#cgNovo'); await p.waitForSelector('.cg-form');
       t('novo evento: modal central, só agendas editáveis, sem tipo de evento nem escolha de cor', (await p.$$eval('#cgAg option', e => e.map(x => x.textContent))).join() === 'Marketing' && !/Tipo de evento/i.test(await p.innerText('.cg-form')) && (await p.$$('.cg-form input[type=color]')).length === 0);
-      await p.selectOption('#cgMod', 'Reunião com pais'); await p.fill('#cgTit', 'Reunião com pais – Jardins'); await p.click('[data-fs="GERAL"]'); await p.click('[data-fs="JARDINS"]');
+      await p.selectOption('#cgMod', 'Reunião com pais'); await p.fill('#cgTit', 'Reunião com pais – Jardins'); await p.click('[data-fs="GERAL"]'); await p.click('[data-fs="INFANTIL"]');
       if (dir) await p.screenshot({ path: `${dir}/calendario-novo-evento-${nome}.png` });
       await p.click('#cgSalvar'); await p.waitForSelector('.cg-ok', { timeout: 15000 });
       t('sucesso só depois da confirmação do Google, com apenas 3 ações', (await p.$$eval('.cg-ok-acoes .btn', e => e.map(x => x.textContent.trim()))).join('|') === 'Ver no calendário|Abrir no Google Agenda|Concluir' || (await p.$$eval('.cg-ok-acoes .btn', e => e.map(x => x.textContent.trim()))).join('|') === 'Ver no calendário|Concluir');

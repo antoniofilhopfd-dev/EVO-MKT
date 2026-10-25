@@ -4,7 +4,7 @@ import { audit } from '../records';
 import { setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { gConnected } from '../integrations/google';
-import { agendaAdicionar, agendaAtualizar, agendaPublica, agendaRemover, agendasCadastradas, agendasDaConta, agendasVerificar, ErroAgenda, eventoCriar, eventoEditar, eventoExcluir, eventosAgendas, eventosLegado, GRUPOS } from '../integrations/agendas';
+import { agendaAdicionar, agendaAtualizar, agendaPublica, agendaRemover, agendasCadastradas, agendasDaConta, agendasVerificar, ErroAgenda, eventoCriar, eventoEditar, eventoExcluir, eventosAgendas, GRUPOS } from '../integrations/agendas';
 import { json } from './handlers';
 
 /**
@@ -57,9 +57,8 @@ export async function agendasRoute(c: Ctx): Promise<Response> {
     if (path === '/agenda/eventos' && method === 'GET') {
       const de = c.qs('de'), ate = c.qs('ate');
       const r = await eventosAgendas(de, ate);
-      const legado = await eventosLegado(de, ate);
       const ags = (await agendasCadastradas()).map(agendaPublica);
-      return json({ itens: [...r.itens, ...legado].sort((x, y) => (String(x.dia) + (x.horaInicio || '00:00')).localeCompare(String(y.dia) + (y.horaInicio || '00:00'))), avisos: r.avisos, agendas: ags, pode: ags.some((a) => a.permissao === 'edicao') });
+      return json({ itens: r.itens.sort((x, y) => (String(x.dia) + (x.horaInicio || '00:00')).localeCompare(String(y.dia) + (y.horaInicio || '00:00'))), avisos: r.avisos, agendas: ags, pode: ags.some((a) => a.permissao === 'edicao') });
     }
     if (path === '/agenda/evento' && method === 'POST') {
       const b = await c.body();
