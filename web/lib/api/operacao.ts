@@ -124,7 +124,7 @@ export async function operacaoRoute(c: Ctx) {
     const dados = { mes, anterior: ant, periodo: { de: iniMes, ate: parcial ? hojeDia : fimMes, parcial, futuro: hojeDia < iniMes }, atual: pega(mes), anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), serieSeguidores, semanas, posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' };
     if (path === '/instagram/relatorio.pdf') {
       const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
-      return respostaPdf(await relatorioInstagramPdf(dados, quando), `Relatorio-Mensal-Instagram_${mes}.pdf`);
+      return respostaPdf(await relatorioInstagramPdf(dados, quando), `Relatorio-Mensal-Instagram${dados.conta ? '_' + String(dados.conta).replace(/^@/, '') : ''}_${mes}.pdf`);
     }
     return json(dados);
   }

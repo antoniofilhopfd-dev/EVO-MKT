@@ -21,7 +21,7 @@ const sh = c => execFileSync('bash', ['-c', c], { encoding: 'utf8' });
   // ---- PDF ----
   const pdfApi = (q, h = G.H) => fetch(U.B + '/instagram/relatorio.pdf?' + q, { headers: h });
   const r = await pdfApi('mes=' + mesAtual); const buf = Buffer.from(await r.arrayBuffer()); const arq = os.tmpdir() + '/rel-ig.pdf'; fs.writeFileSync(arq, buf);
-  t('PDF: 200, application/pdf, anexo com nome do mês, sem cache', r.status === 200 && /application\/pdf/.test(r.headers.get('content-type')) && new RegExp(`attachment; filename="Relatorio-Mensal-Instagram_${mesAtual}\\.pdf"`).test(r.headers.get('content-disposition')) && r.headers.get('cache-control') === 'no-store' && buf.subarray(0, 5).toString() === '%PDF-');
+  t('PDF: 200, application/pdf, anexo com nome do mês, sem cache', r.status === 200 && /application\/pdf/.test(r.headers.get('content-type')) && new RegExp(`attachment; filename="Relatorio-Mensal-Instagram_evolucaopb_${mesAtual}\\.pdf"`).test(r.headers.get('content-disposition')) && r.headers.get('cache-control') === 'no-store' && buf.subarray(0, 5).toString() === '%PDF-');
   const info = sh(`pdfinfo ${arq}`), txt = sh(`pdftotext -layout ${arq} -`);
   t('PDF A4 (595×842 pt) com páginas numeradas', /Page size:\s+595\.\d+ x 841\.\d+ pts \(A4\)/.test(info) && /Página 1 de \d+/.test(txt.replace(/Pagina/g, 'Página')), info.split('\n').filter(l => /Pages|Page size/.test(l)));
   t('PDF: cabeçalho, mês, período exato e perfil', /Relatório Mensal - Instagram/.test(txt) && /de 20\d\d/.test(txt) && new RegExp(`Período: 01/${mesAtual.slice(5)}/${mesAtual.slice(0, 4)} a ${U.dia(0).split('-').reverse().join('/')} \\(mês em andamento\\)`).test(txt) && /@/.test(txt));
@@ -37,12 +37,26 @@ const sh = c => execFileSync('bash', ['-c', c], { encoding: 'utf8' });
   t('mês inválido cai no mês atual (sem erro)', (await pdfApi('mes=abc')).status === 200);
   t('Equipe também baixa o relatório (consulta)', (await pdfApi('mes=' + mesAtual, E.H)).status === 200);
   t('POST no PDF não é aceito', (await fetch(U.B + '/instagram/relatorio.pdf?mes=' + mesAtual, { method: 'POST', headers: G.H, body: '{}' })).status >= 400);
+  // ---- escolha do perfil ----
+  const contas = (await G.get('/instagram/contas')).contas;
+  t('há dois perfis monitorados para escolher', contas.length === 2 && contas.some(c => c.usuario === 'geracao.evolucao'), contas.map(c => c.usuario));
+  const ig2 = contas.find(c => c.usuario === 'geracao.evolucao').ig;
+  const d2 = await G.get(`/instagram/relatorio?mes=${mesAtual}&conta=${encodeURIComponent(ig2)}`);
+  t('API do relatório devolve os dados do perfil escolhido (não os do principal)', d2.conta === 'geracao.evolucao' && d2.posts.length >= 1 && d2.posts.length !== d.posts.length || d2.seguidores !== d.seguidores, [d2.conta, d2.posts.length, d.posts.length, d2.seguidores, d.seguidores]);
+  const r2 = await pdfApi(`mes=${mesAtual}&conta=${encodeURIComponent(ig2)}`); fs.writeFileSync(os.tmpdir() + '/rel-ig2.pdf', Buffer.from(await r2.arrayBuffer()));
+  t('PDF do outro perfil: @ certo no arquivo e no nome', /Relatorio-Mensal-Instagram_geracao\.evolucao_/.test(r2.headers.get('content-disposition')) && sh(`pdftotext ${os.tmpdir()}/rel-ig2.pdf -`).includes('@geracao.evolucao'));
   // ---- telas ----
   const dir = process.env.CAPTURAS; if (dir) { fs.mkdirSync(dir, { recursive: true }); sh(`pdftoppm -r 70 -png ${arq} ${dir}/pdf-instagram`); }
   const b = await U.abrir();
   for (const [nome, vp] of [['desktop', { width: 1440, height: 900 }], ['tablet', { width: 820, height: 1180 }]]) {
     const p = await U.pagina(b, 'NAT-3301', G.nova, vp);
     await p.goto(U.BASE + `/relatorio-instagram.html?mes=${mesAtual}`); await p.waitForSelector('.rel', { timeout: 15000 }); await p.waitForTimeout(900);
+    t(`${nome}: seletor de perfil com os perfis conectados`, (await p.$$eval('#perfil option', e => e.map(x => x.textContent))).join('|') === '@evolucaopb|@geracao.evolucao' && (await p.inputValue('#perfil')) === ig1, await p.$$eval('#perfil option', e => e.map(x => x.value)));
+    await p.selectOption('#perfil', ig2); await p.waitForTimeout(1200);
+    t(`${nome}: trocar o perfil troca o relatório inteiro (cabeçalho, números e PDF)`, /@geracao\.evolucao/.test(await p.innerText('.cab .conta')) && (await p.$$('.top .t')).length >= 1);
+    const [dl2] = await Promise.all([p.waitForEvent('download', { timeout: 30000 }), p.click('#baixar')]);
+    t(`${nome}: Baixar PDF usa o perfil escolhido`, /^Relatorio-Mensal-Instagram_geracao\.evolucao_/.test(dl2.suggestedFilename()), dl2.suggestedFilename());
+    await p.selectOption('#perfil', ig1); await p.waitForTimeout(1000);
     const logo = await p.$eval('.cab .logo', e => { const r = e.getBoundingClientRect(); return [r.width, r.height]; });
     t(`${nome}: logo pequena no cabeçalho (altura ≤ 50 px, largura ≤ 180 px), sem distorcer`, logo[1] <= 50 && logo[0] <= 180 && logo[0] > 40, logo);
     const rod = await p.$eval('.rodape img', e => { const r = e.getBoundingClientRect(); return [r.width, r.height]; });
@@ -55,7 +69,7 @@ const sh = c => execFileSync('bash', ['-c', c], { encoding: 'utf8' });
     t(`${nome}: sem rolagem horizontal`, await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     await p.evaluate(() => { window.__imp = 0; window.print = () => { window.__imp++; }; });
     const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 30000 }), p.click('#baixar')]);
-    t(`${nome}: Baixar PDF baixa o arquivo direto, sem abrir impressão`, new RegExp(`^Relatorio-Mensal-Instagram_${mesAtual}\\.pdf$`).test(dl.suggestedFilename()) && (await p.evaluate(() => window.__imp)) === 0 && (await p.$$('#imprime')).length === 0);
+    t(`${nome}: Baixar PDF baixa o arquivo direto, sem abrir impressão`, new RegExp(`^Relatorio-Mensal-Instagram_evolucaopb_${mesAtual}\\.pdf$`).test(dl.suggestedFilename()) && (await p.evaluate(() => window.__imp)) === 0 && (await p.$$('#imprime')).length === 0);
     await p.fill('#mes', mesVazio); await p.dispatchEvent('#mes', 'change'); await p.waitForTimeout(1200);
     t(`${nome}: o mês escolhido governa tudo (mês sem dados)`, /Janeiro de 2025/.test(await p.innerText('main')) && /Nenhuma publicação sincronizada/.test(await p.innerText('main')));
     await p.fill('#mes', mesAtual); await p.dispatchEvent('#mes', 'change'); await p.waitForSelector('.top .t', { timeout: 10000 });
