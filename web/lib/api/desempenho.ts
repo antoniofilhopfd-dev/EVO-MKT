@@ -47,7 +47,7 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
       interacoesPorDia: [...serieInteracoes.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, interacoes]) => ({ dia, interacoes })),
       melhor: melhorPost(o), recentes: o.posts.slice(0, 12).map((p) => ({ id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda).slice(0, 120), interacoes: p.interacoes, alcance: p.alcance ?? null, miniatura: strv(p.miniatura), link: strv(p.permalink), titulo: p.conteudo ? strv(p.conteudo.titulo) : '' })),
       semEfeito: o.semEfeito, somenteVinculadas: o.vinculadas, ultimaSync: await setting('ig_last_sync'),
-      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), natureza: 'publicações do período (não inclui anúncios)' },
+      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'publicações do período (não inclui anúncios)' },
     });
   }
   if (c.path === '/instagram/desempenho') {
@@ -83,7 +83,7 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
       filtros: f, dim, rows, total: base.length, minimo: 3,
       aviso: semVinculo ? 'Esta análise considera só as publicações ligadas a uma publicação do EVO MKT (a Meta não informa segmento, tema, objetivo nem campanha editorial).' : '',
       somenteVinculadas: semVinculo || o.vinculadas,
-      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), natureza: 'média de interações por publicação (curtidas, comentários, salvamentos e compartilhamentos)' },
+      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'média de interações por publicação (curtidas, comentários, salvamentos e compartilhamentos)' },
     });
   }
   if (c.path === '/instagram/impulsionados') {
