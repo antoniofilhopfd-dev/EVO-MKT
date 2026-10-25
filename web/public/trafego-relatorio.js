@@ -82,7 +82,7 @@ function html(d,OPC,sub,obs){
   if(OPC.tipo==='segmento')secs.push(sec('Resumo por segmento',`<div class="tw">${tabelaSeg(r)}</div>`));
   if(OPC.tipo==='geral'||OPC.tipo==='anuncio')secs.push(sec('Detalhamento por anúncio',`<div class="tw">${tabelaAnuncios(r)}</div>`,'det'));
   const avisos=[...(d.avisos||[]),...(r.filtrado?['Recorte filtrado: totais recalculados a partir das linhas exibidas; o alcance não é somado entre linhas e a comparação com o período anterior não se aplica.']:[])];
-  return `<div class="pg"><header class="cab"><img class="logo" src="/img/logo-colegio.png" alt="Colégio Evolução"><div class="tit"><h1>${TIPOS[OPC.tipo]} — Tráfego Pago (Meta Ads)</h1><p class="sub">${esc(sub)}${filtrosTxt(OPC,d)?' · '+esc(filtrosTxt(OPC,d)):''}</p></div></header>
+  return `<div class="pg"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>${TIPOS[OPC.tipo]} — Tráfego Pago (Meta Ads)</h1><p class="sub">${esc(sub)}${filtrosTxt(OPC,d)?' · '+esc(filtrosTxt(OPC,d)):''}</p></div></header>
   ${secs.join('')}
   ${avisos.length?`<p class="nota">${avisos.map(esc).join(' ')}</p>`:''}${obs?`<p class="nota">${esc(obs)}</p>`:''}
   <div class="fim"><span>Colégio Evolução · EVO MKT · fonte: ${esc(d.origem.fonte)} · versão da API ${esc(d.origem.versaoApi)}</span><span>Gerado em ${esc(agora)}</span></div></div>`;
