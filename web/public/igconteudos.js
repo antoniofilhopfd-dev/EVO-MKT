@@ -4,7 +4,7 @@ const IG_ETAPAS = ['IDEIA', 'RASCUNHO', 'EM PRODUÇÃO', 'EM REVISÃO', 'APROVAD
 const IG_ESTADO_ROTULO = { ...ESTADO_ROTULO };
 const IG_PAPEIS = { referencia: 'Referência', producao: 'Arquivo em produção', final: 'Arquivo final', miniatura: 'Miniatura' };
 const SEG_NOMES = SEG_LISTA.filter(s => s[0]).map(s => s[1]).concat(['Todos']);
-const IGC = { rows: [], estados: new Map(), busca: '', status: '', resp: '', pagina: 1, vista: pref('igVista', 'lista') };
+const IGC = { rows: [], estados: new Map(), busca: '', status: '', resp: '', vista: pref('igVista', 'lista') };
 
 const qDoPub = r => `${r.titulo || ''} ${r.legenda || ''} ${r.hashtags || ''}`.toLowerCase();
 const stLimpo = s => ({ BRIEFING: 'RASCUNHO', 'PRODUÇÃO': 'EM PRODUÇÃO', 'REVISÃO': 'EM REVISÃO', PROGRAMADO: 'AGENDADO' }[String(s || '').toUpperCase()] || String(s || '').toUpperCase());
@@ -30,30 +30,14 @@ const badgeEstado = r => { const s = stLimpo(r.status); return `<span class="bad
 const faltasDe = r => (IGC.estados.get(r.id)?.pendencias || []).map(p => p.texto);
 
 PAGINAS.igconteudos = async function () {
-  IGC.pagina = 1;
+  await carregarConteudos();
   const equipe = (await api('/team').catch(() => ({ rows: [] }))).rows.map(x => x.nome);
   const foco = window.IG_FOCO;
-  let requisicao = 0;
-  const desenha = async () => {
-    const atual = ++requisicao;
-    const params = new URLSearchParams(Filtros.query(['perfil', 'segmento', 'formato', 'campanha']));
-    params.set('pagina', IGC.pagina); params.set('tamanho', '30');
-    params.set('busca', IGC.busca); params.set('status', IGC.status); params.set('responsavel', IGC.resp);
-    if (window.IG_FOCO) params.set('ids', window.IG_FOCO.ids.join(','));
-    $('#igcLista').setAttribute('aria-busy', 'true');
-    let dados;
-    try { dados = await api('/content/list?' + params); }
-    catch (e) { if (atual === requisicao && state.page === 'igconteudos') { $('#igcLista').removeAttribute('aria-busy'); $('#igcLista').innerHTML = `<div class="empty-rich" role="alert"><strong>Não foi possível carregar as publicações</strong><p>${esc(e.message)}</p><button class="btn soft" id="igcTentar">Tentar novamente</button></div>`; $('#igcTentar').onclick = desenha; toast(e.message, 'warn'); } return; }
-    if (atual !== requisicao || state.page !== 'igconteudos') return;
-    IGC.pagina = dados.pagina; IGC.rows = dados.rows;
-    IGC.estados = new Map(dados.estados.map(x => [x.id, x]));
-    const rows = dados.rows;
-    const corpo = rows.length ? (IGC.vista === 'quadro' ? quadro(rows) : lista(rows)) : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>Crie uma publicação ou ajuste os filtros.</p>${botaoNova()}</div>`;
-    $('#igcLista').innerHTML = corpo + `<nav class="ig-acoes ig-paginacao" aria-label="Páginas das publicações"><button class="btn soft" id="igcAnterior" ${dados.pagina <= 1 ? 'disabled' : ''}>Anterior</button><span role="status">Página ${dados.pagina} de ${dados.paginas} · ${dados.total} publicação(ões)</span><button class="btn soft" id="igcProxima" ${dados.pagina >= dados.paginas ? 'disabled' : ''}>Próxima</button></nav>`;
-    $('#igcLista').removeAttribute('aria-busy');
-    $('#igcCont').textContent = `${dados.total} publicação(ões)${IGC.vista === 'quadro' ? ' · quadro desta página' : ''}`;
-    $('#igcAnterior').onclick = () => { IGC.pagina--; desenha(); };
-    $('#igcProxima').onclick = () => { IGC.pagina++; desenha(); };
+  const desenha = () => {
+    const rows = filtrarConteudos().sort((a, b) => String(b.publicacaoEm || '').localeCompare(String(a.publicacaoEm || '')));
+    const corpo = rows.length ? (IGC.vista === 'quadro' ? quadro(rows) : lista(rows)) : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>${IGC.rows.length ? 'Nenhuma publicação combina com os filtros. Limpe os filtros para ver todas.' : 'Comece pela primeira ideia de publicação.'}</p>${botaoNova()}</div>`;
+    $('#igcLista').innerHTML = corpo;
+    $('#igcCont').textContent = `${rows.length} de ${IGC.rows.length} publicação(ões)`;
     $$('[data-pub]', $('#igcLista')).forEach(el => { const abre = () => editarPublicacao(el.dataset.pub); el.onclick = abre; el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abre(); } }; });
     ligaNova($('#igcLista'));
   };
@@ -66,12 +50,12 @@ PAGINAS.igconteudos = async function () {
       <div class="view-switch" role="group" aria-label="Vista"><button type="button" data-vista="lista" class="${IGC.vista === 'lista' ? 'active' : ''}" aria-pressed="${IGC.vista === 'lista'}">Lista</button><button type="button" data-vista="quadro" class="${IGC.vista === 'quadro' ? 'active' : ''}" aria-pressed="${IGC.vista === 'quadro'}">Quadro</button></div>
       <span class="kpi-note" id="igcCont" aria-live="polite"></span>
     </div><div id="igcLista"></div>`;
-  $('#igcBusca').oninput = debounce(e => { IGC.busca = e.target.value; IGC.pagina = 1; desenha(); }, 200);
-  $('#igcSt').onchange = e => { IGC.status = e.target.value; IGC.pagina = 1; desenha(); };
-  $('#igcResp').onchange = e => { IGC.resp = e.target.value; IGC.pagina = 1; desenha(); };
+  $('#igcBusca').oninput = debounce(e => { IGC.busca = e.target.value; desenha(); }, 200);
+  $('#igcSt').onchange = e => { IGC.status = e.target.value; desenha(); };
+  $('#igcResp').onchange = e => { IGC.resp = e.target.value; desenha(); };
   $$('[data-vista]').forEach(b => { b.onclick = () => { IGC.vista = b.dataset.vista; setPref('igVista', IGC.vista); $$('[data-vista]').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', x === b); }); desenha(); }; });
   const lf = $('#igcLimparFoco'); if (lf) lf.onclick = () => { window.IG_FOCO = null; go('igconteudos'); };
-  await desenha(); ligaNova();
+  desenha(); ligaNova();
   if (window.IG_ABRIR) { const id = window.IG_ABRIR; window.IG_ABRIR = null; editarPublicacao(id); }
 };
 function lista(rows) {
