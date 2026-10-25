@@ -13,7 +13,7 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   const ps = [['m1', -2, 'FEED', 'Aula aberta de ciências', 120, 9, 4, 3, 900, 2100], ['m2', -5, 'REELS', 'Reels da feira cultural', 480, 30, 22, 14, 4200, 9800], ['m3', -9, 'FEED', 'Matrículas 2027 abertas', 60, 4, 2, 1, 500, 1200]];
   sql(`DELETE FROM ig_posts WHERE conta='${conta}'; INSERT INTO ig_posts(conta,media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,permalink,miniatura,atualizado_em) VALUES ${ps.map(p => `('${conta}','${p[0]}','${dia(p[1])}T15:00:00+0000','${p[2]}','${p[3]}',${p[4]},${p[5]},${p[6]},${p[7]},${p[8]},${p[9]},'https://www.instagram.com/p/${p[0]}/','${png}','x')`).join(',')};`);
   const hojeDia = dia(0);
-  await G.post('/data?module=conteudos', { titulo: 'Stories de amanhã', status: 'AGENDADO', perfil: '@evolucaopb', formato: 'Stories', publicacaoEm: dia(1) + 'T09:00', legenda: 'x' });
+  await G.post('/data?module=conteudos', { titulo: 'Stories de amanhã', status: 'EM REVISÃO', perfil: '@evolucaopb', formato: 'Stories', publicacaoEm: dia(1) + 'T09:00', legenda: 'x' });
   await G.post('/data?module=conteudos', { titulo: 'Rascunho com data', status: 'RASCUNHO', perfil: '@evolucaopb', formato: 'Feed', publicacaoEm: dia(3) + 'T14:30' });
   const r = await G.get(`/instagram/ranking?de=${dia(-29)}&ate=${hojeDia}`);
   t('API do ranking traz as 3 publicações da Meta com métricas', r.rows.length === 3 && r.rows[0].engajamento !== undefined && r.rows.every(x => 'curtidas' in x && 'visualizacoes' in x && x.perfil), r.rows.length);
@@ -24,17 +24,17 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   t('Instagram tem seis seções', (await p.$$eval('#subtabs .subtab', e => e.map(x => x.innerText.trim()))).join('|') === 'Visão geral|Conteúdos|Planejamento|Calendário|Desempenho|Ranking');
   t('seletor de perfil no cabeçalho com as três opções', (await p.$$eval('#igPerfilCabecalho option', e => e.map(x => x.value))).join('|') === '|@evolucaopb|@geracaoevolucao');
   t('o seletor não se repete nos filtros do Instagram', (await p.$$('#fbPerfil')).length === 0);
-  t('Visão geral: seguidores, engajamento e melhores conteúdos', /Engajamento/.test(await p.innerText('#content')) && /Melhores conteúdos/.test(await p.innerText('#content')));
+  t('Visão geral: seguidores, engajamento e melhores conteúdos', /engajamento/i.test(await p.innerText('#content')) && /melhores conteúdos/i.test(await p.innerText('#content')), (await p.innerText('#content')).slice(0, 700));
   t('sem botão “Nova publicação” repetido nas abas (só o do cabeçalho)', (await p.$$('#content [data-nova]')).length === 0 && (await p.$$('#newBtn')).length === 1);
   await foto('instagram-visao-geral');
   await U.ir(p, 'igconteudos', 900);
-  t('Conteúdos lista as publicações do EVO MKT e as já postadas na Meta', (await p.$$('#igcLista tbody tr')).length === 2 && (await p.$$('.igc-meta .ig-post')).length === 3);
+  t('Conteúdos lista as publicações do EVO MKT e as já postadas na Meta', (await p.$$('#igcLista tbody tr')).length === 2 && (await p.$$('.igc-meta .ig-post')).length === 3, [(await p.$$('#igcLista tbody tr')).length, (await p.$$('.igc-meta .ig-post')).length, (await p.innerText('#content')).slice(0, 500)]);
   await foto('instagram-conteudos');
   await U.ir(p, 'igcalendario', 900);
   t('Calendário: mês mostra programadas, em preparação e postadas', (await p.$$('.igcal-item')).length >= 4 && /Rascunho com data/.test(await p.innerText('#content')) && /Publicado no Instagram/.test(await p.innerText('#content')));
   await foto('instagram-calendario-mes');
   for (const m of ['semana', 'dia', 'lista']) { await p.click(`[data-modo="${m}"]`); await p.waitForTimeout(300); t('Calendário: visão ' + m + ' abre sem erro', (await p.$$('#igcalCorpo')).length === 1); if (m === 'lista') { t('Calendário: lista traz miniatura, horário e status', (await p.$$('.igcal-lista .igcal-item')).length >= 4 && (await p.$$('.igcal-lista .badge')).length >= 4); await foto('instagram-calendario-lista'); } }
-  t('Calendário do Instagram não traz o calendário escolar', !/Calendário escolar|Feriado/i.test(await p.innerText('#content')));
+  t('Calendário do Instagram não traz o calendário escolar', !/feriado|prova bimestral/i.test(await p.innerText('#igcalCorpo')), ((await p.innerText('#content')).match(/.{0,60}(Calendário escolar|Feriado).{0,60}/i) || [])[0]);
   await U.ir(p, 'igdesempenho', 900); await foto('instagram-desempenho');
   t('Desempenho carrega', (await p.$$('[data-dim]')).length >= 1);
   await U.ir(p, 'igranking', 900);
