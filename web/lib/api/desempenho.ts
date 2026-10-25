@@ -45,7 +45,7 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
       filtros: f, anteriorPeriodo: { de: anterior(f).de, ate: anterior(f).ate }, resumo, resumoAnterior: resumoAnt, contas: o.contas.map((x) => x.usuario),
       seguidores: serie.length ? { atual: serie[serie.length - 1].seguidores, variacao: serie.length > 1 ? serie[serie.length - 1].seguidores - serie[0].seguidores : null, serie } : null,
       interacoesPorDia: [...serieInteracoes.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, interacoes]) => ({ dia, interacoes })),
-      melhor: melhorPost(o), recentes: o.posts.slice(0, 12).map((p) => ({ id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda).slice(0, 120), interacoes: p.interacoes, alcance: p.alcance ?? null, miniatura: strv(p.miniatura), link: strv(p.permalink), titulo: p.conteudo ? strv(p.conteudo.titulo) : '' })),
+      melhor: melhorPost(o), recentes: o.posts.slice(0, 500).map((p) => ({ id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda).slice(0, 120), interacoes: p.interacoes, alcance: p.alcance ?? null, miniatura: strv(p.miniatura), link: strv(p.permalink), titulo: p.conteudo ? strv(p.conteudo.titulo) : '' })),
       semEfeito: o.semEfeito, somenteVinculadas: o.vinculadas, ultimaSync: await setting('ig_last_sync'),
       origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'publicações do período (não inclui anúncios)' },
     });
