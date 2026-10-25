@@ -1,11 +1,11 @@
 // Calendário de publicações em modo leitura (link da direção). O token na URL é a credencial; nada aqui altera dados.
 const T=new URLSearchParams(location.search).get('t')||'',box=document.getElementById('box'),sub=document.getElementById('sub');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ROT={REVISÃO:['Em aprovação','rev'],APROVADO:['Aprovado','ok'],PROGRAMADO:['Agendado',''],PUBLICADO:['Publicado','ok']};
+const ROT={'EM REVISÃO':['Em revisão','rev'],APROVADO:['Aprovado','ok'],AGENDADO:['Agendado',''],PUBLICADO:['Publicado','ok']};
 (async()=>{
  if(!T){sub.textContent='';box.innerHTML='<div class="msg"><b>Link inválido.</b></div>';return}
  let d;try{const r=await fetch('/api/public/calendario?t='+encodeURIComponent(T),{headers:{'X-EVO':'1'}});d=await r.json();if(!r.ok)throw new Error(d.error||'Não foi possível abrir.')}catch(e){sub.textContent='';box.innerHTML=`<div class="msg"><b>${esc(e.message)}</b></div>`;return}
- sub.textContent='Somente leitura. Mostra posts em aprovação, aprovados, agendados e publicados.';
+ sub.textContent='Somente leitura. Mostra publicações em revisão, aprovadas, agendadas e publicadas.';
  const por={};d.rows.forEach(r=>{const k=String(r.quando).slice(0,10);(por[k]=por[k]||[]).push(r)});
  const hoje=new Date().toISOString().slice(0,10);
  const dias=Object.keys(por).sort();

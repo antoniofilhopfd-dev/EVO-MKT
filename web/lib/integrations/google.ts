@@ -76,6 +76,40 @@ export async function gCalendarList(): Promise<Row[]> {
   const atual = await setting('g_calendar_id');
   return (r.items ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.summaryOverride || i.summary || i.id), principal: !!i.primary, atual: String(i.id) === atual }));
 }
+/** Todas as agendas visíveis na conta (inclusive as só de leitura): para escolher quais aparecem no Calendário sem permitir edição. */
+export async function gCalendarListTodas(): Promise<Row[]> {
+  const r = await gApi('GET', '/calendar/v3/users/me/calendarList?maxResults=250');
+  let leitura: string[] = []; try { leitura = JSON.parse((await setting('g_leitura')) || '[]'); } catch { /* vazio */ }
+  const escrita = await setting('g_calendar_id');
+  return (r.items ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.summaryOverride || i.summary || i.id), papel: String(i.accessRole ?? ''), gravavel: ['owner', 'writer'].includes(String(i.accessRole ?? '')), usadaParaEscrita: String(i.id) === escrita, mostrar: leitura.includes(String(i.id)) }));
+}
+export async function gLeituraSalvar(ids: string[]): Promise<void> {
+  const todas = await gCalendarListTodas();
+  const ok = ids.filter((id) => todas.some((c) => c.id === id) && id !== (todas.find((c) => c.usadaParaEscrita)?.id));
+  await setSetting('g_leitura', JSON.stringify(ok.slice(0, 10)));
+}
+const cacheLeitura = new Map<string, { em: number; itens: Row[] }>();
+/** Eventos das agendas marcadas como "somente leitura": nunca são gravados no EVO MKT nem enviados de volta ao Google. */
+export async function gEventosLeitura(de: string, ate: string): Promise<Row[]> {
+  let ids: string[] = []; try { ids = JSON.parse((await setting('g_leitura')) || '[]'); } catch { /* vazio */ }
+  if (!ids.length || !(await gConnected())) return [];
+  const chave = `${de}|${ate}|${ids.join(',')}`;
+  const c = cacheLeitura.get(chave);
+  if (c && Date.now() - c.em < 300000) return c.itens;
+  const nomes = new Map((await gCalendarListTodas()).map((x) => [x.id, x.nome]));
+  const itens: Row[] = [];
+  for (const id of ids) {
+    const r = await gApi('GET', `/calendar/v3/calendars/${encodeURIComponent(id)}/events?` + qsOf({ maxResults: 250, singleEvents: 'true', orderBy: 'startTime', timeMin: `${de}T00:00:00-03:00`, timeMax: `${ate}T23:59:59-03:00` }));
+    for (const ev of (r.items ?? []) as Row[]) {
+      if (ev.status === 'cancelled' || !ev.start) continue;
+      const dia = String(ev.start.date ?? ev.start.dateTime ?? '').slice(0, 10);
+      const fimBruto = ev.end?.date ? fmtDate(addDays(parseLocal(String(ev.end.date) + 'T12:00:00'), -1)) : String(ev.end?.dateTime ?? '').slice(0, 10);
+      itens.push({ uid: `gl:${id}:${ev.id}`, titulo: String(ev.summary ?? '(sem título)'), data: dia, fim: fimBruto > dia ? fimBruto : '', hora: ev.start.dateTime ? String(ev.start.dateTime).slice(11, 16) : '', agenda: nomes.get(id) ?? id, descricao: String(ev.description ?? '').slice(0, 500), local: String(ev.location ?? '') });
+    }
+  }
+  cacheLeitura.set(chave, { em: Date.now(), itens });
+  return itens;
+}
 /** Passa a usar uma agenda existente. Vazio = desliga a sincronização da Agenda. */
 export async function gCalendarChoose(id: string): Promise<void> {
   const novo = id.trim();

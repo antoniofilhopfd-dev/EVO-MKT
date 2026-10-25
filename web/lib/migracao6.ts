@@ -18,6 +18,9 @@ const sha = (o: unknown) => createHash('sha256').update(JSON.stringify(o)).diges
 const tabelaExiste = async (t: string) => !!(await q1('SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?', [t]));
 
 export async function antes(): Promise<void> {
+  // instalação nova (sem fichas e sem registros): não há o que proteger, e um backup sem Administrador não passaria na verificação
+  const fichas = Number((await q1('SELECT COUNT(*) c FROM users'))?.c ?? 0), regs = Number((await q1('SELECT COUNT(*) c FROM records'))?.c ?? 0);
+  if (!fichas && !regs) { antesGuardado = { backup: '', legado: '', contagens: {}, arquivosRemovidos: [], equipe: [] }; return; }
   const pad = (n: number) => String(n).padStart(2, '0');
   // 1) backup completo padrão (inclui anexos): é o ponto de volta
   const backup = await makeBackup('prereestruturacao', { completo: true });

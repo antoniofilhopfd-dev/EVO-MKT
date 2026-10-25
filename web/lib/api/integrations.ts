@@ -1,12 +1,14 @@
 import { Ctx } from '../ctx';
 import { q, q1, run } from '../db';
 import { requireInternal, requireAdmin, requireManager, stepUp } from '../auth';
-import { audit, getRow, listRows } from '../records';
+import { audit, EVO_VERSION, getRow, listRows } from '../records';
+import { verificarIntegridade } from '../integridade';
+import { versaoApi } from '../integrations/trafego';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
-import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gFinishConnect } from '../integrations/google';
+import { gCalendarChoose, gCalendarList, gCalendarListTodas, gEventosLeitura, gLeituraSalvar, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gFinishConnect } from '../integrations/google';
 import { adsPermitido, ContaAds, listarContasAds, adsSync } from '../integrations/metaads';
 import { json } from './handlers';
 
@@ -29,7 +31,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     }
     case path === '/integrations/meta/callback' || path === '/integrations/google/callback': {
       const svc = path.includes('meta') ? 'meta' : 'google';
-      const dest = '/?page=administracao&int=';
+      const dest = '/?page=configuracoes&int=';
       try {
         if (!checkState(c.qs('state'), svc)) throw new Error('Sessão de conexão expirada. Tente de novo.');
         if (c.qs('error')) throw new Error('Autorização negada: ' + (c.qs('error_description') || c.qs('error')));
@@ -96,8 +98,25 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const agendados = metaOn ? (await listRows('conteudos')).filter((r) => r.publicarInstagram === 'SIM' && !r.instagramMediaId && r.midiaInstagram && /AGENDADO/i.test(String(r.status ?? ''))).length : 0;
       const ultPub = await setting('ig_last_publish_run');
       add('cron_publicar', agendados === 0 || (ultPub !== '' && Date.now() - new Date(ultPub.replace(' ', 'T')).getTime() < 30 * 60000), 'aviso', 'Publicação automática: o cron rodou nos últimos 30 minutos', `Há ${agendados} post(s) agendado(s) para sair sozinhos, mas o cron de publicação não rodou. Crie o cron da Hostinger a cada 10 minutos (comando "cronPublicar" abaixo).`);
+      const ultSync = await setting('ig_last_sync'), adsSync = await setting('meta_ads_ultima_sync'), gSync = await setting('g_last_cal_sync');
+      const falha = await q1("SELECT quando,servico,msg FROM integration_log WHERE nivel='erro' ORDER BY id DESC LIMIT 1");
+      const bk = await q1('SELECT nome,criado_em FROM backups ORDER BY criado_em DESC LIMIT 1');
+      const integ = await verificarIntegridade().catch(() => null);
+      const mais = (iso: string, h: number) => (iso ? now(new Date(new Date(iso.replace(' ', 'T')).getTime() + h * 3600000)) : '');
+      const resumo = {
+        conexaoMeta: metaOn ? ((await setting('meta_token_invalido')) === '1' ? 'Acesso expirado ou revogado' : 'Conectada') : 'Não conectada',
+        conexaoGoogle: (await gConnected()) ? 'Conectada' : 'Não conectada',
+        ultimaSincronizacao: { instagram: ultSync, anuncios: adsSync, google: gSync },
+        proximaSincronizacao: ultSync ? mais(ultSync, 24) + ' (estimada: o cron diário da Hostinger)' : 'Sem sincronização ainda',
+        ultimaFalha: falha ? `${falha.quando} · ${falha.servico}: ${falha.msg}` : 'Nenhuma falha registrada',
+        validadeToken: exp ? now(new Date(exp * 1000)) : metaOn ? 'Sem data informada pela Meta' : '—',
+        versaoApi: versaoApi(),
+        ultimoBackup: bk ? `${bk.criado_em} (${bk.nome})` : 'Nenhum backup ainda',
+        integridade: integ ? (integ.ok ? 'Sem problemas' : `${integ.achados.length} achado(s) para revisar`) : 'Não foi possível verificar',
+        versaoInstalada: EVO_VERSION, ambiente: `${env('NODE_ENV', 'development') === 'production' ? 'Produção' : 'Desenvolvimento'} · ${pub || origin}`,
+      };
       return json({
-        pronto: it.every((x) => x.ok || x.nivel === 'aviso'), itens: it,
+        pronto: it.every((x) => x.ok || x.nivel === 'aviso'), itens: it, resumo,
         urls: { site: origin, privacidade: origin + '/privacidade.html', termos: origin + '/termos.html', metaRedirect: origin + '/api/integrations/meta/callback', googleRedirect: origin + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + origin + '/api/cron/integracoes?tarefa=sincronizar',
         cronPublicar: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + origin + '/api/cron/integracoes?tarefa=publicar',
@@ -109,6 +128,9 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await stepUp(u, input);
       for (const k of ['meta_app_id', 'meta_app_secret', 'g_client_id', 'g_client_secret']) if (input[k] !== undefined && strv(input[k]).trim() !== '') await setSetting(k, strv(input[k]).trim());
       if (input.g_importar !== undefined) await setSetting('g_importar', input.g_importar ? '1' : '0');
+      if (strv(input.anthropic_key).trim() !== '') await setSetting('anthropic_key', strv(input.anthropic_key).trim());
+      if (input.ia_remover_chave) await setSetting('anthropic_key', '');
+      if (input.ia_guia_voz !== undefined) await setSetting('ia_guia_voz', strv(input.ia_guia_voz).slice(0, 1500));
       await audit(u.codigo, 'integracoes-config');
       return json({ ok: true });
     }
@@ -236,6 +258,23 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         await igMarkError(id, e.message);
         return bad('instagram', e);
       }
+    }
+    case path === '/integrations/google/agendas-leitura' && method === 'GET': {
+      await requireAdmin(c);
+      try { return json({ agendas: await gCalendarListTodas() }); } catch (e: any) { return fail(502, e.message); }
+    }
+    case path === '/integrations/google/agendas-leitura' && method === 'POST': {
+      const u = await requireAdmin(c);
+      const b = await c.body();
+      await gLeituraSalvar(Array.isArray(b.ids) ? b.ids.map(String) : []);
+      await audit(u.codigo, 'google-agendas-leitura');
+      return json({ ok: true });
+    }
+    case path === '/integrations/google/eventos-leitura' && method === 'GET': {
+      await requireInternal(c);
+      const de = c.qs('de'), ate = c.qs('ate');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate) || de > ate) fail(400, 'Período inválido.');
+      try { return json({ rows: await gEventosLeitura(de, ate) }); } catch (e: any) { return json({ rows: [], aviso: 'Não foi possível ler as agendas do Google agora.' }); }
     }
     case path === '/integrations/google/calendars' && method === 'GET': {
       await requireInternal(c);

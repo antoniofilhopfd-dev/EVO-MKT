@@ -21,6 +21,7 @@ import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
 import { operacaoRoute } from './operacao';
 import { desempenhoRoute } from './desempenho';
+import { sistemaRoute } from './sistema';
 import { comentariosRoute } from './comentarios';
 import { conteudoRoute } from './conteudo';
 import { calendarioPublicoRoute } from './calendarioPublico';
@@ -67,6 +68,8 @@ export async function route(c: Ctx): Promise<Out> {
       return conteudoRoute(c);
     case path === '/comments' || path === '/checklist':
       return comentariosRoute(c);
+    case path === '/ia/estado' || path === '/ia/variacoes' || ['/admin/users/email', '/admin/migracao', '/admin/arquivos-sem-vinculo', '/admin/arquivos-sem-vinculo/excluir'].includes(path):
+      return sistemaRoute(c);
     case ['/instagram/visao', '/instagram/desempenho', '/instagram/impulsionados', '/instagram/vinculo'].includes(path):
       return desempenhoRoute(c);
     case ['/notificacoes', '/notificacoes/lida', '/timeline', '/insights', '/admin/integridade', '/datas', '/studio/hashtags', '/studio/modelos', '/team'].includes(path) || path.startsWith('/instagram/'):

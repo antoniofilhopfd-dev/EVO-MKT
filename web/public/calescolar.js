@@ -1,6 +1,5 @@
-/* Calendário Escolar: eventos e atividades OFICIAIS do Colégio, separados do Calendário de Marketing.
-   Usa o mesmo motor (CalMotor, em calmkt.js); aqui ficam só a configuração, o formulário e o pedido opcional ao Marketing.
-   Consulta: toda a equipe. Cadastro, edição, reagendamento e exclusão: Gerência/Administração. Nada é criado automaticamente. */
+/* Camada "Calendário escolar" do Calendário: eventos e atividades OFICIAIS do Colégio (fonte: calendário escolar cadastrado pela equipe).
+   Aqui ficam o carregamento, o formulário e a criação opcional de uma publicação a partir do evento. Nada é criado automaticamente. */
 const ESC_TIPOS=[
  {k:'EVENTO',rotulo:'Evento escolar',glifo:'★'},{k:'PROVA',rotulo:'Prova / avaliação',glifo:'✎'},{k:'PROJETO',rotulo:'Projeto pedagógico',glifo:'◆'},
  {k:'PASSEIO',rotulo:'Passeio / excursão',glifo:'➤'},{k:'REUNIAO_PAIS',rotulo:'Reunião de pais',glifo:'◷'},{k:'ESPORTIVA',rotulo:'Atividade esportiva',glifo:'●'},
@@ -29,7 +28,6 @@ async function escForm(it,dataInicial=''){
  const segs=new Set(edit?escSegs(e):['TODOS']);
  const ro=!ESC_PODE;
  const dis=ro?'disabled':'';
- const ligados=(e.solicitacoes||[]);
  const o=adminOverlay(`<h3>${edit?(ro?esc(e.titulo):'Editar evento'):'Novo evento'}</h3>
   <form id="escForm" class="cm-form" novalidate>
    <label class="wide">Título *<input class="control" id="eTitulo" maxlength="140" required autocomplete="off" value="${attr(e.titulo||'')}" ${dis}></label>
@@ -40,8 +38,9 @@ async function escForm(it,dataInicial=''){
    <label>Local (opcional)<input class="control" id="eLocal" maxlength="140" value="${attr(e.local||'')}" ${dis}></label>
    <fieldset class="wide cm-segs"><legend>Segmentos</legend>${(ESC_OPC.segmentos||[]).map(([k,l])=>`<label class="check-row"><input type="checkbox" data-seg="${k}" ${segs.has(k)?'checked':''} ${dis}> ${esc(l)}</label>`).join('')}</fieldset>
    <label class="wide">Descrição ou observações (opcional)<textarea class="control" id="eDesc" rows="3" maxlength="1000" ${dis}>${esc(e.descricao||'')}</textarea></label>
+   ${edit&&(e.publicacoes||[]).length?`<div class="wide cm-pubs"><b>Publicações deste evento</b>${e.publicacoes.map(p=>`<button type="button" class="badge" data-pub="${attr(p.id)}">${esc(p.titulo)} · ${esc(p.status)}</button>`).join(' ')}</div>`:''}
    <div class="cm-erro wide" id="eErro" role="alert"></div>
-   <div class="actions wide">${edit&&!ro?'<button type="button" class="btn danger-soft" id="eExcluir">Excluir</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>${ro?'Fechar':'Cancelar'}</button>${ro?'':'<button type="submit" class="btn" id="eSalvar">Salvar</button>'}</div>
+   <div class="actions wide">${edit&&!ro?'<button type="button" class="btn danger-soft" id="eExcluir">Excluir</button>':''}${edit?'<button type="button" class="btn soft" id="ePub">Criar publicação deste evento</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>${ro?'Fechar':'Cancelar'}</button>${ro?'':'<button type="submit" class="btn" id="eSalvar">Salvar</button>'}</div>
   </form>`);
  const f=o.el;
  // "Toda a escola" exclui os demais segmentos, e vice-versa
@@ -52,38 +51,18 @@ async function escForm(it,dataInicial=''){
  });
   const pintaRng=()=>{const d=$('#eData',f).value,a=$('#eFim',f).value;$('#eRange',f).textContent='📅 '+(d?(a&&a!==d?`${fmtDate(d)} a ${fmtDate(a)}`:fmtDate(d)):'Escolher a data')};pintaRng();
   $('#eRange',f).onclick=()=>{if(ro)return;PeriodoPicker.abrir({de:$('#eData',f).value,ate:$('#eFim',f).value||$('#eData',f).value,titulo:'Dia do evento (e o último dia)'},(d,a)=>{$('#eData',f).value=d;$('#eFim',f).value=a===d?'':a;pintaRng()})};
+   f.querySelectorAll('[data-pub]').forEach(b=>b.onclick=()=>{o.close();editarPublicacao(b.dataset.pub)});
+ $('#ePub',f)&&($('#ePub',f).onclick=()=>{o.close();calCriarPublicacao('escolar',e.id,'',e.titulo)});
    if(ro)return;
  $('#eTitulo',f).focus();
  $('#escForm',f).onsubmit=async ev=>{
   ev.preventDefault();const err=$('#eErro',f);err.textContent='';
   const body={id:edit?e.id:'',titulo:$('#eTitulo',f).value,dataInicio:$('#eData',f).value,dataFim:$('#eFim',f).value,horaInicio:$('#eHi',f).value,horaFim:$('#eHf',f).value,tipoEvento:$('#eTipo',f).value,local:$('#eLocal',f).value,descricao:$('#eDesc',f).value,segmentos:[...f.querySelectorAll('[data-seg]')].filter(x=>x.checked).map(x=>x.dataset.seg)};
   const btn=$('#eSalvar',f);btn.disabled=true;
-  try{await escPost('/escolar/salvar',body);o.close();toast(edit?'Evento atualizado':'Evento criado');await ESC.recarregar()}catch(x){err.textContent=x.message;btn.disabled=false}
+  try{await escPost('/escolar/salvar',body);o.close();toast(edit?'Evento atualizado':'Evento criado');await CAL_UNICO.recarregar()}catch(x){err.textContent=x.message;btn.disabled=false}
  };
  $('#eExcluir',f)&&($('#eExcluir',f).onclick=async()=>{
-  if(!confirm(`Excluir "${e.titulo}"? Ele vai para a Lixeira e pode ser restaurado. As solicitações já criadas a partir dele continuam.`))return;
-  try{await escPost('/escolar/excluir',{id:e.id});o.close();toast('Evento movido para a Lixeira');await ESC.recarregar()}catch(x){$('#eErro',f).textContent=x.message}
+  if(!await Dlg.confirmar({titulo:'Excluir evento',texto:`Excluir "${e.titulo}"? As publicações criadas a partir dele continuam, apenas sem o vínculo.`,confirmar:'Excluir',perigo:true}))return;
+  try{await escPost('/escolar/excluir',{id:e.id});o.close();toast('Evento excluído');await CAL_UNICO.recarregar()}catch(x){$('#eErro',f).textContent=x.message}
  });
 }
-function escPedir(e,acao,pai){
- const rot=(ESC_OPC.acoes||[]).find(a=>a[0]===acao)?.[1]||'Apoio';
- const o=adminOverlay(`<h3>${esc(rot)}</h3><p class="kpi-note">Evento: <b>${esc(e.titulo)}</b> · ${esc(escData(e.dataInicio))}</p>
-  <form id="escPed" class="cm-form" novalidate><label>Prazo (opcional)<input class="control" type="date" id="pPrazo"></label><label class="wide">Observação (opcional)<textarea class="control" id="pObs" rows="3" maxlength="500"></textarea></label>
-  <div class="cm-erro wide" id="pErro" role="alert"></div><div class="actions wide"><button type="button" class="btn soft" data-close>Voltar</button><button type="submit" class="btn" id="pOk">Criar solicitação</button></div></form>`);
- $('#escPed',o.el).onsubmit=async ev=>{
-  ev.preventDefault();$('#pOk',o.el).disabled=true;
-  try{const s=await escPost('/escolar/solicitar',{id:e.id,acao,prazo:$('#pPrazo',o.el).value,observacao:$('#pObs',o.el).value});invalidate('solicitacoes');o.close();pai&&pai.close();toast(`Solicitação ${s.id} criada`);await ESC.recarregar()}
-  catch(x){$('#pErro',o.el).textContent=x.message;$('#pOk',o.el).disabled=false}
- };
-}
-const ESC=CalMotor.criar({
- chave:'escolar',tituloPagina:'Calendário Escolar',eyebrow:'PLANEJAMENTO',
- descricao:'Eventos e atividades oficiais do Colégio Evolução, por segmento. As datas comemorativas e as ações de Marketing têm calendários próprios.',
- tipos:ESC_TIPOS,carregar:escCarregar,novo:d=>escForm(null,d),abrir:escAbrir,
- mover:(it,d)=>escPost('/escolar/mover',{id:it.id,data:d}),
- modos:[['month','Mês'],['week','Semana'],['list','Próximos']],modoPadrao:'month',
- busca:true,filtroResponsavel:false,
- filtroExtra:{rotulo:'Segmento',vazio:'Todos os segmentos',opcoes:()=>(ESC_OPC.segmentos||[]).map(([k,l])=>[k,l]),testa:(i,v)=>i.segmentos.includes(v)||i.segmentos.includes('TODOS')},
- detalhe:i=>escSegTxt(i.raw),
-});
-async function renderEscolar(){return ESC.render()}

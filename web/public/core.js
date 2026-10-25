@@ -190,7 +190,7 @@ async function go(page) {
   if (!ROTULOS[page] || !canAccess(page)) page = 'hoje';
   clearInterval(go._timer);
   state.page = page; history.replaceState(null, '', `?page=${encodeURIComponent(page)}`);
-  renderNav(); updateHeader();
+  renderNav(); updateHeader(); montarFiltros();
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
   try {
     const fn = PAGINAS[page]; if (!fn) throw new Error('Esta tela não está disponível.');
@@ -248,6 +248,8 @@ function startApp() {
   document.addEventListener('click', e => { const sb = $('#sidebar'); if (sb.classList.contains('open') && !e.target.closest('#sidebar') && !e.target.closest('#menuBtn')) sb.classList.remove('open'); });
   $('#collapseBtn').onclick = () => { const on = !document.body.classList.contains('sidebar-collapsed'); document.body.classList.toggle('sidebar-collapsed', on); setPref('sidebarCollapsed', on); };
   $('#notifyBtn').onclick = abrirNotificacoes;
+  $('#newBtn').onclick = () => novaPublicacao();
+  Filtros.aoMudar(() => { if (FILTROS_PAGINA[state.page]) go(state.page); });
   const busca = $('#globalSearch');
   busca.onkeydown = e => { if (e.key === 'Enter') buscaGlobal(busca.value).catch(er => toast(er.message, 'warn')); };
   document.addEventListener('keydown', e => {

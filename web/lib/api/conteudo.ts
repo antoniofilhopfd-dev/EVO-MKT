@@ -113,7 +113,7 @@ export async function conteudoRoute(c: Ctx) {
   }
   if (path === '/content/duplicate' && method === 'POST') {
     const cur = await conteudo(strv((await c.body()).id));
-    const novo = await insertRow('conteudos', copiaParaNova(cur, { titulo: `${strv(cur.titulo)} (cópia)`.slice(0, 140), duplicadoDe: String(cur.id), responsavel: strv(cur.responsavel) }), String(u.codigo));
+    const novo = await insertRow('conteudos', copiaParaNova(cur, { titulo: `${strv(cur.titulo)} (cópia)`.slice(0, 140), duplicadoDe: String(cur.id), responsavel: strv(cur.responsavel) }), String(u.codigo), { interno: true });
     await audit(String(u.codigo), 'duplicar-conteudo', 'conteudos', String(cur.id));
     return json(novo, 201);
   }
@@ -123,7 +123,7 @@ export async function conteudoRoute(c: Ctx) {
     const perfil = strv(b.perfil).trim();
     if (!perfil || !['@evolucaopb', '@geracaoevolucao'].includes(perfil)) fail(400, 'Escolha o perfil de destino (@evolucaopb ou @geracaoevolucao).');
     if (strv(cur.perfil) === perfil) fail(409, 'A publicação já é deste perfil.');
-    const novo = await insertRow('conteudos', copiaParaNova(cur, { titulo: strv(cur.titulo), perfil, adaptadoDe: String(cur.id), compartilhado: 'NAO', contaInstagram: '' }), String(u.codigo));
+    const novo = await insertRow('conteudos', copiaParaNova(cur, { titulo: strv(cur.titulo), perfil, adaptadoDe: String(cur.id), compartilhado: 'NAO', contaInstagram: '' }), String(u.codigo), { interno: true });
     await audit(String(u.codigo), 'adaptar-conteudo', 'conteudos', String(cur.id));
     return json(novo, 201);
   }
