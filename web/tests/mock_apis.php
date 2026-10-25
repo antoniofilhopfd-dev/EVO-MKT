@@ -1,6 +1,6 @@
 <?php
 // Servidor SIMULADO da Meta (Graph API) e do Google — somente para testes. Uso: php -S 127.0.0.1:8099 tests/mock_apis.php
-date_default_timezone_set(getenv('TIMEZONE') ?: 'America/Recife'); // mesmo fuso do sistema (senão as datas viram o dia seguinte à noite)
+date_default_timezone_set(getenv('TIMEZONE') ?: 'America/Fortaleza'); // mesmo fuso do sistema (senão as datas viram o dia seguinte à noite)
 $F = sys_get_temp_dir() . '/evo_mock_state.json';
 $S = is_file($F) ? json_decode(file_get_contents($F), true) : [];
 $S += ['seq' => 0, 'containers' => [], 'published' => [], 'events' => [], 'folders' => [], 'files' => [], 'sheets' => [], 'values' => [], 'calls' => []];

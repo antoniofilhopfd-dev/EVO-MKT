@@ -20,6 +20,7 @@ import { cleanInput, env, fail, HttpError, lower, now, Row, strv } from '../util
 import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
 import { operacaoRoute } from './operacao';
+import { desempenhoRoute } from './desempenho';
 import { comentariosRoute } from './comentarios';
 import { conteudoRoute } from './conteudo';
 import { calendarioPublicoRoute } from './calendarioPublico';
@@ -66,7 +67,9 @@ export async function route(c: Ctx): Promise<Out> {
       return conteudoRoute(c);
     case path === '/comments' || path === '/checklist':
       return comentariosRoute(c);
-    case ['/fluxo', '/notificacoes', '/notificacoes/lida', '/timeline', '/indicadores', '/insights', '/admin/integridade', '/datas', '/studio/hashtags', '/studio/modelos', '/team'].includes(path) || path.startsWith('/instagram/'):
+    case ['/instagram/visao', '/instagram/desempenho', '/instagram/impulsionados', '/instagram/vinculo'].includes(path):
+      return desempenhoRoute(c);
+    case ['/notificacoes', '/notificacoes/lida', '/timeline', '/insights', '/admin/integridade', '/datas', '/studio/hashtags', '/studio/modelos', '/team'].includes(path) || path.startsWith('/instagram/'):
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);

@@ -100,7 +100,7 @@ export async function registerDevice(c: Ctx, tipo: 'int', codigo: string, nome: 
     await run('INSERT INTO trusted_devices(hash,codigo,tipo,criado,visto) VALUES(?,?,?,?,?)', [sha256(dev), codigo, tipo, now(), now()]);
     await audit(codigo, 'novo-dispositivo');
     const d = new Date();
-    const msg = `${nome} (${codigo}) entrou de um aparelho novo.\nIP: ${c.ip}\nNavegador: ${c.ua.slice(0, 120)}\nHorário: ${d.toLocaleString('pt-BR', { timeZone: process.env.TIMEZONE || 'America/Recife' })}\n\nSe não foi essa pessoa, gere um novo código em Administração → Acessos.`;
+    const msg = `${nome} (${codigo}) entrou de um aparelho novo.\nIP: ${c.ip}\nNavegador: ${c.ua.slice(0, 120)}\nHorário: ${d.toLocaleString('pt-BR', { timeZone: process.env.TIMEZONE || 'America/Fortaleza' })}\n\nSe não foi essa pessoa, gere um novo código em Administração → Acessos.`;
     await notifyMail('Novo acesso: ' + nome, msg);
     const mine = await emailForPerson(nome);
     if (mine) await notifyMail('Novo acesso à sua conta no EVO MKT', msg, mine);

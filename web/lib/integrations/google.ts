@@ -6,7 +6,7 @@ import { addDays, env, fmtDate, fmtDateTimeLocal, now, parseLocal, Row } from '.
 import { httpCall, httpOk, publicUrl, qsOf, signState } from './http';
 
 const gUrl = (key: string, def: string) => env(key, def).replace(/\/+$/, '');
-const tz = () => env('TIMEZONE', 'America/Recife');
+const tz = () => env('TIMEZONE', 'America/Fortaleza');
 const md5 = (o: unknown) => createHash('md5').update(JSON.stringify(o)).digest('hex');
 const FORM = { 'Content-Type': 'application/x-www-form-urlencoded' };
 

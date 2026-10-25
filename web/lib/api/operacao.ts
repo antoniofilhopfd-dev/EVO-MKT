@@ -1,7 +1,8 @@
 import { Ctx } from '../ctx';
 import { verificarIntegridade } from '../integridade';
 import { rateCheck, rateFail } from '../auth';
-import { melhoresHorarios, proximasDatas, rankingConteudos } from '../insights';
+import { gerarInsights, hojeLocal, melhoresHorarios, proximasDatas, rankingConteudos } from '../insights';
+import { lerFiltros } from '../filtros';
 import { listarNotificacoes } from '../notificacoes';
 import { run } from '../db';
 import { q, q1 } from '../db';
@@ -62,7 +63,8 @@ export async function operacaoRoute(c: Ctx) {
   }
   if (path === '/insights') {
     await requireInternal(c);
-    return json({ datas: proximasDatas(90), horarios: await melhoresHorarios(await igContaValida(c.qs('conta'))), ranking: await rankingConteudos(8, await igContaValida(c.qs('conta'))) });
+    const f = lerFiltros(c);
+    return json({ insights: await gerarInsights(f, null, hojeLocal()), datas: proximasDatas(90), horarios: await melhoresHorarios(await igContaValida(c.qs('conta'))), ranking: await rankingConteudos(8, await igContaValida(c.qs('conta'))) });
   }
   if (path === '/studio/modelos') {
     await requireInternal(c);

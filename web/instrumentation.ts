@@ -1,7 +1,7 @@
 // Ao iniciar o servidor Node: define o fuso e aplica as migrações pendentes.
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  process.env.TZ = process.env.TIMEZONE || 'America/Recife';
+  process.env.TZ = process.env.TIMEZONE || 'America/Fortaleza';
   if (!process.env.DB_NAME) {
     console.warn('[startup] DB_NAME não definido — migrações adiadas.');
     return;

@@ -68,7 +68,7 @@ async function alertas(): Promise<Row> {
     if (op.length) await notifyMail('Resumo diário do EVO MKT', `Operação:\n${op.join('\n')}`);
     return { enviados: 0, resumo: op.length > 0, itens: 0 };
   }
-  const br = (d: string) => parseLocal(d + 'T12:00:00').toLocaleDateString('pt-BR', { timeZone: env('TIMEZONE', 'America/Recife') });
+  const br = (d: string) => parseLocal(d + 'T12:00:00').toLocaleDateString('pt-BR', { timeZone: env('TIMEZONE', 'America/Fortaleza') });
   const linha = (i: Item) => `- [${i.mod}] ${i.titulo} — ${i.atraso ? 'ATRASADO desde ' : 'vence '}${br(i.due)}${i.resp ? ` (${i.resp})` : ''}`;
   const porPessoa: Record<string, Item[]> = {};
   for (const i of itens) if (i.resp) (porPessoa[i.resp] ??= []).push(i);

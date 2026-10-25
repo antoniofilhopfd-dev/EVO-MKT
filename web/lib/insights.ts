@@ -11,7 +11,7 @@ const MIN_AMOSTRA = 8, MIN_BUCKET = 3;
 export async function melhoresHorarios(conta = ''): Promise<Row> {
   const posts = await q('SELECT publicado_em,curtidas,comentarios,tipo FROM ig_posts' + (conta ? ' WHERE conta=?' : ''), conta ? [conta] : []);
   if (posts.length < MIN_AMOSTRA) return { amostra: posts.length, minimo: MIN_AMOSTRA, melhor: null };
-  const tz = env('TIMEZONE', 'America/Recife');
+  const tz = env('TIMEZONE', 'America/Fortaleza');
   const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', hourCycle: 'h23' });
   const w: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   const dias = new Map<number, number[]>(), horas = new Map<number, number[]>();
@@ -105,4 +105,64 @@ export async function resumoOperacional(): Promise<string[]> {
   if (emRevisao) out.push(`- ${emRevisao} publicação(ões) aguardando revisão`);
   if (Number(falhas)) out.push(`- ${falhas} falha(s) de integração nas últimas 24 h`);
   return out;
+}
+
+// ---------- insights do Marketing (determinísticos, no máximo 3, sempre com amostra, fonte e atalho) ----------
+import { Filtros } from './filtros';
+import { organico, PostFiltrado } from './painel';
+import { materiaisAtivos, statusAtual } from './conteudo';
+import { conteudoCabe } from './filtros';
+import { strv } from './util';
+
+export interface Insight { id: string; prioridade: number; titulo: string; texto: string; fonte: string; amostra: string; link: { pagina: string; rotulo: string } }
+const MIN_POSTS = 8, MIN_GRUPO = 3, DIFERENCA_MIN = 0.2;
+const media = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+/** Pendências da produção nos próximos 7 dias (dado interno, sempre disponível). */
+async function insightProducao(f: Filtros, hoje: string): Promise<Insight | null> {
+  const lim = fmtDate(addDays(new Date(hoje + 'T12:00:00'), 7));
+  const prox = (await listRows('conteudos')).filter((r) => conteudoCabe(r, f) && !/PUBLICADO|ARQUIVADO/.test(statusAtual(r.status)) && strv(r.publicacaoEm).slice(0, 10) >= hoje && strv(r.publicacaoEm).slice(0, 10) <= lim);
+  const semArte = prox.filter((r) => !materiaisAtivos(r, 'final').length && !strv(r.midiaInstagram)).length;
+  const semLegenda = prox.filter((r) => !strv(r.legenda).trim()).length;
+  const naoAprovadas = prox.filter((r) => !/APROVADO|AGENDADO/.test(statusAtual(r.status))).length;
+  if (!prox.length || !(semArte || semLegenda || naoAprovadas)) return null;
+  const partes = [semArte && `${semArte} sem arte final`, semLegenda && `${semLegenda} sem legenda`, naoAprovadas && `${naoAprovadas} ainda não aprovada(s)`].filter(Boolean);
+  return { id: 'producao', prioridade: 1, titulo: 'Publicações dos próximos 7 dias com pendências', texto: `Das ${prox.length} publicações previstas até ${lim.slice(8, 10)}/${lim.slice(5, 7)}: ${partes.join(', ')}.`, fonte: 'Publicações do EVO MKT (Instagram › Conteúdos)', amostra: `${prox.length} publicações`, link: { pagina: 'igconteudos', rotulo: 'Ver as publicações' } };
+}
+
+function insightFormato(posts: PostFiltrado[]): Insight | null {
+  if (posts.length < MIN_POSTS) return null;
+  const grupos = new Map<string, number[]>();
+  for (const p of posts) (grupos.get(p.formato) ?? grupos.set(p.formato, []).get(p.formato)!).push(p.interacoes);
+  const geral = media(posts.map((p) => p.interacoes));
+  const lista = [...grupos.entries()].filter(([, v]) => v.length >= MIN_GRUPO).map(([k, v]) => ({ k, m: media(v), n: v.length })).sort((a, b) => b.m - a.m);
+  if (lista.length < 2 || geral <= 0) return null;
+  const top = lista[0];
+  if (top.m < geral * (1 + DIFERENCA_MIN)) return null;
+  return { id: 'formato', prioridade: 3, titulo: `${top.k} tem rendido mais interações`, texto: `Em média ${Math.round(top.m)} interações por publicação em ${top.k}, ${Math.round((top.m / geral - 1) * 100)}% acima da média geral (${Math.round(geral)}).`, fonte: 'Instagram (orgânico), publicações do período', amostra: `${top.n} de ${posts.length} publicações`, link: { pagina: 'igdesempenho', rotulo: 'Ver o desempenho' } };
+}
+
+async function insightHorario(f: Filtros, posts: PostFiltrado[], contasIds: string[]): Promise<Insight | null> {
+  if (posts.length < MIN_POSTS || contasIds.length !== 1) return null; // o horário só faz sentido por perfil
+  const h = await melhoresHorarios(contasIds[0]);
+  const m = h.melhor as Row | null;
+  if (!m || m.confianca !== 'alta') return null;
+  return { id: 'horario', prioridade: 4, titulo: `${m.dia}, por volta das ${String(m.hora).padStart(2, '0')}h, tem funcionado melhor`, texto: `Melhor média de curtidas e comentários: ${m.dia} (${m.mediaDia}) e o horário das ${String(m.hora).padStart(2, '0')}h (${m.mediaHora}).`, fonte: 'Instagram (orgânico), histórico sincronizado do perfil', amostra: `${h.amostra} publicações`, link: { pagina: 'igdesempenho', rotulo: 'Ver por dia e horário' } };
+}
+
+function insightTrafego(t: Row | null): Insight | null {
+  if (!t) return null;
+  const camps = ((t.campanhas ?? []) as Row[]).filter((c) => c.conversas >= 5 && c.custoConversa !== null);
+  const total = t.atual as Row;
+  if (camps.length < 2 || !total?.custoConversa) return null;
+  const melhor = [...camps].sort((a, b) => a.custoConversa - b.custoConversa)[0];
+  if (melhor.custoConversa > total.custoConversa * (1 - DIFERENCA_MIN)) return null;
+  const br = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return { id: 'trafego', prioridade: 2, titulo: 'Uma campanha converte mais barato em conversas', texto: `“${melhor.nome}” custou ${br(melhor.custoConversa)} por conversa, contra ${br(total.custoConversa)} na média de todas as campanhas.`, fonte: 'Meta Ads (somente leitura)', amostra: `${melhor.conversas} conversas em ${camps.length} campanhas`, link: { pagina: 'tfcampanhas', rotulo: 'Ver as campanhas' } };
+}
+
+export async function gerarInsights(f: Filtros, trafego: Row | null, hoje: string): Promise<Insight[]> {
+  const o = await organico(f);
+  const lista = (await Promise.all([insightProducao(f, hoje), Promise.resolve(insightFormato(o.posts)), insightHorario(f, o.posts, o.contas.map((c) => c.ig)), Promise.resolve(insightTrafego(trafego))])).filter((x): x is Insight => !!x);
+  return lista.sort((a, b) => a.prioridade - b.prioridade).slice(0, 3);
 }
