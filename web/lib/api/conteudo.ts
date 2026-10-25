@@ -4,7 +4,7 @@ import { requireInternal } from '../auth';
 import { audit, getRow, insertRow, listRows, logStatus, modifyRow } from '../records';
 import { registrarNotificacao } from '../notificacoes';
 import { adicionarComentario } from '../comentarios';
-import { adicionarMaterial, copiaParaNova, materiaisDe, pendencias, PAPEIS, requisitosDeAgendamento, sincronizarMidia, statusAtual, tipoDeLink, urlPermitida } from '../conteudo';
+import { adicionarMaterial, copiaParaNova, materiaisAtivos, materiaisDe, pendencias, PAPEIS, requisitosDeAgendamento, sincronizarMidia, statusAtual, tipoDeLink, urlPermitida } from '../conteudo';
 import { conteudoCoerente } from '../files';
 import { envInt, fail, now, Row, safePart, strv } from '../util';
 import { json } from './handlers';
@@ -155,7 +155,8 @@ export async function conteudoRoute(c: Ctx) {
     if (!arqs.length) fail(400, 'Escolha ao menos um arquivo.');
     if (arqs.length > 20) fail(400, 'No máximo 20 arquivos por envio.');
     const max = envInt('MAX_UPLOAD_MB', 15) * 1048576;
-    await conteudo(id);
+    const atual = await conteudo(id);
+    if (papel === 'final' && !grupo && materiaisAtivos(atual, 'final').length + arqs.length > 20) fail(400, 'A publicação aceita no máximo 20 itens de arte final (limite do carrossel).');
     const novos: Row[] = [];
     for (const f of arqs) {
       if (f.size > max) fail(413, `"${f.name}" passa do limite de ${Math.floor(max / 1048576)} MB.`);

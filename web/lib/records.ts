@@ -1,3 +1,5 @@
+import { registrarNotificacao } from './notificacoes';
+import { notifyMail } from './mail';
 import { q, q1, run, withTx } from './db';
 import { cleanInput, currentIp, fail, lower, now, Row, strv } from './util';
 import { registrarVersaoTexto, segmentoNormalizado, sincronizarMidia, statusAtual, validarStatusPorEdicao } from './conteudo';
@@ -172,5 +174,16 @@ export async function emailForPerson(name: string): Promise<string> {
     if (lower(String(r.nome ?? '').trim()) === n && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(r.email ?? ''))) return String(r.email);
   }
   return '';
+}
+/** Avisa a pessoa quando uma publicação, ideia, campanha ou compromisso passa a ser dela: aviso no sistema e, se ela tiver e-mail, por e-mail. */
+export async function notifyAssignment(mod: string, nw: Row, old: Row | null, actorName: string): Promise<void> {
+  if (!['conteudos', 'ideias', 'campanhas', 'calendario'].includes(mod)) return;
+  const resp = strv(nw.responsavel).trim();
+  if (!resp || lower(resp) === lower(actorName)) return;
+  if (old && lower(strv(old.responsavel).trim()) === lower(resp)) return;
+  await registrarNotificacao('responsavel', resp, 'Atribuição para você', `"${strv(nw.titulo) || nw.id}" agora está com você.`, mod, String(nw.id));
+  const to = await emailForPerson(resp);
+  if (!to) return;
+  await notifyMail(`Nova atribuição: ${strv(nw.titulo) || nw.id}`, `Olá, ${resp}!\n\n${actorName} atribuiu a você: ${strv(nw.titulo)}\nOnde: ${mod}${nw.publicacaoEm ? ` · Publicação: ${strv(nw.publicacaoEm).replace('T', ' ')}` : ''}\n\nAcesse o EVO MKT para ver os detalhes.`, to);
 }
 export { env, strv };

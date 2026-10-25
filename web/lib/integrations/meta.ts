@@ -302,24 +302,6 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
 
 // ---------- mídia do conteúdo (guardada no MySQL) ----------
 export const midiasDe = (r: Row): string[] => { try { const l = JSON.parse(String(r.midiasInstagram ?? '[]')); if (Array.isArray(l) && l.length) return l.map(String); } catch { /* lista inválida */ } return r.midiaInstagram ? [String(r.midiaInstagram)] : []; };
-export async function igSaveMedia(conteudoId: string, file: File | null, adicionar = false): Promise<string> {
-  const row = (await getRow('conteudos', conteudoId)) ?? fail(404, 'Conteúdo não encontrado.');
-  if (!file) fail(400, 'Envie um arquivo.');
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
-  if (!['jpg', 'jpeg', 'mp4', 'mov'].includes(ext)) fail(400, 'O Instagram aceita imagem JPEG (.jpg) ou vídeo (.mp4/.mov).');
-  if (file.size > Number(env('MAX_UPLOAD_MB', '15')) * 1048576) fail(413, 'Arquivo acima do limite de upload do servidor.');
-  const rel = `ANEXOS/CONTEUDOS/${conteudoId.replace(/[^A-Za-z0-9._-]/g, '_')}/midia_${Math.random().toString(16).slice(2, 10)}.${ext}`;
-  const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', mp4: 'video/mp4', mov: 'video/quicktime' }[ext]!;
-  await run('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)', [rel, mime, file.size, Buffer.from(await file.arrayBuffer()), now()]);
-  const lista = adicionar ? midiasDe(row) : [];
-  if (lista.length >= 20) fail(400, 'O carrossel aceita no máximo 20 itens.');
-  lista.push(rel);
-  row.midiaInstagram = lista[0];
-  row.midiasInstagram = JSON.stringify(lista);
-  row.atualizadoEm = now();
-  await saveRow('conteudos', row);
-  return rel;
-}
 /** Registra falha de publicação (sem sobrescrever um conteúdo já PUBLICADO). */
 export async function igMarkError(id: string, msg: string): Promise<void> {
   const cur = await q1('SELECT status FROM ig_publish WHERE conteudo_id=?', [id]);

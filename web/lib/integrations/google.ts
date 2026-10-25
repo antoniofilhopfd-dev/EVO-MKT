@@ -140,7 +140,7 @@ function gEventFromRow(mod: string, r: Row): Row | null {
   if (mod === 'campanhas' && /^\d{4}-\d{2}-\d{2}/.test(String(r.prazo ?? '')) && String(r.prazo).slice(0, 10) >= d) endDay = String(r.prazo).slice(0, 10);
   return { summary: title, description: desc, start: { date: d }, end: { date: fmtDate(addDays(parseLocal(endDay + 'T12:00:00'), 1)) }, extendedProperties: ext };
 }
-const stripLabel = (s: string) => s.replace(/^\[(Evento|Conteúdo|Tarefa|Campanha)\]\s*/u, '');
+const stripLabel = (s: string) => s.replace(/^\[(Publicação|Conteúdo|Evento|Tarefa|Campanha)\]\s*/u, "");
 function gApplyEventToRow(mod: string, row: Row, ev: Row): Row {
   const patch: Row = { titulo: stripLabel(String(ev.summary ?? row.titulo ?? '')) };
   const sdt = ev.start?.dateTime, sd = ev.start?.date;
@@ -277,14 +277,6 @@ export async function gCalendarSync(): Promise<Row> {
   return stat;
 }
 
-// ---------- Drive ----------
-async function gDriveFolder(name: string, parent = ''): Promise<string> {
-  const qq = `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${name.replace(/'/g, "\\'")}'` + (parent ? ` and '${parent}' in parents` : '');
-  const r = await gApi('GET', '/drive/v3/files?' + qsOf({ q: qq, fields: 'files(id,name)', spaces: 'drive' }));
-  if (r.files?.[0]?.id) return String(r.files[0].id);
-  const meta: Row = { name, mimeType: 'application/vnd.google-apps.folder', ...(parent ? { parents: [parent] } : {}) };
-  return String((await gApi('POST', '/drive/v3/files?fields=id', meta)).id);
-}
 /** Remove do sistema os eventos que vieram do Google. NÃO apaga nada no Google (os vínculos saem antes das linhas). */
 export async function gLimparImportados(): Promise<number> {
   const like = '%"origem":"GOOGLE_AGENDA"%';

@@ -45,11 +45,11 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  await call('POST','/integrations/meta/account',{ig_user_id:IG1});
  // publicar pela conta escolhida + colab
  const jpg=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
- const up=async id=>{const fd=new FormData();fd.append('files',new Blob([jpg]),'a.jpg');const rr=await fetch(B+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G.Cookie,'X-EVO':'1'},body:fd});return rr.status};
- const mk=async b=>(await call('POST','/data?module=conteudos',{titulo:b.titulo,legenda:b.titulo,status:'APROVADO',formato:'Feed',publicarInstagram:'NÃO',publicacaoEm:'2020-01-01T10:00',...b}))[1].id;
- let cc;const c2=await mk({titulo:'Post da segunda conta',contaInstagram:IG2,colaboradores:'@evolucaopb, @amiga.escola'});await up(c2);
+ const up=async id=>{const fd=new FormData();fd.append('id',id);fd.append('papel','final');fd.append('files',new Blob([jpg]),'a.jpg');const rr=await fetch(B+'/content/material',{method:'POST',headers:{Cookie:G.Cookie,'X-EVO':'1'},body:fd});return rr.status};
+ const mk=async b=>{const id=(await call('POST','/data?module=conteudos',{titulo:b.titulo,legenda:b.titulo,status:'RASCUNHO',formato:'Feed',perfil:'@evolucaopb',publicarInstagram:'SIM',publicacaoEm:'2020-01-01T10:00',...b}))[1].id;await up(id);await call('PUT','/data?module=conteudos&id='+id,{status:'EM REVISÃO'});await call('POST','/content/decision',{id,decisao:'APROVADO'});await call('POST','/content/schedule',{id,quando:'2020-01-01T10:00'});return id};
+ let cc;const c2=await mk({titulo:'Post da segunda conta',contaInstagram:IG2,colaboradores:'@evolucaopb, @amiga.escola'});
  [s,r]=await call('POST','/integrations/instagram/publish',{id:c2});t('publica pela segunda conta',s===200&&r.status==='PUBLICADO',r);
- const c1=await mk({titulo:'Post da conta padrão'});await up(c1);await call('POST','/integrations/instagram/publish',{id:c1});
+ const c1=await mk({titulo:'Post da conta padrão'});await call('POST','/integrations/instagram/publish',{id:c1});
  const cont=Object.values((await mock('/__state')).containers);const k2=cont.find(c=>/segunda conta/.test(c.params.caption||'')),k1=cont.find(c=>/conta padrão/.test(c.params.caption||''));
  t('o container saiu da conta escolhida, não da padrão',k2&&k2.conta==='ig2'&&k1&&k1.conta==='ig1',[k1&&k1.conta,k2&&k2.conta]);
  t('colab: convida os perfis informados (até 3) no pedido à Meta',k2&&JSON.parse(k2.params.collaborators).join()==='evolucaopb,amiga.escola'&&!k1.params.collaborators,[k2&&k2.params.collaborators,k1&&k1.params.collaborators]);

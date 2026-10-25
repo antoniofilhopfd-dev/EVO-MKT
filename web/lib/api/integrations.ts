@@ -7,7 +7,7 @@ import { versaoApi } from '../integrations/trafego';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
-import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
+import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
 import { gCalendarChoose, gCalendarList, gCalendarListTodas, gEventosLeitura, gLeituraSalvar, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gFinishConnect } from '../integrations/google';
 import { adsPermitido, ContaAds, listarContasAds, adsSync } from '../integrations/metaads';
 import { json } from './handlers';
@@ -226,15 +226,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         o.push({ id: r.id, titulo: r.titulo ?? '', status: r.status ?? '', publicacaoEm: r.publicacaoEm ?? '', formato: r.formato ?? '', midia: r.midiaInstagram ?? '', publicado: !!r.instagramMediaId, link: r.instagramLink ?? '', estado: s?.status ?? '', erro: s?.erro ?? '' });
       }
       return json(o);
-    }
-    case path === '/integrations/instagram/media' && method === 'POST': {
-      const u = await requireInternal(c);
-      const form = await c.req.formData();
-      const arqs = (form.getAll('files').length ? form.getAll('files') : [form.get('file')]).filter((f): f is File => !!f && typeof f !== 'string');
-      let rel = '';
-      for (let i = 0; i < Math.max(1, arqs.length); i++) rel = await igSaveMedia(c.qs('id'), arqs[i] ?? null, c.qs('add') === '1' || i > 0);
-      await audit(u.codigo, 'instagram-midia', 'conteudos', c.qs('id'));
-      return json({ midia: rel });
     }
     case path === '/integrations/instagram/retry' && method === 'POST': {
       const u = await requireInternal(c);

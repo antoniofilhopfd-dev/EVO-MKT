@@ -20,7 +20,7 @@ async function entrar(installOut, cod = 'NAT-3301', nova = 'Nat26ab') {
   await fetch(B + '/auth/password', { method: 'POST', headers: { ...J, Cookie: ck }, body: JSON.stringify({ atual: pw, nova }) });
   r = await fetch(B + '/auth/login', { method: 'POST', headers: J, body: JSON.stringify({ codigo: cod, senha: nova }) });
   const H = { ...J, Cookie: cookie(r) };
-  return { H, pw, nova, cod, get: u => fetch(B + u, { headers: H }).then(x => x.json()), post: (u, b) => fetch(B + u, { method: 'POST', headers: H, body: JSON.stringify(b ?? {}) }).then(async x => ({ status: x.status, ...(await x.json().catch(() => ({}))) })), put: (u, b) => fetch(B + u, { method: 'PUT', headers: H, body: JSON.stringify(b ?? {}) }).then(async x => ({ status: x.status, ...(await x.json().catch(() => ({}))) })), req: (m, u, b) => fetch(B + u, { method: m, headers: H, body: b ? JSON.stringify(b) : undefined }) };
+  return { H, pw, nova, cod, get: u => fetch(B + u, { headers: H }).then(x => x.json()), post: (u, b) => fetch(B + u, { method: 'POST', headers: H, body: JSON.stringify(b ?? {}) }).then(async x => ({ ...(await x.json().catch(() => ({}))), http: x.status })), put: (u, b) => fetch(B + u, { method: 'PUT', headers: H, body: JSON.stringify(b ?? {}) }).then(async x => ({ ...(await x.json().catch(() => ({}))), http: x.status })), req: (m, u, b) => fetch(B + u, { method: m, headers: H, body: b ? JSON.stringify(b) : undefined }) };
 }
 async function abrir() { return chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }); }
 async function pagina(browser, cod, senha, vp = { width: 1440, height: 900 }) {

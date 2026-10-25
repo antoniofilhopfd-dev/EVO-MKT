@@ -52,6 +52,7 @@ export function requisitosDeAgendamento(r: Row): string[] {
   if (!materiaisAtivos(r, 'final').length && !strv(r.midiaInstagram).trim()) falta.push('arte final');
   if (!strv(r.perfil).trim()) falta.push('perfil');
   if (!strv(r.formato).trim()) falta.push('formato');
+  if (strv(r.publicarInstagram) === 'SIM' && !strv(r.midiaInstagram).trim() && (Array.isArray(r.materiais) ? materiaisAtivos(r, 'final').length > 0 : true)) falta.push('arte final em JPEG ou vídeo MP4/MOV (o Instagram não publica PNG nem PDF)');
   return falta;
 }
 

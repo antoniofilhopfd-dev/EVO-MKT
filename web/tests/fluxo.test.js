@@ -56,7 +56,7 @@ const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP////////////////////
   let r = (await a.get('/data?module=conteudos')).rows.find(x => x.id === id);
   t('enviada para revisão', r.status === 'EM REVISÃO', r.status);
   const semAprov = await a.put(`/data?module=conteudos&id=${id}`, { status: 'APROVADO' });
-  t('aprovar pela edição comum é recusado (só pela decisão de revisão)', semAprov.status === 400 || semAprov.status === 409, semAprov);
+  t('aprovar pela edição comum é recusado (só pela decisão de revisão)', semAprov.http === 400 || semAprov.http === 409, semAprov);
   await p.click('#aAprovar'); await p.waitForSelector('#dlgForm'); await p.fill('#dlgIn', 'Pode seguir.'); await p.click('#dlgForm button[type=submit]');
   await p.waitForFunction(() => document.querySelector('#aAgendar'), null, { timeout: 10000 });
   r = (await a.get('/data?module=conteudos')).rows.find(x => x.id === id);

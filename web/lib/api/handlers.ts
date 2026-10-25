@@ -11,7 +11,7 @@ import {
 import { accessHmac, decryptSecret, encryptSecret } from '../crypto';
 import { notifyMail } from '../mail';
 import {
-  ALLOWED_EXT, audit, deleteRow, emailForPerson, EVO_VERSION, getRow, headersOf, insertRow, listRows, logStatus, modifyRow, MODULES,
+  ALLOWED_EXT, audit, notifyAssignment, deleteRow, emailForPerson, EVO_VERSION, getRow, headersOf, insertRow, listRows, logStatus, modifyRow, MODULES,
   saveRow, TEAM_WRITE, teamMayDelete, updateRow,
 } from '../records';
 import { serveFile } from '../files';
@@ -487,11 +487,13 @@ async function dataRoute(c: Ctx): Promise<Response> {
   if (mod === 'calescolar' && (method === 'POST' || method === 'PUT')) fail(400, 'O Calendário Escolar é editado pela própria tela (com validação de datas, segmentos e duplicidade).');
   if (mod === 'datacom' && (method === 'POST' || method === 'PUT')) fail(400, 'As Datas Comemorativas são editadas pela própria tela (com validação das regras e de duplicidade).');
   await autoBackupIfDue();
-  if (method === 'POST') return json(await insertRow(mod, await c.body(), u.codigo), 201);
+  if (method === 'POST') { const novo = await insertRow(mod, await c.body(), u.codigo); await notifyAssignment(mod, novo, null, String(u.nome)).catch(() => {}); return json(novo, 201); }
   if (!id) fail(400, 'Informe o id.');
   if (method === 'PUT') {
-    await (getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
-    return json(await updateRow(mod, id, await c.body(), u.codigo));
+    const antes = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
+    const dep = await updateRow(mod, id, await c.body(), u.codigo);
+    await notifyAssignment(mod, dep, antes, String(u.nome)).catch(() => {});
+    return json(dep);
   }
   if (method === 'DELETE') {
     const alvo = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
