@@ -43,25 +43,25 @@ Na tela de Integrações, os dois endereços de redirecionamento aparecem pronto
 - Algumas métricas dependem da conta (ex.: contas com poucos seguidores têm menos dados) e a Meta altera nomes de métricas com o tempo; o log em *Integrações → Últimas operações* mostra qualquer erro.
 
 ---
-## 2) Google (Agenda, Drive e Planilhas)
+## 2) Google (somente Agenda)
 **Criar o projeto**
 1. Entre em **console.cloud.google.com** com a conta do Marketing e **crie um projeto** ("EVO MKT").
-2. *APIs e serviços → Biblioteca*: **ative** *Google Calendar API*, *Google Drive API* e *Google Sheets API*.
+2. *APIs e serviços → Biblioteca*: **ative** apenas a *Google Calendar API* (o sistema não usa mais Drive nem Planilhas).
 3. *APIs e serviços → Tela de permissão OAuth*:
    - Se o Colégio usa **Google Workspace**: escolha **Interno**. É o melhor caso — não exige verificação e o acesso não expira.
    - Se for conta Gmail comum: **Externo**; preencha nome, e-mail de suporte e e-mail do desenvolvedor. **Atenção:** em modo "Testando" o acesso **expira em 7 dias**. Depois de configurar, clique **Publicar app** (modo "Em produção"). O Google mostrará "app não verificado" no login — clique em *Avançado → Acessar EVO MKT*; funciona para até 100 usuários.
-   - Escopos: `.../auth/calendar`, `.../auth/drive.file`, `.../auth/spreadsheets`.
+   - Escopo: `.../auth/calendar` (e `openid email` para mostrar a conta conectada).
 4. *Credenciais → Criar credenciais → ID do cliente OAuth* → tipo **Aplicativo da Web**. Em **URIs de redirecionamento autorizados** cole o endereço **do Google** mostrado na tela de Integrações. Copie o **ID do cliente** e a **chave secreta**.
 
 **Conectar**
 1. Cole **Client ID** e **Client Secret** → *Salvar credenciais* → **Conectar com Google** → aceite as permissões.
 2. Se voltar a mensagem "o Google não devolveu o refresh token": acesse *myaccount.google.com/permissions*, remova o acesso do EVO MKT e conecte de novo.
 
-**O que cada parte faz**
-- **Agenda** (calendário novo chamado "EVO MKT"): envia Agenda, Calendário, Eventos, Conteúdos (data de publicação), Tarefas (prazo, enquanto abertas) e Campanhas. É **nos dois sentidos**: mudou título ou horário no Google → volta para o EVO (vale a edição mais recente); criou um evento direto no Google → vira item do **Calendário** (origem GOOGLE_AGENDA); apagou no EVO → some do Google; apagou no Google → **o item permanece no EVO** (por segurança).
-- **Drive:** cria a pasta **"EVO MKT — Entregas"** e uma subpasta por solicitação ("SOL-0001 — título") com os arquivos finais de entrega. Pode ser **automático** a cada entrega enviada ou manual (**Enviar entregas ao Drive**). O link fica gravado na solicitação. (O app só enxerga arquivos que ele mesmo criou.)
-- **Planilhas:** cria a planilha **"EVO MKT — Relatórios (automático)"** com uma aba por módulo (tarefas, conteúdos, solicitações, campanhas, eventos, instagram, tráfego) e **reescreve** o conteúdo a cada exportação. Não edite essas abas à mão: ficam sobrescritas.
-- ⚠ **LGPD:** a Planilha e o Drive passam dados do sistema para a conta Google. Evite lançar dados pessoais de alunos nos campos exportados e compartilhe a planilha só com quem precisa.
+**O que o sistema faz**
+- **Agenda sincronizada** (uma agenda que você escolhe em Configurações › Google; o sistema nunca cria agenda sozinho): envia compromissos do Calendário e publicações (com data) e importa o que for criado direto no Google. É **nos dois sentidos**: mudou título ou horário no Google → volta para o EVO (vale a edição mais recente); apagou no EVO → some do Google.
+- **Agendas somente leitura:** em Configurações › Google você marca outras agendas da conta (por exemplo, a da direção ou a do colégio) para aparecerem no Calendário. Elas são **só consulta**: o sistema não grava nelas, não importa seus eventos e não os edita. Dá para criar uma publicação a partir de um evento delas.
+- **Link de leitura do Calendário:** a direção pode ver as publicações em revisão, aprovadas, agendadas e publicadas sem entrar no sistema, por um link temporário somente leitura.
+- Arquivos continuam onde estão: no Drive entra **apenas o link** colado em cada publicação (o sistema não lê nem copia o seu Drive).
 
 ---
 ## 3) Cron Jobs (hPanel → Avançado → Cron Jobs)

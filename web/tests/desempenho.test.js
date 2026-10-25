@@ -1,26 +1,23 @@
-// Medição (antes de decidir por paginação no servidor): carrega o banco com milhares de registros e cronometra as telas mais pesadas.
-// Falha só se alguma resposta passar do limite. Uso: node desempenho.test.js <install.out>
-const fs=require('fs');const {execSync}=require('child_process');
-const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const BASE=process.env.BASE||'http://127.0.0.1:8080';const B=BASE+'/api';
-let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(typeof x==='string'?x:JSON.stringify(x)).slice(0,400))};
-const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
-const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
-(async()=>{
- let r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:'NAT-3301',senha:pw('NAT-3301')})});let ck=cookie(r);
- await fetch(B+'/auth/password',{method:'POST',headers:{...J,Cookie:ck},body:JSON.stringify({atual:pw('NAT-3301'),nova:'Nat26ab'})});
- r=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:'NAT-3301',senha:'Nat26ab'})});const H={...J,Cookie:cookie(r)};
- const N={solicitacoes:5000,conteudos:3000,projetos:3000,tarefas:5000};
- const linhas=[];
- for(const [mod,n] of Object.entries(N)){const pref=mod.slice(0,3).toUpperCase();for(let i=1;i<=n;i++){const id=`${pref}-9${String(i).padStart(5,'0')}`;
-  const d={id,titulo:`Registro de carga ${i}`,status:mod==='solicitacoes'?'NOVA':'NOVO',prazo:dia(i%90-30),dataInicio:dia(i%90-30),publicacaoEm:dia(i%60)+'T10:00',responsavel:['Natália Mello','Antônio Filho','Monique Vilante'][i%3],segmento:'Geral',descricao:'x'.repeat(200)};
-  linhas.push(`('${mod}','${id}','${JSON.stringify(d).replace(/\\/g,'\\\\').replace(/'/g,"''")}','2026-01-01T00:00:00','2026-01-01T00:00:00')`)}}
- const sql='INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES '+linhas.join(',')+';';
- fs.writeFileSync('/tmp/evo-carga.sql',sql);
- execSync('mariadb -uroot -S /run/mysqld/mysqld.sock evowebtest < /tmp/evo-carga.sql');
- const total=Object.values(N).reduce((a,b)=>a+b,0);
- const medir=async(u,limite)=>{const ini=Date.now();const x=await fetch(B+u,{headers:H});const txt=await x.text();const ms=Date.now()-ini;console.log(`     ${u}: ${ms} ms, ${(txt.length/1024).toFixed(0)} KB`);return {s:x.status,ms}};
- const rotas=[['/data?module=tarefas',3000],['/data?module=solicitacoes',3000],['/solicitacoes/painel',3000],['/planejamento/painel',3000],['/dashboard/resumo',3000],['/data?module=conteudos',3000],['/escolar/painel',2000],['/datacom/painel',2000]];
- console.log(`     banco com ${total} registros`);
- for(const [u,lim] of rotas){const m=await medir(u);t(`${u} responde em até ${lim} ms com ${total} registros`,m.s===200&&m.ms<=lim,m)}
- console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
-})().catch(e=>{console.error(e);process.exit(1)});
+// Medição: carrega o banco com milhares de registros e cronometra as telas mais pesadas das cinco áreas. Falha só se uma resposta passar do limite.
+// Uso: node desempenho.test.js <install.out>
+const { execFileSync } = require('child_process');
+const U = require('./lib/ui');
+const { t, fim } = U.contador();
+const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-uroot', '-S', '/run/mysqld/mysqld.sock', process.env.DB_NAME || 'evowebtest', '-N'], { encoding: 'utf8', input: q, maxBuffer: 1 << 28 });
+(async () => {
+  const G = await U.entrar(process.argv[2]);
+  // 4.000 publicações e 4.000 posts de Instagram direto no banco
+  const hoje = U.hoje();
+  const linhas = []; for (let i = 0; i < 4000; i++) { const d = U.dia(-(i % 120)); const o = { id: `CON-9${String(i).padStart(4, '0')}`, titulo: 'Carga ' + i, status: ['IDEIA', 'RASCUNHO', 'EM PRODUÇÃO', 'EM REVISÃO', 'APROVADO', 'PUBLICADO'][i % 6], perfil: i % 2 ? '@evolucaopb' : '@geracaoevolucao', segmento: 'Ensino Médio', formato: 'Feed', publicacaoEm: d + 'T10:00', legenda: 'x'.repeat(200) }; linhas.push(`('conteudos','${o.id}','${JSON.stringify(o)}','x','x')`); }
+  sql(`INSERT INTO records(modulo,id,data,criado_em,atualizado_em) VALUES ${linhas.join(',')}`);
+  await G.post('/integrations/meta/token', { token: 'GOOD_TOKEN' });
+  const conta = (await G.get('/integrations/status')).instagram.igUserId;
+  const ps = []; for (let i = 0; i < 4000; i++) ps.push(`('${conta}','c${i}','${U.dia(-(i % 120))}T15:00:00+0000','${i % 3 ? 'FEED' : 'REELS'}','x',${i % 90},${i % 7},0,0,'https://i/${i}','x')`);
+  sql(`INSERT INTO ig_posts(conta,media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,permalink,atualizado_em) VALUES ${ps.join(',')}`);
+  const q = `de=${U.dia(-119)}&ate=${hoje}`;
+  for (const u of ['/data?module=conteudos', '/content/states', '/dashboard/resumo?' + q, '/instagram/visao?' + q, '/instagram/desempenho?dim=formato&' + q, '/instagram/desempenho?dim=horario&' + q, '/insights?' + q, '/search?q=Carga%201']) {
+    const t0 = Date.now(); const r = await G.req('GET', u); await r.text(); const ms = Date.now() - t0;
+    t(`${u.split('?')[0]}${u.includes('dim=') ? '?' + u.split('?')[1].split('&')[0] : ''} responde em até 3000 ms com 4.000 registros (${ms} ms)`, r.status === 200 && ms <= 3000);
+  }
+  fim();
+})().catch(e => { console.error(e); process.exit(1); });

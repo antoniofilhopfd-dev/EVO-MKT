@@ -1,10 +1,10 @@
 # EVO MKT
 
-Sistema web de gestão de marketing do Colégio Evolução, com portal de solicitações para as coordenações.
+Sistema web de gestão de marketing do Colégio Evolução, em cinco áreas: **Dashboard, Calendário, Instagram, Tráfego Pago (somente consulta) e Configurações**.
 
 - **Código:** `web/` (Next.js 16 + MySQL). Veja `web/README.md`.
 - **Publicação (Hostinger):** `web/docs/DEPLOY_HOSTINGER.md`.
-- **Auditoria e plano de finalização:** `web/docs/AUDITORIA_01.md`.
+- **Reestruturação v6:** `web/docs/AUDITORIA_V6.md` (ponto de partida) e `web/docs/RELATORIO_V6.md` (resultado, testes e capturas).
 - **Operação e recuperação:** `web/docs/` (backup, restauração, integrações).
 
 ## Histórico

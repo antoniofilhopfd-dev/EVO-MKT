@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { q, q1, run, withTx } from './db';
 import { notifyMail } from './mail';
-import { audit } from './records';
+import { audit, MODULES } from './records';
 import { envInt, fail, now, Row } from './util';
 
 export const BACKUP_FORMAT = 2;
@@ -14,16 +14,13 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   module_headers: { cols: ['modulo', 'headers'], restore: 'replace' },
   id_counters: { cols: ['modulo', 'n'], restore: 'counters' },
   used_ids: { cols: ['id'], restore: 'ignore' },
-  notices: { cols: ['id', 'data'], restore: 'replace' },
-  users: { cols: ['codigo', 'nome', 'role', 'label', 'admin', 'pass_hash', 'must_change', 'ativo', 'acesso_hmac', 'acesso_enc'], restore: 'replace' },
-  portal_users: { cols: ['codigo', 'nome', 'perfil', 'segmentos', 'pass_hash', 'must_change', 'ativo', 'acesso_hmac', 'acesso_enc'], restore: 'replace' },
+  users: { cols: ['codigo', 'nome', 'role', 'label', 'admin', 'pass_hash', 'must_change', 'ativo', 'acesso_hmac', 'acesso_enc', 'email'], restore: 'replace' },
   integration_settings: { cols: ['k', 'v'], restore: 'replace' },
   google_event_map: { cols: ['modulo', 'id', 'event_id', 'hash'], restore: 'replace' },
   ig_publish: { cols: ['conteudo_id', 'status', 'container_id', 'media_id', 'erro', 'quando'], restore: 'replace' },
   // tabelas acrescentadas depois do formato 2 original: backups mais antigos não as trazem (opt = ausência não é erro)
   status_history: { cols: ['id', 'modulo', 'registro', 'campo', 'de', 'para', 'ator', 'quando', 'motivo'], restore: 'replace', opt: true },
   notifications: { cols: ['id', 'quando', 'tipo', 'modulo', 'registro', 'destino', 'titulo', 'texto', 'lida'], restore: 'replace', opt: true },
-  approval_links: { cols: ['token_hash', 'solicitacao', 'criado_por', 'criado_em', 'expira_em', 'usado_em', 'decisao', 'aprovador'], restore: 'replace', opt: true },
   record_comments: { cols: ['id', 'modulo', 'registro', 'autor', 'autor_tipo', 'quando', 'texto', 'interno'], restore: 'replace', opt: true },
   record_checklist: { cols: ['id', 'modulo', 'registro', 'texto', 'feito', 'ordem', 'atualizado_em'], restore: 'replace', opt: true },
   ads_snapshots: { cols: ['id', 'conta', 'campanha_id', 'campanha', 'periodo', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'conversas', 'inicio', 'moeda', 'status', 'objetivo', 'orcamento_diario', 'atualizado_em'], restore: 'replace', opt: true },
@@ -92,7 +89,7 @@ export async function makeBackup(motivo = 'manual', opts: { completo?: boolean }
     if (!check.ok) throw new Error('Backup gerado não passou na verificação: ' + check.erros.join('; '));
     await run('INSERT INTO backups(nome,criado_em,conteudo) VALUES(?,?,?) ON DUPLICATE KEY UPDATE conteudo=VALUES(conteudo)', [nome, now(), gz]);
     const keep = envInt('BACKUP_KEEP', 30);
-    const old = await q<{ nome: string }>('SELECT nome FROM backups ORDER BY nome DESC LIMIT 1000 OFFSET ?', [keep]);
+    const old = await q<{ nome: string }>("SELECT nome FROM backups WHERE nome NOT LIKE '%legadov6%' AND nome NOT LIKE '%prereestruturacao%' ORDER BY nome DESC LIMIT 1000 OFFSET ?", [keep]); // os backups da reestruturação ficam guardados
     for (const o of old) await run('DELETE FROM backups WHERE nome=?', [o.nome]);
     await logBackup('criar', nome, 'OK', `${Object.entries(resumo).map(([k, v]) => `${k}:${v}`).join(' ')} · ${(gz.length / 1024).toFixed(0)} KB${dump.anexosIncompletos ? ' · anexos acima do limite: não incluídos' : ''}`);
     return nome;
@@ -188,14 +185,18 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
     await logBackup('restaurar', nome, 'ERRO', 'recusado: ' + v.erros.join('; '));
     fail(400, 'Backup inválido, restauração recusada: ' + v.erros.join(' '));
   }
-  const seguranca = await makeBackup('prerestauracao', { completo: false });
   const dump = JSON.parse(gunzipSync(gz).toString('utf8'));
+  if (dump.somenteLegado) {
+    await logBackup('restaurar', nome, 'ERRO', 'recusado: arquivo só de consulta');
+    fail(400, 'Este arquivo guarda apenas os dados dos módulos removidos (consulta) e não pode ser restaurado.');
+  }
+  const seguranca = await makeBackup('prerestauracao', { completo: false });
   const restaurado: Record<string, number> = {};
   try {
     await withTx(async (c) => {
       const legado = !dump.tabelas;
       const T: Record<string, Row[]> = legado
-        ? { records: dump.records, module_headers: dump.headers, id_counters: dump.counters, used_ids: dump.used_ids, notices: dump.notices }
+        ? { records: dump.records, module_headers: dump.headers, id_counters: dump.counters, used_ids: dump.used_ids }
         : dump.tabelas;
       const [cur] = await c.query('SELECT modulo,n FROM id_counters');
       const maxCur: Record<string, number> = {};
@@ -204,7 +205,7 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
         const rows = T[t];
         if (!Array.isArray(rows) || spec.restore === 'info') continue;
         // backups anteriores à separação Administrador × Gerente não têm "admin": toda Gerente daquela época vira Administradora
-        const data = rows.map((r) => spec.cols.map((k) => (k === 'admin' && t === 'users' && r.admin === undefined ? (r.role === 'manager' ? 1 : 0) : r[k] === undefined ? null : r[k])));
+        const data = rows.map((r) => spec.cols.map((k) => (k === 'admin' && t === 'users' && r.admin === undefined ? (r.role === 'manager' ? 1 : 0) : r[k] === undefined ? (k === 'email' ? '' : null) : r[k])));
         if (spec.restore === 'replace') {
           await c.query(`DELETE FROM ${t}`);
           await insertChunks(c, t, spec.cols, data);
@@ -229,8 +230,11 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
         const [ex] = await c.query("SELECT 1 FROM users WHERE codigo=? AND role='manager' AND ativo=1", [ator]);
         if ((ex as Row[]).length) await c.query('DELETE FROM sessions WHERE NOT (tipo=? AND codigo=?)', ['int', ator]);
         else await c.query('DELETE FROM sessions');
-        await c.query('DELETE FROM trusted_devices WHERE codigo NOT IN (SELECT codigo FROM users UNION SELECT codigo FROM portal_users)');
+        await c.query('DELETE FROM trusted_devices WHERE codigo NOT IN (SELECT codigo FROM users)');
       }
+      // backups de versões anteriores trazem registros de módulos que não existem mais: não voltam ao sistema
+      const mods = Object.keys(MODULES);
+      await c.query(`DELETE FROM records WHERE modulo NOT IN (${mods.map(() => '?').join(',')})`, mods);
     });
   } catch (e: any) {
     await logBackup('restaurar', nome, 'ERRO', 'falhou e foi desfeito: ' + String(e?.message ?? e));

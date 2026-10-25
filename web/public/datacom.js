@@ -1,6 +1,5 @@
-/* Datas Comemorativas: terceiro calendário (independente do de Marketing e do Escolar), sobre o mesmo motor CalMotor.
-   As datas do catálogo e as regras (fixas e móveis) são calculadas no servidor para o ano escolhido; nada é copiado ano a ano.
-   A equipe marca quais datas são relevantes, cadastra as suas e, se quiser, cria uma ação no Planejamento ou uma solicitação. */
+/* Camada "Datas comemorativas" do Calendário. As datas do catálogo e as regras (fixas e móveis) são calculadas no servidor para o ano;
+   nada é copiado ano a ano. A equipe marca quais são relevantes, cadastra as suas e, se quiser, cria uma publicação a partir da data. */
 const DC_GLIFOS={FERIADO_NACIONAL:'⚑',FERIADO_ESTADUAL_PB:'⚐',FERIADO_MUNICIPAL_JP:'⌂',EDUCACIONAL:'✎',CULTURAL:'★',RELIGIOSA:'✚',PROFISSIONAL:'⚒',AMBIENTAL:'❀',SAUDE:'♥',INSTITUCIONAL:'▣'};
 const DC_PADRAO=Object.keys(DC_GLIFOS);
 const DC_MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -23,10 +22,7 @@ const dcChips=r=>`<span class="dc-chip ${dcClasse(r.categoria)}">${esc(dcNomeCat
 /* ---------- detalhe da data ---------- */
 async function dcAbrir(it){
  const r=it.raw;
- let equipe=[];try{equipe=((await getRows('equipe')).rows||[]).map(x=>x.titulo).filter(Boolean)}catch{}
- const gerente=DC.eu.role==='manager';
  const pend=r.status==='pendente';
- const vs=r.vinculos.solicitacoes,vp=r.vinculos.planejamento;
  const o=adminOverlay(`<div class="dc-det"><h3>${esc(r.nome)}</h3>
   <div class="dc-chips">${dcChips(r)}</div>
   <dl class="dc-dl"><dt>Data</dt><dd>${esc(dcBr(r.data))}${r.fim&&r.fim!==r.data?' a '+esc(dcBr(r.fim)):''}</dd><dt>Regra</dt><dd>${esc(r.regra)}${r.repeteAnual?' · repete todo ano':''}</dd>
@@ -34,38 +30,17 @@ async function dcAbrir(it){
   ${pend?'<p class="dc-aviso" role="note">Esta data ainda não foi confirmada em fonte oficial; por isso não é tratada como feriado e não permite criar ações. Valide-a antes de usar.</p>':''}
   <section><h4>Relevância para o marketing</h4><div class="dc-seg" role="group" aria-label="Relevância"><button type="button" data-rel="SIM" class="${r.relevante==='SIM'?'on':''}" aria-pressed="${r.relevante==='SIM'}">Relevante</button><button type="button" data-rel="NAO" class="${r.relevante==='NAO'?'on':''}" aria-pressed="${r.relevante==='NAO'}">Não relevante</button>${r.origem==='catalogo'&&r.relevanteAjustado?'<button type="button" data-rel="">Voltar ao padrão</button>':''}</div>
    <label class="dc-obs">Observações da equipe<textarea class="control" id="dcObs" rows="2" maxlength="1000">${esc(r.observacoes||'')}</textarea></label><button type="button" class="softbtn" id="dcObsSalvar">Salvar observações</button></section>
-  <div class="actions">${r.origem==='personalizada'&&r.editavel?'<button type="button" class="btn soft" id="dcEditar">Editar</button><button type="button" class="btn danger-soft" id="dcExcluir">Excluir</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Fechar</button></div></div>`);
- const f=o.el,recarrega=async()=>{await DC_CAL.recarregar()};
+  <div class="actions">${pend?'':'<button type="button" class="btn" id="dcPub">Criar publicação desta data</button>'}${r.origem==='personalizada'&&r.editavel?'<button type="button" class="btn soft" id="dcEditar">Editar</button><button type="button" class="btn danger-soft" id="dcExcluir">Excluir</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Fechar</button></div></div>`);
+ const f=o.el,recarrega=async()=>{await CAL_UNICO.recarregar()};
  f.querySelectorAll('[data-rel]').forEach(b=>b.onclick=async()=>{try{await dcPost('/datacom/relevancia',{id:r.id,relevante:b.dataset.rel});o.close();toast('Relevância atualizada');await recarrega()}catch(e){toast(e.message,'warn')}});
  $('#dcObsSalvar',f).onclick=async()=>{try{await dcPost('/datacom/relevancia',{id:r.id,relevante:r.relevanteAjustado||r.origem==='personalizada'?r.relevante:'',observacoes:$('#dcObs',f).value});toast('Observações salvas');await recarrega()}catch(e){toast(e.message,'warn')}};
+ $('#dcPub',f)&&($('#dcPub',f).onclick=()=>{o.close();calCriarPublicacao('datacom',r.id,r.data,r.nome)});
  $('#dcEditar',f)&&($('#dcEditar',f).onclick=()=>{o.close();dcForm(r)});
  $('#dcExcluir',f)&&($('#dcExcluir',f).onclick=async()=>{
-  if(!confirm(`Excluir "${r.nome}"? Ela vai para a Lixeira e pode ser restaurada. Ações e solicitações já criadas continuam.`))return;
-  try{await dcPost('/datacom/excluir',{id:r.id});o.close();toast('Data movida para a Lixeira');await recarrega()}catch(e){toast(e.message,'warn')}
+  if(!await Dlg.confirmar({titulo:'Excluir data',texto:`Excluir "${r.nome}"? As publicações criadas a partir dela continuam.`,confirmar:'Excluir',perigo:true}))return;
+  try{await dcPost('/datacom/excluir',{id:r.id});o.close();toast('Data excluída');await recarrega()}catch(e){toast(e.message,'warn')}
  });
 }
-/* mini-formulário das duas ações opcionais */
-function dcAcao(r,tipo,equipe,gerente,pai){
- const plan=tipo==='planejar';
- const o=adminOverlay(`<h3>${plan?'Criar ação no Planejamento':'Criar solicitação'}</h3><p class="kpi-note">${esc(r.nome)} · ${esc(dcBr(r.data))}</p>
-  <form id="dcAc" class="cm-form" novalidate>
-   <label class="wide">${plan?'Ação planejada':'O que solicitar'}<input class="control" id="aTexto" maxlength="120" value="${attr(plan?`Ação para ${r.nome}`:'Produzir arte para o Instagram')}" autocomplete="off"></label>
-   <label>Prazo ${plan?'':'(opcional)'}<input class="control" type="date" id="aPrazo" value="${plan?attr(r.data):''}"></label>
-   ${gerente?`<label>Responsável (opcional)<select class="control" id="aResp"><option value="">A definir</option>${equipe.map(n=>`<option>${esc(n)}</option>`).join('')}</select></label>`:''}
-   <label class="wide">Observação (opcional)<textarea class="control" id="aObs" rows="2" maxlength="500"></textarea></label>
-   <div class="cm-erro wide" id="aErro" role="alert"></div>
-   <div class="actions wide"><button type="button" class="btn soft" data-close>Voltar</button><button type="submit" class="btn" id="aOk">${plan?'Criar ação':'Criar solicitação'}</button></div></form>`);
- $('#aTexto',o.el).focus();
- $('#dcAc',o.el).onsubmit=async ev=>{
-  ev.preventDefault();$('#aOk',o.el).disabled=true;
-  try{
-   const base={id:r.id,data:r.data,prazo:$('#aPrazo',o.el).value,responsavel:$('#aResp',o.el)?.value||'',observacao:$('#aObs',o.el).value};
-   const x=plan?await dcPost('/datacom/planejar',{...base,acao:$('#aTexto',o.el).value}):await dcPost('/datacom/solicitar',{...base,texto:$('#aTexto',o.el).value});
-   invalidate(plan?'projetos':'solicitacoes');o.close();pai&&pai.close();toast(plan?`Ação ${x.id} criada no Planejamento`:`Solicitação ${x.id} criada`);await DC_CAL.recarregar();
-  }catch(e){$('#aErro',o.el).textContent=e.message;$('#aOk',o.el).disabled=false}
- };
-}
-
 /* ---------- cadastro e edição de datas da equipe ---------- */
 function dcForm(r,dataIso=''){
  const edit=!!r,rd=edit?(r.regraDados||{}):{};
@@ -101,22 +76,8 @@ function dcForm(r,dataIso=''){
    const t=$('#fTipo',f).value;
    const regra=t==='fixa'?{tipo:t,dia:$('#fDia',f).value,mes:$('#fMesFixa',f).value}:t==='nesimo'?{tipo:t,n:$('#fN',f).value,diaSemana:$('#fSem',f).value,mes:$('#fMesN',f).value}:t==='pascoa'?{tipo:t,offset:$('#fOff',f).value}:{tipo:t,mes:$('#fMesM',f).value};
    await dcPost('/datacom/salvar',{id:edit?r.id:'',nome:$('#fNome',f).value,categoria:cat,regra,repeteAnual:$('#fRep',f).checked?'SIM':'NAO',ano:$('#fAno',f).value,relevante:$('#fRel',f).value,descricao:$('#fDesc',f).value,observacoes:$('#fObs',f).value});
-   o.close();toast(edit?'Data atualizada':'Data cadastrada');await DC_CAL.recarregar();
+   o.close();toast(edit?'Data atualizada':'Data cadastrada');await CAL_UNICO.recarregar();
   }catch(e){err.textContent=e.message;btn.disabled=false}
  };
 }
 
-const DC_CAL=CalMotor.criar({
- chave:'datacom',tituloPagina:'Datas Comemorativas',eyebrow:'PLANEJAMENTO',rotuloNovo:'+ Nova data',
- descricao:'Feriados e datas relevantes ao marketing escolar, calculadas para cada ano. Marque as que a equipe quer trabalhar; datas ainda não confirmadas ficam em “Pendentes de validação”.',
- tipos:[],carregar:dcCarregar,novo:d=>dcForm(null,d),abrir:dcAbrir,
- modos:[['month','Mês'],['year','Ano'],['list','Lista']],modoPadrao:'month',porAno:true,listaEscopo:'ano',busca:true,filtroResponsavel:false,
- filtrosExtras:[
-  {chave:'grupo',vazio:'Todas as datas',opcoes:()=>[['feriados','Feriados'],['educacionais','Datas educacionais']],testa:(i,v)=>!v||(v==='feriados'?DC.grupoFeriados.includes(i.raw.categoria):i.raw.categoria==='EDUCACIONAL')},
-  {chave:'validacao',vazio:'Confirmadas',opcoes:()=>[['pendentes','Pendentes de validação'],['todas','Todas (inclui pendentes)']],testa:(i,v)=>v==='todas'||(v==='pendentes'?i.raw.status==='pendente':i.raw.status==='confirmada')},
- ],
- alternancias:[{chave:'relevantes',rotulo:'Somente datas relevantes',testa:i=>i.raw.relevante==='SIM'}],
- classeDia:lista=>lista.some(i=>DC.grupoFeriados.includes(i.raw.categoria)&&i.raw.status==='confirmada')?'feriado':'',
- detalhe:i=>i.raw.regra,
-});
-async function renderDatacom(){return DC_CAL.render()}

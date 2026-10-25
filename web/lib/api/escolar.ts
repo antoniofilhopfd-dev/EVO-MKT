@@ -1,37 +1,21 @@
 import { Ctx } from '../ctx';
 import { requireInternal, requireManager } from '../auth';
-import { audit, getRow, insertRow, listRows, modifyRow, trashRow } from '../records';
+import { audit, deleteRow, getRow, insertRow, listRows, modifyRow } from '../records';
+import { SEGMENTOS } from '../segmentos';
 import { addDays, fail, fmtDate, lower, now, parseLocal, Row, strv } from '../util';
 import { json } from './handlers';
-import { criarSolicitacaoInterna } from './solicitacoes';
 
 /**
  * Calendário Escolar: eventos e atividades OFICIAIS do Colégio. Módulo próprio (`calescolar`), separado do Calendário de Marketing
  * e do futuro Calendário de Datas Comemorativas. Nenhum evento é criado pelo sistema: o calendário oficial é cadastrado pela Gerência.
  * Consulta: toda a equipe. Cadastro, edição, reagendamento e exclusão: só a Gerência/Administração.
  */
-export const SEGMENTOS_ESCOLARES: [string, string][] = [
-  ['TODOS', 'Toda a escola'],
-  ['INFANTIL', 'Educação Infantil — Maternais e Jardins'],
-  ['ANO1', '1º ano'],
-  ['FUND1', 'Ensino Fundamental (2º ao 5º ano)'],
-  ['FUND2', 'Ensino Fundamental — Anos Finais (6º ao 9º ano)'],
-  ['MEDIO', 'Ensino Médio (1ª à 3ª série)'],
-  ['ADMIN', 'Administrativo'],
-  ['DIRECAO', 'Direção'],
-];
+export const SEGMENTOS_ESCOLARES: [string, string][] = SEGMENTOS;
 export const TIPOS_ESCOLARES: [string, string][] = [
   ['EVENTO', 'Evento escolar'], ['PROVA', 'Prova / avaliação'], ['PROJETO', 'Projeto pedagógico'], ['PASSEIO', 'Passeio / excursão'],
   ['REUNIAO_PAIS', 'Reunião de pais'], ['ESPORTIVA', 'Atividade esportiva'], ['CULTURAL', 'Apresentação cultural'],
   ['SOLENIDADE', 'Formatura / solenidade'], ['INSTITUCIONAL', 'Atividade institucional'], ['OUTRO', 'Outra atividade oficial'],
 ];
-/** Segmento do módulo Solicitações correspondente (as que não têm correspondente ficam sem segmento). */
-const SEGMENTO_SOLICITACAO: Record<string, string> = { INFANTIL: 'Infantil', ANO1: 'Anos Iniciais', FUND1: 'Anos Iniciais', FUND2: 'Anos Finais', MEDIO: 'Ensino Médio' };
-const ACOES: Record<string, { rotulo: string; antecedenciaDias: number }> = {
-  cobertura_foto: { rotulo: 'Cobertura fotográfica', antecedenciaDias: 0 },
-  video: { rotulo: 'Produção de vídeo', antecedenciaDias: 0 },
-  arte: { rotulo: 'Arte de divulgação', antecedenciaDias: 7 },
-};
 const MAX_DIAS = 120;
 
 const dataValida = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && fmtDate(parseLocal(s + 'T12:00:00')) === s;
@@ -81,13 +65,12 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
 
   if (path === '/escolar/painel' && method === 'GET') {
-    const acoes = (await listRows('projetos')).filter((p) => strv(p.eventoEscolarId));
-    const sols = (await listRows('solicitacoes')).filter((s) => strv(s.eventoEscolarId));
+    const pubs = (await listRows('conteudos')).filter((p) => strv(p.origemTipo) === 'calescolar');
     const vinc: Record<string, Row[]> = {};
-    for (const s of sols) (vinc[String(s.eventoEscolarId)] ??= []).push({ id: s.id, titulo: s.titulo, acao: s.eventoEscolarAcao, status: s.status });
+    for (const p of pubs) (vinc[String(p.origemId)] ??= []).push({ id: p.id, titulo: p.titulo, status: p.status });
     return json({
-      rows: (await listRows('calescolar')).map((e) => ({ ...e, solicitacoes: vinc[String(e.id)] ?? [], acoes: acoes.filter((p) => strv(p.eventoEscolarId) === String(e.id)).map((p) => ({ id: p.id, titulo: p.titulo, status: p.status })) })),
-      opcoes: { segmentos: SEGMENTOS_ESCOLARES, tipos: TIPOS_ESCOLARES, acoes: Object.entries(ACOES).map(([k, v]) => [k, v.rotulo]) },
+      rows: (await listRows('calescolar')).map((e) => ({ ...e, publicacoes: vinc[String(e.id)] ?? [] })),
+      opcoes: { segmentos: SEGMENTOS_ESCOLARES, tipos: TIPOS_ESCOLARES },
       eu: { nome: u.nome, role: u.role }, podeEditar: true, hoje: fmtDate(new Date()),
     });
   }
@@ -126,38 +109,32 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
     await requireInternal(c);
     const id = strv((await c.body()).id);
     const r0 = (await getRow('calescolar', id)) ?? fail(404, 'Evento não encontrado.');
-    // as ações de Planejamento e as solicitações ligadas a este evento continuam; só perdem o vínculo (guardam título e data para histórico)
+    // as publicações criadas a partir deste evento continuam; só perdem o vínculo (guardam título e data para histórico)
     let soltos = 0;
-    for (const mod of ['projetos', 'solicitacoes']) {
-      for (const x of await listRows(mod)) if (strv(x.eventoEscolarId) === id) { await modifyRow(mod, String(x.id), (y) => ({ ...y, eventoEscolarId: '', eventoEscolarTitulo: strv(y.eventoEscolarTitulo) || strv(r0.titulo), eventoEscolarData: strv(y.eventoEscolarData) || strv(r0.dataInicio), atualizadoEm: now() })); soltos++; }
+    for (const x of await listRows('conteudos')) {
+      if (strv(x.origemTipo) === 'calescolar' && strv(x.origemId) === id) { await modifyRow('conteudos', String(x.id), (y) => ({ ...y, origemId: '', origemNome: strv(y.origemNome) || strv(r0.titulo), atualizadoEm: now() })); soltos++; }
     }
-    await trashRow('calescolar', id, u.codigo); // vai para a Lixeira, de onde pode ser restaurado
+    await deleteRow('calescolar', id, u.codigo);
     return json({ ok: true, vinculosDesfeitos: soltos });
   }
 
-  // Pedido opcional ao Marketing a partir de um evento: nunca é automático e fica ligado ao evento de origem.
-  if (path === '/escolar/solicitar' && method === 'POST') {
+  // Nova publicação a partir de um evento escolar: cria um Conteúdo (IDEIA) com título, data e origem; nunca é automático.
+  if (path === '/escolar/publicacao' && method === 'POST') {
     const b = await c.body();
     const ev = (await getRow('calescolar', strv(b.id))) ?? fail(404, 'Evento não encontrado.');
-    const acao = strv(b.acao);
-    const a = ACOES[acao] ?? fail(400, 'Escolha o que solicitar: cobertura fotográfica, vídeo ou arte de divulgação.');
-    const hoje = fmtDate(new Date());
-    if (String(ev.dataFim || ev.dataInicio) < hoje) fail(409, 'Este evento já passou.');
-    for (const s of await listRows('solicitacoes')) {
-      if (strv(s.eventoEscolarId) === String(ev.id) && strv(s.eventoEscolarAcao) === acao && !['CONCLUÍDA', 'CANCELADA'].includes(strv(s.status).toUpperCase()))
-        fail(409, `Já existe um pedido de ${a.rotulo.toLowerCase()} para este evento (${s.id}).`);
+    const titulo = (strv(b.titulo).trim() || `Publicação: ${ev.titulo}`).slice(0, 140);
+    if (titulo.length < 3) fail(400, 'Dê um título à publicação.');
+    for (const p of await listRows('conteudos')) {
+      if (strv(p.origemTipo) === 'calescolar' && strv(p.origemId) === String(ev.id) && lower(strv(p.titulo)) === lower(titulo)) fail(409, `Essa publicação já existe (${p.id}).`);
     }
-    let prazo = strv(b.prazo).trim();
-    if (prazo && !dataValida(prazo)) fail(400, 'Prazo inválido.');
-    if (!prazo) { const p = soDias(String(ev.dataInicio), -a.antecedenciaDias); prazo = p < hoje ? hoje : p; }
     const segs = listaSeg(ev.segmentos);
-    const segmento = segs.length === 1 ? SEGMENTO_SOLICITACAO[segs[0]] ?? '' : '';
-    const quando = `${String(ev.dataInicio).split('-').reverse().join('/')}${ev.dataFim && ev.dataFim !== ev.dataInicio ? ' a ' + String(ev.dataFim).split('-').reverse().join('/') : ''}${ev.horaInicio ? ', ' + ev.horaInicio + (ev.horaFim ? '–' + ev.horaFim : '') : ''}`;
-    const linhas = [`Evento escolar: ${ev.titulo}`, `Quando: ${quando}`, ev.local ? `Local: ${ev.local}` : '', `Público: ${segs.map((s) => rotulo(SEGMENTOS_ESCOLARES, s)).join(', ')}`, strv(b.observacao).trim() ? `Observação: ${strv(b.observacao).trim()}` : ''].filter(Boolean);
-    const nova = await criarSolicitacaoInterna(u, { titulo: `${a.rotulo} — ${ev.titulo}`, descricao: linhas.join('\n'), segmento, prazo, prioridade: 'MÉDIA', solicitante: String(u.nome) },
-      { eventoEscolarId: String(ev.id), eventoEscolarTitulo: strv(ev.titulo), eventoEscolarData: strv(ev.dataInicio), eventoEscolarAcao: acao });
-    await audit(String(u.codigo), 'solicitar-do-evento', 'calescolar', String(ev.id));
-    return json(nova, 201);
+    const novo = await insertRow('conteudos', {
+      titulo, status: 'IDEIA', canal: 'Instagram', publicacaoEm: strv(ev.dataInicio), segmento: segs.length === 1 ? rotulo(SEGMENTOS_ESCOLARES, segs[0]) : 'Todos',
+      mensagem: `Evento escolar: ${ev.titulo} (${String(ev.dataInicio).split('-').reverse().join('/')}).`,
+      origemTipo: 'calescolar', origemId: String(ev.id), origemData: strv(ev.dataInicio), origemNome: strv(ev.titulo), responsavel: strv(b.responsavel).trim(),
+    }, u.codigo);
+    await audit(String(u.codigo), 'publicacao-do-evento', 'calescolar', String(ev.id));
+    return json(novo, 201);
   }
 
   return fail(404, 'Rota não encontrada.');

@@ -12,9 +12,9 @@ const mails=()=>MAILLOG&&fs.existsSync(MAILLOG)?fs.readFileSync(MAILLOG,'utf8'):
  // ---- Gerente entra com senha e liga o modo por código ----
  const GJ={};r=await call('/auth/login',{m:'POST',b:{codigo:'NAT-3301',senha:pw('NAT-3301')},jarOut:GJ});t('Gerente entra com senha (modo atual)',r.s===200);
  r=await call('/admin/mode',{m:'POST',cookies:GJ,b:{modo:'codigo'}});const codes=r.j.codigos||[];
- t('liga o modo e gera 10 códigos (5 equipe + 5 portal)',r.s===200&&codes.length===10&&codes.filter(c=>c.tipo==='portal').length===5,r.j);
+ t('liga o modo e gera 5 códigos (a equipe de Marketing)',r.s===200&&codes.length===5&&codes.every(c=>c.tipo==='interno'),r.j);
  t('códigos têm 2 letras (sem I/O) + 4 números',codes.every(c=>/^[A-HJ-NP-Z]{2}[0-9]{4}$/.test(c.acesso)));
- t('códigos são únicos e sem sequências óbvias',new Set(codes.map(c=>c.acesso)).size===10&&codes.every(c=>!/(\d)\1{3}/.test(c.acesso)&&!/1234|4321|0000/.test(c.acesso)));
+ t('códigos são únicos e sem sequências óbvias',new Set(codes.map(c=>c.acesso)).size===5&&codes.every(c=>!/(\d)\1{3}/.test(c.acesso)&&!/1234|4321|0000/.test(c.acesso)));
  const C={};codes.forEach(c=>C[c.codigo]=c.acesso);
  r=await call('/auth/mode');t('modo público informa "codigo"',r.j.modo==='codigo');
  r=await call('/admin/users',{cookies:GJ});t('lista de acessos mostra o código de cada pessoa à Gerente',r.j.find(x=>x.codigo==='ANT-3302').acesso===C['ANT-3302']);
@@ -29,8 +29,8 @@ const mails=()=>MAILLOG&&fs.existsSync(MAILLOG)?fs.readFileSync(MAILLOG,'utf8'):
  if(MAILLOG)t('mesmo aparelho: não envia novo alerta',(mails().match(/Novo acesso/g)||[]).length===n1);
  const GJ2={};r=await call('/auth/login',{m:'POST',b:{codigo:C['NAT-3301']},jarOut:GJ2});t('Gerente entra só com o código, sem pedir senha nem troca de senha',r.s===200&&r.j.mustChange===false);
  // ---- o sistema nunca pede senha nas ações da Gerente ----
- r=await call('/admin/user-active',{m:'POST',cookies:GJ2,b:{tipo:'portal',codigo:'MED-2604',ativo:false}});t('desativar acesso funciona sem senha',r.s===200);
- await call('/admin/user-active',{m:'POST',cookies:GJ2,b:{tipo:'portal',codigo:'MED-2604',ativo:true}});
+ r=await call('/admin/user-active',{m:'POST',cookies:GJ2,b:{tipo:'interno',codigo:'EDU-3305',ativo:false}});t('desativar acesso funciona sem senha',r.s===200);
+ await call('/admin/user-active',{m:'POST',cookies:GJ2,b:{tipo:'interno',codigo:'EDU-3305',ativo:true}});
  r=await call('/integrations/settings',{m:'POST',cookies:GJ2,b:{meta_app_id:'X'}});t('salvar credenciais de integração funciona sem senha',r.s===200);
  r=await call('/admin/mode',{m:'POST',cookies:AJ,b:{modo:'senha',senhaAdmin:'x'}});t('Equipe não muda o modo de acesso',r.s===403);
  r=await call('/admin/reset-password',{m:'POST',cookies:GJ2,b:{tipo:'interno',codigo:'ANT-3302',senhaAdmin:pw('NAT-3301')}});const novo=r.j.senhaTemporaria;
@@ -39,11 +39,8 @@ const mails=()=>MAILLOG&&fs.existsSync(MAILLOG)?fs.readFileSync(MAILLOG,'utf8'):
  r=await call('/auth/login',{m:'POST',b:{codigo:C['ANT-3302']},cookies:{evo_dev:AJ.evo_dev}});t('aparelhos antigos da pessoa são removidos ao gerar novo código',r.s===401);
  r=await call('/auth/me',{cookies:AJ});t('sessão aberta com o código antigo é encerrada',r.s===401);
  const ND={};r=await call('/auth/login',{m:'POST',b:{codigo:novo},jarOut:ND});t('código novo funciona',r.s===200&&!!ND.evo_dev);
- // ---- Portal só com código + isolamento ----
- const PJ={};r=await call('/portal/login',{m:'POST',b:{codigo:C['INF-2601']},jarOut:PJ});const PT=r.j.token;t('Portal entra só com o código',r.s===200&&!!PT&&r.j.user.segmentos[0]==='Infantil');
- r=await call('/portal/requests',{m:'POST',pt:PT,b:{titulo:'Teste código',objetivo:'x',segmento:'Infantil',prioridade:'NORMAL'}});t('Portal cria demanda',r.s===201);
- r=await call('/portal/login',{m:'POST',b:{codigo:C['MED-2604']}});r=await call('/portal/requests',{pt:r.j.token});t('isolamento por segmento continua valendo',r.s===200&&r.j.rows.length===0);
- r=await call('/data?module=tarefas',{pt:PT});t('Portal continua sem acesso a áreas internas',r.s===401||r.s===403);
+ // ---- não existe mais Portal ----
+ r=await call('/portal/login',{m:'POST',b:{codigo:'XX0000'}});t('/portal/login não existe mais (404)',r.s===404);
  // ---- proteção contra adivinhação ----
  r=await call('/auth/login',{m:'POST',b:{codigo:'ZZ9999'}});t('código inexistente = erro genérico',r.s===401&&/Código inválido/.test(r.j.error));
  r=await call('/auth/login',{m:'POST',b:{codigo:'abc'}});t('formato inválido = mesmo erro (não revela regra)',r.s===401&&/Código inválido/.test(r.j.error));

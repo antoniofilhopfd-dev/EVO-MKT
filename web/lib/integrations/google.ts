@@ -1,12 +1,12 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { q, q1, run } from '../db';
-import { getRow, headersOf, insertRow, listRows, MODULES, updateRow } from '../records';
+import { createHash } from 'node:crypto';
+import { q, run } from '../db';
+import { getRow, insertRow, listRows, updateRow } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { addDays, env, fmtDate, fmtDateTimeLocal, now, parseLocal, Row } from '../util';
 import { httpCall, httpOk, publicUrl, qsOf, signState } from './http';
 
 const gUrl = (key: string, def: string) => env(key, def).replace(/\/+$/, '');
-const tz = () => env('TIMEZONE', 'America/Recife');
+const tz = () => env('TIMEZONE', 'America/Fortaleza');
 const md5 = (o: unknown) => createHash('md5').update(JSON.stringify(o)).digest('hex');
 const FORM = { 'Content-Type': 'application/x-www-form-urlencoded' };
 
@@ -17,7 +17,7 @@ export async function gConnectUrl(): Promise<string> {
   if (!(await setting('g_client_id')) || !(await setting('g_client_secret'))) throw new Error('Informe o Client ID e o Client Secret do Google primeiro.');
   return `${gUrl('GOOGLE_AUTH_URL', 'https://accounts.google.com/o/oauth2/v2/auth')}?${qsOf({
     client_id: await setting('g_client_id'), redirect_uri: publicUrl() + '/api/integrations/google/callback', response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets openid email',
+    scope: 'https://www.googleapis.com/auth/calendar openid email',
     access_type: 'offline', prompt: 'consent', state: signState('google'),
   })}`;
 }
@@ -50,8 +50,8 @@ async function gToken(): Promise<string> {
   await setSetting('g_access_expira', String(Math.floor(Date.now() / 1000) + Number(j.expires_in ?? 3000)));
   return String(j.access_token);
 }
-async function gApi(method: string, path: string, body: any = null, svc: 'api' | 'sheets' | 'upload' = 'api', extra: Record<string, string> = {}): Promise<Row> {
-  const base = svc === 'sheets' ? gUrl('GOOGLE_SHEETS_BASE', 'https://sheets.googleapis.com') : gUrl('GOOGLE_API_BASE', 'https://www.googleapis.com');
+async function gApi(method: string, path: string, body: any = null, extra: Record<string, string> = {}): Promise<Row> {
+  const base = gUrl('GOOGLE_API_BASE', 'https://www.googleapis.com');
   const h: Record<string, string> = { Authorization: 'Bearer ' + (await gToken()), ...extra };
   let payload: BodyInit | null = null;
   if (body !== null) {
@@ -64,7 +64,7 @@ async function gApi(method: string, path: string, body: any = null, svc: 'api' |
 }
 
 // ---------- Agenda ----------
-export const GCAL_MODULES = ['agenda', 'calendario', 'eventos', 'conteudos', 'tarefas', 'campanhas'];
+export const GCAL_MODULES = ['calendario', 'conteudos'];
 async function gCalendarId(): Promise<string> {
   const id = await setting('g_calendar_id');
   if (!id) throw new Error('Escolha a agenda do Google em Administração → Integrações (o sistema não cria agenda sozinho).');
@@ -76,6 +76,40 @@ export async function gCalendarList(): Promise<Row[]> {
   const atual = await setting('g_calendar_id');
   return (r.items ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.summaryOverride || i.summary || i.id), principal: !!i.primary, atual: String(i.id) === atual }));
 }
+/** Todas as agendas visíveis na conta (inclusive as só de leitura): para escolher quais aparecem no Calendário sem permitir edição. */
+export async function gCalendarListTodas(): Promise<Row[]> {
+  const r = await gApi('GET', '/calendar/v3/users/me/calendarList?maxResults=250');
+  let leitura: string[] = []; try { leitura = JSON.parse((await setting('g_leitura')) || '[]'); } catch { /* vazio */ }
+  const escrita = await setting('g_calendar_id');
+  return (r.items ?? []).map((i: Row) => ({ id: String(i.id), nome: String(i.summaryOverride || i.summary || i.id), papel: String(i.accessRole ?? ''), gravavel: ['owner', 'writer'].includes(String(i.accessRole ?? '')), usadaParaEscrita: String(i.id) === escrita, mostrar: leitura.includes(String(i.id)) }));
+}
+export async function gLeituraSalvar(ids: string[]): Promise<void> {
+  const todas = await gCalendarListTodas();
+  const ok = ids.filter((id) => todas.some((c) => c.id === id) && id !== (todas.find((c) => c.usadaParaEscrita)?.id));
+  await setSetting('g_leitura', JSON.stringify(ok.slice(0, 10)));
+}
+const cacheLeitura = new Map<string, { em: number; itens: Row[] }>();
+/** Eventos das agendas marcadas como "somente leitura": nunca são gravados no EVO MKT nem enviados de volta ao Google. */
+export async function gEventosLeitura(de: string, ate: string): Promise<Row[]> {
+  let ids: string[] = []; try { ids = JSON.parse((await setting('g_leitura')) || '[]'); } catch { /* vazio */ }
+  if (!ids.length || !(await gConnected())) return [];
+  const chave = `${de}|${ate}|${ids.join(',')}`;
+  const c = cacheLeitura.get(chave);
+  if (c && Date.now() - c.em < 300000) return c.itens;
+  const nomes = new Map((await gCalendarListTodas()).map((x) => [x.id, x.nome]));
+  const itens: Row[] = [];
+  for (const id of ids) {
+    const r = await gApi('GET', `/calendar/v3/calendars/${encodeURIComponent(id)}/events?` + qsOf({ maxResults: 250, singleEvents: 'true', orderBy: 'startTime', timeMin: `${de}T00:00:00-03:00`, timeMax: `${ate}T23:59:59-03:00` }));
+    for (const ev of (r.items ?? []) as Row[]) {
+      if (ev.status === 'cancelled' || !ev.start) continue;
+      const dia = String(ev.start.date ?? ev.start.dateTime ?? '').slice(0, 10);
+      const fimBruto = ev.end?.date ? fmtDate(addDays(parseLocal(String(ev.end.date) + 'T12:00:00'), -1)) : String(ev.end?.dateTime ?? '').slice(0, 10);
+      itens.push({ uid: `gl:${id}:${ev.id}`, titulo: String(ev.summary ?? '(sem título)'), data: dia, fim: fimBruto > dia ? fimBruto : '', hora: ev.start.dateTime ? String(ev.start.dateTime).slice(11, 16) : '', agenda: nomes.get(id) ?? id, descricao: String(ev.description ?? '').slice(0, 500), local: String(ev.location ?? '') });
+    }
+  }
+  cacheLeitura.set(chave, { em: Date.now(), itens });
+  return itens;
+}
 /** Passa a usar uma agenda existente. Vazio = desliga a sincronização da Agenda. */
 export async function gCalendarChoose(id: string): Promise<void> {
   const novo = id.trim();
@@ -85,42 +119,41 @@ export async function gCalendarChoose(id: string): Promise<void> {
   await run('DELETE FROM google_event_map'); // os vínculos eram da agenda anterior; os eventos lá ficam como estão
 }
 function gEventFromRow(mod: string, r: Row): Row | null {
-  const label: Record<string, string> = { agenda: '', calendario: '', eventos: '[Evento] ', conteudos: '[Conteúdo] ', tarefas: '[Tarefa] ', campanhas: '[Campanha] ' };
+  const label: Record<string, string> = { calendario: '', conteudos: '[Publicação] ' };
   const title = (label[mod] ?? '') + (r.titulo ?? r.id);
   const desc = [`Status: ${r.status || '—'}`, `Responsável: ${r.responsavel || '—'}`, r.segmento ? `Segmento: ${r.segmento}` : '', `Origem: EVO MKT ${r.id}`].filter(Boolean).join('\n');
   const ext = { private: { evoModule: mod, evoId: r.id } };
   let timed = '', end = '';
-  if (mod === 'agenda' || mod === 'calendario') { timed = r.inicioEm || ''; end = r.fimEm || ''; }
+  if (mod === 'calendario') { timed = r.inicioEm || ''; end = r.fimEm || ''; }
   else if (mod === 'conteudos') timed = r.publicacaoEm || '';
-  const diaInteiro = (mod === 'agenda' || mod === 'calendario') && /^s/i.test(String(r.diaInteiro ?? ''));
+  const diaInteiro = (mod === 'calendario') && /^s/i.test(String(r.diaInteiro ?? ''));
   if (timed && timed.length >= 16 && !diaInteiro) {
     const s = parseLocal(timed);
     let e = end ? parseLocal(end) : new Date(s.getTime() + 30 * 60000);
     if (e <= s) e = new Date(s.getTime() + 30 * 60000);
     return { summary: title, description: desc, start: { dateTime: now(s), timeZone: tz() }, end: { dateTime: now(e), timeZone: tz() }, extendedProperties: ext };
   }
-  let d = String(mod === 'tarefas' ? r.prazo ?? '' : r.dataInicio ?? r.prazo ?? (diaInteiro ? timed : '')).slice(0, 10);
+  let d = String((mod === 'conteudos' ? r.publicacaoEm : r.dataInicio) ?? r.prazo ?? (diaInteiro ? timed : '')).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
   let endDay = d;
-  if ((mod === 'agenda' || mod === 'calendario') && /^\d{4}-\d{2}-\d{2}/.test(String(r.dataFim ?? '')) && String(r.dataFim).slice(0, 10) >= d) endDay = String(r.dataFim).slice(0, 10); // evento de vários dias
+  if ((mod === 'calendario') && /^\d{4}-\d{2}-\d{2}/.test(String(r.dataFim ?? '')) && String(r.dataFim).slice(0, 10) >= d) endDay = String(r.dataFim).slice(0, 10); // evento de vários dias
   if (mod === 'campanhas' && /^\d{4}-\d{2}-\d{2}/.test(String(r.prazo ?? '')) && String(r.prazo).slice(0, 10) >= d) endDay = String(r.prazo).slice(0, 10);
   return { summary: title, description: desc, start: { date: d }, end: { date: fmtDate(addDays(parseLocal(endDay + 'T12:00:00'), 1)) }, extendedProperties: ext };
 }
-const stripLabel = (s: string) => s.replace(/^\[(Evento|Conteúdo|Tarefa|Campanha)\]\s*/u, '');
+const stripLabel = (s: string) => s.replace(/^\[(Publicação|Conteúdo|Evento|Tarefa|Campanha)\]\s*/u, "");
 function gApplyEventToRow(mod: string, row: Row, ev: Row): Row {
   const patch: Row = { titulo: stripLabel(String(ev.summary ?? row.titulo ?? '')) };
   const sdt = ev.start?.dateTime, sd = ev.start?.date;
   if (sdt) {
     const s = new Date(sdt);
     const e = ev.end?.dateTime ? new Date(ev.end.dateTime) : new Date(s.getTime() + 30 * 60000);
-    if (mod === 'agenda' || mod === 'calendario') { patch.inicioEm = fmtDateTimeLocal(s); patch.fimEm = fmtDateTimeLocal(e); patch.dataInicio = fmtDate(s); }
+    if (mod === 'calendario') { patch.inicioEm = fmtDateTimeLocal(s); patch.fimEm = fmtDateTimeLocal(e); patch.dataInicio = fmtDate(s); }
     else if (mod === 'conteudos') patch.publicacaoEm = fmtDateTimeLocal(s);
-    else if (mod === 'tarefas') patch.prazo = fmtDate(s);
     else patch.dataInicio = fmtDate(s);
   } else if (sd) {
-    patch[mod === 'tarefas' ? 'prazo' : 'dataInicio'] = sd;
+    patch[mod === 'conteudos' ? 'publicacaoEm' : 'dataInicio'] = sd;
     // dia inteiro de vários dias: o Google guarda o fim como o dia seguinte ao último
-    if ((mod === 'agenda' || mod === 'calendario') && ev.end?.date) {
+    if ((mod === 'calendario') && ev.end?.date) {
       const ultimo = fmtDate(addDays(parseLocal(String(ev.end.date) + 'T12:00:00'), -1));
       patch.dataFim = ultimo > sd ? ultimo : '';
     }
@@ -210,7 +243,7 @@ export async function gCalendarSync(): Promise<Row> {
   const seen = new Set<string>();
   for (const mod of GCAL_MODULES) {
     for (const r of await listRows(mod)) {
-      if (mod === 'tarefas' && closed.test(String(r.status ?? ''))) continue;
+      if (mod === 'conteudos' && closed.test(String(r.status ?? ''))) continue;
       const ev = gEventFromRow(mod, r);
       const key = `${mod}|${r.id}`;
       if (!ev) continue;
@@ -231,7 +264,7 @@ export async function gCalendarSync(): Promise<Row> {
   for (const [key, m] of Object.entries(map)) {
     if (seen.has(key)) continue;
     const row = await getRow(m.modulo, m.id);
-    const gone = !row || (m.modulo === 'tarefas' && closed.test(String(row.status ?? '')));
+    const gone = !row || (m.modulo === 'conteudos' && closed.test(String(row.status ?? '')));
     const noDate = !!row && !gEventFromRow(m.modulo, row);
     if (gone || noDate) {
       await gApi('DELETE', `/calendar/v3/calendars/${cal}/events/${encodeURIComponent(m.event_id)}`);
@@ -242,82 +275,6 @@ export async function gCalendarSync(): Promise<Row> {
   await setSetting('g_last_cal_sync', now());
   await intLog('google', 'ok', 'Agenda sincronizada: ' + JSON.stringify(stat));
   return stat;
-}
-
-// ---------- Drive ----------
-async function gDriveFolder(name: string, parent = ''): Promise<string> {
-  const qq = `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${name.replace(/'/g, "\\'")}'` + (parent ? ` and '${parent}' in parents` : '');
-  const r = await gApi('GET', '/drive/v3/files?' + qsOf({ q: qq, fields: 'files(id,name)', spaces: 'drive' }));
-  if (r.files?.[0]?.id) return String(r.files[0].id);
-  const meta: Row = { name, mimeType: 'application/vnd.google-apps.folder', ...(parent ? { parents: [parent] } : {}) };
-  return String((await gApi('POST', '/drive/v3/files?fields=id', meta)).id);
-}
-async function gDriveRoot(): Promise<string> {
-  let id = await setting('g_drive_folder_id');
-  if (!id) { id = await gDriveFolder('EVO MKT — Entregas'); await setSetting('g_drive_folder_id', id); }
-  return id;
-}
-async function gDriveUpload(name: string, mime: string, data: Buffer, solId: string, solTitulo: string): Promise<string> {
-  const sub = await gDriveFolder(`${solId} — ${solTitulo.slice(0, 60)}`, await gDriveRoot());
-  const b = 'evo' + randomBytes(8).toString('hex');
-  const body = Buffer.concat([
-    Buffer.from(`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [sub] })}\r\n--${b}\r\nContent-Type: ${mime}\r\n\r\n`),
-    data, Buffer.from(`\r\n--${b}--`),
-  ]);
-  const r = await gApi('POST', '/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', body, 'upload', { 'Content-Type': `multipart/related; boundary=${b}` });
-  return String(r.webViewLink ?? `https://drive.google.com/file/d/${r.id}/view`);
-}
-/** Envia ao Drive os arquivos de ENTREGA da solicitação que ainda não foram. Devolve o nº de arquivos. */
-export async function gDriveSendEntregas(solId: string): Promise<number> {
-  const r = await getRow('solicitacoes', solId);
-  if (!r) throw new Error(`Solicitação ${solId} não encontrada.`);
-  const split = (s: unknown) => String(s ?? '').split('|').map((x) => x.trim()).filter(Boolean);
-  const done = split(r.entregaDriveLinks), sent = split(r.entregaDriveEnviados);
-  let n = 0;
-  for (const rel of split(r.arquivosEntrega)) {
-    if (sent.includes(rel)) continue;
-    const f = await q1('SELECT mime,conteudo FROM arquivos WHERE caminho=?', [rel]);
-    if (!f) continue;
-    done.push(await gDriveUpload(rel.split('/').pop()!, f.mime, f.conteudo as Buffer, solId, String(r.titulo ?? '')));
-    sent.push(rel);
-    n++;
-  }
-  if (n) {
-    await updateRow('solicitacoes', solId, { entregaDriveLinks: done.join(' | '), entregaDriveEnviados: sent.join(' | ') }, 'integracao:google');
-    await intLog('google', 'ok', `Drive: ${n} arquivo(s) de ${solId} enviados`);
-  }
-  return n;
-}
-
-// ---------- Planilhas ----------
-export const GSHEET_DEFAULT_MODULES = ['tarefas', 'conteudos', 'solicitacoes', 'campanhas', 'eventos', 'instagram', 'trafego'];
-async function gSheetId(): Promise<string> {
-  const id = await setting('g_sheet_id');
-  if (id) return id;
-  const r = await gApi('POST', '/v4/spreadsheets', { properties: { title: 'EVO MKT — Relatórios (automático)' } }, 'sheets');
-  await setSetting('g_sheet_id', String(r.spreadsheetId));
-  await setSetting('g_sheet_url', String(r.spreadsheetUrl ?? ''));
-  return String(r.spreadsheetId);
-}
-export async function gSheetsExport(): Promise<Row> {
-  const id = await gSheetId();
-  const mods = (await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(','))).split(',').map((m) => m.trim()).filter((m) => m in MODULES);
-  const meta = await gApi('GET', `/v4/spreadsheets/${id}?fields=sheets.properties.title`, null, 'sheets');
-  const have: string[] = (meta.sheets ?? []).map((s: Row) => s.properties.title);
-  const add = mods.filter((m) => !have.includes(m)).map((m) => ({ addSheet: { properties: { title: m } } }));
-  if (add.length) await gApi('POST', `/v4/spreadsheets/${id}:batchUpdate`, { requests: add }, 'sheets');
-  const out: Row = {};
-  for (const m of mods) {
-    const headers = await headersOf(m);
-    const rows = (await listRows(m)).slice(0, 5000);
-    const vals = [headers, ...rows.map((r) => headers.map((h) => String(r[h] ?? '')))];
-    await gApi('POST', `/v4/spreadsheets/${id}/values/${encodeURIComponent(m)}:clear`, {}, 'sheets');
-    await gApi('PUT', `/v4/spreadsheets/${id}/values/${encodeURIComponent(m + '!A1')}?valueInputOption=RAW`, { range: m + '!A1', majorDimension: 'ROWS', values: vals }, 'sheets');
-    out[m] = rows.length;
-  }
-  await setSetting('g_last_sheet_export', now());
-  await intLog('google', 'ok', 'Planilha atualizada: ' + JSON.stringify(out));
-  return out;
 }
 
 /** Remove do sistema os eventos que vieram do Google. NÃO apaga nada no Google (os vínculos saem antes das linhas). */

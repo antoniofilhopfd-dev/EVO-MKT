@@ -1,4 +1,4 @@
-// Integrações Instagram (Meta) e Google (Agenda/Drive/Planilhas) contra servidores simulados (mock_apis.php, porta 8099).
+// Integrações Instagram (Meta) e Google (Agenda) contra servidores simulados (mock_apis.php, porta 8099). A mídia das publicações vem dos materiais (arte final).
 // Uso: EVO_DIR=<pasta do site> node integrations.test.js <install.out>
 const fs=require('fs');const {execFileSync}=require('child_process');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];
@@ -41,39 +41,46 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/instagram/seguidores',{ck:E});t('seguidores: visível à Equipe',r.s===200);
  // ---------- Instagram: publicar ----------
  const jpg=Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==','base64');
- const up=async(id,name,buf)=>{const fd=new FormData();fd.append('files',new Blob([buf]),name);const rr=await fetch(API+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return{s:rr.status,j:await rr.json().catch(()=>null)}};
- r=await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Post matrículas',legenda:'Matrículas abertas! #evolucao',status:'APROVADO',formato:'Feed',publicarInstagram:'SIM',publicacaoEm:'2020-01-01T10:00'}});const cid=r.j.id;
- let x=await up(cid,'arte.png',jpg);t('mídia PNG é recusada (Instagram exige JPEG)',x.s===400);
- x=await up(cid,'arte.jpg',jpg);t('mídia JPEG anexada ao conteúdo',x.s===200&&/ANEXOS\/CONTEUDOS\/.+\.jpg$/.test(x.j.midia));
+ const up=async(id,name,buf,papel='final')=>{const fd=new FormData();fd.append('id',id);fd.append('papel',papel);fd.append('files',new Blob([buf]),name);const rr=await fetch(API+'/content/material',{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return{s:rr.status,j:await rr.json().catch(()=>null)}};
+ const upN=async(id,n)=>{const fd=new FormData();fd.append('id',id);fd.append('papel','final');for(let i=0;i<n;i++)fd.append('files',new Blob([jpg]),`f${i}.jpg`);const rr=await fetch(API+'/content/material',{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return rr.status};
+ /* publicação pronta para o Instagram: cria, anexa a arte final, leva a revisão, aprova e (opcionalmente) agenda */
+ const pronto=async(b,{agendar=true,aprovar=true,fotos=1}={})=>{const c=(await call('/data?module=conteudos',{m:'POST',ck:G,b:{legenda:b.titulo,formato:'Feed',perfil:'@evolucaopb',publicarInstagram:'SIM',status:'RASCUNHO',...b}})).j.id;
+  if(fotos===1)await up(c,'a.jpg',jpg);else if(fotos>1)await upN(c,fotos);
+  if(aprovar){await put('conteudos',c,{status:'EM REVISÃO'});await call('/content/decision',{m:'POST',ck:G,b:{id:c,decisao:'APROVADO'}})}
+  if(agendar)await call('/content/schedule',{m:'POST',ck:G,b:{id:c,quando:b.publicacaoEm}});return c};
+ r=await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Post matrículas',legenda:'Matrículas abertas! #evolucao',status:'RASCUNHO',formato:'Feed',perfil:'@evolucaopb',publicarInstagram:'SIM',publicacaoEm:'2020-01-01T10:00'}});const cid=r.j.id;
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==','base64');
+ let x=await up(cid,'arte.png',png);t('arte final PNG é aceita como material, mas não serve ao Instagram (sem JPEG, não agenda)',x.s===201&&(await put('conteudos',cid,{status:'EM REVISÃO'})).s===200);
+ await call('/content/decision',{m:'POST',ck:G,b:{id:cid,decisao:'APROVADO'}});r=await call('/content/schedule',{m:'POST',ck:G,b:{id:cid,quando:'2020-01-01T10:00'}});t('agendar com publicação automática exige JPEG ou vídeo',r.s===409&&/JPEG|vídeo/i.test(r.j.error),r);
+ x=await up(cid,'arte.jpg',jpg);t('arte final JPEG anexada ao conteúdo',x.s===201&&x.j.materiais.some(m=>m.papel==='final'&&/\.jpg$/.test(m.caminho)));
+ r=await call('/content/schedule',{m:'POST',ck:G,b:{id:cid,quando:'2020-01-01T10:00'}});t('com JPEG, agenda',r.s===200,r);
  r=await call('/integrations/instagram/queue',{ck:E});t('fila de publicação (visível à Equipe)',r.s===200&&r.j.some(q=>q.id===cid&&q.midia&&!q.publicado));
  r=await call('/integrations/instagram/publish',{m:'POST',ck:E,b:{id:cid}});t('publica agora',r.s===200&&r.j.status==='PUBLICADO'&&/instagram\.com\/p\/MEDIA_/.test(r.j.link),r);
  const st=await mock('/__state');const cont=Object.values(st.containers)[0];
  t('Meta conseguiu baixar a mídia pela URL assinada (JPEG)',cont&&cont.bytes>0&&/jpeg/.test(cont.type)&&/api\/public\/media\?p=/.test(cont.params.image_url)&&cont.params.caption.includes('Matrículas abertas'),cont);
  let cc=(await rows('conteudos')).find(c=>c.id===cid);t('conteúdo vira PUBLICADO com link e id do Instagram',cc.status==='PUBLICADO'&&/MEDIA_/.test(cc.instagramMediaId)&&/instagram\.com/.test(cc.instagramLink));
- r=await call('/integrations/instagram/publish',{m:'POST',ck:G,b:{id:cid}});t('não publica duas vezes',r.s===502&&/já foi publicado/.test(r.j.error));
+ r=await call('/integrations/instagram/publish',{m:'POST',ck:G,b:{id:cid}});t('não publica duas vezes (já publicada não é aceita de novo)',(r.s===409||r.s===502)&&/já foi publicado|APROVADAS/.test(r.j.error),r);
  const rel=cc.midiaInstagram;const pr=await fetch(API+'/public/media?p='+Buffer.from(rel).toString('base64url')+'&e=9999999999&s=deadbeef');t('link público de mídia sem assinatura válida é negado',pr.status===403);
  // agendado: cron publica só o vencido
- const mk=async(titulo,publicacaoEm,status)=>{const c=(await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo,legenda:titulo,status,formato:'Feed',publicarInstagram:'SIM',publicacaoEm}})).j.id;await up(c,'a.jpg',jpg);return c};
- const due=await mk('Agendado vencido','2020-02-01T09:00','PROGRAMADO');const fut=await mk('Agendado futuro','2099-01-01T09:00','PROGRAMADO');const draft=await mk('Rascunho vencido','2020-02-01T09:00','BRIEFING');
+ const due=await pronto({titulo:'Agendado vencido',publicacaoEm:'2020-02-01T09:00'});const fut=await pronto({titulo:'Agendado futuro',publicacaoEm:'2099-01-01T09:00'});const draft=await pronto({titulo:'Rascunho vencido',publicacaoEm:'2020-02-01T09:00'},{agendar:false,aprovar:false});
  const o=cron('publicar');cc=await rows('conteudos');
- t('cron publica o programado vencido',cc.find(c=>c.id===due).status==='PUBLICADO'&&/publicados":1/.test(o),o);
- t('cron não publica futuro nem rascunho',cc.find(c=>c.id===fut).status==='PROGRAMADO'&&cc.find(c=>c.id===draft).status==='BRIEFING');
+ t('cron publica o agendado vencido',cc.find(c=>c.id===due).status==='PUBLICADO'&&/publicados":1/.test(o),o);
+ t('cron não publica futuro nem rascunho',cc.find(c=>c.id===fut).status==='AGENDADO'&&cc.find(c=>c.id===draft).status==='RASCUNHO');
  // hashtags, primeiro comentário, carrossel, nova tentativa
- const mk2=async(b)=>{const c=(await call('/data?module=conteudos',{m:'POST',ck:G,b:{legenda:b.titulo,status:'PROGRAMADO',formato:'Feed',publicarInstagram:'SIM',publicacaoEm:'2020-03-01T09:00',...b}})).j.id;return c};
- const upN=async(id,n)=>{const fd=new FormData();for(let i=0;i<n;i++)fd.append('files',new Blob([jpg]),`f${i}.jpg`);const rr=await fetch(API+'/integrations/instagram/media?id='+id,{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return rr.status};
- const hT=await mk2({titulo:'Com hashtags',hashtags:'#evolucao #matriculas'});await up(hT,'a.jpg',jpg);
- const hC=await mk2({titulo:'Tags no comentario',hashtags:'#primeirocomentario #evo',hashtagsComentario:'SIM'});await up(hC,'a.jpg',jpg);
+ const mk2=(b,fotos=1,extra={})=>pronto({publicacaoEm:'2020-03-01T09:00',...b},{fotos,...extra});
+ const hT=await mk2({titulo:'Com hashtags',hashtags:'#evolucao #matriculas'});
+ const hC=await mk2({titulo:'Tags no comentario',hashtags:'#primeirocomentario #evo',hashtagsComentario:'SIM'});
  cron('publicar');const stp=await mock('/__state');const caps=Object.values(stp.containers).map(c=>c.params.caption||'');
  t('as hashtags do post entram no fim da legenda publicada',caps.some(c=>/Com hashtags[\s\S]*#evolucao #matriculas/.test(c)));
  t('com "hashtags no primeiro comentário", a legenda fica limpa',caps.some(c=>c==='Tags no comentario')&&!caps.some(c=>/Tags no comentario[\s\S]*#primeirocomentario/.test(c)));
  t('...e as hashtags vão como primeiro comentário do post publicado',Object.values(stp.comments||{}).some(l=>l.some(m=>/#primeirocomentario #evo/.test(m))),stp.comments);
- const car=await mk2({titulo:'Carrossel de teste',formato:'Carrossel'});
- t('carrossel: envia vários arquivos de uma vez',(await upN(car,3))===200);
+ const car=await mk2({titulo:'Carrossel de teste',formato:'Carrossel'},3);
+ t('carrossel: vários arquivos de uma vez viram a lista de mídias',(await call('/content/materials?id='+car,{ck:G})).j.materiais.length===3);
  cc=(await rows('conteudos')).find(c=>c.id===car);t('carrossel guarda a lista de mídias',JSON.parse(cc.midiasInstagram).length===3&&cc.midiaInstagram===JSON.parse(cc.midiasInstagram)[0]);
  cron('publicar');cc=(await rows('conteudos')).find(c=>c.id===car);const stc=await mock('/__state');const pai=Object.values(stc.containers).find(c=>c.params.media_type==='CAROUSEL');
  t('cron publica o carrossel com 3 itens filhos',cc.status==='PUBLICADO'&&pai&&pai.params.children.split(',').length===3&&pai.params.caption==='Carrossel de teste',[cc.status,pai&&pai.params]);
- const carG=await mk2({titulo:'Carrossel grande',formato:'Carrossel',status:'BRIEFING'});t('carrossel aceita 20 mídias',(await upN(carG,20))===200);t('carrossel com 21 mídias é recusado',(await upN(carG,21))===400);
- const car1=await mk2({titulo:'Carrossel curto',formato:'Carrossel'});await up(car1,'a.jpg',jpg);
+ const carG=await mk2({titulo:'Carrossel grande',formato:'Carrossel'},0,{agendar:false,aprovar:false});t('carrossel aceita 20 mídias',(await upN(carG,20))===201);t('carrossel com 21 mídias é recusado',(await upN(carG,1))===400);
+ const car1=await mk2({titulo:'Carrossel curto',formato:'Carrossel'});
  r=await call('/integrations/instagram/publish',{m:'POST',ck:G,b:{id:car1}});t('carrossel com 1 item não publica e explica',r.s===502&&/2 a 20/.test(r.j.error),r);
  r=await call('/integrations/instagram/queue',{ck:G});t('falha aparece na fila com o motivo',r.j.find(q=>q.id===car1).estado==='ERRO');
  r=await call('/integrations/instagram/retry',{m:'POST',ck:G,b:{id:car1}});t('"Tentar de novo" libera o post para o cron',r.s===200);
@@ -81,21 +88,24 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/integrations/prontidao',{ck:G});t('prontidão confirma que o cron de publicação rodou e mostra o comando',r.j.itens.find(i=>i.id==='cron_publicar').ok===true&&/tarefa=publicar/.test(r.j.cronPublicar),r.j.cronPublicar);
  // ---------- Google: conectar ----------
  r=await call('/integrations/google/connect',{ck:G,manual:true});const gu=new URL(r.loc);
- t('conectar Google redireciona com escopos de Agenda/Drive/Planilhas e acesso offline',r.s===302&&/calendar/.test(gu.searchParams.get('scope'))&&/drive.file/.test(gu.searchParams.get('scope'))&&/spreadsheets/.test(gu.searchParams.get('scope'))&&gu.searchParams.get('access_type')==='offline');
+ t('conectar Google redireciona com escopo de Agenda e acesso offline',r.s===302&&/calendar/.test(gu.searchParams.get('scope'))&&gu.searchParams.get('access_type')==='offline');
  r=await call('/integrations/google/callback?code=GOODCODE&state='+encodeURIComponent(gu.searchParams.get('state')),{manual:true});t('callback Google conecta',/google_ok/.test(r.loc||''),r.loc);
  r=await call('/integrations/status',{ck:G});t('Google conectado com e-mail da conta',r.j.google.conectado&&r.j.google.email==='marketing@colegio.test');
  // ---------- Google Agenda ----------
  const fut1=new Date(Date.now()+3*864e5).toISOString().slice(0,10);
  await call('/data?module=calendario',{m:'POST',ck:G,b:{titulo:'Reunião de pauta',status:'NOVO',dataInicio:fut1,inicioEm:fut1+'T14:00',fimEm:fut1+'T15:00'}});
- await call('/data?module=tarefas',{m:'POST',ck:G,b:{titulo:'Entregar banner',status:'NOVO',prazo:fut1}});
- await call('/data?module=eventos',{m:'POST',ck:G,b:{titulo:'Feira de Ciências',status:'PRÉ-EVENTO',dataInicio:fut1}});
- await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Reel da feira',status:'PRODUÇÃO',publicacaoEm:fut1+'T18:00'}});
+ await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Reel da feira',status:'EM PRODUÇÃO',publicacaoEm:fut1+'T18:00'}});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: sem agenda escolhida, não cria nenhuma',r.s>=400&&!/cal1/.test(JSON.stringify(await mock('/__state'))),r);
+ r=await call('/integrations/google/agendas-leitura',{ck:G});t('lista todas as agendas visíveis, com o papel de acesso',r.s===200&&r.j.agendas.some(a=>a.id==='cal1'&&'papel' in a&&'gravavel' in a),r);
+ r=await call('/integrations/google/agendas-leitura',{m:'POST',ck:G,b:{ids:['cal1']}});t('marca uma agenda como somente leitura',r.s===200);
+ r=await call('/integrations/google/eventos-leitura?de=2020-01-01&ate=2099-12-31',{ck:G});t('eventos das agendas somente leitura chegam sem entrar no sistema',r.s===200&&Array.isArray(r.j.rows)&&!(await rows('calendario')).some(c=>c.origem==='GOOGLE_AGENDA'),r);
+ r=await call('/integrations/google/eventos-leitura?de=2026-05-10&ate=2026-05-01',{ck:G});t('período inválido nos eventos de leitura: 400',r.s===400);
+ r=await call('/integrations/google/agendas-leitura',{m:'POST',ck:G,b:{ids:[]}});
  r=await call('/integrations/google/calendars',{ck:G});t('lista as agendas da conta',r.s===200&&r.j.rows.some(a=>a.id==='cal1'),r);
  r=await call('/integrations/google/calendar/choose',{m:'POST',ck:G,b:{id:'cal1'}});t('escolhe uma agenda existente',r.s===200,r);
- r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: envia itens do EVO ao Google',r.s===200&&r.j.para_google>=4,r);
+ r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: envia itens do EVO ao Google (compromisso e publicação)',r.s===200&&r.j.para_google>=2,r);
  let s2=await mock('/__state');const evs=Object.values(s2.events);
- t('eventos criados com módulo/ID de origem e horário',evs.some(e=>e.summary==='Reunião de pauta'&&e.extendedProperties.private.evoModule==='calendario'&&e.start.dateTime)&&evs.some(e=>e.summary==='[Tarefa] Entregar banner'&&e.start.date===fut1)&&evs.some(e=>e.summary==='[Evento] Feira de Ciências'));
+ t('eventos criados com módulo/ID de origem e horário',evs.some(e=>e.summary==='Reunião de pauta'&&e.extendedProperties.private.evoModule==='calendario'&&e.start.dateTime)&&evs.some(e=>e.summary==='[Publicação] Reel da feira'&&e.extendedProperties.private.evoModule==='conteudos'));
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('sincronizar de novo não duplica',r.j.para_google===0&&r.j.do_google===0&&r.j.criados===0,r.j);
  const cal=(await rows('calendario')).find(c=>c.titulo==='Reunião de pauta');
  await put('calendario',cal.id,{titulo:'Reunião de pauta (nova sala)'});r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});
@@ -121,26 +131,11 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  t('salvar no calendário sincroniza sozinho com o Google em segundos (sem clicar em sincronizar)',Object.values(s4.events).some(e=>e.summary==='Auto sincroniza'),Object.values(s4.events).map(e=>e.summary));
  r=await call('/integrations/google/calendar/sync?leve=1',{m:'POST',ck:G,b:{}});t('sincronização leve não repete quando acabou de rodar',r.s===200&&r.j.pulou===true,r);
  r=await call('/integrations/google/calendar/limpar-importados',{m:'POST',ck:G,b:{}});s2=await mock('/__state');t('limpar importados remove do sistema sem apagar no Google',r.s===200&&r.j.removidos>=1&&!(await rows('calendario')).some(c=>c.origem==='GOOGLE_AGENDA')&&Object.values(s2.events).some(e=>e.summary==='Visita da inspetora'),r);
- const tar=(await rows('tarefas')).find(c=>c.titulo==='Entregar banner');await call('/data?module=tarefas&id='+tar.id,{m:'DELETE',ck:G});
+ const tar=(await rows('conteudos')).find(c=>c.titulo==='Reel da feira');await call('/data?module=conteudos&id='+tar.id,{m:'DELETE',ck:G});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});s2=await mock('/__state');
- t('item excluído no EVO remove o evento do Google',r.j.removidos===1&&Object.values(s2.events).find(e=>e.summary==='[Tarefa] Entregar banner').status==='cancelled',r.j);
- // ---------- Google Drive ----------
- const sid=(await call('/data?module=solicitacoes',{m:'POST',ck:G,b:{titulo:'Cartaz festa junina',status:'EM EXECUÇÃO',segmento:'Infantil'}})).j.id;
- const upE=async(name)=>{const fd=new FormData();fd.append('files',new Blob([jpg]),name);const rr=await fetch(API+'/manager/upload?id='+sid,{method:'POST',headers:{Cookie:G,'X-EVO':'1'},body:fd});return rr.status};
- t('entrega enviada (Drive automático desligado)',await upE('final1.jpg')===200);s2=await mock('/__state');t('nada vai ao Drive com o automático desligado',Object.keys(s2.files).length===0);
- r=await call('/integrations/google/drive/send-entregas',{m:'POST',ck:G,b:{}});s2=await mock('/__state');const f1=Object.values(s2.files)[0];
- t('envia entregas pendentes ao Drive (pasta da solicitação)',r.j.arquivos===1&&f1&&f1.name.startsWith('final1')&&f1.size>0,r);
- const fold=Object.values(s2.folders);t('estrutura de pastas: EVO MKT — Entregas / SOL-xxxx — título',fold.some(f=>/Entregas/.test(f.name)&&!f.parent)&&fold.some(f=>f.name.startsWith(sid)&&f.parent));
- const sol=(await rows('solicitacoes')).find(s=>s.id===sid);t('link do Drive gravado na solicitação',/drive\.google\.com/.test(sol.entregaDriveLinks||''));
- r=await call('/integrations/google/drive/send-entregas',{m:'POST',ck:G,b:{}});t('reenviar não duplica arquivos',r.j.arquivos===0);
- await call('/integrations/settings',{m:'POST',ck:G,b:{g_auto_drive_entregas:true}});await upE('final2.jpg');s2=await mock('/__state');t('com o automático ligado, nova entrega vai sozinha ao Drive',Object.keys(s2.files).length===2);
- // ---------- Google Planilhas ----------
- r=await call('/integrations/google/sheets/export',{m:'POST',ck:G,b:{}});s2=await mock('/__state');
- t('exporta módulos para a planilha do Google',r.s===200&&/docs\.google\.com\/spreadsheets/.test(r.j.url)&&r.j.abas.tarefas>=0&&s2.values.tarefas&&s2.values.tarefas[0].includes('titulo')&&s2.values.conteudos.length>=4,r);
- const n1=s2.values.conteudos.length;await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Novo conteúdo',status:'IDEIA'}});
- await call('/integrations/google/sheets/export',{m:'POST',ck:G,b:{}});s2=await mock('/__state');t('exportar de novo reescreve (sem duplicar linhas)',s2.values.conteudos.length===n1+1);
+ t('item excluído no EVO remove o evento do Google',r.j.removidos===1&&Object.values(s2.events).find(e=>e.summary==='[Publicação] Reel da feira').status==='cancelled',r.j);
  // ---------- cron geral, log e desconexão ----------
- const o2=cron('sincronizar');t('cron sincronizar roda Instagram + Google sem erro',/instagram-metricas/.test(o2)&&/google-agenda/.test(o2)&&/google-planilhas/.test(o2)&&!/ERRO/.test(o2),o2);
+ const o2=cron('sincronizar');t('cron sincronizar roda Instagram + Google Agenda sem erro',/instagram-metricas/.test(o2)&&/google-agenda/.test(o2)&&!/ERRO/.test(o2),o2);
  r=await call('/integrations/log',{ck:G});t('log das integrações registra as operações',r.s===200&&r.j.length>5&&r.j.some(l=>l.servico==='instagram')&&r.j.some(l=>l.servico==='google'));
  await call('/integrations/meta/disconnect',{m:'POST',ck:G,b:{}});r=await call('/integrations/instagram/sync',{m:'POST',ck:G,b:{}});t('desconectado: sincronizar avisa que não está conectado',r.s===502&&/não conectado/.test(r.j.error));
  await call('/integrations/google/disconnect',{m:'POST',ck:G,b:{}});r=await call('/integrations/status',{ck:G});t('desconectar Google',!r.j.google.conectado);

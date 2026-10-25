@@ -96,61 +96,12 @@ export async function adsSync(meses = 3): Promise<number> {
     }
   }
   await setSetting('meta_ads_ultima_sync', now());
-  await notificarAlertasTrafego();
-  try { await (await import('./metaadsAnalise')).avaliarLimitesGasto(true); } catch { /* limites de gasto não derrubam a leitura */ }
   await intLog('instagram', 'ok', `Meta Ads: ${n} linha(s) de campanha/mês atualizadas (somente leitura).`);
   return n;
 }
 
 export async function adsSnapshots(periodo?: string): Promise<Row[]> {
   return q(`SELECT conta,campanha_id,campanha,periodo,gasto,impressoes,alcance,cliques,resultados,conversas,inicio,moeda,status,objetivo,orcamento_diario,atualizado_em FROM ads_snapshots ${periodo ? 'WHERE periodo=?' : ''} ORDER BY periodo DESC, gasto DESC LIMIT 1000`, periodo ? [periodo] : []);
-}
-
-// ---------- alertas (regras objetivas, com limites visíveis e ajustáveis; só disparam com dados suficientes) ----------
-export const LIMITES_PADRAO = { ctrMin: 0.9, frequenciaMax: 3.5, gastoSemResultado: 100, impressoesMin: 1000 };
-export async function limitesAlerta() {
-  const g = async (k: string, d: number) => { const v = Number(await setting(k)); return Number.isFinite(v) && v > 0 ? v : d; };
-  return { ctrMin: await g('ads_ctr_min', LIMITES_PADRAO.ctrMin), frequenciaMax: await g('ads_freq_max', LIMITES_PADRAO.frequenciaMax), gastoSemResultado: await g('ads_gasto_sem_resultado', LIMITES_PADRAO.gastoSemResultado), impressoesMin: await g('ads_impr_min', LIMITES_PADRAO.impressoesMin) };
-}
-export interface AlertaTrafego { chave: string; campanha_id: string; campanha: string; periodo: string; regra: string; severidade: 'atencao' | 'critico'; mensagem: string }
-const OBJETIVOS_COM_RESULTADO = /LEADS|SALES|CONVERSIONS|MESSAGES|ENGAGEMENT_MESSAGES/i;
-
-/** Alertas do período mais recente de cada campanha. Cada regra cita o número que a disparou e o limite. */
-export async function alertasTrafego(): Promise<AlertaTrafego[]> {
-  const lim = await limitesAlerta();
-  const rows = await q('SELECT campanha_id,campanha,periodo,gasto,impressoes,alcance,cliques,resultados,moeda,status,objetivo FROM ads_snapshots WHERE periodo=(SELECT MAX(periodo) FROM ads_snapshots)');
-  const out: AlertaTrafego[] = [];
-  const comCliques = rows.filter((r) => Number(r.impressoes) >= lim.impressoesMin && Number(r.cliques) > 0);
-  const cpcs = comCliques.map((r) => ({ id: r.campanha_id, cpc: Number(r.gasto) / Number(r.cliques) }));
-  for (const r of rows) {
-    if (/PAUSED|ARCHIVED|DELETED/i.test(String(r.status))) continue; // alertas só para campanhas em veiculação
-    const imp = Number(r.impressoes), cli = Number(r.cliques), gasto = Number(r.gasto), alc = Number(r.alcance), res = Number(r.resultados);
-    const add = (regra: string, severidade: 'atencao' | 'critico', mensagem: string) => out.push({ chave: `${r.campanha_id}|${regra}|${r.periodo}`, campanha_id: String(r.campanha_id), campanha: String(r.campanha), periodo: String(r.periodo), regra, severidade, mensagem });
-    if (imp >= lim.impressoesMin) {
-      const ctr = (cli / imp) * 100;
-      if (ctr < lim.ctrMin) add('CTR baixo', 'atencao', `CTR de ${ctr.toFixed(2)}% com ${imp.toLocaleString('pt-BR')} impressões (limite: ${lim.ctrMin}%). Criativo ou público podem estar fracos.`);
-      if (alc > 0 && imp / alc > lim.frequenciaMax) add('Frequência alta', 'atencao', `Frequência de ${(imp / alc).toFixed(1)} no período (limite: ${lim.frequenciaMax}). O público já viu o anúncio muitas vezes.`);
-    }
-    if (OBJETIVOS_COM_RESULTADO.test(String(r.objetivo)) && gasto >= lim.gastoSemResultado && res === 0) add('Gasto sem resultado', 'critico', `Gasto de ${gasto.toLocaleString('pt-BR', { style: 'currency', currency: r.moeda || 'BRL' })} sem nenhum lead/conversa registrado (limite: ${lim.gastoSemResultado}). Confira formulário, destino e rastreamento.`);
-    if (cpcs.length >= 3 && imp >= lim.impressoesMin && cli > 0) {
-      const outros = cpcs.filter((c) => c.id !== r.campanha_id).map((c) => c.cpc);
-      const media = outros.reduce((a, b) => a + b, 0) / outros.length;
-      if (outros.length >= 2 && gasto / cli > 2 * media) add('CPC acima do normal', 'atencao', `CPC de ${(gasto / cli).toFixed(2)} é mais que o dobro da média das outras campanhas (${media.toFixed(2)}).`);
-    }
-    if (/DISAPPROVED|WITH_ISSUES/i.test(String(r.status))) add('Problema de aprovação', 'critico', `A Meta informa o status ${r.status}. Veja o motivo no Gerenciador de Anúncios.`);
-  }
-  return [...out, ...(await alertasExtras())];
-}
-
-/** Avisa a Gerência (uma vez por campanha, regra e mês) sobre alertas novos. */
-export async function notificarAlertasTrafego(): Promise<number> {
-  let n = 0;
-  for (const a of await alertasTrafego()) {
-    if (await q1("SELECT 1 FROM notifications WHERE tipo='ads_alerta' AND registro=?", [a.chave])) continue;
-    await registrarNotificacao('ads_alerta', 'gerencia', `Tráfego: ${a.regra} em "${a.campanha}"`, a.mensagem, 'trafego', a.chave);
-    n++;
-  }
-  return n;
 }
 
 // ---------- extras (somente leitura) ----------
@@ -215,58 +166,4 @@ export async function adsDiario(dias = 30): Promise<Row[]> {
 }
 export async function adsAnuncios(periodo: string): Promise<Row[]> {
   return q('SELECT anuncio_id,anuncio,campanha,gasto,impressoes,alcance,cliques,resultados,conversas,inicio,moeda,status,problema,ativo FROM ads_anuncios WHERE periodo=? ORDER BY gasto DESC LIMIT 200', [periodo]);
-}
-
-/** Orçamento do mês (informado pela Gerência) × gasto acumulado, com projeção linear até o fim do mês. */
-export async function pacingMes(): Promise<{ orcamento: number; gasto: number; projecao: number; diasPassados: number; diasMes: number; moeda: string } | null> {
-  const orc = Number(await setting('ads_orcamento_mensal'));
-  if (!Number.isFinite(orc) || orc <= 0) return null;
-  const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
-  const r = await q1('SELECT COALESCE(SUM(gasto),0) g, MAX(moeda) m FROM ads_snapshots WHERE periodo=?', [per]);
-  const gasto = Number(r?.g ?? 0), diasMes = new Date(lp.y, lp.m, 0).getDate(), diasPassados = Math.max(1, lp.d);
-  return { orcamento: orc, gasto, projecao: Math.round((gasto / diasPassados) * diasMes * 100) / 100, diasPassados, diasMes, moeda: String(r?.m ?? '') };
-}
-
-/** Alertas de conta, orçamento, entrega e anúncios (regras objetivas; cada mensagem cita o número que a gerou). */
-export async function alertasExtras(): Promise<AlertaTrafego[]> {
-  const out: AlertaTrafego[] = [];
-  const lp = localParts(new Date()), per = `${lp.y}-${String(lp.m).padStart(2, '0')}`;
-  const add = (chave: string, regra: string, severidade: 'atencao' | 'critico', mensagem: string, campanha = 'Conta de anúncios') => out.push({ chave: `${chave}|${per}`, campanha_id: '', campanha, periodo: per, regra, severidade, mensagem });
-  const saude = await saudeConta();
-  if (saude && !saude.ok) add('conta-status', 'Conta de anúncios com problema', 'critico', `A Meta informa a conta como "${saude.rotulo}". Os anúncios podem parar de rodar: confira no Gerenciador de Anúncios.`);
-  if (saude && saude.tetoGasto > 0 && saude.gastoTotal / saude.tetoGasto >= 0.9) add('conta-teto', 'Teto de gasto da conta perto do fim', 'atencao', `A conta já usou ${Math.round((saude.gastoTotal / saude.tetoGasto) * 100)}% do limite de gasto definido na Meta.`);
-  const pc = await pacingMes();
-  if (pc) {
-    if (pc.gasto >= pc.orcamento) add('orc-estourou', 'Orçamento do mês estourado', 'critico', `Gasto de ${pc.gasto.toFixed(2)} já passou do orçamento do mês (${pc.orcamento.toFixed(2)}).`);
-    else if (pc.diasPassados >= 5 && pc.projecao > pc.orcamento * 1.05) add('orc-projecao', 'Ritmo de gasto acima do orçamento', 'atencao', `No ritmo atual, o mês fecha em ${pc.projecao.toFixed(2)}, acima do orçamento de ${pc.orcamento.toFixed(2)} (gasto até hoje: ${pc.gasto.toFixed(2)}).`);
-  }
-  // entrega parada: os 3 últimos dias fechados sem gasto, mas a semana anterior teve gasto e há campanha ativa
-  const dias = await adsDiario(14), hoje = fmtDate(new Date());
-  const fechados = dias.filter((d) => String(d.dia) < hoje).slice(-10);
-  if (fechados.length >= 6) {
-    const ult3 = fechados.slice(-3), ant = fechados.slice(0, -3);
-    const ativa = await q1("SELECT 1 FROM ads_snapshots WHERE periodo=(SELECT MAX(periodo) FROM ads_snapshots) AND status='ACTIVE' LIMIT 1");
-    if (ativa && ult3.every((d) => Number(d.gasto) === 0) && ant.reduce((s, d) => s + Number(d.gasto), 0) > 0) add('entrega-parou', 'Entrega parou', 'critico', 'Os 3 últimos dias fechados não tiveram gasto, mas há campanha ativa e a semana anterior gastou. Verifique pagamento, aprovação e orçamento.');
-  }
-  // custo por resultado subindo: últimos 7 dias fechados contra os 7 anteriores
-  if (fechados.length >= 10) {
-    const u7 = dias.filter((d) => String(d.dia) < hoje).slice(-7), a7 = dias.filter((d) => String(d.dia) < hoje).slice(-14, -7);
-    const sm = (l: Row[], k: string) => l.reduce((s, d) => s + Number(d[k]), 0);
-    if (a7.length === 7 && sm(u7, 'resultados') > 0 && sm(a7, 'resultados') > 0) {
-      const cu = sm(u7, 'gasto') / sm(u7, 'resultados'), ca = sm(a7, 'gasto') / sm(a7, 'resultados');
-      if (cu > ca * 1.4 && sm(u7, 'gasto') >= 30) add('custo-sobe', 'Custo por resultado subindo', 'atencao', `O custo por resultado dos últimos 7 dias (${cu.toFixed(2)}) está ${Math.round((cu / ca - 1) * 100)}% acima da semana anterior (${ca.toFixed(2)}). Veja em Tráfego → Gerenciador → Comparar anúncios.`);
-    }
-  }
-  // anúncios com problema, agrupados pelo motivo (um aviso por motivo, com a lista dos anúncios)
-  const grupos = new Map<string, string[]>();
-  for (const a of await adsAnuncios(per)) {
-    if (!/DISAPPROVED|WITH_ISSUES/i.test(String(a.status)) || Number(a.ativo) === 0) continue; // só anúncios ligados (anúncio, conjunto e campanha)
-    const motivo = String(a.problema || 'A Meta informa ' + a.status + '.').trim();
-    (grupos.get(motivo) ?? grupos.set(motivo, []).get(motivo)!).push(String(a.anuncio));
-  }
-  for (const [motivo, nomes] of grupos) {
-    const lista = nomes.slice(0, 5).join(', ') + (nomes.length > 5 ? ` e mais ${nomes.length - 5}` : '');
-    add(`anuncio-${sha256(motivo).slice(0, 12)}`, 'Anúncio com problema', 'critico', `${nomes.length} anúncio(s): ${motivo.replace(/\.$/, '')}. Confira no Gerenciador de Anúncios.`, lista);
-  }
-  return out;
 }

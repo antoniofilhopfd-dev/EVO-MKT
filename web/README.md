@@ -4,17 +4,17 @@ Versão web do sistema de marketing do Colégio Evolução, pronta para a Hostin
 
 - **Next.js 16** (App Router) · **mysql2** · TypeScript · Node 20/22.
 - **API** em `app/api/[...path]/route.ts` → `lib/api/*` (mesmos endpoints `/api/*` da versão PHP).
-- **Front-end** (HTML/JS/CSS, PWA) em `public/`; `proxy.ts` entrega `/` e `/solicitante` e bloqueia arquivos ocultos.
+- **Front-end** (HTML/JS/CSS, PWA) em `public/`; `proxy.ts` entrega `/` e bloqueia arquivos ocultos.
 - **Banco**: migrações automáticas em `db/migrations/NNN_nome.sql`, embutidas por `scripts/prebuild.mjs` (`npm run prebuild`/`build`) em `lib/migrations.generated.ts` (não versionado). O app aplica as pendentes ao iniciar e registra em `schema_migrations`. **Nunca edite uma migração já aplicada: crie uma nova.** O esquema é compatível com a versão PHP, então o banco antigo pode ser reaproveitado.
 - **Login**: senha (bcrypt, compatível com o PHP) ou só código; cookie de sessão **assinado** (`SESSION_SECRET`) com a sessão guardada no MySQL; limite de tentativas; auditoria; CSRF por cabeçalho `X-EVO`.
 - **Anexos e backups** ficam no MySQL (o disco do app pode ser recriado a cada deploy).
 - **Cron** protegido por `CRON_SECRET`: `/api/cron/integracoes?tarefa=publicar|sincronizar|tudo`, `/api/cron/alertas`.
 
 ## Áreas do sistema
-Menu com 8 áreas (seções em abas): **Visão geral** (Hoje, Minha Área, Central Operacional) · **Solicitações** (triagem, Fluxos) · **Planejamento** (Agenda, Calendário, Tarefas, Projetos, Eventos) · **Conteúdo** (Conteúdos, Ideias, Planejamento Editorial, Aprovações, Templates, Instagram) · **Tráfego** (Tráfego, Campanhas) · **Relatórios** (Relatórios, Fechamento Mensal) · **Arquivos e equipe** · **Administração** (Acessos, Integrações, Avisos, Auditoria, Backups, Configurações). Portal das coordenações em `/solicitante`.
+Cinco áreas: **Dashboard** · **Calendário** (publicações, planejamento editorial, calendário escolar, datas comemorativas, Google Agenda) · **Instagram** (Visão geral, Conteúdos, Planejamento, Desempenho) · **Tráfego Pago** (somente consulta à Meta Ads) · **Configurações** (acessos, integrações, backup, auditoria e prontidão). Só a equipe de Marketing entra; não há Portal.
 
 ## Documentação
-`docs/OPERACAO.md` (instalação, variáveis, migrações, autenticação, permissões, backup, procedimentos) · `docs/DEPLOY_HOSTINGER.md` · `docs/GUIA_INTEGRACOES.md` · `docs/INDICADORES_E_SLA.md` · `docs/DESIGN_SYSTEM.md` · `docs/SEGURANCA_RELATORIO.md` · `docs/PLANO_FINALIZACAO.md` e `docs/ACOMPANHAMENTO_EXECUCAO.md` (diagnóstico e execução) · `docs/HOMOLOGACAO.md` · `docs/screenshots/final/` (capturas reais com índice).
+`docs/OPERACAO.md` (as cinco áreas, instalação, variáveis, migrações, permissões, backup, procedimentos) · `docs/RELATORIO_V6.md` (resultado da reestruturação) · `docs/AUDITORIA_V6.md` (ponto de partida) · `docs/DEPLOY_HOSTINGER.md` · `docs/GUIA_INTEGRACOES.md` · `docs/DESIGN_SYSTEM.md` · `docs/SEGURANCA_RELATORIO.md` · `docs/HOMOLOGACAO.md`.
 
 ## Rodar localmente
 ```bash

@@ -9,7 +9,7 @@ const CalMotor=(()=>{
  const MODOS_PADRAO=[['day','Dia'],['week','Semana'],['month','Mês']];
  const guarda=(k,d)=>{try{return JSON.parse(localStorage.getItem('evo.cal.'+k)||'null')??d}catch{return d}};
  const salva=(k,v)=>{try{localStorage.setItem('evo.cal.'+k,JSON.stringify(v))}catch{}};
- const hojeIso=()=>isoDate(new Date());
+ const hojeIso=()=>hojeBR();
  const dataDe=iso=>{const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d)};
  const fmtCurto=iso=>iso.split('-').reverse().slice(0,2).join('/');
  const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
@@ -25,7 +25,7 @@ const CalMotor=(()=>{
   const modoSalvo=guarda(cfg.chave+'.modo',cfg.modoPadrao||'month');
   const extrasDef=cfg.filtrosExtras||(cfg.filtroExtra?[{chave:'extra',vazio:cfg.filtroExtra.vazio,opcoes:cfg.filtroExtra.opcoes,testa:(i,v)=>!v||cfg.filtroExtra.testa(i,v)}]:[]);
   const alternDef=cfg.alternancias||[];
-  const est={modo:modos.some(m=>m[0]===modoSalvo)?modoSalvo:(cfg.modoPadrao||modos[0][0]),data:new Date(),ocultos:new Set(cfg.semTipos?[]:guarda(cfg.chave+'.ocultos',[])),resp:guarda(cfg.chave+'.resp',''),extras:guarda(cfg.chave+'.extras',{}),tog:guarda(cfg.chave+'.tog',{}),mes:'',busca:'',itens:[],tipos:cfg.tipos,opcoes:{responsaveis:[]},eu:{nome:'',role:''},podeEditar:true};
+  const est={modo:modos.some(m=>m[0]===modoSalvo)?modoSalvo:(cfg.modoPadrao||modos[0][0]),data:dataDe(hojeBR()),ocultos:new Set(cfg.semTipos?[]:guarda(cfg.chave+'.ocultos',[])),resp:guarda(cfg.chave+'.resp',''),extras:guarda(cfg.chave+'.extras',{}),tog:guarda(cfg.chave+'.tog',{}),mes:'',busca:'',itens:[],tipos:cfg.tipos,opcoes:{responsaveis:[]},eu:{nome:'',role:''},podeEditar:true};
   let anoCarregado=null;
   const tipo=k=>est.tipos.find(t=>t.k===k)||est.tipos[0]||{k,rotulo:k,glifo:'▪'};
   const cls=k=>tipo(k).classe||('t-'+k);
@@ -119,7 +119,7 @@ const CalMotor=(()=>{
    const passo=(sinal)=>muda(()=>{const d=new Date(est.data);if(est.modo==='year'||(est.modo==='list'&&listaAno())){d.setDate(1);d.setFullYear(d.getFullYear()+sinal)}else if(est.modo==='month'){d.setDate(1);d.setMonth(d.getMonth()+sinal)}else d.setDate(d.getDate()+sinal*(est.modo==='week'?7:1));est.data=d});
    $('#cmPrev')&&($('#cmPrev').onclick=()=>passo(-1));
    $('#cmNext')&&($('#cmNext').onclick=()=>passo(1));
-   $('#cmHoje')&&($('#cmHoje').onclick=()=>muda(()=>{est.data=new Date()}));
+   $('#cmHoje')&&($('#cmHoje').onclick=()=>muda(()=>{est.data=dataDe(hojeBR())}));
    $('#cmIr')&&($('#cmIr').onchange=e=>{if(e.target.value)muda(()=>{est.data=dataDe(e.target.value)})});
    $('#cmAno')&&($('#cmAno').onchange=e=>muda(()=>{const d=new Date(est.data);d.setDate(1);d.setFullYear(Number(e.target.value));est.data=d}));
    $('#cmMes')&&($('#cmMes').onchange=e=>{est.mes=e.target.value;desenhar()});
@@ -172,132 +172,3 @@ const CalMotor=(()=>{
  return api_;
 })();
 
-/* ---------- 2) Configuração do Calendário de Marketing ---------- */
-const CAL_MKT_TIPOS=[
- {k:'REUNIAO',rotulo:'Reunião',glifo:'◷'},
- {k:'COBERTURA',rotulo:'Cobertura foto/vídeo',glifo:'◉'},
- {k:'COMPROMISSO',rotulo:'Compromisso',glifo:'▪'},
- {k:'INTERNA',rotulo:'Atividade interna',glifo:'⚙'},
- {k:'PUBLICACAO',rotulo:'Publicação',glifo:'✎'},
- {k:'PRAZO',rotulo:'Prazo de solicitação',glifo:'⚑'},
- {k:'PLANO',rotulo:'Ação planejada',glifo:'◆'},
-];
-/** Tipos que a equipe escolhe ao cadastrar (publicações e prazos vêm dos próprios registros). */
-const CAL_MKT_TIPOS_FORM=[['REUNIAO','Reunião'],['COMPROMISSO','Compromisso'],['COBERTURA_FOTO','Cobertura fotográfica'],['COBERTURA_VIDEO','Cobertura de vídeo'],['ACAO','Ação institucional'],['INTERNA','Atividade interna']];
-const CAL_SEGMENTOS=['Geral','Infantil','Anos Iniciais','Anos Finais','Ensino Médio'];
-function calMktTipoForm(r){const t=String(r.tipoItem||'').toLowerCase();if(/reuni/.test(t))return 'REUNIAO';if(/v[ií]deo|grava/.test(t))return 'COBERTURA_VIDEO';if(/cobert|foto/.test(t))return 'COBERTURA_FOTO';if(/institucional|a[cç][aã]o/.test(t))return 'ACAO';if(/intern|atividade/.test(t))return 'INTERNA';return 'COMPROMISSO'}
-const calMktRotuloTipo=k=>(CAL_MKT_TIPOS_FORM.find(x=>x[0]===k)||[,'Compromisso'])[1];
-function calMktTipoDe(r){
- const t=String(r.tipoItem||'').toLowerCase();
- if(/reuni/.test(t))return 'REUNIAO';
- if(/cobert|foto|v[ií]deo|grava/.test(t))return 'COBERTURA';
- if(/institucional|a[cç][aã]o/.test(t))return 'ACAO';
- if(/intern|atividade/.test(t))return 'INTERNA';
- if(!t){const ti=String(r.titulo||'').toLowerCase();if(/reuni/.test(ti))return 'REUNIAO';if(/cobertura|grava[cç]/.test(ti))return 'COBERTURA'}
- return 'COMPROMISSO';
-}
-function calMktDataHora(r){
- const bruto=String(r.inicioEm||r.dataInicio||'');
- const data=bruto.slice(0,10);let hora=bruto.length>10?bruto.slice(11,16):'';
- if(hora==='00:00'||String(r.diaInteiro||'').toLowerCase().startsWith('s'))hora='';
- return [data,hora];
-}
-async function calMktCarregar(){
- const [cal,age,con,pn,pl]=await Promise.all([getRows('calendario',true),getRows('agenda',true),getRows('conteudos',true),api('/solicitacoes/painel'),api('/planejamento/painel')]);
- const eu=pn.eu||{nome:'',role:''},gerente=eu.role==='manager';
- const dono=r=>String(r.responsavel||'').trim()!==''&&String(r.responsavel).trim().toLowerCase()===String(eu.nome).trim().toLowerCase();
- const itens=[];
- [['calendario',cal.rows],['agenda',age.rows]].forEach(([modulo,rows])=>(rows||[]).forEach(r=>{
-  const [data,hora]=calMktDataHora(r);if(!data||/CANCEL/i.test(String(r.status||'')))return;
-  const fimR=String(r.dataFim||r.fimEm||'').slice(0,10);itens.push({uid:modulo+':'+r.id,id:r.id,modulo,titulo:r.titulo,data,fim:fimR>data?fimR:'',hora,tipo:calMktTipoDe(r),responsavel:r.responsavel||'',editavel:true,feito:/REALIZ|CONCLU/i.test(String(r.status||'')),raw:r});
- }));
- (con.rows||[]).forEach(r=>{
-  const v=String(r.publicacaoEm||'');if(!v||/ARQUIV/i.test(String(r.status||'')))return;
-  itens.push({uid:'conteudos:'+r.id,id:r.id,modulo:'conteudos',titulo:r.titulo,data:v.slice(0,10),hora:v.length>10?v.slice(11,16):'',tipo:'PUBLICACAO',responsavel:r.responsavel||'',editavel:true,feito:/PUBLICADO/i.test(String(r.status||'')),raw:r});
- });
- (pn.rows||[]).forEach(r=>{
-  if(r.etapa==='CONCLUIDO'||!r.prazoEfetivo)return;
-  itens.push({uid:'solicitacoes:'+r.id,id:r.id,modulo:'solicitacoes',titulo:r.titulo,data:r.prazoEfetivo,hora:'',tipo:'PRAZO',responsavel:r.responsavel||'',editavel:gerente||dono(r),atrasada:!!r.atrasada,raw:r});
- });
- // ações de Planejamento que a equipe marcou para aparecer aqui: é o mesmo registro (nenhuma cópia); mexer nele reflete nos dois lugares
- (pl.acoes||[]).forEach(a=>{
-  if(!a.dataInicio||a.arquivada)return;
-  itens.push({uid:'planejamento:'+a.id,id:a.id,modulo:'planejamento',titulo:a.titulo,data:a.dataInicio,fim:a.dataFim&&a.dataFim>a.dataInicio?a.dataFim:'',hora:'',tipo:'PLANO',responsavel:a.responsavel||'',editavel:a.editavel,feito:a.situacao==='FINALIZADO',atrasada:a.atrasada,raw:a});
- });
- return {itens,opcoes:pn.opcoes,eu};
-}
-/** Reagendar mantém o horário; para eventos de mais de um dia, mantém também a duração. */
-function calMktNovaData(it,nova){
- const r=it.raw,suf=s=>String(s||'').length>10?String(s).slice(10):'';
- if(it.modulo==='conteudos')return {publicacaoEm:nova+suf(r.publicacaoEm)};
- const ini=String(r.inicioEm||r.dataInicio||'').slice(0,10),fim=String(r.fimEm||'').slice(0,10);
- const patch={dataInicio:nova,inicioEm:nova+suf(r.inicioEm)};
- if(fim){const dias=Math.round((CalMotor.dataDe(fim)-CalMotor.dataDe(ini))/86400000);const f=CalMotor.dataDe(nova);f.setDate(f.getDate()+Math.max(0,dias));patch.fimEm=isoDate(f)+suf(r.fimEm)}
- if(r.dataFim&&String(r.dataFim).slice(0,10)>ini){const dias=Math.round((CalMotor.dataDe(String(r.dataFim).slice(0,10))-CalMotor.dataDe(ini))/86400000);const f=CalMotor.dataDe(nova);f.setDate(f.getDate()+dias);patch.dataFim=isoDate(f)}
- return patch;
-}
-async function calMktMover(it,nova){
- if(it.modulo==='planejamento'){await api('/planejamento/mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:it.id,data:nova})});invalidate('projetos');return}
- if(it.modulo==='solicitacoes'){await api('/solicitacoes/editar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:it.id,prazo:nova})});invalidate('solicitacoes');return}
- await api(`/data?module=${it.modulo}&id=${encodeURIComponent(it.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(calMktNovaData(it,nova))});
- invalidate(it.modulo);
-}
-function calMktAbrir(it){
- if(it.modulo==='solicitacoes')return slAbrirExterno(it.id,()=>CAL_MKT.recarregar());
- if(it.modulo==='planejamento')return plAbrirPorId(it.id,()=>CAL_MKT.recarregar());
- if(it.modulo==='conteudos'){state.module='conteudos';return openModal(it.raw)}
- calMktForm(it);
-}
-/** Formulário simples: título, data, horário (opcional), tipo, responsável (opcional), observações (opcional). */
-async function calMktForm(it,dataInicial=''){
- if(pref('safeMode',false))return toast('Modo Seguro ativo: edição bloqueada.','warn');
- const edit=!!it,r=edit?it.raw:{};
- let resp=[];try{resp=((await api('/solicitacoes/painel')).opcoes||{}).responsaveis||[]}catch{}
- if(edit&&it.responsavel&&!resp.includes(it.responsavel))resp=[it.responsavel,...resp];
- const tipoAtual=edit?calMktTipoForm(r):'REUNIAO',tipos=CAL_MKT_TIPOS_FORM;let anexos=String(r.anexos||'').split('|').map(x=>x.trim()).filter(Boolean);
- const o=adminOverlay(`<h3>${edit?'Editar evento':'Novo evento'}</h3>
-  <form id="cmForm" class="cm-form" novalidate>
-   <label class="wide">Título *<input class="control" id="fTitulo" maxlength="140" required autocomplete="off" value="${attr(edit?it.titulo:'')}"></label>
-   <label>Data *<input class="control" type="date" id="fData" required value="${attr(edit?it.data:dataInicial)}"></label>
-   <label>Horário (opcional)<input class="control" type="time" id="fHora" value="${attr(edit?it.hora:'')}"></label>
-   <label>Até (opcional, evento de vários dias)<input class="control" type="date" id="fFim" value="${attr(edit&&it.fim?it.fim:'')}"></label>
-   <label>Tipo de atividade<select class="control" id="fTipo">${tipos.map(([k,l])=>`<option value="${k}" ${k===tipoAtual?'selected':''}>${l}</option>`).join('')}</select></label>
-   <label>Responsável (opcional)<select class="control" id="fResp"><option value="">Sem responsável</option>${resp.map(n=>`<option value="${attr(n)}" ${n===(edit?it.responsavel:'')?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
-   <label>Segmento escolar (opcional)<select class="control" id="fSeg"><option value="">Não se aplica</option>${CAL_SEGMENTOS.map(sg=>`<option value="${attr(sg)}" ${sg===(r.segmento||'')?'selected':''}>${esc(sg==='Geral'?'Toda a escola':sg)}</option>`).join('')}</select></label>
-   <div class="wide cal-anexos"><b>Anexos (opcional)</b><div id="fAnexLista"></div><button type="button" class="softbtn" id="fAnexAdd">Anexar da biblioteca</button></div>
-   <label class="wide">Observações (opcional)<textarea class="control" id="fObs" rows="3" maxlength="1000">${esc(edit?(r.descricao||''):'')}</textarea></label>
-   <div class="cm-erro wide" id="fErro" role="alert"></div>
-   <div class="actions wide">${edit?'<button type="button" class="btn danger-soft" id="fExcluir">Excluir</button>':''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Cancelar</button><button type="submit" class="btn" id="fSalvar">Salvar</button></div>
-  </form>`);
- $('#fTitulo',o.el).focus();
- const pintaAnex=()=>{$('#fAnexLista',o.el).innerHTML=anexos.length?anexos.map((a,i)=>`<div class="cal-anex"><a href="/api/file?path=${encodeURIComponent(a)}" target="_blank" rel="noopener">${esc(a.split('/').pop())}</a><button type="button" class="softbtn" data-rm="${i}" aria-label="Remover anexo">×</button></div>`).join(''):'<small class="kpi-note">Nenhum anexo.</small>';o.el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{anexos.splice(Number(b.dataset.rm),1);pintaAnex()})};pintaAnex();
- $('#fAnexAdd',o.el).onclick=async()=>{const esc2=await arquivosEscolher({tipos:['imagem','video','documento','audio','outro'],multi:true});esc2.forEach(c=>{if(!anexos.includes(c))anexos.push(c)});pintaAnex()};
- $('#cmForm',o.el).onsubmit=async ev=>{
-  ev.preventDefault();const err=$('#fErro',o.el);err.textContent='';
-  const titulo=$('#fTitulo',o.el).value.trim(),data=$('#fData',o.el).value,hora=$('#fHora',o.el).value;
-  if(titulo.length<2){err.textContent='Informe o título.';return}
-  if(!data){err.textContent='Escolha a data.';return}
-  const fimSel=$('#fFim',o.el).value;if(fimSel&&fimSel<data){err.textContent='O dia final não pode ser antes do inicial.';return}
-  const body={titulo,tipoItem:calMktRotuloTipo($('#fTipo',o.el).value),dataInicio:data,inicioEm:`${data}T${hora||'00:00'}`,fimEm:`${data}T${hora||'00:00'}`,diaInteiro:hora?'Não':'Sim',responsavel:$('#fResp',o.el).value,segmento:$('#fSeg',o.el).value,anexos:anexos.join(' | '),descricao:$('#fObs',o.el).value.trim()};
-  if(edit&&r.fimEm&&String(r.fimEm).slice(0,10)!==String(r.inicioEm||r.dataInicio||'').slice(0,10)){ // evento de vários dias: preserva a duração
-   const dias=Math.round((CalMotor.dataDe(String(r.fimEm).slice(0,10))-CalMotor.dataDe(String(r.inicioEm||r.dataInicio).slice(0,10)))/86400000);const f=CalMotor.dataDe(data);f.setDate(f.getDate()+Math.max(0,dias));body.fimEm=`${isoDate(f)}T${hora||'00:00'}`}
-  else if(edit&&hora&&r.fimEm&&String(r.fimEm).length>10&&String(r.fimEm).slice(11,16)>hora)body.fimEm=`${data}T${String(r.fimEm).slice(11,16)}`;
-  body.dataFim=fimSel&&fimSel>data?fimSel:'';if(body.dataFim)body.fimEm=`${body.dataFim}T${hora||'00:00'}`;
-  const btn=$('#fSalvar',o.el);btn.disabled=true;
-  try{
-   if(edit)await api(`/data?module=${it.modulo}&id=${encodeURIComponent(it.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-   else await api('/data?module=calendario',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,status:'PLANEJADO'})});
-   invalidate(edit?it.modulo:'calendario');o.close();toast(edit?'Evento atualizado':'Evento criado');await CAL_MKT.recarregar();
-  }catch(e){err.textContent=e.message;btn.disabled=false}
- };
- $('#fExcluir',o.el)&&($('#fExcluir',o.el).onclick=async()=>{
-  if(!confirm(`Excluir "${it.titulo}"? Ele vai para a Lixeira e pode ser restaurado.`))return;
-  try{await api(`/data?module=${it.modulo}&id=${encodeURIComponent(it.id)}`,{method:'DELETE'});invalidate(it.modulo);invalidate('lixeira');o.close();toast('Evento movido para a Lixeira');await CAL_MKT.recarregar()}catch(e){$('#fErro',o.el).textContent=e.message}
- });
-}
-const CAL_MKT=CalMotor.criar({
- chave:'marketing',tituloPagina:'Calendário de Marketing',eyebrow:'PLANEJAMENTO',
- descricao:'Compromissos, reuniões, coberturas, publicações e prazos das solicitações. Clique em um dia para criar; arraste para reagendar.',
- tipos:CAL_MKT_TIPOS,carregar:calMktCarregar,novo:d=>calMktForm(null,d),abrir:calMktAbrir,mover:calMktMover,
-});
-async function renderCalendar(){return CAL_MKT.render()}

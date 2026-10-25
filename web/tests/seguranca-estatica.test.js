@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),{execFileSync}=require('child_proces
 const WEB=path.join(__dirname,'..');let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(typeof x==='string'?x:JSON.stringify(x)).slice(0,700))};
 const walk=(d,ext,out=[])=>{for(const f of fs.readdirSync(d,{withFileTypes:true})){if(['node_modules','.next','dist'].includes(f.name))continue;const p=path.join(d,f.name);if(f.isDirectory())walk(p,ext,out);else if(ext.some(e=>f.name.endsWith(e)))out.push(p)}return out};
 // 1) SQL: toda interpolação dentro de consulta deve ser identificador/constante conhecida (valores sempre vão por "?")
-const permitido=[/^tab$/,/^t$/,/^table$/,/^dest$/,/^where$/,/^extra$/,/^tipo === 'interno' \? ',role' : ''$/,/^spec\.cols\.join\(','\)$/,/^cols\.join\(','\)$/,/^FILES_TABLE\.cols\.join\(','\)$/,/^ids\.map\(\(\) => '\?'\)\.join\(','\)$/,/^Math\.min\(200, limite\)$/,/^soPublicos \? 'AND interno=0' : ''$/,/^periodo \? 'WHERE periodo=\?' : ''$/];
+const permitido=[/^o\.contas\.map\(\(\) => '\?'\)\.join\(','\) \|\| "''"$/,/^mods\.map\(\(\) => '\?'\)\.join\(','\)$/,/^marcas$/,/^CHAVES_REMOVIDAS\.map\(\(\) => '\?'\)\.join\(','\)$/,/^tab$/,/^t$/,/^table$/,/^dest$/,/^where$/,/^extra$/,/^tipo === 'interno' \? ',role' : ''$/,/^spec\.cols\.join\(','\)$/,/^cols\.join\(','\)$/,/^FILES_TABLE\.cols\.join\(','\)$/,/^ids\.map\(\(\) => '\?'\)\.join\(','\)$/,/^Math\.min\(200, limite\)$/,/^soPublicos \? 'AND interno=0' : ''$/,/^periodo \? 'WHERE periodo=\?' : ''$/];
 const achados=[];
 for(const f of walk(path.join(WEB,'lib'),['.ts']).concat(walk(path.join(WEB,'app'),['.ts']))){if(f.endsWith('migrations.generated.ts'))continue;
  const src=fs.readFileSync(f,'utf8');const re=/\b(q|q1|run|query)\(\s*`([^`]*)`/g;let m;
@@ -19,7 +19,7 @@ t('segredos: nenhum token/chave conhecida nos arquivos versionados',vazou.length
 t('segredos: nenhum arquivo .env versionado',!tracked.some(f=>/(^|\/)\.env(\.|$)/.test(f)&&!/\.example$/.test(f)));
 // 3) APIs perigosas no código
 const js=walk(path.join(WEB,'public'),['.js']).concat(walk(path.join(WEB,'lib'),['.ts']),walk(path.join(WEB,'app'),['.ts']));
-const perigo=[];for(const f of js){const s=fs.readFileSync(f,'utf8');const dw=(s.match(/document\.write\s*\(/g)||[]).length;const permitidoDw=f.endsWith(path.join('public','app.js'))?1:0; // 1 uso revisado: relatório impresso, com esc() em tudo (teste de XSS cobre)
+const perigo=[];for(const f of js){const s=fs.readFileSync(f,'utf8');const dw=(s.match(/document\.write\s*\(/g)||[]).length;const permitidoDw=0;
  if(/\beval\s*\(/.test(s)||/new Function\s*\(/.test(s)||dw>permitidoDw||/dangerouslySetInnerHTML/.test(s)||/child_process/.test(s))perigo.push(path.relative(WEB,f))}
 t('código: sem eval, new Function, document.write, dangerouslySetInnerHTML nem child_process',perigo.length===0,perigo);
 // 4) configuração de cabeçalhos

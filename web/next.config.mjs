@@ -16,16 +16,6 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ['mysql2', 'bcryptjs', 'nodemailer'],
-  // As páginas do Portal das Coordenações só saem pelo servidor, que confere se o Portal está ligado (padrão: desligado).
-  async rewrites() {
-    return {
-      beforeFiles: [
-        { source: '/solicitante.html', destination: '/api/portal/pagina/solicitante.html' },
-        { source: '/portal.js', destination: '/api/portal/pagina/portal.js' },
-        { source: '/manifest-portal.webmanifest', destination: '/api/portal/pagina/manifest-portal.webmanifest' },
-      ],
-    };
-  },
   async headers() {
     return [
       {
@@ -43,7 +33,7 @@ const nextConfig = {
         ],
       },
       // arquivos enviados pelos usuários: CSP própria (sem scripts); a regra vem depois da global e a substitui
-      ...['/api/file', '/api/portal/file', '/api/public/approval/file'].map((source) => ({
+      ...['/api/file'].map((source) => ({
         source,
         headers: [{ key: 'Content-Security-Policy', value: "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self'; frame-ancestors 'none'; sandbox allow-same-origin" }],
       })),

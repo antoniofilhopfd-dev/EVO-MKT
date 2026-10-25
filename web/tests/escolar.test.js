@@ -1,5 +1,5 @@
 // Calendário Escolar: cadastro com validação no servidor, vários dias, segmentos, duplicidade, permissões, separação do Marketing,
-// pedido opcional ao Marketing (Solicitações), filtros/busca, visões e celular. Uso: node escolar.test.js <install.out>
+// criação opcional de uma publicação a partir do evento, camada no Calendário e celular. Uso: node escolar.test.js <install.out>
 const {chromium}=require(process.env.PLAYWRIGHT||'/opt/node-tools/node_modules/playwright');const fs=require('fs');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const BASE=process.env.BASE||'http://127.0.0.1:8080';const B=BASE+'/api';
 let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(typeof x==='string'?x:JSON.stringify(x)).slice(0,500))};
@@ -20,7 +20,7 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  [s]=await call('POST','/escolar/salvar',{titulo:'x'},E);t('a equipe tem acesso a cadastrar (dados inválidos dão 400, não 403)',s===400);
  [s]=await call('POST','/data?module=calescolar',base);t('o /data genérico não grava no calendário escolar (validação obrigatória)',s===400);
  [s]=await call('POST','/data?module=calescolar',base,E);t('nem a equipe pelo /data (403)',s===403);
- [s,r]=await call('GET','/escolar/painel',null,E);t('equipe consulta e também edita',s===200&&r.podeEditar===true&&r.opcoes.segmentos.length===8&&r.opcoes.tipos.length===10,r&&r.opcoes);
+ [s,r]=await call('GET','/escolar/painel',null,E);t('equipe consulta e também edita',s===200&&r.podeEditar===true&&r.opcoes.segmentos.length===7&&r.opcoes.tipos.length===10,r&&r.opcoes);
  t('não há nenhum evento fictício cadastrado de fábrica',r.rows.length===0);
 
  // ---- validação no servidor ----
@@ -62,98 +62,36 @@ const dia=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
  const ev1=await lista();const E2=await (async()=>{const x=await fetch(B+'/auth/login',{method:'POST',headers:J,body:JSON.stringify({codigo:'NAT-3301',senha:senha['NAT-3301']})});return {...J,Cookie:cookie(x)}})();
  t('os registros persistem (nova sessão enxerga os mesmos)',(await call('GET','/escolar/painel',null,E2))[1].rows.length===ev1.length&&ev1.length>=5);
 
- // ---- integração com Solicitações (opcional, nunca automática) ----
- const sols0=(await call('GET','/data?module=solicitacoes'))[1].rows.length;
- t('criar eventos não gerou nenhuma solicitação',sols0===0,sols0);
- [s]=await call('POST','/escolar/solicitar',{id:FEIRA.id,acao:'drone'},E);t('ação desconhecida é recusada',s===400);
- [s,r]=await call('POST','/escolar/solicitar',{id:FEIRA.id,acao:'cobertura_foto'},E);const SOL=r;
- t('a equipe cria "Cobertura fotográfica" a partir do evento, com referência ao evento',s===201&&/Cobertura fotográfica — Feira de Ciências 2026/.test(r.titulo)&&r.eventoEscolarId===FEIRA.id&&r.eventoEscolarAcao==='cobertura_foto'&&r.prazo===dia(10)&&r.origem==='INTERNO',r);
- t('a descrição leva o contexto do evento (data, local e público)',/Pátio central/.test(SOL.descricao)&&/Anos Iniciais|Anos Finais|Ensino Fundamental/.test(SOL.descricao)&&new RegExp(dia(10).split('-').reverse().join('/')).test(SOL.descricao),SOL.descricao);
- [s,r]=await call('POST','/escolar/solicitar',{id:FEIRA.id,acao:'cobertura_foto'});t('pedido repetido é recusado (409) citando o existente',s===409&&r.error.includes(SOL.id),r);
- [s,r]=await call('POST','/escolar/solicitar',{id:FEIRA.id,acao:'arte',observacao:'Usar a identidade do Colégio'});t('"Arte de divulgação" tem prazo com antecedência (7 dias antes)',s===201&&r.prazo===dia(3)&&/identidade/.test(r.descricao),r);
- [s,r]=await call('POST','/escolar/solicitar',{id:FEIRA.id,acao:'video',prazo:dia(9)});t('prazo informado prevalece',s===201&&r.prazo===dia(9));
- [s,r]=await call('POST','/escolar/solicitar',{id:EXC.id,acao:'video'});t('segmento do evento passa para a solicitação (Ensino Médio)',s===201&&r.segmento==='Ensino Médio',r);
- [s,r]=await call('POST','/escolar/solicitar',{id:REU.id,acao:'arte'});t('arte para evento próximo não fica com prazo no passado',s===201&&r.prazo>=new Date(Date.now()-3*3600e3).toISOString().slice(0,10),r);
- const pnl=(await call('GET','/escolar/painel'))[1].rows.find(x=>x.id===FEIRA.id);t('o evento lista as solicitações ligadas a ele',pnl.solicitacoes.length===3&&pnl.solicitacoes.every(x=>/^SOL-/.test(x.id)),pnl.solicitacoes);
- const sp=(await call('GET','/solicitacoes/painel'))[1].rows.find(x=>x.id===SOL.id);t('a solicitação aparece no módulo Solicitações como pendente, com a referência',sp&&sp.etapa==='PENDENTE'&&sp.eventoEscolarTitulo==='Feira de Ciências 2026',sp);
-
+ // ---- publicação a partir do evento (opcional, nunca automática) ----
+ t('criar eventos não gerou nenhuma publicação',(await call('GET','/data?module=conteudos'))[1].rows.length===0);
+ [s,r]=await call('POST','/escolar/publicacao',{id:FEIRA.id,titulo:'Feira de Ciências: chamada'},E);const PUB=r;
+ t('cria uma publicação (Ideia) com data, segmento e origem do evento',s===201&&r.status==='IDEIA'&&r.origemTipo==='calescolar'&&r.origemId===FEIRA.id&&r.publicacaoEm===FEIRA.dataInicio&&r.segmento==='Ensino Fundamental – Anos Iniciais'||r.segmento==='Todos',r);
+ [s,r]=await call('POST','/escolar/publicacao',{id:FEIRA.id,titulo:'Feira de Ciências: chamada'});t('publicação repetida é recusada (409)',s===409);
+ [s]=await call('POST','/escolar/publicacao',{id:'ESC-9999'});t('evento inexistente: 404',s===404);
+ const pnl=(await call('GET','/escolar/painel'))[1].rows.find(x=>x.id===FEIRA.id);t('o evento lista as publicações ligadas a ele',pnl.publicacoes.length===1&&pnl.publicacoes[0].id===PUB.id);
  // ---- excluir ----
- [s]=await call('POST','/escolar/excluir',{id:'ESC-9999'},E);t('equipe tem acesso a excluir (inexistente dá 404, não 403)',s===404);
- [s]=await call('POST','/escolar/excluir',{id:REU.id});const lix=(await call('GET','/data?module=lixeira'))[1].rows;
- t('a Gerência exclui (vai para a Lixeira) e some do calendário',s===200&&!(await lista()).some(x=>x.id===REU.id)&&lix.some(x=>x.titulo==='Reunião geral'));
- t('solicitações já criadas a partir de um evento continuam depois da exclusão dele',(await call('GET','/data?module=solicitacoes'))[1].rows.some(x=>x.id===SOL.id));
+ [s]=await call('POST','/escolar/excluir',{id:'ESC-9999'},E);t('excluir inexistente dá 404',s===404);
+ [s,r]=await call('POST','/escolar/excluir',{id:FEIRA.id});
+ t('excluir apaga o evento e solta as publicações (continuam, sem o vínculo, guardando o nome)',s===200&&r.vinculosDesfeitos===1&&!(await lista()).some(x=>x.id===FEIRA.id)&&(await call('GET','/data?module=conteudos&id='+PUB.id))[1].origemId===''&&(await call('GET','/data?module=conteudos&id='+PUB.id))[1].origemNome==='Feira de Ciências 2026');
+ [s]=await call('POST','/escolar/excluir',{id:REU.id});t('exclui a reunião geral',s===200&&!(await lista()).some(x=>x.id===REU.id));
 
- // ============ INTERFACE ============
- const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
- const errs=[];
- const entra=async(cod,w=1440,h=1000)=>{const p=await (await b.newContext({viewport:{width:w,height:h}})).newPage();p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());await p.goto(BASE+'/');await p.fill('#internalCode',cod);await p.fill('#internalPass',senha[cod]);await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');await p.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:20000}).catch(()=>{});await p.waitForTimeout(800);return p};
- const p=await entra('NAT-3301');
- const mesVista=async(pg=p)=>{await pg.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pg.$('.cm-mes'))){await pg.click('[data-modo="month"]');await pg.waitForSelector('.cm-mes')}};
- const abre=async(pg=p)=>pg.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));
- const setD=(a,b)=>p.evaluate(([x,y])=>{document.querySelector('#eData').value=x;document.querySelector('#eFim').value=y||'';document.querySelector('#eRange')&&document.querySelector('#eRange').click&&0},[a,b]);
- const novoEsc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="esc"]');await pg.waitForSelector('#escForm')};
- await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-semana, .cm-mes, .cm-proximos');
- const sub=await p.$$eval('.cm-tipo',x=>x.map(y=>y.innerText.trim()));
- t('Calendário único: sem faixa de categorias e sem subabas',sub.length===0&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
- await p.evaluate(()=>go('calescolar'));await p.waitForSelector('.cm-semana, .cm-mes');await mesVista();
- t('Calendário escolar aberto pelo calendário único (um botão "+ Novo")',/Novo/.test(await p.$eval('#cmNovo',x=>x.textContent)));
- t('visões Semana, Mês, Dia, Lista e Ano',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
- // eventos de arrastar sintéticos: exercitam os mesmos tratadores (dragstart/dragover/drop) sem depender do gesto do mouse
- const soltar=(txt,data)=>p.evaluate(([txt,data])=>{const s=[...document.querySelectorAll('.cm-item')].find(x=>x.textContent.includes(txt)),d=document.querySelector(`.cm-dia[data-date="${data}"]`),dt=new DataTransfer();s.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));d.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));s.dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}))},[txt,data]);
- const irA=async()=>{await p.fill('#cmIr',dia(10));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(250)};
- await irA();
- let txt=await p.$eval('#cmRaiz',e=>e.innerText);
- t('mostra os eventos cadastrados (e não os do Marketing)',/Feira de Ciências 2026/.test(txt)&&!/Reunião geral/.test(txt));
- // vários dias aparecem em cada dia do período
- await p.fill('#cmIr',dia(30));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(250);
- t('evento de vários dias aparece em cada dia do período (3 células)',(await p.$$eval('.cm-item:has-text("Excursão ao museu")',e=>e.length))>=3);
- await irA();
- // filtros
- await abre();await p.selectOption('#cmExtra3','MEDIO');await p.waitForTimeout(200);txt=await p.$eval('#cmRaiz',e=>e.innerText);
- const semFeira=!/Feira de Ciências/.test(txt);
- await p.fill('#cmIr',dia(7));await p.dispatchEvent('#cmIr','change');await p.waitForTimeout(300);txt=await p.$eval('#cmRaiz',e=>e.innerText); // a prova pode cair em outro mês, conforme o dia do teste
- t('filtro por segmento (Ensino Médio): tira o do Fundamental, mantém "Toda a escola"',semFeira&&/Prova bimestral/.test(txt));
- await abre();await p.selectOption('#cmExtra3','');await p.waitForTimeout(150);
- await p.fill('#cmBusca','feira');await p.waitForTimeout(250);txt=await p.$eval('#cmRaiz',e=>e.innerText);t('pesquisa pelo título',/Feira de Ciências/.test(txt)&&!/Prova bimestral/.test(txt));await p.fill('#cmBusca','');await p.waitForTimeout(250);
- // criar pelo botão e pelo dia
- await novoEsc();
- const campos=await p.$eval('#escForm',e=>e.innerText);t('formulário: Título, Data, Horários, Tipo, Segmentos, Local e Descrição',['Título','Data','Horário inicial','Horário final','Tipo de evento','Local','Segmentos','Descrição'].every(x=>campos.includes(x)),campos);
- t('"Toda a escola" já vem marcado',await p.isChecked('[data-seg="TODOS"]'));
- await p.fill('#eTitulo','Torneio de vôlei');await setD(dia(12),dia(13));await p.selectOption('#eTipo','ESPORTIVA');await p.check('[data-seg="FUND2"]');
- t('marcar um segmento desmarca "Toda a escola"',!(await p.isChecked('[data-seg="TODOS"]')));
- await p.check('[data-seg="MEDIO"]');await p.fill('#eLocal','Ginásio');await p.click('#eSalvar');await p.waitForSelector('#escForm',{state:'detached'});
- const tor=(await lista()).find(x=>x.titulo==='Torneio de vôlei');
- t('criado pela tela, em dois dias e dois segmentos',tor&&tor.dataFim===dia(13)&&tor.segmentos==='FUND2|MEDIO'&&tor.local==='Ginásio',tor);
- await p.click(`.cm-num[data-novo="${dia(11)}"]`);await p.waitForSelector('.cal-escolha');await p.click('.cal-escolha [data-n="esc"]');await p.waitForSelector('#escForm');t('clicar no dia preenche a data',(await p.inputValue('#eData'))===dia(11));
- await p.click('#eRange');await p.waitForSelector('.pp');await p.click('.pp-g button[data-d$="-20"]');await p.click('.pp-g button[data-d$="-22"]');await p.click('.pp .ok');await p.waitForTimeout(200);t('Data e "Até" são escolhidos no mesmo calendário, de uma vez',(await p.inputValue('#eData')).endsWith('-20')&&(await p.inputValue('#eFim')).endsWith('-22')&&/ a /.test(await p.textContent('#eRange')));
- await p.fill('#eTitulo','ab');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});t('erros do servidor aparecem no formulário',/título/i.test(await p.textContent('#eErro')));await p.click('#escForm [data-close]');
- // duplicado na tela
- await novoEsc();await p.fill('#eTitulo','Torneio de vôlei');await setD(dia(12),'');await p.uncheck('[data-seg="TODOS"]').catch(()=>{});await p.check('[data-seg="FUND2"]');await p.check('[data-seg="MEDIO"]');await p.click('#eSalvar');await p.waitForFunction(()=>document.querySelector('#eErro')?.textContent,null,{timeout:8000}).catch(()=>{});
- t('evento repetido é barrado na tela',/já está cadastrado/.test(await p.textContent('#eErro')),await p.textContent('#eErro'));await p.click('#escForm [data-close]');
- // editar, reagendar por arrastar, excluir
- await p.click('.cm-item:has-text("Torneio de vôlei")');await p.waitForSelector('#escForm');t('abrir o evento mostra os dados',(await p.inputValue('#eTitulo'))==='Torneio de vôlei'&&(await p.inputValue('#eLocal'))==='Ginásio');
- await p.fill('#eTitulo','Torneio de vôlei (final)');await p.click('#eSalvar');await p.waitForSelector('#escForm',{state:'detached'});t('editar pela tela',(await lista()).some(x=>x.titulo==='Torneio de vôlei (final)'));await p.waitForSelector('.cm-item:has-text("Torneio de vôlei (final)")');await p.waitForTimeout(300);
- await soltar('Prova bimestral',dia(8));await p.waitForTimeout(1200);t('arrastar reagenda o evento',(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio===dia(8),[await p.textContent('#toast'),(await lista()).find(x=>x.titulo==='Prova bimestral').dataInicio,dia(8),dia(10)]);
- await p.click('.cm-item:has-text("Prova bimestral")');await p.waitForSelector('#eExcluir');
- p.removeAllListeners('dialog');p.once('dialog',d=>d.dismiss());await p.click('#eExcluir');await p.waitForTimeout(400);t('cancelar a confirmação não exclui',(await lista()).some(x=>x.titulo==='Prova bimestral'));
- p.removeAllListeners('dialog');p.once('dialog',d=>d.accept());await p.click('#eExcluir');await p.waitForSelector('#escForm',{state:'detached'});await p.waitForTimeout(400);t('confirmar exclui',!(await lista()).some(x=>x.titulo==='Prova bimestral'));p.on('dialog',d=>d.accept());
- // semana e próximos
- await p.click('[data-modo="week"]');await p.waitForSelector('.cm-semana');const s0=await p.$eval('.cm-periodo',e=>e.textContent);await p.click('#cmNext');await p.waitForTimeout(200);t('navegação semanal',(await p.$eval('.cm-periodo',e=>e.textContent))!==s0);await p.click('#cmHoje');
- await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');const lt=await p.$eval('.cm-proximos',e=>e.innerText);
- t('lista de próximos eventos, em ordem de data',lt.indexOf('Feira de Ciências')>=0&&lt.indexOf('Feira de Ciências')<lt.indexOf('Excursão ao museu'),lt);
- await p.click('[data-modo="month"]');await p.waitForSelector('.cm-mes');
-
- // ---- equipe: só consulta e pede apoio ----
- const pe=await entra('MON-3303');await pe.evaluate(()=>go('calescolar'));await pe.waitForSelector('.cm-semana, .cm-mes');await mesVista(pe);
- await pe.click('#cmNovo');await pe.waitForSelector('.cal-escolha');t('a equipe de Marketing também cria eventos (escolhe o tipo)',true);await pe.evaluate(()=>document.querySelectorAll('.admin-overlay').forEach(x=>x.remove()));
- t('a equipe arrasta eventos',await pe.$eval('.cm-item:has-text("Feira de Ciências")',e=>e.hasAttribute('draggable')));
-
- // ---- celular ----
- const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('calescolar'));await pc.waitForSelector('.cm-semana, .cm-mes');await mesVista(pc);
- t('celular: sem rolagem horizontal (mês)',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
- await pc.click('[data-modo="list"]');await pc.waitForSelector('.cm-proximos');t('celular: lista de próximos eventos sem estourar a tela',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
- await pc.click('[data-modo="week"]');await pc.waitForSelector('.cm-semana');t('celular: semana sem estourar a tela',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
- await novoEsc(pc);t('celular: o formulário cabe na tela',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
- t('sem erros de JavaScript',errs.length===0,errs.join(' | '));
- console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
+ // ============ INTERFACE: camada "Calendário escolar" ============
+ const U=require('./lib/ui');const br=await U.abrir();
+ const p=await U.pagina(br,'NAT-3301','Nat26ab');
+ await U.ir(p,'calendario');
+ await p.evaluate(()=>CAL_UNICO.definirFiltro('modo','list'));await p.waitForTimeout(500);
+ const txt=await U.textoConteudo(p);
+ t('o calendário mostra o evento escolar de dias futuros na lista',/Excursão ao museu/.test(txt)||/Prova bimestral/.test(txt),txt.slice(0,300));
+ t('o item mostra de onde vem (calendário escolar)',/Calendário escolar/.test(await p.innerText('.cm-tipos')));
+ await p.click('.cm-item >> text=Prova bimestral').catch(()=>{});await p.waitForSelector('#escForm',{timeout:8000}).catch(()=>{});
+ t('abrir o evento mostra o formulário com “Criar publicação deste evento”',await p.$('#ePub')!==null);
+ await p.click('#ePub');await p.waitForSelector('#dlgForm');await p.click('#dlgForm button[type=submit]');await p.waitForSelector('#estForm',{timeout:10000});
+ t('criar publicação do evento abre o Estúdio já preenchido',(await p.inputValue('#fTitulo')).includes('Prova bimestral'));
+ t('sem erros de script nem diálogos nativos',p.errs.length===0,p.errs);
+ await br.close();
+ // celular
+ const br2=await U.abrir();const pc=await U.pagina(br2,'NAT-3301','Nat26ab',{width:390,height:800});await U.ir(pc,'calendario');
+ t('celular: o calendário não estoura a largura',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+ await br2.close();
+ console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

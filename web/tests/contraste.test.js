@@ -8,9 +8,8 @@ let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n,x!==
 const pares=[['ink','card'],['ink','page'],['ink-2','card'],['ink-3','card'],['ink-3','page'],['brand','card'],['brand','brand-bg'],['ok','ok-bg'],['bad','bad-bg'],['alert','alert-bg'],['brand-dark','card']];
 for(const [f,b] of pares){const r=ratio(tok(f),tok(b));t(`texto --${f} sobre --${b}`,r>=4.5,r.toFixed(2)+':1')}
 const branco='#FFFFFF';for(const f of ['brand','brand-dark','bad','ok']){const r=ratio(branco,tok(f));t(`texto branco sobre --${f} (botões/faixas)`,r>=4.5,r.toFixed(2)+':1')}
-// Portal: texto branco sobre a cor de cada segmento (a última definição de --seg no portal.css é a que vale)
-const pcss=fs.readFileSync(path.join(__dirname,'../public/portal.css'),'utf8');
-for(const seg of ['infantil','iniciais','finais','medio']){const m=[...pcss.matchAll(new RegExp('segment-'+seg+'\\{--seg:(#[0-9A-Fa-f]{6})','g'))].pop();const r=ratio('#FFFFFF',m[1]);t(`Portal (${seg}): texto branco sobre ${m[1]}`,r>=4.5,r.toFixed(2)+':1')}
+// selos novos das cinco áreas
+for(const [n,fg,bg] of [['selo info','#05608F','#E6F4FD'],['selo aviso (“falta”)','#8A5A00','#FFF4D6'],['selo cinza','#5E6678','#EEF0F5'],['aba ativa','#FFFFFF','#063996'],['botão primário','#FFFFFF','#063996']]){const r=ratio(fg,bg);t(`${n}: ${fg} sobre ${bg}`,r>=4.5,r.toFixed(2)+':1')}
 // o laranja institucional é decorativo (indicador/borda), nunca cor de texto sobre fundo claro
 t('laranja institucional não é usado como cor de texto (só realce)',!/(^|[;{\s])color:\s*var\(--accent\)/.test(css)&&!/(^|[;{\s])color:\s*#FF7800/i.test(css));
 console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);

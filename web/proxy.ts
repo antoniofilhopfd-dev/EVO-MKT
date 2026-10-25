@@ -7,7 +7,6 @@ export function proxy(req: NextRequest) {
   const p = req.nextUrl.pathname;
   if (p.split('/').some((s) => s.startsWith('.') && s !== '')) return new NextResponse('Not found', { status: 404 });
   if (p === '/') return NextResponse.rewrite(new URL('/index.html', req.url));
-  if (p === '/solicitante' || p === '/portal') return NextResponse.rewrite(new URL('/api/portal/pagina/solicitante.html', req.url));
   return NextResponse.next();
 }
 

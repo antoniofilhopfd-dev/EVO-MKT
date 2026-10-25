@@ -1,18 +1,17 @@
 import { Ctx } from '../ctx';
 import { q, run } from '../db';
 import { requireInternal } from '../auth';
-import { audit, getRow, insertRow, listRows, modifyRow, notifyAssignment, trashRow } from '../records';
+import { audit, deleteRow, getRow, insertRow, listRows, modifyRow } from '../records';
 import { CATALOGO, CATALOGO_POR_ID, CATEGORIAS_FERIADO, CATEGORIAS_PADRAO, descreverRegra, ehMovel, normalizarRegra, ocorrencia, Regra } from '../datasComemorativas';
 import { fail, fmtDate, lower, now, Row, strv } from '../util';
 import { json } from './handlers';
-import { criarSolicitacaoInterna } from './solicitacoes';
 
 /**
  * Datas Comemorativas (terceiro calendário). O catálogo e as regras ficam em lib/datasComemorativas.ts; aqui:
  *  - painel: calcula as ocorrências do ano pedido (e dos vizinhos) a partir das regras, sem gravar cada ano no banco;
  *  - datas personalizadas: registros do módulo `datacom` (uma linha por data, com a regra de recorrência);
  *  - relevância e observações sobre o catálogo: tabela datacom_ajustes; categorias criadas pela equipe: datacom_categorias;
- *  - vínculos opcionais: solicitação interna (módulo Solicitações) e ação no Planejamento (projeto), ambos só guardam a referência.
+ *  - vínculo opcional: publicação criada a partir da data (módulo Conteúdos), que só guarda a referência.
  * Nada é criado automaticamente.
  */
 const SIMNAO = (v: unknown) => (['SIM', 'S', '1', 'TRUE'].includes(strv(v).trim().toUpperCase()) ? 'SIM' : 'NAO');
@@ -36,15 +35,13 @@ function camposDaRegra(r: Regra): Row {
   return { regraTipo: r.tipo, regraMes: 'mes' in r ? String(r.mes) : '', regraDia: r.tipo === 'fixa' ? String(r.dia) : '', regraN: r.tipo === 'nesimo' ? String(r.n) : '', regraDiaSemana: r.tipo === 'nesimo' ? String(r.diaSemana) : '', regraOffset: r.tipo === 'pascoa' ? String(r.offset) : '' };
 }
 
-interface Item { uid: string; id: string; origem: 'catalogo' | 'personalizada'; nome: string; categoria: string; data: string; fim?: string; regra: string; movel: boolean; relevante: 'SIM' | 'NAO'; relevanteAjustado: boolean; status: 'confirmada' | 'pendente'; fonte: string; baseLegal: string; descricao: string; observacoes: string; repeteAnual: boolean; editavel: boolean; regraDados?: Row; vinculos: { solicitacoes: Row[]; planejamento: Row[] } }
+interface Item { uid: string; id: string; origem: 'catalogo' | 'personalizada'; nome: string; categoria: string; data: string; fim?: string; regra: string; movel: boolean; relevante: 'SIM' | 'NAO'; relevanteAjustado: boolean; status: 'confirmada' | 'pendente'; fonte: string; baseLegal: string; descricao: string; observacoes: string; repeteAnual: boolean; editavel: boolean; regraDados?: Row; vinculos: { publicacoes: Row[] } }
 
 export async function ocorrencias(anoBase: number, u: Row): Promise<Item[]> {
   const ajustes = new Map((await q('SELECT catalogo_id,relevante,observacoes FROM datacom_ajustes')).map((r) => [String(r.catalogo_id), r]));
-  const sols = (await listRows('solicitacoes')).filter((s) => strv(s.dataComemorativaId));
-  const projs = (await listRows('projetos')).filter((s) => strv(s.dataComemorativaId));
+  const pubs = (await listRows('conteudos')).filter((s) => strv(s.origemTipo) === 'datacom');
   const vinc = (id: string, data: string) => ({
-    solicitacoes: sols.filter((s) => strv(s.dataComemorativaId) === id && strv(s.dataComemorativaData) === data).map((s) => ({ id: s.id, titulo: s.titulo, status: s.status })),
-    planejamento: projs.filter((s) => strv(s.dataComemorativaId) === id && strv(s.dataComemorativaData) === data).map((s) => ({ id: s.id, titulo: s.titulo, modulo: 'projetos', status: s.status })),
+    publicacoes: pubs.filter((s) => strv(s.origemId) === id && strv(s.origemData) === data).map((s) => ({ id: s.id, titulo: s.titulo, status: s.status })),
   });
   const out: Item[] = [];
   const anos = [anoBase - 1, anoBase, anoBase + 1];
@@ -129,7 +126,7 @@ export async function datacomRoute(c: Ctx): Promise<Response> {
     const id = strv((await c.body()).id);
     const cur = (await getRow('datacom', id)) ?? fail(404, 'Só datas cadastradas pela equipe podem ser excluídas (as do catálogo não).');
     
-    await trashRow('datacom', id, u.codigo); // Lixeira: pode ser restaurada
+    await deleteRow('datacom', id, u.codigo);
     return json({ ok: true });
   }
 
@@ -174,53 +171,20 @@ export async function datacomRoute(c: Ctx): Promise<Response> {
     return item;
   };
 
-  if (path === '/datacom/solicitar' && method === 'POST') {
+  // Nova publicação a partir da data: cria um Conteúdo (IDEIA) com título, data e origem; o cadastro da comemoração não é copiado.
+  if (path === '/datacom/publicacao' && method === 'POST') {
     const b = await c.body();
     const item = await ocorrenciaDe(strv(b.id), strv(b.data));
-    const texto = strv(b.texto).trim() || 'Produzir arte para o Instagram';
-    if (texto.length < 3 || texto.length > 120) fail(400, 'Descreva o que solicitar (3 a 120 letras).');
-    const hoje = fmtDate(new Date());
-    let prazo = strv(b.prazo).trim();
-    if (prazo && !dataValida(prazo)) fail(400, 'Prazo inválido.');
-    if (!prazo) {
-      if ((item.fim ?? item.data) < hoje) fail(409, 'Essa data já passou neste ano; escolha um prazo ou outro ano.');
-      const d = new Date(item.data + 'T12:00:00');
-      d.setDate(d.getDate() - 2);
-      const sug = fmtDate(d);
-      prazo = sug < hoje ? hoje : sug;
+    const titulo = (strv(b.titulo).trim() || `Publicação: ${item.nome}`).slice(0, 140);
+    if (titulo.length < 3) fail(400, 'Dê um título à publicação.');
+    for (const p of await listRows('conteudos')) {
+      if (strv(p.origemTipo) === 'datacom' && strv(p.origemId) === item.id && strv(p.origemData) === item.data && lower(strv(p.titulo)) === lower(titulo)) fail(409, `Essa publicação já existe (${p.id}).`);
     }
-    const titulo = `${texto} — ${item.nome}`;
-    for (const s of await listRows('solicitacoes')) {
-      if (strv(s.dataComemorativaId) === item.id && strv(s.dataComemorativaData) === item.data && lower(strv(s.titulo)) === lower(titulo) && !['CONCLUÍDA', 'CANCELADA'].includes(strv(s.status).toUpperCase()))
-        fail(409, `Já existe essa solicitação para esta data (${s.id}).`);
-    }
-    const descricao = [`Data comemorativa: ${item.nome}`, `Data: ${brData(item.data)}`, strv(b.observacao).trim() ? `Observação: ${strv(b.observacao).trim()}` : ''].filter(Boolean).join('\n');
-    const nova = await criarSolicitacaoInterna(u, { titulo, descricao, prazo, prioridade: 'MÉDIA', responsavel: strv(b.responsavel).trim(), solicitante: String(u.nome) },
-      { dataComemorativaId: item.id, dataComemorativaNome: item.nome, dataComemorativaData: item.data });
-    await audit(String(u.codigo), 'solicitar-da-data', 'datacom', item.id);
-    return json(nova, 201);
-  }
-
-  // Ação no Planejamento: cria um Projeto (status PLANEJAMENTO) que só guarda a referência à data; o cadastro da comemoração não é copiado.
-  if (path === '/datacom/planejar' && method === 'POST') {
-    const b = await c.body();
-    const item = await ocorrenciaDe(strv(b.id), strv(b.data));
-    const acao = strv(b.acao).trim() || `Ação para ${item.nome}`;
-    if (acao.length < 3 || acao.length > 140) fail(400, 'Descreva a ação planejada (3 a 140 letras).');
-    const prazo = strv(b.prazo).trim() || item.data;
-    if (!dataValida(prazo)) fail(400, 'Prazo inválido.');
-    const resp = strv(b.responsavel).trim();
-    
-    for (const p of await listRows('projetos')) {
-      if (strv(p.dataComemorativaId) === item.id && strv(p.dataComemorativaData) === item.data && lower(strv(p.titulo)) === lower(acao)) fail(409, `Essa ação já está no Planejamento (${p.id}).`);
-    }
-    const novo = await insertRow('projetos', {
-      titulo: acao, status: 'PLANEJAMENTO', prioridade: 'MÉDIA', responsavel: resp, prazo, dataInicio: prazo, categoriaPlano: ['CAMPANHAS', 'CONTEUDOS', 'EVENTOS', 'PROJETOS', 'INSTITUCIONAL'].includes(strv(b.categoria).toUpperCase()) ? strv(b.categoria).toUpperCase() : 'CONTEUDOS', segmento: 'Geral',
-      descricao: `Ação planejada a partir da data comemorativa "${item.nome}" (${brData(item.data)}).` + (strv(b.observacao).trim() ? `\n${strv(b.observacao).trim()}` : ''),
-      origem: 'DATA_COMEMORATIVA', dataComemorativaId: item.id, dataComemorativaNome: item.nome, dataComemorativaData: item.data,
+    const novo = await insertRow('conteudos', {
+      titulo, status: 'IDEIA', canal: 'Instagram', publicacaoEm: item.data, mensagem: `Data comemorativa: ${item.nome} (${brData(item.data)}).`,
+      origemTipo: 'datacom', origemId: item.id, origemData: item.data, origemNome: item.nome, responsavel: strv(b.responsavel).trim(),
     }, u.codigo);
-    await notifyAssignment('projetos', novo, null, String(u.nome));
-    await audit(String(u.codigo), 'planejar-da-data', 'datacom', item.id);
+    await audit(String(u.codigo), 'publicacao-da-data', 'datacom', item.id);
     return json(novo, 201);
   }
 

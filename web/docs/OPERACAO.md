@@ -1,218 +1,68 @@
-# EVO MKT — Operação, configuração e procedimentos
+# EVO MKT v6 — Operação, configuração e procedimentos
 
-Complementa `DEPLOY_HOSTINGER.md` (publicação) e `GUIA_INTEGRACOES.md` (Meta e Google).
+Complementa `DEPLOY_HOSTINGER.md` (publicação), `GUIA_INTEGRACOES.md` (Meta e Google) e `RELATORIO_V6.md` (o que mudou na reestruturação).
 
-## 1. Instalação e execução local
+## 1. As cinco áreas
+| Área | Para que serve |
+|---|---|
+| **Dashboard** | O que o Marketing precisa decidir hoje: cartões de publicações (planejadas, aprovadas, agendadas, publicadas, aguardando revisão, sem arte, sem legenda, sem data), próximas publicações, resumo orgânico e de tráfego (separados), melhor conteúdo, no máximo 3 insights e alertas de integração. Cada cartão abre os registros que contou. |
+| **Calendário** | Uma tela só com camadas: publicações, planejamento editorial (campanhas editoriais), calendário escolar, datas comemorativas, feriados, Google Agenda e agendas do Google somente leitura. Visões Mês, Semana, Dia e Lista, botão Hoje, criar ao clicar no dia, reagendar arrastando. Cada item mostra de onde vem. |
+| **Instagram** | Quatro abas: **Visão geral** (só orgânico), **Conteúdos** (fluxo e Estúdio), **Planejamento** (pauta do mês, ideias, campanhas editoriais, modelos e hashtags) e **Desempenho** (por perfil, segmento, formato, tema, objetivo, campanha editorial, dia e horário; orgânico × impulsionado só com vínculo confirmado). “Nova publicação” existe nas quatro. |
+| **Tráfego Pago** | **Somente consulta** à Meta Ads (Visão geral, Campanhas, Anúncios, CSV e PDF A4). Criar, editar, ativar e pausar anúncios continua no Gerenciador de Anúncios da Meta. Leads, matrículas e funil comercial pertencem ao EVO CRM e não aparecem. |
+| **Configurações** | Geral, Perfis e segmentos, Acessos internos, Instagram, Meta Ads, Google, IA, E-mail, Backup e restauração, Auditoria e Prontidão. |
+
+Filtros globais (período, perfil, segmento, formato, campanha editorial) valem em todas as áreas, ficam guardados no navegador, mostram sempre o intervalo e podem ser limpos. Quando uma tela não consegue aplicar um filtro (ex.: perfil em Tráfego Pago, que a Meta não separa), o filtro aparece desativado com o motivo — nunca é ignorado em silêncio. Fuso de todos os cálculos: **America/Fortaleza**.
+
+## 2. Fluxo da publicação
+`Ideia → Rascunho → Em produção → Em revisão → Aprovado → Agendado → Publicado` (mais *Arquivado*).
+- A revisão e a aprovação são **internas** (quem decide fica registrado com data e versão); não existe Portal nem link externo de aprovação.
+- Aprovar, agendar e confirmar a publicação têm botão próprio e conferem os requisitos no servidor (a edição comum não pula etapas). Para agendar: título, legenda, data e hora, arte final, perfil e formato (e, para publicar sozinho no Instagram, arte em JPEG ou vídeo MP4/MOV).
+- *Agendado* é interno; só vira *Publicado* quando a Meta confirma (publicação automática) ou quando alguém confirma com o link da publicação.
+- **Materiais** da publicação: referência, arquivo em produção, arquivo final e miniatura, com versões (substituir guarda a anterior) e link do Google Drive (só o link; o sistema não copia nada do seu Drive).
+- **Estúdio** (editor): prévias de Feed, Stories e Reels, contadores de legenda (2.200) e hashtags (30), duração do roteiro, CTA, link de destino com UTM, modelos, grupos de hashtags, salvamento automático a cada 20 s, aviso de alterações não salvas, comparação de versões do texto, copiar legenda, duplicar, adaptar para o outro perfil e compartilhar nos dois perfis. A IA só gera **rascunhos** de variação de legenda e fica desligada até haver uma chave (Configurações › IA).
+
+## 3. Instalação e execução local
 ```bash
 cd web && npm install
 cp .env.example .env.local        # preencha DB_*, SESSION_SECRET, APP_KEY, SETUP_KEY (npm run gerar:segredos)
 npm run dev                       # http://localhost:3000
 # 1ª vez: http://localhost:3000/api/setup?key=SUA_SETUP_KEY  → mostra as fichas e os acessos temporários
-npm run typecheck                 # verificação de tipos (não há script de lint no projeto)
-npm run build                     # next build --webpack (a Hostinger não tem os binários nativos do Turbopack)
+npm run typecheck
+npm run build                     # next build --webpack
 ```
 Requisitos: Node ≥ 20 (testado com 22), MySQL/MariaDB. O disco do app é descartável: **anexos e backups ficam no banco**.
 
-## 2. Variáveis de ambiente
+## 4. Variáveis de ambiente
 Obrigatórias: `DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD SESSION_SECRET APP_KEY PUBLIC_URL`. Instalação: `SETUP_KEY` (**remover depois**). Recuperação de acesso: `RECOVERY_KEY` (**remover depois**).
-Opcionais: `NOTIFY_TO MAIL_FROM SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD` (e-mails), `CRON_SECRET` (cron), `TIMEZONE SESSION_HOURS BACKUP_KEEP MAX_UPLOAD_MB LOGIN_IP_MAX LOGIN_GLOBAL_MAX LOGIN_DELAY_MS`, `TRUSTED_PROXY_HOPS` (padrão 1), `FERIADOS`, `LIMITE_SOBRECARGA`, `ANTHROPIC_API_KEY IA_MODEL`, `DB_POOL`.
-Só para testes/simulação: `META_GRAPH_BASE META_OAUTH_BASE GOOGLE_* MAIL_LOG IG_POLL_MS IG_POLL_TRIES`. Exemplo comentado em `.env.example`. A tela **Administração → Integrações → Prontidão** confere o que falta.
+Opcionais: `NOTIFY_TO MAIL_FROM SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD` (e-mails), `CRON_SECRET`, `TIMEZONE` (padrão America/Fortaleza), `SESSION_HOURS BACKUP_KEEP MAX_UPLOAD_MB LOGIN_IP_MAX LOGIN_GLOBAL_MAX LOGIN_DELAY_MS`, `TRUSTED_PROXY_HOPS`, `DB_POOL`.
+A chave da IA (Anthropic) fica criptografada no banco e é cadastrada em Configurações › IA. Só para testes: `META_GRAPH_BASE META_OAUTH_BASE GOOGLE_* ANTHROPIC_API_BASE MAIL_LOG IG_POLL_MS`. Configurações › Prontidão confere o que falta.
 
-## 3. Migrações
-`db/migrations/NNN_*.sql` são embutidas em `lib/migrations.generated.ts` (`npm run prebuild`) e aplicadas ao iniciar o app; o que já foi aplicado fica em `schema_migrations`. São idempotentes (`IF NOT EXISTS`; erros 1050/1060/1061/1091 tolerados). Nunca edite uma migração já aplicada em produção: crie a próxima. Testes: instalação nova (toda suíte) e **atualização de instalação existente com dados** (`tests/migracoes.test.js`, 7 verificações). Aplicadas hoje: 001 base · 002 acesso/integrações · 003 arquivos/backups · 004 índices · 005 log de backup · 006 histórico de status · 007 notificações · 008 publicações do Instagram · 009 links de aprovação · 010 comentários, checklists e snapshots de anúncios.
+## 5. Migrações
+`db/migrations/NNN_*.sql` são embutidas em `lib/migrations.generated.ts` (`npm run prebuild`) e aplicadas ao iniciar; o que já foi aplicado fica em `schema_migrations`. Nunca edite uma migração já aplicada: crie a próxima.
+**Migração 027 (cinco áreas):** antes de mexer em qualquer dado ela faz um **backup completo (com anexos)** e uma cópia de tudo que vai sair (arquivo `_legadov6`, só para consulta); se o backup falhar, a migração para sem alterar nada. Depois converte status e segmentos, transforma anexos e arquivos em materiais das publicações e grava o **relatório** (Configurações › Backup e restauração): o que foi removido, mantido e migrado, e os arquivos sem vínculo (nada é apagado da biblioteca; a exclusão é uma decisão sua, com backup antes). O histórico de ações em anúncios (`ads_acoes`, `ads_criacoes`, `ads_lancamentos`) fica preservado, sem escrita nova. Em instalação nova não há o que proteger e o backup é dispensado.
 
-## 4. Autenticação
-- **Dois modos** (Administração → Acessos): *código* (um código pessoal) ou *senha* (6 a 8 caracteres, letras e números, bcrypt). A Gerência escolhe; o modo ativo não foi alterado por esta entrega.
-- Sessão: cookie `evo_sid` assinado (HMAC), `HttpOnly`, `SameSite=Strict`, `Secure` em HTTPS, guardada no banco, expira em `SESSION_HOURS`. Logout e troca de senha encerram as sessões (a troca mantém só a atual). O Portal usa token em cabeçalho (`X-Portal-Token`).
-- Limite de tentativas por IP, por conta e global; atraso fixo em falhas; aparelhos novos são registrados na auditoria. IP real = fim de `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`).
-- **Recuperação de senha:** o usuário pede em "Esqueci"; a resposta é igual exista a conta ou não; a Gerência recebe aviso e gera senha temporária (troca obrigatória). Não há link de redefinição por e-mail.
-- Links de aprovação sem login: token de 64 hex, hash no banco, uso único, validade 1–30 dias, limite de tentativas por IP.
+## 6. Acesso e permissões
+- Só a equipe de Marketing entra (`users`): **Administrador** (tudo, inclusive acessos, integrações, backup, auditoria) e **Equipe** (opera Calendário, Instagram e consulta Tráfego; não vê integrações, backup nem auditoria — o servidor devolve 403). Não existe Portal de coordenações.
+- Modos de entrada: código pessoal ou código + senha (6 a 8 caracteres, letras e números). Sessão em cookie `evo_sid` (HMAC, HttpOnly, SameSite=Strict), limite de tentativas por IP, por conta e global, aparelho novo registrado na auditoria. Recuperação: a pessoa pede, a Administração gera um acesso temporário; emergência: `/api/recover` com `RECOVERY_KEY` (remova depois).
+- Cada pessoa pode ter e-mail (Configurações › Acessos internos) para avisos de atribuição.
+- O calendário pode ser visto **sem login, somente leitura**, por um link temporário (Calendário › “Link de leitura para a direção”): mostra só publicações em revisão, aprovadas, agendadas e publicadas; rascunhos e ideias nunca aparecem; só o hash do link fica guardado.
 
-## 5. Permissões (verificadas no servidor)
-| Perfil | Pode |
-|---|---|
-| **Gerência** (`manager`) | Tudo: administração, acessos, integrações, backups, indicadores, relatórios salvos, automações |
-| **Equipe** (`team`) | Ler os módulos operacionais; criar/editar nos módulos de trabalho (`TEAM_WRITE`); reatribuir só o que é seu; excluir só o que criou ou é seu; decidir revisão de conteúdo **se for o revisor indicado**. Não lê Configurações; recebe 403 em todas as rotas `/admin/*`, `/backup*`, `/integrations/*`, `/indicadores`, `/insights`, `/reports/save` |
-| **Coordenação (Portal)** | Só `/portal/*`: criar, ver e acompanhar demandas **do(s) próprio(s) segmento(s)**, responder complementações, aprovar/pedir ajustes, anexar, comentar, avaliar (nota e NPS). Não altera status, responsável, prazo nem segmento |
-A interface esconde o que o perfil não usa, mas **não é a barreira**: `tests/integridade.test.js` e `tests/seguranca.test.js` chamam a API direta. *Administrador* e *Gerente* compartilham o papel `manager`; não há motivo técnico hoje para um terceiro papel (registrado como limitação).
+## 7. Backup e restauração
+Automático diário (ao usar o sistema) e manual (Configurações › Backup e restauração). Formato 2 com manifesto (contagem e SHA-256 por tabela); o backup novo é validado antes de valer; restaurar valida, guarda um backup de segurança, aplica numa transação e nunca devolve IDs já usados. Backup antigo da v5 pode ser restaurado: os registros de módulos que não existem mais (Solicitações, Tarefas etc.) não voltam ao sistema. Fora do backup: variáveis de ambiente (guarde `APP_KEY` e `SESSION_SECRET` em cofre), publicações já feitas na Meta/Google e `ig_posts` (recalculado na próxima sincronização). Faça também cópia do banco pelo phpMyAdmin e **nunca teste restauração em produção**.
 
-## 6. Backup e restauração
-- Automático diário (ao usar o sistema) e manual (Administração → Backups). Formato 2: manifesto com contagem e SHA-256 por tabela; o backup recém-criado é validado antes de valer; **Validar** e **Restaurar** na tela.
-- **Cobertura:** registros de todos os módulos, cabeçalhos, contadores e IDs usados, avisos, fichas de acesso (Equipe e Portal), configurações das integrações (segredos criptografados), vínculos do Google, publicações do Instagram, **histórico de status, notificações, links de aprovação, comentários, checklists e snapshots de anúncios**, trilha de auditoria (últimos 20 mil eventos, informativa) e, no backup "completo", os **anexos**.
-- **Fora do backup:** variáveis de ambiente (guarde `APP_KEY` e `SESSION_SECRET` em cofre: sem a `APP_KEY` os tokens salvos não abrem), publicações já feitas no Instagram/Google, `ig_posts` (recalculado na próxima sincronização) e sessões ativas.
-- Restauração: valida → cria backup de segurança → aplica numa transação (falha desfaz tudo) → IDs nunca voltam atrás → sessões do Portal são encerradas. Testada em ambiente isolado (`backup.test.js`, 28 verificações, incluindo backup corrompido, adulterado, sem Gerência e anterior às tabelas novas). **Nunca teste sobre a produção.** Além disso, faça cópia do banco pelo phpMyAdmin.
+## 8. Tráfego Pago (regras de segurança)
+Tokens só no servidor (criptografados); nada de segredo no navegador nem nos logs; datas, conta, versão e nível validados; paginação das consultas à Meta; miniaturas só de endereços https da Meta; sem raspagem; sem dados simulados em produção (sem conta, sem permissão `ads_read` ou com token expirado a tela mostra o estado vazio com o que fazer); qualquer método diferente de GET nas rotas `/trafego/*` responde 405 e as rotas antigas de criar/editar/pausar não existem (404). Indicadores: CTR, CPC e custo por conversa são recalculados dos valores absolutos; conversas iniciadas contam uma vez por conversa; o alcance do total não soma o das campanhas; a Meta pode ajustar números por até 72 horas.
 
-## 7. Testes
-`tests/run-web.sh [suíte…]` (build de produção + MariaDB local + servidores simulados da Meta e do Google). Suítes: `api acesso integrations instagram ads importar recover codigo backup integridade operacao notificacoes insights extras trabalho conteudo ui ui2 ui3 ui4 ui5 ui6 ui7 ui8 ui9 ui10 contraste seguranca-estatica seguranca xss migracoes responsive`. Auditoria de dependências: `npm audit --omit=dev`.
+## 9. Testes
+`tests/run-web.sh [suíte…]` (build de produção + MariaDB local + servidores simulados da Meta e do Google; `SKIP_BUILD=1` reaproveita o build). Suítes: `api acesso codigo recover integrations instagram contas backup integridade notificacoes conteudo fluxo removidos trafego filtros painel cinco migracoes escolar datacom auditoria seguranca-estatica seguranca contraste responsive desempenho insights`. Veja o resultado completo em `RELATORIO_V6.md`.
 
-## 8. Procedimentos operacionais
-- **Rotina diária:** olhar *Visão geral → Central Operacional* (alertas, SLA, notificações). O resumo por e-mail chega pelo cron `/api/cron/alertas`.
-- **Semanal:** conferir a Prontidão, o log de integrações e o último backup (Administração → Backups → Verificar integridade dos dados).
-- **Mensal:** salvar o relatório integrado no histórico; conferir `FERIADOS` e os acessos ativos.
-- **Token da Meta expirou / permissão desmarcada:** Administração → Integrações → Reconectar (a Prontidão e a central avisam).
-- **Esqueci o acesso da Gerência:** definir `RECOVERY_KEY` no painel, usar `/api/recover`, **remover a variável**.
-- **Suspeita de vazamento:** trocar `SESSION_SECRET` (derruba todas as sessões), `CRON_SECRET`, senha do banco; trocar `APP_KEY` só reconectando as integrações depois.
+## 10. Procedimentos
+- **Diário:** Dashboard (alertas, publicações sem arte/legenda/data).
+- **Semanal:** Configurações › Prontidão, log das integrações e último backup; Auditoria › integridade dos dados.
+- **Token da Meta expirou / permissão desmarcada:** Configurações › Instagram › Reconectar.
+- **Esqueci o acesso do Administrador:** `RECOVERY_KEY` + `/api/recover`, depois **remover a variável**.
+- **Suspeita de vazamento:** trocar `SESSION_SECRET` (derruba as sessões), `CRON_SECRET` e a senha do banco; trocar `APP_KEY` só reconectando as integrações depois.
+- **Cron (Hostinger):** publicação no Instagram a cada 10 min (`tarefa=publicar`) e sincronização 1 vez por dia (`tarefa=sincronizar`); os comandos aparecem em Configurações › Prontidão.
 
-## 9. Limitações conhecidas
-Sem paginação no servidor (volume atual não exige; reavaliar acima de ~5 mil registros por módulo). Sem Gantt. Sem API do TikTok/YouTube (planejamento e confirmação manual). Sem indicadores institucionais (não há fonte autorizada). Integrações reais Meta/Google/Anthropic não validadas (dependem de credenciais; testadas só com servidores simulados). Sem teste com leitor de tela real. Demandas anteriores à migração 006 não têm histórico.
-
-
-## Estúdio de publicações (v5.3.0)
-Conteúdo → **Estúdio de publicações**: semana editorial com arrastar-e-soltar (reagenda mantendo a hora), coluna "Sem data", filtros por perfil/etapa/formato, datas comemorativas no dia e dica de melhor horário (calculada dos posts reais; abaixo de 8 posts não sugere nada).
-- **Novo post:** título, perfil, formato, legenda (contador de 2.200), hashtags (contador de 30), CTA, data/hora, revisor, mídia e prévia aproximada do Instagram. Três botões: *Salvar rascunho* (PRODUÇÃO), *Enviar para aprovação* (REVISÃO) e *Agendar* (PROGRAMADO, exige data).
-- **Grupos de hashtags:** salvos no servidor (`/api/studio/hashtags`), até 30 grupos de 30 tags.
-- Nada é publicado sozinho: a publicação automática segue exigindo a opção marcada, status Aprovado/Agendado e mídia anexada.
-- **Link de aprovação do post (direção, sem login):** com o post em REVISÃO, o compositor tem "Gerar link para a direção aprovar". A pessoa vê a mídia, a legenda e as hashtags, e aprova ou pede ajustes (comentário obrigatório). Link de uso único, 7 dias; a resposta muda a etapa para APROVADO ou PRODUÇÃO, grava no histórico e avisa a Gerência e o responsável.
-- **Publicar agora:** só publica conteúdo APROVADO ou PROGRAMADO (o servidor recusa o resto). A Gerência pode aprovar e publicar numa só ação, com confirmação. Carrossel segue manual.
-- **Desempenho (área Instagram):** alcance, salvamentos e compartilhamentos são lidos das 30 publicações mais recentes a cada sincronização; as demais mostram "—".
-- **Calendário compartilhável (somente leitura):** Estúdio → "Compartilhar calendário" (Gerência). Gera um link por 30 dias para a direção ver os próximos posts (em aprovação, aprovados, agendados e publicados), sem login. Rascunhos e ideias nunca aparecem. Só o hash do link fica guardado: o endereço aparece uma vez, na criação. "Gerar novo link" invalida o anterior; "Desativar" encerra na hora.
-- **Fechamento Mensal:** além da produção, traz Instagram (seguidores, alcance, interações, engajamento, melhores publicações), atendimento (SLA, tempo, avaliação, NPS) e tráfego (investimento, conversas, leads). "Imprimir / PDF" leva tudo com a logo.
-
-## Tráfego (Meta Ads, somente leitura)
-- **Visão do mês** (Tráfego): saúde da conta (ativa, pagamento pendente, teto de gasto), indicadores do mês contra o mês anterior, **orçamento do mês** (número de acompanhamento definido pela Gerência) com projeção, **gasto por dia** (30 dias) e **anúncios** (melhor custo por resultado, gasto sem resultado, reprovados com o motivo da Meta).
-- **Alertas novos:** conta com problema, teto de gasto a 90%, orçamento estourado ou ritmo acima do orçamento, entrega parada (3 dias fechados sem gasto com campanha ativa) e anúncio reprovado.
-- **Dashboard de Tráfego (relatório semanal em PDF):** botão "Relatório semanal (PDF)" no Tráfego, só Gerência. Lê a Meta na hora para o período escolhido (padrão: última semana de domingo a sábado, até 31 dias) e monta o mesmo modelo usado hoje: indicadores do mês (parcial) e da semana, investimento diário por campanha, resumo por campanha e detalhamento por anúncio com a foto do criativo. Subtítulo e observações são editáveis antes de imprimir. No diálogo de impressão: Salvar como PDF, A4, marcar "Gráficos de segundo plano". Conversas = conversas iniciadas pelos anúncios; CTR = cliques ÷ impressões; CPC = gasto ÷ cliques.
-
-## Gestor de Anúncios (Fase 1)
-Tráfego → **Gestor de anúncios** (só Gerência). Cria e gere anúncios de verdade, que vão **ativos** ao ar após a análise da Meta. Impulsionar: Instagram → Desempenho → botão **Impulsionar** na publicação. A tela de resumo mostra objetivo, público, total comprometido (R$/dia × dias) e o teto do mês; só libera depois de marcar a confirmação. Travas: teto por campanha, teto mensal (gasto do mês + campanhas em andamento + a nova), duração máxima, cidade obrigatória, pedido com chave única (não duplica) e compensação em caso de falha no meio (pausa e remove a campanha incompleta). **Pausar**, **Retomar** e **Pausar tudo** estão na mesma tela. Todo lançamento fica registrado (`ads_lancamentos`), gera aviso à Gerência e entra no backup. Detalhes e primeiro teste real em `GESTOR_DE_ANUNCIOS_DESENHO.md`.
-
-## Gerenciador de Anúncios (Etapa A)
-Tráfego → **Gerenciador** (só Gerência). Lê a conta de anúncios inteira (não só o que o sistema lançou): campanhas > conjuntos > anúncios, com ligado/pausado, estado na Meta, orçamento, resultados conforme o objetivo, custo por resultado, gasto, impressões, alcance, CTR e CPC, para hoje, 7/30 dias, mês ou período livre (até 93 dias). Dá para: ligar/pausar pelo interruptor, **editar** nome, orçamento diário ou total, início, término e público do conjunto (idade e raio), **duplicar** (a cópia nasce pausada, como na Meta), **arquivar** e **excluir** (exige confirmação). Regras: só mexe em objeto da conta escolhida; respeita os tetos do Gestor; a gestão precisa estar ligada; tudo vai para o **Histórico de alterações** (quem, quando, antes e depois) e as mudanças graves avisam a Gerência.
-
-## Nova campanha completa (Etapa B)
-Tráfego → Gerenciador → **+ Nova campanha**: todos os objetivos da Meta (reconhecimento, tráfego, engajamento, cadastros, vendas, app), com público detalhado, orçamento diário ou total, datas, lance e criativo (publicação do Instagram ou imagem do Estúdio). A revisão mostra o total comprometido e o teto do mês; só lança depois da confirmação, ativa. Tabela de objetivos e exigências em `GESTOR_DE_ANUNCIOS_DESENHO.md`.
-
-## Programar e postar no Instagram pelo sistema
-- **Fluxo:** Instagram → Estúdio → Novo post → legenda, hashtags, mídia → *Enviar para aprovação* → após **Aprovado**, *Agendar* (Gerência agenda direto). Com "Publicar no Instagram automaticamente" marcado (padrão em posts novos), o cron publica na data e hora marcadas.
-- **Trava de aprovação:** a Equipe só agenda depois de Aprovado; a Gerência pode agendar direto.
-- **Hashtags:** o campo de hashtags entra no fim da legenda publicada. Marcando "hashtags no primeiro comentário", a legenda sai limpa e o sistema comenta as hashtags logo após publicar (se o comentário falhar, o post continua publicado e o erro vai ao registro).
-- **Carrossel:** selecione de 2 a 20 arquivos (JPEG/MP4/MOV) de uma vez no campo Mídia. Enviar novos arquivos substitui todos.
-- **Falhas:** o post fica com a falha visível no editor ("A publicação automática falhou: …") com o botão **Tentar de novo**; a Gerência recebe notificação (e e-mail, se configurado).
-- **Cron de publicação (Hostinger → Cron Jobs, a cada 10 minutos):** o comando aparece em Admin → Prontidão ("Cron de PUBLICAÇÃO no Instagram"): `curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/integracoes?tarefa=publicar`. A Prontidão avisa se há posts agendados e o cron não rodou nos últimos 30 minutos.
-
-## Conversas no WhatsApp (anúncios)
-Cadastre o **WhatsApp do Colégio** (DDI+DDD, ex.: +5583999999999) em Tráfego → Gestor de anúncios. Ele é usado ao **Impulsionar** com o objetivo "Conversas no WhatsApp" e vem preenchido na Nova campanha (Engajamento/Cadastros → Conversas → WhatsApp). O número precisa estar ligado à Página no Business Manager da Meta.
-
-## Recursos opcionais de Instagram e Tráfego (ligue o que quiser)
-**Instagram**
-- **Ranking** (Instagram → Ranking): métricas completas por mês e por ano (seguidores e variação, alcance, visualizações, visitas, interações, curtidas, comentários, compartilhamentos, salvamentos, posts, reels) com ▲▼ contra o período anterior; posts do mês/ano com todas as métricas e ordenação; **Carregar histórico** (12 meses); **Informar seguidores de um mês** (só meses sem registro automático).
-- **Relatório mensal em PDF:** `/relatorio-instagram.html` (Gerência), com comparação com o mês anterior e top 5 publicações.
-- **Modelos de legenda:** no editor do post, "Modelos de legenda" guarda/usa legenda + CTA + hashtags.
-- **Melhor horário por formato:** aparece na dica do Estúdio (formatos com 4+ posts lidos).
-- A semana do Estúdio já tem arrastar e soltar para reagendar.
-
-**Tráfego** (Tráfego → "Regras, relatório automático e custo por matrícula"; Gerenciador → Comparar anúncios / Salvar rascunho)
-- **Regras automáticas** (desligadas): a cada sincronização do cron, anúncios ativos que gastaram ≥ R$ X em N dias sem resultado, ou com custo por resultado acima de um limite, geram aviso (notificação + e-mail) ou são pausados (exige a gestão ligada). Há "ver o que a regra pegaria agora" (simulação, sem mexer em nada).
-- **Relatório semanal por e-mail** (desligado): toda segunda-feira, resumo da semana anterior com link do PDF. Precisa de e-mail de avisos e do cron `?tarefa=sincronizar`.
-- **Custo por matrícula:** informe as matrículas de cada mês; o sistema divide pelo investimento.
-- **Comparar anúncios:** ranking por custo por resultado no período, com Pausar.
-- **Rascunho de campanha:** "Salvar rascunho" em qualquer passo da Nova campanha; continuar depois pelo passo 1.
-- **Alerta novo:** custo por resultado subindo (7 dias contra os 7 anteriores).
-
-## Duas (ou mais) contas de Instagram
-- **Conectar:** Administração → Integrações → Instagram → Conectar (ou Reconectar) e marque **todas as Páginas** com os Instagram do Colégio. Depois, em "Contas acompanhadas pelo sistema", marque as contas e salve; clique em Sincronizar.
-- **Separado por conta:** um seletor de conta aparece em Instagram → Estúdio, Desempenho e Ranking. Métricas mensais/anuais, seguidores, melhores posts, melhor horário e relatório mensal em PDF são sempre de uma conta só. Cada post do Estúdio tem o campo **Conta do Instagram** (publica pela conta escolhida).
-- **Colab:** no post, campo "Colab com (@usuário; até 3)". O post é publicado como colaboração: aparece nos dois perfis depois que o convidado aceita o convite no Instagram. Vale para Feed e Reels.
-- **Anúncios:** ao impulsionar, o sistema usa a conta e a Página dona da publicação. A conta de anúncios é uma só (a escolhida em Integrações).
-
-## Tráfego: somente leitura por padrão
-- **Padrão:** o Tráfego só LÊ e mostra métricas (painel do mês, relatório semanal em PDF, alertas, Gerenciador em leitura com "Comparar anúncios", custo por matrícula e relatório semanal por e-mail). Não aparecem os botões de criar, editar, pausar, duplicar nem Impulsionar, e o servidor recusa (403) qualquer escrita.
-- **Modo completo (opcional):** Administração → Integrações → Anúncios → "Modo completo". Libera Gestor de anúncios, Impulsionar, Nova campanha, edição/pausa e regras automáticas. Depois, siga o guia do Gestor (ligar a gestão e reconectar a Meta com ads_management).
-- **Alertas:** anúncios com problema aparecem agrupados por motivo.
-
-## Tráfego em 3 níveis (Campanha → Conjunto → Anúncio)
-Tráfego → **Gerenciador** (Gerência), somente leitura por padrão:
-- **Abas:** Hierarquia | Campanhas | Conjuntos | Anúncios. Clicar no nome de uma campanha abre os conjuntos dela; no de um conjunto, os anúncios. Um aviso "Filtrado em…" com **Ver tudo** mantém o contexto; período, busca e status continuam ao navegar.
-- **Códigos:** cada objeto recebe um código interno estável do EVO MKT (CAM-0001, CJ-0001, AN-0001). O ID da Meta é mostrado ao lado e nunca é trocado.
-- **Métricas em cada nível:** investimento, impressões, alcance, frequência, cliques, CTR, CPC, CPM, conversas, custo por conversa, leads, CPL, resultado e custo por resultado.
-- **Detalhes:** status na Meta (como a API devolve), orçamento, datas, e no conjunto: localização, idade, gênero, plataformas e posicionamentos, otimização, evento de conversão, destino e lance; no anúncio: formato, título, texto, descrição, botão, link, publicação do Instagram, Página e perfil usados.
-- **Orçamento:** três números separados: planejado no EVO MKT (mês), configurado na Meta (campanhas ativas, por dia) e gasto no mês.
-- **Comparar:** marque 2 ou mais anúncios e use "Comparar selecionados": métricas lado a lado, com melhor/pior destacados só pela comparação numérica (CTR, conversas e leads: maior é melhor; CPC, CPM e custos: menor é melhor).
-- **Vínculo com Conteúdo:** em Detalhes do anúncio, ligue-o a um Conteúdo do EVO MKT (liga produção orgânica à mídia paga). É um registro local; nada muda na Meta.
-- **Criar/publicar/pausar:** só no modo completo (Administração → Integrações → Anúncios), com confirmação, tetos, auditoria (quem, quando, antes/depois, resposta da Meta) e a campanha incompleta removida se a Meta recusar. Credenciais da Meta ficam só no servidor.
-- **Ainda não existe:** biblioteca de criativos separada e rascunho local de conjunto/anúncio dentro de uma campanha existente (hoje o assistente "Nova campanha" cria campanha, conjunto e anúncio de uma vez).
-
-## Tráfego: painel novo (visual)
-Com a conta de anúncios escolhida, Tráfego abre num painel único: investimento do mês em destaque (com variação contra o mês anterior) e barra do orçamento com projeção; seis indicadores (alcance, impressões, cliques, CTR, resultados e custo por resultado) com variação e minigráfico; gráfico "Por dia" (investimento, resultados, cliques ou impressões; 7, 14 ou 30 dias; dica ao passar o mouse ou com as setas do teclado; tabela alternativa); investimento por campanha; anúncios do mês (tabela ordenável, status com texto e ícone); alertas agrupados; atalho "Campanhas e anúncios" para o Gerenciador de 3 níveis. Sem conta de anúncios escolhida, a tela antiga continua aparecendo.
-
-## Solicitações (tela única) e Portal das Coordenações suspenso
-
-**Solicitações.** Uma área só, com cadastro rápido (título, descrição, solicitante, segmento, responsável, prazo, prioridade, anexos opcionais), Kanban e lista, e **4 etapas**: Pendente, Em andamento, Em aprovação e Concluído. Por baixo continuam os 9 status originais (nada foi migrado); a tela só traduz. A Gerência distribui e move qualquer solicitação; a equipe avança, uma etapa por vez, só as que estão com ela (Iniciar → Enviar para aprovação ou Concluir). A aprovação só existe quando a solicitação está marcada como "Precisa de aprovação" (as vindas do Portal pedem por padrão). Cada solicitação tem comentários, anexos e histórico; filtros por responsável, segmento, status e prazo; atrasadas ficam marcadas. A tarefa automática não é mais criada por essa tela (a solicitação já é o item de trabalho).
-
-**Portal das Coordenações.** Suspenso por padrão (`portal_ativo` ausente ou `0`). Enquanto suspenso: `/solicitante`, `/solicitante.html`, `/portal.js` e o manifesto respondem 503/404; login, pedidos, anexos, comentários, avisos e links de aprovação de **demandas** respondem 503; sessões antigas deixam de valer. Nada é apagado: código, tabelas, códigos de acesso, solicitações, histórico, comentários e anexos permanecem. Pedidos por WhatsApp ou presenciais são cadastrados em Solicitações. Para religar: Administração → faixa "Portal das Coordenações" → "Reativar o Portal" (só a Gerência, com confirmação; fica na auditoria). Os links de aprovação de posts (direção) não dependem do Portal.
-
-## Calendários (Marketing e Escolar)
-
-**Calendário de Marketing** (`Planejamento → Calendário de Marketing`): compromissos e reuniões da equipe, coberturas foto/vídeo, atividades internas, publicações planejadas (Conteúdos) e **prazos das solicitações** (lidos do próprio registro, sem cópia; arrastar um prazo ou editá-lo na solicitação altera a mesma data). Visões Mês, Semana e Dia; criar clicando no dia, no espaço livre ou em "+ Novo evento"; editar, excluir (vai para a Lixeira) e reagendar arrastando; filtros por tipo e responsável. Tarefas, campanhas e eventos continuam nos seus módulos.
-
-**Calendário Escolar** (`Planejamento → Calendário Escolar`): eventos e atividades oficiais do Colégio, em módulo próprio (`calescolar`), sem mistura com o de Marketing. Cadastro com título, data (um ou vários dias), horários opcionais, segmentos (Educação Infantil, Fund. Anos Iniciais, Fund. Anos Finais, Ensino Médio, Administrativo, Direção ou Toda a escola), tipo, local e descrição. Visões Mês, Semana e Próximos eventos; filtros por segmento e tipo; pesquisa pelo título. O servidor valida datas, horários, segmentos, tipo e **duplicidade** (mesmo título, data e segmentos). Só a Gerência cadastra/edita/exclui/reagenda; a equipe consulta e pode, opcionalmente, **pedir apoio ao Marketing** a partir do evento (cobertura fotográfica, vídeo ou arte): vira uma solicitação interna que guarda a referência ao evento. Nada é criado automaticamente e **nenhuma data escolar vem pré-cadastrada**: o calendário oficial deve ser lançado a partir das informações do Colégio. Datas comemorativas terão calendário próprio (ainda não implementado).
-
-Código: o motor comum (`CalMotor`, em `public/calmkt.js`) serve aos calendários; cada um tem sua configuração (`calmkt.js`, `calescolar.js`).
-
-## Datas Comemorativas (terceiro calendário)
-
-`Planejamento → Datas Comemorativas`. Independente do Calendário de Marketing e do Escolar: nada se mistura sozinho.
-
-**Como as datas funcionam.** O catálogo e as regras ficam no código (`lib/datasComemorativas.ts`); cada ano é **calculado** pela regra, então não há registro por ano no banco e as datas aparecem nos anos seguintes sozinhas. Regras: dia fixo (dia/mês; 29/02 só em ano bissexto), móvel por dia da semana do mês (ex.: 2º domingo de maio, último, etc.), relativa à Páscoa (algoritmo de Meeus/Jones/Butcher, testado de 2024 a 2030) e mês inteiro (campanhas). A equipe pode cadastrar datas próprias (uma linha em `records`, módulo `datacom`, com a regra), criar categorias novas e marcar a **relevância** de qualquer data (ajuste guardado em `datacom_ajustes`; sem ajuste vale a sugestão inicial do catálogo). Migração `019_datas_comemorativas.sql` (duas tabelas pequenas, incluídas no backup).
-
-**Verificação.** Cada item do catálogo traz a **fonte e a base legal** conferidas (ver a tela de detalhe). O que não foi confirmado fica **pendente de validação** e não aparece como oficial nem permite criar ações (hoje: 8/12 Imaculada Conceição e 24/6 São João em João Pessoa). Carnaval e Corpus Christi aparecem como **ponto facultativo**, não como feriado.
-
-**Uso.** Visões Mês, Ano e Lista; filtros por categoria, mês, ano, Feriados, Datas educacionais, pendentes e "Somente datas relevantes"; pesquisa pelo nome. Ao abrir uma data: marcar relevância/observações, **Criar ação no Planejamento** (cria um Projeto em PLANEJAMENTO com a referência `dataComemorativaId/Nome/Data`) e **Criar solicitação** (usa o fluxo de Solicitações; guarda a mesma referência). Nenhuma publicação ou ação é criada automaticamente.
-
-## Planejamento, Dashboard e menu (v5.15.0)
-- **Planejamento** (menu Organização) mostra "o que o marketing pretende realizar": ações com título, objetivo, segmento, categoria (Campanhas, Conteúdos, Eventos, Projetos, Ações institucionais), datas, responsável e observações. Visões mensal, semanal e lista; filtros por segmento, responsável, categoria, período e busca; situações Planejado / Em execução / Finalizado; duplicar (recorrentes), arquivar e excluir (Lixeira).
-- O acompanhamento é calculado só pelas solicitações vinculadas (contagens reais, sem percentuais inventados). A produção continua em **Solicitações**; Planejamento não duplica dados, apenas aponta para elas.
-- Vínculos opcionais, guardados na própria ação ou no registro filho, sem cópias: solicitações (uma ou várias), evento do Calendário Escolar, data comemorativa e conteúdo. Editar a ação não altera o evento/data original. Nada é criado automaticamente.
-- Armazenamento: reaproveita `projetos` (projetos antigos aparecem como ações; nada foi apagado ou migrado destrutivamente). Tarefas internas e Eventos ficam como abas dentro de Planejamento; Agenda abre no Calendário de Marketing.
-- **Dashboard** (Visão geral): solicitações pendentes/em andamento/atrasadas, compromissos dos próximos 7 dias, próximos eventos escolares, ações da semana e entregas recentes — tudo de dados reais.
-- **Menu**: Visão geral · Organização (Solicitações, Planejamento, Calendários) · Marketing · Gestão · Administração (Configurações, Usuários e permissões, Integrações, Backup e segurança). Telas antigas continuam acessíveis (redirecionamentos), nenhum registro ficou inacessível.
-
-## Segurança (revisão da v5.15.0)
-Verificada pela suíte `auditoria`: todas as rotas novas exigem login (401); escritas sem `X-EVO` são recusadas (403); equipe não executa ações de Gerência/Administração (403); JSON inválido, corpo/campo gigante e texto com SQL/HTML tratados sem 500 e sem execução; criar/reagendar/arquivar/excluir ficam no registro de operações; Portal das Coordenações segue suspenso (503). Consultas usam parâmetros; credenciais nunca são devolvidas pela API.
-
-## Implantação na Hostinger
-1. `main` aciona o build automático (pasta raiz `web`, Node 22). A migração 019 roda sozinha no primeiro start; nenhuma migração já aplicada foi alterada.
-2. Faça backup antes (Administração → Backup e segurança).
-3. Pendências de configuração (não são código): cron `publicar` a cada 10 min; trocar segredos que passaram pelo chat; conferir o deploy; fornecer o calendário oficial do Colégio.
-4. O Portal só volta com o interruptor em Administração, com confirmação explícita.
-
-## Reorganização final (v5.16.0): nove módulos
-- **Menu**: Dashboard · Planejamento · Calendário · Instagram · Tráfego Pago · Arquivos · Relatórios · Equipe · Configurações. Nada foi excluído: o que saiu do menu continua acessível dentro de um desses módulos e os links antigos redirecionam.
-- **Planejamento** (abas *Ações* e *Solicitações*; menu *Mais*: Tarefas internas, Eventos, Campanhas). Projetos viraram Ações (mesmo armazenamento). As campanhas internas de Planejamento **não** são as campanhas de anúncios, que continuam em Tráfego Pago.
-- **Calendário único**: compromissos, reuniões, coberturas, publicações, prazos de solicitações, ações planejadas, eventos escolares, datas comemorativas e feriados, com filtros por categoria e visão semanal por padrão (também Mês, Dia e Lista). Cada item abre o formulário da sua origem e reagendar altera o registro original; nada é copiado. Datas ainda pendentes de validação ficam só no cadastro de datas; entram no calendário as confirmadas e marcadas como relevantes. Eventos ou ações com mais de 7 dias aparecem só no primeiro dia.
-- **Instagram**: abas *Estúdio*, *Conteúdos*, *Aprovações*, *Métricas*; menu *Mais*: Editorial, Ideias, Templates, Desempenho, Ranking. Conteúdos é o mesmo registro de antes (nenhum cadastro duplicado com o Calendário).
-- **Tráfego Pago**: sem alterações de módulo (Tráfego e Gerenciador).
-- **Arquivos**: Biblioteca, Entregas e Anexos (anexos das solicitações, lidos direto do registro, sem duplicar armazenamento).
-- **Relatórios**: o cartão "Fechamento mensal" duplicado foi retirado; o Fechamento mensal completo é a segunda aba.
-- **Configurações**: *Perfil e preferências* (todos) e *Administração* (só Administrador: acessos, integrações, avisos, auditoria, backups).
-
-## Perfis: Administrador, Gerente e Equipe
-- A migração 020 cria `users.admin`. **Todas as Gerentes que já existiam viram Administradoras**, então nada deixa de funcionar. Novas fichas podem ser criadas como Gerente (sem administração).
-- **Administrador**: tudo, incluindo usuários e perfis, códigos de acesso, integrações (conectar/desconectar Meta e Google, tokens, contas), backup/restauração, auditoria, importação, integridade, interruptor do Portal, modo de login e LGPD.
-- **Gerente**: opera todos os módulos (distribui solicitações, edita Calendário Escolar e Datas, vê Equipe, Relatórios, status das integrações e pode sincronizar), mas não administra o sistema.
-- **Equipe**: vê e edita só o que é dela.
-- Sempre precisa existir ao menos um Administrador ativo (não pode ser rebaixado, desativado, excluído nem anonimizado). Backups antigos (sem a coluna) restauram com as Gerentes daquela época como Administradoras.
-- O modo de login (senha ou código) não foi alterado e o Portal das Coordenações continua suspenso.
-
-## LGPD (o que se aplica)
-- **Exportar dados** de uma pessoa (Administração → Acessos): ficha (sem senha/código), registros em que aparece, comentários e operações, em JSON.
-- **Anonimizar**: remove nome e acesso, desativa a ficha e limpa o e-mail na Equipe, preservando o histórico, que continua apontando para o código da ficha. Pede confirmação e fica no registro de operações. Não existe exclusão de registros operacionais por regra de preservação de dados.
-- **Retenção**: sessões e tentativas de login expiram sozinhas; a auditoria e o histórico são mantidos. Prazos formais de retenção por tipo de dado dependem de decisão do Colégio (encarregado/DPO); o sistema ainda não apaga nada por prazo.
-
-## Desempenho
-Medido com 16.000 registros (5.000 solicitações, 5.000 tarefas, 3.000 conteúdos, 3.000 projetos): a pior resposta foi o painel de Planejamento, com cerca de 0,5 s; as demais ficaram abaixo de 0,12 s. Por isso **não foi implementada paginação no servidor** (suíte `desempenho`; revisar se o volume passar de dezenas de milhares de registros).
-
-## Seis módulos (v5.17.0)
-
-- Menu: Dashboard, Calendário, Instagram, Tráfego Pago, Arquivos e Configurações. As telas antigas saíram da navegação; os dados continuam no banco e no backup.
-- Perfis: **Administrador** (acesso total, inclui Usuários, Integrações, Segurança e Backup) e **Equipe de Marketing** (operação). A migração 021 converte quem era Gerente sem permissão de administração em Equipe; sempre existe ao menos um Administrador ativo.
-- Arquivos: biblioteca em `BIBLIOTECA/<pasta>/`; renomear e mover não alteram a referência; arquivos em uso por publicações/criativos não podem ser excluídos.
-- Tráfego Pago: seções Visão Geral, Gerenciador de Anúncios, Criativos, Públicos, Análises, Orçamentos, Alertas, Relatórios e Histórico. Preferências (colunas, filtros, visões, layout) são salvas por usuário. Não há CRM: só conversas, custo por conversa e leads como métrica oficial da Meta.
-- Implantação: a migração 021 roda no build (prebuild). Push na `main` aciona o deploy da Hostinger — só com autorização.
-- Dependem de credenciais reais da Meta (não validadas aqui): escrita em lote, quebras por posicionamento, públicos personalizados, séries diárias e saúde da integração.
-- Matriz completa: `docs/AUDITORIA_17-10.md`.
-
-## Criar campanha, conjunto e anúncio separados (v5.17.23)
-
-No Gerenciador, o botão **+ Criar** pergunta o que criar: **Campanha**, **Conjunto de anúncios** (dentro de uma campanha existente) ou **Anúncio** (dentro de um conjunto existente), como no Gerenciador da Meta. Cada um passa por **Conferir** (nada é enviado antes) e **nasce pausado**; quem ativa é a pessoa, depois de conferir. O assistente de **campanha completa** continua existindo, mas ele cria tudo de uma vez e **vai ao ar ativo**.
-Regras: só com o modo completo ligado (Administrador) e a permissão `ads_management`; respeita os tetos de gasto, a duração máxima e o orçamento mínimo; campanha com orçamento próprio (CBO) dispensa orçamento no conjunto; cada criação fica no histórico do Gerenciador e é protegida contra duplicidade. Validado só contra o simulador da Meta: o primeiro uso real deve ser supervisionado.
+## 11. Limitações conhecidas
+Sem paginação no servidor para as listas de publicações (medido com 4.000 publicações e 4.000 posts: pior resposta ~1,5 s). Sem API do TikTok/YouTube (planejamento e confirmação manual). As integrações reais Meta/Google/Anthropic dependem das suas credenciais e foram testadas contra servidores simulados. Sem teste com leitor de tela real.

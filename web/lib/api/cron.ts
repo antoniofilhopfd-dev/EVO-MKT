@@ -8,7 +8,7 @@ import { adsSync } from '../integrations/metaads';
 import { resumoOperacional } from '../insights';
 import { intLog, setting } from '../settings';
 import { igPublishDue, igSync, metaConnected, metaRefreshIfNeeded } from '../integrations/meta';
-import { gCalendarSync, gConnected, gDriveSendEntregas, gSheetsExport } from '../integrations/google';
+import { gCalendarSync, gConnected } from '../integrations/google';
 import { json } from './handlers';
 
 /** Autenticação dos endpoints de cron: Authorization: Bearer CRON_SECRET (comparação em tempo constante). */
@@ -20,7 +20,6 @@ function cronAuth(c: Ctx): void {
   if (a.length !== b.length || !timingSafeEqual(a, b)) fail(401, 'Não autorizado.');
 }
 
-import { enviarRelatorioSemanal, rodarRegras } from '../integrations/metaadsExtras';
 export async function cronRoute(c: Ctx): Promise<Response> {
   cronAuth(c);
   if (c.path === '/cron/ping') return json({ ok: true, quando: now() });
@@ -35,8 +34,6 @@ async function integracoes(what: string): Promise<Row> {
     try { out[name] = await fn(); } catch (e: any) { out[name] = 'ERRO: ' + e.message; await intLog('cron', 'erro', `${name}: ${e.message}`); }
   };
   if (what === 'publicar' || what === 'tudo') await step('instagram-publicar', async () => ({ publicados: await igPublishDue() }));
-  if (what === 'regras' || what === 'sincronizar' || what === 'tudo') await step('ads-regras', () => rodarRegras());
-  if (what === 'relatorio' || what === 'sincronizar' || what === 'tudo') await step('ads-relatorio-semanal', () => enviarRelatorioSemanal());
   if (what === 'sincronizar' || what === 'tudo') {
     if (await metaConnected()) {
       await step('instagram-token', async () => { await metaRefreshIfNeeded(); return 'ok'; });
@@ -45,20 +42,12 @@ async function integracoes(what: string): Promise<Row> {
     }
     if (await gConnected()) {
       if (await setting('g_calendar_id')) await step('google-agenda', () => gCalendarSync());
-      await step('google-planilhas', () => gSheetsExport());
-      if ((await setting('g_auto_drive_entregas')) === '1') {
-        await step('google-drive', async () => {
-          let n = 0;
-          for (const r of await listRows('solicitacoes')) if (r.arquivosEntrega) n += await gDriveSendEntregas(r.id);
-          return { arquivos: n };
-        });
-      }
     }
   }
   return out;
 }
 
-/** Alertas de prazo: a cada pessoa com e-mail na ficha da Equipe e o resumo da Gerente. */
+/** Alertas de prazo: a cada pessoa com e-mail cadastrado em Acessos internos e o resumo do Marketing. */
 async function alertas(): Promise<Row> {
   await run('DELETE FROM sessions WHERE expira<?', [Math.floor(Date.now() / 1000)]).catch(() => {});
   await run('DELETE FROM login_attempts WHERE quando < ?', [Math.floor(Date.now() / 1000) - 86400]).catch(() => {});
@@ -66,10 +55,10 @@ async function alertas(): Promise<Row> {
   const FECHADOS = /CONCLU|PUBLICADO|APROVADO|CANCEL|ARQUIV|ENTREGUE|FINAL/i;
   type Item = { mod: string; titulo: string; due: string; resp: string; atraso: boolean };
   const itens: Item[] = [];
-  for (const mod of ['solicitacoes', 'tarefas', 'projetos', 'conteudos', 'eventos']) {
+  for (const mod of ['conteudos']) {
     for (const r of await listRows(mod)) {
       if (FECHADOS.test(`${r.status ?? ''} ${r.triagemStatus ?? ''}`)) continue;
-      const due = String((mod === 'solicitacoes' ? r.prazoNegociado || r.prazoSLA || r.prazo || '' : r.prazo ?? r.dataInicio ?? '')).slice(0, 10);
+      const due = String(r.publicacaoEm ?? r.prazo ?? r.dataInicio ?? '').slice(0, 10);
       if (!due || due > amanha) continue;
       itens.push({ mod, titulo: r.titulo ?? r.id, due, resp: String(r.responsavel ?? '').trim(), atraso: due < hoje });
     }
@@ -79,7 +68,7 @@ async function alertas(): Promise<Row> {
     if (op.length) await notifyMail('Resumo diário do EVO MKT', `Operação:\n${op.join('\n')}`);
     return { enviados: 0, resumo: op.length > 0, itens: 0 };
   }
-  const br = (d: string) => parseLocal(d + 'T12:00:00').toLocaleDateString('pt-BR', { timeZone: env('TIMEZONE', 'America/Recife') });
+  const br = (d: string) => parseLocal(d + 'T12:00:00').toLocaleDateString('pt-BR', { timeZone: env('TIMEZONE', 'America/Fortaleza') });
   const linha = (i: Item) => `- [${i.mod}] ${i.titulo} — ${i.atraso ? 'ATRASADO desde ' : 'vence '}${br(i.due)}${i.resp ? ` (${i.resp})` : ''}`;
   const porPessoa: Record<string, Item[]> = {};
   for (const i of itens) if (i.resp) (porPessoa[i.resp] ??= []).push(i);

@@ -1,5 +1,5 @@
 // Datas Comemorativas: catálogo e regras (fixas e móveis) verificados, recorrência sem duplicar, cadastro com validação, relevância,
-// categorias, vínculos com Solicitações e Planejamento, permissões, filtros e celular. Uso: node datacom.test.js <install.out>
+// categorias, criação de publicação a partir da data, camada no Calendário e celular. Uso: node datacom.test.js <install.out>
 const {chromium}=require(process.env.PLAYWRIGHT||'/opt/node-tools/node_modules/playwright');const fs=require('fs');
 const out=fs.readFileSync(process.argv[2],'utf8');const pw=k=>out.match(new RegExp(k+'[^:]*: (\\S+)'))[1];const BASE=process.env.BASE||'http://127.0.0.1:8080';const B=BASE+'/api';
 let ok=0,bad=0;const t=(n,c,x)=>{c?ok++:bad++;console.log(c?'OK  ':'FAIL',n);if(!c&&x!==undefined)console.log('    ',String(typeof x==='string'?x:JSON.stringify(x)).slice(0,600))};
@@ -78,8 +78,7 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('POST','/datacom/salvar',{...base,id:ANIV.id,nome:'Aniversário do Colégio Evolução',regra:{tipo:'fixa',dia:'15',mes:'3'}},E);t('o autor edita (nome e regra)',s===200&&r.titulo==='Aniversário do Colégio Evolução');
  t('a edição vale para todos os anos (15/03)',dataDe(await painel(2027),ANIV.id,2027)==='2027-03-15');
  [s]=await call('POST','/datacom/excluir',{id:'natal'});t('datas do catálogo não se excluem (404)',s===404);
- [s]=await call('POST','/datacom/excluir',{id:BIS.id},M);t('a equipe exclui (vai para a Lixeira)',s===200);
- t('a exclusão vai para a Lixeira',(await call('GET','/data?module=lixeira'))[1].rows.some(x=>x.titulo==='Dia bissexto da escola'));
+ [s]=await call('POST','/datacom/excluir',{id:BIS.id},M);t('a equipe exclui a data cadastrada',s===200&&!(await painel(2026)).itens.some(x=>x.id===BIS.id));
 
  // ---- relevância ----
  [s]=await call('POST','/datacom/relevancia',{id:'dia-do-trabalho',relevante:'TALVEZ'});t('valor inválido de relevância é recusado',s===400);
@@ -98,88 +97,27 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  [s,r]=await call('POST','/datacom/categoria',{nome:'Esportes e Olimpíadas'},E);const CAT=r;t('a equipe cria uma categoria nova',s===201&&/^CAT_/.test(r.codigo)&&(await painel(2026)).categorias.some(c=>c.codigo===CAT.codigo&&c.personalizada));
  [s,r]=await call('POST','/datacom/salvar',{nome:'Dia do Desafio',categoria:CAT.codigo,regra:{tipo:'nesimo',n:'-1',diaSemana:'3',mes:'5'},repeteAnual:'SIM',relevante:'SIM'});t('data na categoria nova; "último dia da semana do mês" (última quarta de maio 2026 = 27/05)',s===201&&dataDe(await painel(2026),r.id,2026)==='2026-05-27');
 
- // ---- vínculos: Solicitações e Planejamento ----
- const NATAL26='2026-12-25',DP26=dataDe(await painel(2026),'dia-do-professor',2026);
- [s,r]=await call('POST','/datacom/solicitar',{id:'natal',data:'2026-12-24'});t('só aceita a data real da ocorrência (24/12 não é Natal)',s===404);
- [s]=await call('POST','/datacom/solicitar',{id:'sao-joao-jp',data:'2026-06-24'});t('data PENDENTE não gera solicitação (409)',s===409);
- const sols0=(await call('GET','/data?module=solicitacoes'))[1].rows.length;
- [s,r]=await call('POST','/datacom/solicitar',{id:'dia-das-criancas',data:'2026-10-12'});const SOL=r;
- if(s===409)console.log('   (obs.: a data de hoje pode estar após 12/10; teste de prazo padrão ajustado)');
- const hoje=new Date().toISOString().slice(0,10);
- [s,r]=await call('POST','/datacom/solicitar',{id:'natal',data:NATAL26,texto:'Produzir arte para o Instagram',observacao:'Usar o tema do ano'},E);const SN=r;
- t('cria solicitação interna (usando o fluxo de Solicitações) com referência à data',s===201&&/Produzir arte para o Instagram — Natal/.test(r.titulo)&&r.origem==='INTERNO'&&r.dataComemorativaId==='natal'&&r.dataComemorativaData===NATAL26&&r.etapa==='PENDENTE'&&/Usar o tema/.test(r.descricao),r);
- t('prazo padrão: 2 dias antes da data (23/12)',SN.prazo==='2026-12-23',SN.prazo);
- [s,r]=await call('POST','/datacom/solicitar',{id:'natal',data:NATAL26,texto:'Produzir arte para o Instagram'});t('solicitação repetida é barrada (409)',s===409&&r.error.includes(SN.id));
- [s]=await call('POST','/datacom/solicitar',{id:'natal',data:NATAL26,texto:'Gravar vídeo curto'});t('outra solicitação para a mesma data é permitida',s===201);
- const spn=(await call('GET','/solicitacoes/painel'))[1].rows.find(x=>x.id===SN.id);t('aparece no módulo Solicitações com a referência',spn&&spn.dataComemorativaNome==='Natal');
- t('não criou nada além do pedido (só 2 solicitações novas, nenhuma tarefa)',(await call('GET','/data?module=solicitacoes'))[1].rows.length===sols0+2+(SOL&&SOL.id?1:0)&&(await call('GET','/data?module=tarefas'))[1].rows.length===0);
- [s,r]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);const PL=r;
- t('cria ação no Planejamento (Projeto) com a referência à data, sem copiar a comemoração',s===201&&/^PRJ-/.test(r.id)&&r.status==='PLANEJAMENTO'&&r.dataComemorativaId==='dia-do-professor'&&r.dataComemorativaData===DP26&&r.prazo===DP26&&(await call('GET','/data?module=datacom'))[1].rows.length===5,r);
- [s]=await call('POST','/datacom/planejar',{id:'dia-do-professor',data:DP26,acao:'Homenagem aos professores do Colégio Evolução'},E);t('ação repetida é barrada (409)',s===409);
- const pv=(await painel(2026)).itens.find(x=>x.id==='dia-do-professor'&&x.data===DP26);
- t('natal mostra as 2 solicitações',(await painel(2026)).itens.find(x=>x.id==='natal'&&x.data===NATAL26).vinculos.solicitacoes.length===2);
-
- // ============ INTERFACE ============
- const b=await chromium.launch({executablePath:process.env.CHROME||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
- const errs=[];
- const entra=async(cod,w=1440,h=1000)=>{const p=await (await b.newContext({viewport:{width:w,height:h}})).newPage();p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept());await p.goto(BASE+'/');await p.fill('#internalCode',cod);await p.fill('#internalPass',senha[cod]);await p.click('#internalLoginBtn');await p.waitForSelector('#nav .navitem');await p.waitForFunction(()=>!document.querySelector('#content .loading'),null,{timeout:20000}).catch(()=>{});await p.waitForTimeout(800);return p};
- const p=await entra('NAT-3301');
- const abre=async(pg=p)=>pg.evaluate(()=>document.querySelector('.cm-maisfiltros')?.setAttribute('open',''));
- const novoDc=async(pg=p)=>{await pg.click('#cmNovo');await pg.waitForSelector('.cal-escolha');await pg.click('.cal-escolha [data-n="dc"]');await pg.waitForSelector('#dcForm')};
- await p.evaluate(()=>go('agenda'));await p.waitForSelector('.cm-semana, .cm-mes, .cm-proximos');
- const sub=await p.$$eval('.cm-tipo',e=>e.map(x=>x.innerText.trim()));
- t('Calendário único sem faixa de categorias e sem subabas (um só calendário)',sub.length===0&&(await p.$$('#subtabs .subtab')).length===0,sub.join('|'));
- await p.evaluate(()=>go('datacom'));await p.waitForSelector('.cm-semana, .cm-mes');await p.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));
- t('Calendário único aberto pelas Datas, com Semana, Mês, Dia, Lista e Ano',(await p.$$eval('[data-modo]',e=>e.map(x=>x.textContent))).join()==='Semana,Mês,Dia,Lista,Ano');
- await p.selectOption('#cmAno','2026');await p.waitForFunction(()=>/2026/.test(document.querySelector('.cm-periodo')?.textContent||''));
- await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');
- let txt=await p.$eval('.cm-proximos',e=>e.innerText);
- t('lista do ano mostra as datas confirmadas e esconde as pendentes',/Natal/.test(txt)&&/Dia do Professor/.test(txt)&&!/São João \(João Pessoa\)/.test(txt),txt.slice(0,200));
- await abre();await p.selectOption('#cmExtra2','pendentes');await p.waitForTimeout(250);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('filtro "Pendentes de validação" mostra só as pendentes',/São João/.test(txt)&&/Imaculada/.test(txt)&&!/Natal/.test(txt));
- await abre();await p.selectOption('#cmExtra2','');await p.waitForTimeout(150);
- await abre();await p.selectOption('#cmExtra','feriados');await p.waitForTimeout(250);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('filtro Feriados: só feriados (Natal sim, Dia do Professor não)',/Natal/.test(txt)&&/Data Magna/.test(txt)&&!/Dia do Professor/.test(txt)&&!/Corpus Christi/.test(txt));
- await abre();await p.selectOption('#cmExtra','educacionais');await p.waitForTimeout(250);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('filtro Datas educacionais',/Dia do Professor/.test(txt)&&/Livro Infantil/.test(txt)&&!/Natal/.test(txt));
- await abre();await p.selectOption('#cmExtra','');await p.waitForTimeout(150);
- await abre();await p.selectOption('#cmMes','12');await p.waitForTimeout(250);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('filtro por mês (dezembro)',/Natal/.test(txt)&&!/Dia do Professor/.test(txt));await abre();await p.selectOption('#cmMes','');await p.waitForTimeout(150);
- await abre();await p.click('[data-tog="relevantes"]');await p.waitForTimeout(250);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('"Somente datas relevantes" (Dia dos Pais sim, Tiradentes não)',/Dia dos Pais/.test(txt)&&!/Tiradentes/.test(txt));await abre();await p.click('[data-tog="relevantes"]');await p.waitForTimeout(150);
- await p.fill('#cmBusca','professor');await p.waitForTimeout(300);txt=await p.$eval('.cm-proximos',e=>e.innerText);t('pesquisa pelo nome (acentos e caixa não atrapalham)',/Dia do Professor/.test(txt)&&!/Natal/.test(txt));await p.fill('#cmBusca','');await p.waitForTimeout(300);
- // navegação entre anos
- await p.click('#cmNext');await p.waitForFunction(()=>document.querySelector('.cm-periodo')?.textContent==='2027');
- const l27=await p.$eval('.cm-proximos',e=>e.innerText);t('navegar para 2027: as datas aparecem sozinhas (e as móveis mudam de dia)',/Natal/.test(l27)&&/Dia das Mães/.test(l27)&&/28\/03/.test(l27),l27.slice(0,300));
- await p.selectOption('#cmAno','2030');await p.waitForFunction(()=>document.querySelector('.cm-periodo')?.textContent==='2030');t('seletor de ano (2030): Páscoa em 21/04',/21\/04/.test(await p.$eval('.cm-proximos',e=>e.innerText)));
- await p.click('#cmHoje');await p.waitForFunction(()=>document.querySelector('.cm-periodo')?.textContent===String(new Date().getFullYear()));
- // visão anual e mensal
- await p.click('[data-modo="year"]');await p.waitForSelector('.cm-ano');t('visão anual: 12 meses com as datas marcadas',(await p.$$eval('.cm-mini',e=>e.length))===12&&(await p.$$eval('.cm-md.tem',e=>e.length))>20);
- t('feriados aparecem destacados na visão anual',(await p.$$eval('.cm-md.tem.feriado',e=>e.length))>=8);
- await p.click('.cm-mini-t >> nth=11');await p.waitForSelector('.cm-mes');t('clicar no mês abre a visão mensal (dezembro)',/dezembro/i.test(await p.$eval('.cm-periodo',e=>e.textContent)));
- t('o Natal aparece no mês e o dia fica destacado como feriado',/Natal/.test(await p.$eval('.cm-mes',e=>e.innerText))&&(await p.$$eval('.cm-dia.feriado',e=>e.length))>=1);
- // detalhe + relevância + vínculos
- await p.click('.cm-item:has-text("Natal")');await p.waitForSelector('.dc-det');
- t('detalhe: categoria, fixa/móvel, confirmada, regra e fonte',/Feriados nacionais/.test(await p.$eval('.dc-det',e=>e.innerText))&&/Data fixa/.test(await p.$eval('.dc-det',e=>e.innerText))&&/Confirmada/.test(await p.$eval('.dc-det',e=>e.innerText))&&/Lei 10\.607/.test(await p.$eval('.dc-det',e=>e.innerText)));
- await p.click('[data-rel="SIM"]');await p.waitForSelector('.dc-det',{state:'detached'});await p.waitForTimeout(400);
- t('marcar como relevante pela tela',(await painel(new Date().getFullYear())).itens.find(x=>x.id==='natal').relevante==='SIM');await call('POST','/datacom/relevancia',{id:'natal',relevante:''});
- await p.click('[data-modo="month"]').catch(()=>{});
- await p.evaluate(()=>{document.querySelectorAll('.admin-overlay').forEach(e=>e.remove())});
- // nova data pela tela
- await novoDc();
- await p.click('#dcForm #fOk');await p.waitForFunction(()=>document.querySelector('#fErro')?.textContent,null,{timeout:8000}).catch(()=>{});t('formulário valida o nome',/nome/i.test(await p.textContent('#fErro')));
- await p.fill('#fNome','Semana da Matemática');await p.selectOption('#fTipo','nesimo');await p.selectOption('#fN','1');await p.selectOption('#fSem','1');await p.selectOption('#fMesN','11');await p.selectOption('#fCat','__nova');await p.fill('#fCatNova','Semanas temáticas');await p.click('#fOk');await p.waitForSelector('#dcForm',{state:'detached'});await p.waitForTimeout(500);
- const sm=(await call('GET','/data?module=datacom'))[1].rows.find(x=>x.titulo==='Semana da Matemática');
- t('data móvel e categoria nova criadas pela tela (1ª segunda de novembro)',sm&&sm.regraTipo==='nesimo'&&/^CAT_SEMANAS/.test(sm.categoria));
- await p.click('[data-modo="list"]');await p.waitForSelector('.cm-proximos');await p.click('.cm-item:has-text("Semana da Matemática")');await p.waitForSelector('#dcEditar');await p.click('#dcEditar');await p.waitForSelector('#dcForm');
- t('editar abre o formulário já preenchido',(await p.inputValue('#fNome'))==='Semana da Matemática'&&(await p.inputValue('#fTipo'))==='nesimo');await p.fill('#fNome','Semana da Matemática 2');await p.click('#fOk');await p.waitForSelector('#dcForm',{state:'detached'});
- t('edição pela tela',(await call('GET','/data?module=datacom'))[1].rows.some(x=>x.titulo==='Semana da Matemática 2'));
- await p.click('.cm-item:has-text("Semana da Matemática 2")');await p.waitForSelector('#dcExcluir');
- p.removeAllListeners('dialog');p.once('dialog',d=>d.dismiss());await p.click('#dcExcluir');await p.waitForTimeout(400);t('cancelar a confirmação não exclui',(await call('GET','/data?module=datacom'))[1].rows.some(x=>x.titulo==='Semana da Matemática 2'));
- p.removeAllListeners('dialog');p.once('dialog',d=>d.accept());await p.click('#dcExcluir');await p.waitForSelector('.dc-det',{state:'detached'});await p.waitForTimeout(400);t('confirmar exclui',!(await call('GET','/data?module=datacom'))[1].rows.some(x=>x.titulo==='Semana da Matemática 2'));p.on('dialog',d=>d.accept());
-
- // ---- celular ----
- const pc=await entra('NAT-3301',390,800);await pc.evaluate(()=>go('datacom'));await pc.waitForSelector('.cm-semana, .cm-mes');await pc.waitForFunction(()=>!document.querySelector('#cmRaiz .loading'));if(!(await pc.$('.cm-mes'))){await pc.click('[data-modo="month"]');await pc.waitForSelector('.cm-mes')}
- const cabe=()=>pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1);
- t('celular: mês sem rolagem horizontal',await cabe());
- await pc.click('[data-modo="year"]');await pc.waitForSelector('.cm-ano');t('celular: visão anual cabe na tela',await cabe());
- await pc.click('[data-modo="list"]');await pc.waitForSelector('.cm-proximos');t('celular: lista cabe na tela',await cabe());
- await novoDc(pc);t('celular: o formulário cabe na tela',await cabe());
- t('sem erros de JavaScript',errs.length===0,errs.join(' | '));
- console.log(`${ok} ok, ${bad} falhas`);await b.close();process.exit(bad?1:0);
+ // ---- publicação a partir da data (opcional, nunca automática) ----
+ const NATAL26='2026-12-25';
+ [s,r]=await call('POST','/datacom/publicacao',{id:'natal',data:'2026-12-24'});t('só aceita a data real da ocorrência (24/12 não é Natal)',s===404);
+ [s]=await call('POST','/datacom/publicacao',{id:'sao-joao-jp',data:'2026-06-24'});t('data PENDENTE não gera publicação (409)',s===409);
+ const n0=(await call('GET','/data?module=conteudos'))[1].rows.length;t('a lista de datas não criou publicações sozinha',n0===0);
+ [s,r]=await call('POST','/datacom/publicacao',{id:'natal',data:NATAL26,titulo:'Natal: mensagem do Colégio'},E);const PN=r;
+ t('cria publicação (Ideia) com a data e a origem',s===201&&r.status==='IDEIA'&&r.publicacaoEm===NATAL26&&r.origemTipo==='datacom'&&r.origemId==='natal'&&r.origemNome==='Natal',r);
+ [s,r]=await call('POST','/datacom/publicacao',{id:'natal',data:NATAL26,titulo:'Natal: mensagem do Colégio'});t('publicação repetida é barrada (409)',s===409);
+ [s]=await call('POST','/datacom/publicacao',{id:'natal',data:NATAL26,titulo:'Natal: vídeo curto'});t('outra publicação para a mesma data é permitida',s===201);
+ // ---- camada no Calendário ----
+ const U=require('./lib/ui');const br=await U.abrir();const p=await U.pagina(br,'NAT-3301','Nat26ab');
+ await U.ir(p,'calendario');
+ t('legenda do calendário tem datas comemorativas e feriados como camadas',/Datas comemorativas/.test(await p.innerText('.cm-tipos'))&&/Feriados/.test(await p.innerText('.cm-tipos')));
+ await p.evaluate(()=>CAL_UNICO.definirFiltro('modo','list'));await p.waitForTimeout(500);
+ t('a lista do ano traz feriados do catálogo (Natal)',/Natal/.test(await U.textoConteudo(p)));
+ await p.click('.cm-item >> text=Natal').catch(()=>{});await p.waitForSelector('.dc-det',{timeout:8000}).catch(()=>{});
+ t('abrir uma data mostra regra, validação e “Criar publicação desta data”',await p.$('#dcPub')!==null&&/Regra/.test(await p.innerText('.dc-det')));
+ t('sem erros de script nem diálogos nativos',p.errs.length===0,p.errs);
+ await br.close();
+ const br2=await U.abrir();const pc=await U.pagina(br2,'NAT-3301','Nat26ab',{width:390,height:800});await U.ir(pc,'calendario');
+ t('celular: sem rolagem horizontal',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+ await br2.close();
+ console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});

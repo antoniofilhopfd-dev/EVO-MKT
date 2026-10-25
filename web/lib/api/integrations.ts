@@ -1,14 +1,15 @@
 import { Ctx } from '../ctx';
 import { q, q1, run } from '../db';
 import { requireInternal, requireAdmin, requireManager, stepUp } from '../auth';
-import { audit, getRow, listRows, MODULES } from '../records';
+import { audit, EVO_VERSION, getRow, listRows } from '../records';
+import { verificarIntegridade } from '../integridade';
+import { versaoApi } from '../integrations/trafego';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
-import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
-import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
-import { relatorioTrafego } from '../integrations/metarelatorio';
-import { adsAnuncios, adsDiario, adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta, pacingMes, saudeConta } from '../integrations/metaads';
+import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
+import { gCalendarChoose, gCalendarList, gCalendarListTodas, gEventosLeitura, gLeituraSalvar, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gFinishConnect } from '../integrations/google';
+import { adsPermitido, ContaAds, listarContasAds, adsSync } from '../integrations/metaads';
 import { json } from './handlers';
 
 const redirect = (to: string) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store' } });
@@ -30,7 +31,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     }
     case path === '/integrations/meta/callback' || path === '/integrations/google/callback': {
       const svc = path.includes('meta') ? 'meta' : 'google';
-      const dest = '/?page=administracao&int=';
+      const dest = '/?page=configuracoes&int=';
       try {
         if (!checkState(c.qs('state'), svc)) throw new Error('Sessão de conexão expirada. Tente de novo.');
         if (c.qs('error')) throw new Error('Autorização negada: ' + (c.qs('error_description') || c.qs('error')));
@@ -57,12 +58,10 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         google: {
           configurado: (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '',
           clientId: await setting('g_client_id'), conectado: await gConnected(), email: await setting('g_email'),
-          ultimaAgenda: await setting('g_last_cal_sync'), planilhaUrl: await setting('g_sheet_url'), ultimaPlanilha: await setting('g_last_sheet_export'),
+          ultimaAgenda: await setting('g_last_cal_sync'),
           calendarioId: await setting('g_calendar_id'), importar: (await setting('g_importar')) !== '0',
-          driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
-          planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
-        ads: { modoCompleto: (await setting('trafego_gestao')) === '1', limites: await limitesAlerta(), ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
+        ads: { ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + publicUrl(c.url.origin) + '/api/cron/integracoes?tarefa=sincronizar',
       });
@@ -93,14 +92,31 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       add('meta_token', !metaOn || (exp * 1000 - Date.now()) / 86400000 > 10, 'aviso', 'Meta: token com mais de 10 dias de validade', 'O cron renova sozinho; se faltar menos de 10 dias, o cron não está rodando — reconecte.');
       const gCred = (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '';
       add('g_cred', gCred, 'erro', 'Google: Client ID e Client Secret salvos', 'Cole as credenciais na caixa Google (veja GUIA_INTEGRACOES.md).');
-      add('g_conn', await gConnected(), 'erro', 'Google: conta conectada (Agenda, Drive, Planilhas)', 'Clique em "Conectar com Google" e aceite as permissões.');
+      add('g_conn', await gConnected(), 'erro', 'Google: conta conectada (Agenda)', 'Clique em "Conectar com Google" e aceite as permissões.');
       const recente = async (k: string) => { const v = await setting(k); return v !== '' && Date.now() - new Date(v).getTime() < 2 * 86400000; };
       add('cron_roda', (!metaOn || (await recente('ig_last_sync'))) && (!(await gConnected()) || (await recente('g_last_cal_sync'))), 'aviso', 'Sincronização rodou nos últimos 2 dias', 'Crie o cron da Hostinger (comando abaixo) ou use os botões "Sincronizar agora".');
-      const agendados = metaOn ? (await listRows('conteudos')).filter((r) => r.publicarInstagram === 'SIM' && !r.instagramMediaId && r.midiaInstagram && /APROVADO|PROGRAMADO/i.test(String(r.status ?? ''))).length : 0;
+      const agendados = metaOn ? (await listRows('conteudos')).filter((r) => r.publicarInstagram === 'SIM' && !r.instagramMediaId && r.midiaInstagram && /AGENDADO/i.test(String(r.status ?? ''))).length : 0;
       const ultPub = await setting('ig_last_publish_run');
       add('cron_publicar', agendados === 0 || (ultPub !== '' && Date.now() - new Date(ultPub.replace(' ', 'T')).getTime() < 30 * 60000), 'aviso', 'Publicação automática: o cron rodou nos últimos 30 minutos', `Há ${agendados} post(s) agendado(s) para sair sozinhos, mas o cron de publicação não rodou. Crie o cron da Hostinger a cada 10 minutos (comando "cronPublicar" abaixo).`);
+      const ultSync = await setting('ig_last_sync'), adsSync = await setting('meta_ads_ultima_sync'), gSync = await setting('g_last_cal_sync');
+      const falha = await q1("SELECT quando,servico,msg FROM integration_log WHERE nivel='erro' ORDER BY id DESC LIMIT 1");
+      const bk = await q1('SELECT nome,criado_em FROM backups ORDER BY criado_em DESC LIMIT 1');
+      const integ = await verificarIntegridade().catch(() => null);
+      const mais = (iso: string, h: number) => (iso ? now(new Date(new Date(iso.replace(' ', 'T')).getTime() + h * 3600000)) : '');
+      const resumo = {
+        conexaoMeta: metaOn ? ((await setting('meta_token_invalido')) === '1' ? 'Acesso expirado ou revogado' : 'Conectada') : 'Não conectada',
+        conexaoGoogle: (await gConnected()) ? 'Conectada' : 'Não conectada',
+        ultimaSincronizacao: { instagram: ultSync, anuncios: adsSync, google: gSync },
+        proximaSincronizacao: ultSync ? mais(ultSync, 24) + ' (estimada: o cron diário da Hostinger)' : 'Sem sincronização ainda',
+        ultimaFalha: falha ? `${falha.quando} · ${falha.servico}: ${falha.msg}` : 'Nenhuma falha registrada',
+        validadeToken: exp ? now(new Date(exp * 1000)) : metaOn ? 'Sem data informada pela Meta' : '—',
+        versaoApi: versaoApi(),
+        ultimoBackup: bk ? `${bk.criado_em} (${bk.nome})` : 'Nenhum backup ainda',
+        integridade: integ ? (integ.ok ? 'Sem problemas' : `${integ.achados.length} achado(s) para revisar`) : 'Não foi possível verificar',
+        versaoInstalada: EVO_VERSION, ambiente: `${env('NODE_ENV', 'development') === 'production' ? 'Produção' : 'Desenvolvimento'} · ${pub || origin}`,
+      };
       return json({
-        pronto: it.every((x) => x.ok || x.nivel === 'aviso'), itens: it,
+        pronto: it.every((x) => x.ok || x.nivel === 'aviso'), itens: it, resumo,
         urls: { site: origin, privacidade: origin + '/privacidade.html', termos: origin + '/termos.html', metaRedirect: origin + '/api/integrations/meta/callback', googleRedirect: origin + '/api/integrations/google/callback' },
         cron: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + origin + '/api/cron/integracoes?tarefa=sincronizar',
         cronPublicar: 'curl -fsS -H "Authorization: Bearer $CRON_SECRET" ' + origin + '/api/cron/integracoes?tarefa=publicar',
@@ -112,8 +128,9 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await stepUp(u, input);
       for (const k of ['meta_app_id', 'meta_app_secret', 'g_client_id', 'g_client_secret']) if (input[k] !== undefined && strv(input[k]).trim() !== '') await setSetting(k, strv(input[k]).trim());
       if (input.g_importar !== undefined) await setSetting('g_importar', input.g_importar ? '1' : '0');
-      if (input.g_auto_drive_entregas !== undefined) await setSetting('g_auto_drive_entregas', input.g_auto_drive_entregas ? '1' : '0');
-      if (input.g_sheet_modules !== undefined) await setSetting('g_sheet_modules', strv(input.g_sheet_modules).split(',').map((m) => m.trim()).filter((m) => m in MODULES).join(','));
+      if (strv(input.anthropic_key).trim() !== '') await setSetting('anthropic_key', strv(input.anthropic_key).trim());
+      if (input.ia_remover_chave) await setSetting('anthropic_key', '');
+      if (input.ia_guia_voz !== undefined) await setSetting('ia_guia_voz', strv(input.ia_guia_voz).slice(0, 1500));
       await audit(u.codigo, 'integracoes-config');
       return json({ ok: true });
     }
@@ -141,16 +158,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await audit(u.codigo, 'instagram-token-manual');
       return json({ ok: true });
     }
-    case path === '/integrations/ads/config' && method === 'POST': {
-      const u = await requireAdmin(c);
-      const b = await c.body();
-      if ('ativar' in b) await setSetting('meta_ads_ativar', b.ativar ? '1' : '0');
-      for (const [k, cfg] of [['ctrMin', 'ads_ctr_min'], ['frequenciaMax', 'ads_freq_max'], ['gastoSemResultado', 'ads_gasto_sem_resultado'], ['impressoesMin', 'ads_impr_min']] as const) {
-        if (k in b) { const v = Number(b[k]); if (!Number.isFinite(v) || v <= 0 || v > 1_000_000) fail(400, `Valor inválido para ${k}.`); await setSetting(cfg, String(v)); }
-      }
-      await audit(u.codigo, 'ads-config', '', b.ativar ? 'ativado' : 'desativado');
-      return json({ ok: true });
-    }
     case path === '/integrations/ads/accounts': {
       await requireAdmin(c);
       try { return json({ contas: await listarContasAds() }); } catch (e: any) { return fail(502, e.message); }
@@ -167,40 +174,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/ads/sync' && method === 'POST': {
       await requireInternal(c);
       try { return json({ linhas: await adsSync() }); } catch (e: any) { await intLog('instagram', 'erro', 'Meta Ads: ' + e.message); return fail(502, e.message); }
-    }
-    case path === '/integrations/ads/orcamento' && method === 'POST': {
-      const u = await requireInternal(c);
-      const v = Number((await c.body()).valor);
-      if (!Number.isFinite(v) || v < 0 || v > 100_000_000) fail(400, 'Informe um valor válido (0 remove o orçamento).');
-      await setSetting('ads_orcamento_mensal', v > 0 ? String(v) : '');
-      await audit(u.codigo, 'ads-orcamento', '', v > 0 ? String(v) : 'removido');
-      return json({ ok: true });
-    }
-    case path === '/traffic/semanal': {
-      await requireInternal(c);
-      const ymd = (v: string) => (/^\d{4}-\d\d-\d\d$/.test(v) && !isNaN(new Date(v + 'T12:00:00').getTime()) ? v : '');
-      const de = ymd(c.qs('de')), ate = ymd(c.qs('ate'));
-      if (!de || !ate) fail(400, 'Informe as datas (de e ate) no formato AAAA-MM-DD.');
-      if (de > ate) fail(400, 'A data inicial é depois da final.');
-      if ((new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 > 31) fail(400, 'O período do relatório vai até 31 dias.');
-      try { return json(await relatorioTrafego(de, ate)); } catch (e: any) { await intLog('instagram', 'erro', 'Relatório de tráfego: ' + e.message); return fail(502, e.message); }
-    }
-    case path === '/traffic/painel': {
-      await requireInternal(c);
-      const lp = new Date(), per = `${lp.getFullYear()}-${String(lp.getMonth() + 1).padStart(2, '0')}`;
-      const ant = new Date(lp.getFullYear(), lp.getMonth() - 1, 1), perAnt = `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`;
-      const soma = async (p: string) => (await q1('SELECT COALESCE(SUM(gasto),0) gasto,COALESCE(SUM(impressoes),0) impressoes,COALESCE(SUM(alcance),0) alcance,COALESCE(SUM(cliques),0) cliques,COALESCE(SUM(resultados),0) resultados,COALESCE(SUM(conversas),0) conversas,COUNT(*) n,MAX(moeda) moeda FROM ads_snapshots WHERE periodo=?', [p])) ?? {};
-      const num = (r: Row) => ({ gasto: Number(r.gasto ?? 0), impressoes: Number(r.impressoes ?? 0), alcance: Number(r.alcance ?? 0), cliques: Number(r.cliques ?? 0), resultados: Number(r.resultados ?? 0), conversas: Number(r.conversas ?? 0), n: Number(r.n ?? 0), moeda: String(r.moeda ?? '') });
-      return json({
-        periodo: per, anterior: perAnt, mes: num(await soma(per)), mesAnterior: num(await soma(perAnt)), saude: await saudeConta(), pacing: await pacingMes(),
-        diario: (await adsDiario(30)).map((d) => ({ dia: d.dia, gasto: Number(d.gasto), resultados: Number(d.resultados), conversas: Number(d.conversas), cliques: Number(d.cliques), impressoes: Number(d.impressoes) })),
-        anuncios: (await adsAnuncios(per)).map((a) => ({ ...a, gasto: Number(a.gasto), impressoes: Number(a.impressoes), alcance: Number(a.alcance), cliques: Number(a.cliques), resultados: Number(a.resultados), conversas: Number(a.conversas) })),
-        orcamentoMensal: Number(await setting('ads_orcamento_mensal')) || 0, ultimaSync: await setting('meta_ads_ultima_sync'),
-      });
-    }
-    case path === '/traffic/snapshots': {
-      await requireInternal(c);
-      return json({ alertas: await alertasTrafego(), limites: await limitesAlerta(), rows: await adsSnapshots(c.qs('periodo') || undefined), ultimaSync: await setting('meta_ads_ultima_sync'), conta: await setting('meta_ads_conta'), fonte: 'Meta Ads (leitura)' });
     }
     case path === '/integrations/meta/account' && method === 'POST': {
       const u = await requireAdmin(c);
@@ -254,15 +227,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       }
       return json(o);
     }
-    case path === '/integrations/instagram/media' && method === 'POST': {
-      const u = await requireInternal(c);
-      const form = await c.req.formData();
-      const arqs = (form.getAll('files').length ? form.getAll('files') : [form.get('file')]).filter((f): f is File => !!f && typeof f !== 'string');
-      let rel = '';
-      for (let i = 0; i < Math.max(1, arqs.length); i++) rel = await igSaveMedia(c.qs('id'), arqs[i] ?? null, c.qs('add') === '1' || i > 0);
-      await audit(u.codigo, 'instagram-midia', 'conteudos', c.qs('id'));
-      return json({ midia: rel });
-    }
     case path === '/integrations/instagram/retry' && method === 'POST': {
       const u = await requireInternal(c);
       const id = strv((await c.body()).id);
@@ -276,7 +240,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       const u = await requireInternal(c);
       const id = strv((await c.body()).id);
       const alvo = await getRow('conteudos', id);
-      if (alvo && !/^(APROVADO|PROGRAMADO|PUBLICADO)$/i.test(strv(alvo.status))) fail(409, 'Só conteúdos APROVADOS ou PROGRAMADOS podem ser publicados no Instagram.');
+      if (alvo && !/^(APROVADO|AGENDADO)$/i.test(strv(alvo.status))) fail(409, 'Só publicações APROVADAS ou AGENDADAS podem ser enviadas ao Instagram.');
       try {
         const r = await igPublish(id, u.codigo);
         await audit(u.codigo, 'instagram-publicado', 'conteudos', id);
@@ -285,6 +249,23 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         await igMarkError(id, e.message);
         return bad('instagram', e);
       }
+    }
+    case path === '/integrations/google/agendas-leitura' && method === 'GET': {
+      await requireAdmin(c);
+      try { return json({ agendas: await gCalendarListTodas() }); } catch (e: any) { return fail(502, e.message); }
+    }
+    case path === '/integrations/google/agendas-leitura' && method === 'POST': {
+      const u = await requireAdmin(c);
+      const b = await c.body();
+      await gLeituraSalvar(Array.isArray(b.ids) ? b.ids.map(String) : []);
+      await audit(u.codigo, 'google-agendas-leitura');
+      return json({ ok: true });
+    }
+    case path === '/integrations/google/eventos-leitura' && method === 'GET': {
+      await requireInternal(c);
+      const de = c.qs('de'), ate = c.qs('ate');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate) || de > ate) fail(400, 'Período inválido.');
+      try { return json({ rows: await gEventosLeitura(de, ate) }); } catch (e: any) { return json({ rows: [], aviso: 'Não foi possível ler as agendas do Google agora.' }); }
     }
     case path === '/integrations/google/calendars' && method === 'GET': {
       await requireInternal(c);
@@ -307,18 +288,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/google/calendar/sync' && method === 'POST': {
       await requireInternal(c);
       try { return json(c.qs('leve') === '1' ? await gCalendarSyncSeNecessario(45) : await gCalendarSync()); } catch (e: any) { return bad('google', e); }
-    }
-    case path === '/integrations/google/sheets/export' && method === 'POST': {
-      await requireInternal(c);
-      try { return json({ abas: await gSheetsExport(), url: await setting('g_sheet_url') }); } catch (e: any) { return bad('google', e); }
-    }
-    case path === '/integrations/google/drive/send-entregas' && method === 'POST': {
-      await requireInternal(c);
-      let n = 0;
-      try {
-        for (const r of await listRows('solicitacoes')) if (r.arquivosEntrega) n += await gDriveSendEntregas(r.id);
-      } catch (e: any) { return bad('google', e); }
-      return json({ arquivos: n });
     }
     case path === '/integrations/log': {
       await requireInternal(c);

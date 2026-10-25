@@ -20,7 +20,7 @@ export function envInt(name: string, def: number): number {
   return Number.isFinite(n) ? n : def;
 }
 
-const tz = () => env('TIMEZONE', 'America/Recife');
+const tz = () => env('TIMEZONE', 'America/Fortaleza');
 
 /** ISO 8601 com o deslocamento do fuso (igual ao date('c') do PHP), ex.: 2026-10-01T13:54:11-03:00 */
 export function now(d: Date = new Date()): string {
@@ -70,7 +70,7 @@ export const currentIp = () => reqStore.getStore()?.ip ?? '-';
 export interface LocalParts { y: number; m: number; d: number; h: number; mi: number; s: number }
 export function localParts(d: Date): LocalParts {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: env('TIMEZONE', 'America/Recife'), hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: env('TIMEZONE', 'America/Fortaleza'), hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   }).formatToParts(d);
   const p: Record<string, number> = {};
