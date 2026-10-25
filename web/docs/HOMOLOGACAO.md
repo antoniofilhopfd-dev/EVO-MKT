@@ -1,36 +1,13 @@
-# Homologação final — EVO MKT (Etapa 06)
+# Roteiro de homologação (v6)
 
-Estado verificado em 2026-10-13 (Prompt Mestre Definitivo): suíte completa `tests/run-web.sh`, **30 suítes, 627 verificações, 0 falhas**, mais `responsive` sem estouro horizontal (6 larguras × todas as telas). Detalhes por suíte em `ACOMPANHAMENTO_EXECUCAO.md`; segurança em `SEGURANCA_RELATORIO.md`; capturas reais em `screenshots/final/`.
+Passo a passo para conferir, em minutos, que a reestruturação em cinco áreas está correta. O resultado automático de cada suíte está em `RELATORIO_V6.md`.
 
-## O que foi comprovado por teste
-| Área | Evidência |
-|---|---|
-| Acesso só por código, sem senha, bloqueio, aparelhos, auditoria | `acesso` (36), `codigo` (13), `recover` (8) |
-| Segurança de rotas (varredura sem sessão, CSRF, Equipe×Gerência, Portal×interno, IDOR entre segmentos) | `integridade` (17), `api` (69) |
-| Edição simultânea sem perda de dados (30 PUTs) | `integridade` (com controle negativo) |
-| Backup completo, validação por SHA-256, restauração transacional, log, anexos | `backup` (23), `ui5` |
-| Fluxo solicitação→entrega, transições, histórico, SLA em dias úteis, indicadores | `operacao` (36), `ui2` (27), `ui8` (7) |
-| Notificações com registro | `notificacoes` (5) |
-| Integrações Meta/Google (servidores simulados), falha → notificação + e-mail | `integrations` (49) |
-| Importação de planilhas | `importar` (9), `ui5` |
-| Interface (telas, calendários, administração, celular) | `ui`…`ui7`, `responsive` |
+1. **Menu:** exatamente Dashboard, Calendário, Instagram, Tráfego Pago e Configurações.
+2. **Filtros:** escolha um perfil no Dashboard, vá para Instagram › Conteúdos (o filtro continua) e para Tráfego Pago (o filtro de perfil fica desativado, com o motivo). “Limpar filtros” zera tudo.
+3. **Publicação:** Instagram › Conteúdos › Nova publicação: preencha, anexe a arte final e um link do Drive, envie para revisão, aprove, agende e confirme a publicação. Confira o histórico na própria publicação.
+4. **Calendário:** clique em um dia (cria publicação), arraste uma publicação para outro dia, abra um evento escolar e uma data comemorativa e use “Criar publicação”.
+5. **Tráfego Pago:** com a Meta conectada, confira Visão geral, Campanhas e Anúncios, baixe o CSV e abra o PDF A4. Não deve existir botão de criar, editar, ativar ou pausar.
+6. **Configurações:** Prontidão mostra conexão, última e próxima sincronização, última falha, validade do token, versão da API, último backup, integridade, versão e ambiente. Backup mostra o relatório da migração e os arquivos sem vínculo.
+7. **Equipe (não administrador):** vê só Geral, Perfis e segmentos e Prontidão em Configurações.
 
-## Não comprovado (dependências externas ou pendências)
-1. **Integrações reais Meta/Google:** só testadas com servidores simulados. Precisam das suas credenciais e de um teste com contas reais.
-2. **Deploy:** o código está na `main`; só vale em produção depois de reimplantar na Hostinger. Confira `/api/health` e a versão no rodapé.
-3. **Backup do banco pela Hostinger** (phpMyAdmin) e teste de restauração fora do app: ação sua.
-4. **Segredos que passaram pelo chat** (senha do banco, `SESSION_SECRET`, `APP_KEY`, `SETUP_KEY`, `CRON_SECRET`, `RECOVERY_KEY`): trocar; remover `SETUP_KEY` e `RECOVERY_KEY` do painel.
-5. **Pendência técnica menor:** paginação no servidor (A14), aceitável para o volume atual. A8, A10 e A11 foram fechadas.
-6. Demandas anteriores à migração 006 não têm histórico de status.
-7. Telas retiradas do menu (Planejamento Editorial, Fechamento Mensal, Arquivos) continuam existindo, com dados, pelos atalhos "Ver também".
-
-## Roteiro de aceite manual (10 minutos, após reimplantar)
-1. Entrar com seu código; abrir Administração → Acessos e conferir os códigos.
-2. Portal: entrar como solicitante, criar uma demanda e anexar um arquivo.
-3. Painel interno: triar, distribuir, entregar; no Portal, aprovar; conferir "Ver histórico" e as notificações.
-4. Central Operacional: clicar em um indicador e ver a lista de origem.
-5. Administração → Backups: criar backup, **Validar**, e só então testar Restaurar em horário sem uso.
-6. Abrir no celular: nenhuma tela deve exigir rolagem lateral.
-
-## Riscos residuais
-Transições de status são estritas: fluxos antigos que pulavam etapas passam a receber aviso (409). Restaurar um backup encerra as sessões do Portal. Se a Hostinger não rodar as migrações 006 e 007 ao iniciar, abra `/api/health` e reinicie o app.
+Antes de subir em produção: backup do banco pelo phpMyAdmin, `npm run typecheck`, `npm run build` e as suítes de `tests/run-web.sh`.

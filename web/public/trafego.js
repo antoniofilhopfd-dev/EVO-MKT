@@ -16,7 +16,9 @@ function tfVazio(e, motivoErro) {
   return `<div class="empty-rich"><strong>${esc(titulo)}</strong><p>${esc(texto)}</p><button class="btn soft" data-go="configuracoes">Abrir Configurações</button></div>`;
 }
 async function tfCarregar(forcar = false) {
-  const f = Filtros.get(), chave = `${f.de}|${f.ate}`;
+  const f0 = Filtros.get(), hoje = hojeBR(), f = { ...f0, ate: f0.ate > hoje ? hoje : f0.ate };
+  if (f0.de > hoje) throw new Error('O período escolhido ainda não começou: a Meta só informa dias que já passaram. Escolha um período até hoje.');
+  const chave = `${f.de}|${f.ate}`;
   if (!forcar && TF_CACHE.chave === chave && TF_CACHE.dados && Date.now() - (TF_CACHE.em || 0) < 60000) return TF_CACHE.dados;
   const d = await api(`/trafego/resumo?de=${f.de}&ate=${f.ate}${forcar ? '&forcar=1' : ''}`);
   TF_CACHE.chave = chave; TF_CACHE.dados = d; TF_CACHE.em = Date.now(); return d;

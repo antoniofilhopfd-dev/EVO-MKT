@@ -25,7 +25,7 @@ export interface Organico { posts: PostFiltrado[]; contas: MetaConta[]; vinculad
 export async function organico(f: Filtros): Promise<Organico> {
   const contas = await contasDoPerfil(f.perfil);
   const ids = contas.map((c) => c.ig);
-  if (!ids.length) return { posts: [], contas, vinculadas: false, semEfeito: [], todos: [] };
+  if (!ids.length) return { posts: [], contas, vinculadas: !!(f.segmento || f.campanha), semEfeito: [], todos: [] };
   const rows = await q(`SELECT conta,media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,seguidores_novos,permalink,miniatura FROM ig_posts WHERE conta IN (${ids.map(() => '?').join(',')}) AND SUBSTR(publicado_em,1,10)>=? AND SUBSTR(publicado_em,1,10)<=? ORDER BY publicado_em DESC`, [...ids, f.de, f.ate]);
   const conteudos = await listRows('conteudos');
   const porMidia = new Map(conteudos.filter((r) => strv(r.instagramMediaId)).map((r) => [strv(r.instagramMediaId), r]));

@@ -10,12 +10,12 @@ Fonte única: `public/design.css` (carregado depois de `style.css`; o que estive
 | `--accent` | `#FF7800` | **Realce** (indicador de item ativo, borda de seção). Nunca como cor de texto sobre fundo claro |
 | `--info` | `#00A1F3` | Foco de teclado, informação |
 | `--warn` | `#FAB900` | Reservada para destaques de atenção (fundo `--alert-bg` para texto) |
-| `--infantil` | `#793A8C` | **Somente** Educação Infantil (segmento e Portal da Infantil) |
+| `--infantil` | `#793A8C` | **Somente** Educação Infantil (segmento) |
 | `--ink` / `--ink-2` / `--ink-3` | `#1D2433` / `#4A5163` / `#5E6678` | Texto principal, secundário, apoio (todos ≥ 4,5:1 sobre branco e sobre `--page`) |
 | `--line`, `--line-2`, `--page`, `--card` | neutros | Bordas, fundo da página, cartões |
 | `--ok`, `--bad`, `--alert` (+ `-bg`) | verde, vermelho, âmbar | Estados: sucesso, erro, atenção |
 
-Segmentos no Portal: Infantil roxo, Anos Iniciais azul claro, Anos Finais laranja, Ensino Médio azul principal (`portal.css`).
+Segmentos usam a mesma cor em filtros, calendário e Estúdio (`areas.css`).
 
 ## Princípios
 Tema claro. Hierarquia por tamanho e peso, não por cor. Cartões só quando agrupam algo útil. **Sem** gradientes decorativos, glassmorphism, neon, sombras pesadas nem gráficos sem função (a camada `design.css` neutraliza gradientes herdados). Sombras: `--sh-1` (cartão) e `--sh-2` (diálogo).

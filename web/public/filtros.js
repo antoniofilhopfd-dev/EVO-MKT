@@ -4,7 +4,7 @@
 const SEG_LISTA = [['', 'Todos os segmentos'], ['INFANTIL', 'Educação Infantil'], ['FUND1', 'Ensino Fundamental – Anos Iniciais'], ['FUND2', 'Ensino Fundamental – Anos Finais'], ['MEDIO', 'Ensino Médio'], ['ADMIN', 'Administrativo'], ['DIRECAO', 'Direção']];
 const PERFIL_LISTA = [['', 'Todos os perfis'], ['@evolucaopb', '@evolucaopb'], ['@geracaoevolucao', '@geracaoevolucao']];
 const FORMATO_LISTA = ['Feed', 'Stories', 'Reels', 'Carrossel', 'Vídeo', 'Foto', 'Outro'];
-const PERIODOS = [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['semana', 'Semana atual'], ['mes', 'Mês atual'], ['mes_ant', 'Mês anterior'], ['x', 'Personalizado…']];
+const PERIODOS = [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['semana', 'Semana atual'], ['mes', 'Mês atual'], ['mes_ant', 'Mês anterior'], ['prox7', 'Próximos 7 dias'], ['prox30', 'Próximos 30 dias'], ['x', 'Personalizado…']];
 
 const Filtros = (() => {
   const PADRAO = { p: '30', de: '', ate: '', perfil: '', segmento: '', formato: '', campanha: '' };
@@ -14,7 +14,9 @@ const Filtros = (() => {
 
   function intervalo(p, de, ate) {
     const h = hojeBR();
-    if (p === 'x' && de && ate) return [de, ate > h ? h : ate];
+    if (p === 'x' && de && ate) return [de, ate];
+    if (p === 'prox7') return [h, somaDias(h, 6)];
+    if (p === 'prox30') return [h, somaDias(h, 29)];
     if (p === 'hoje') return [h, h];
     if (p === 'semana') { const d = new Date(h + 'T12:00:00Z').getUTCDay(); return [somaDias(h, -d), h]; }
     if (p === 'mes') return [h.slice(0, 8) + '01', h];

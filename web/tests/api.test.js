@@ -46,7 +46,7 @@ async function call(p,{m='GET',b,ck,csrf=true}={}){const h={};if(b)h['Content-Ty
  await call('/admin/reset-password',{m:'POST',ck:G,b:{tipo:'interno',codigo:'ALU-3304'}});
  r=await call('/admin/users',{ck:G});t('após redefinir, a marcação some',r.j.find(x=>x.codigo==='ALU-3304').pediuReset===false);
  // atribuição de uma publicação a uma pessoa com e-mail avisa por e-mail
- r=await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Atribuída ao Antônio',responsavel:'Antônio Filho',status:'RASCUNHO'}});t('cria publicação atribuída',r.s===201);
+ r=await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Atribuída ao Antônio',responsavel:'Antônio Filho',status:'RASCUNHO',publicacaoEm:'2020-01-01T10:00'}});t('cria publicação atribuída',r.s===201);
  const MAILLOG=process.env.MAILLOG;
  if(MAILLOG&&fs.existsSync(MAILLOG)){const ml=fs.readFileSync(MAILLOG,'utf8');t('e-mail de atribuição enviado ao Antônio',ml.includes('antonio@teste.com'));}
  console.log(`\n${ok} ok, ${bad} falhas`);process.exit(bad?1:0)})();

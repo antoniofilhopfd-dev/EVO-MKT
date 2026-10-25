@@ -25,8 +25,9 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   if (c.path !== '/dashboard/resumo') return fail(404, 'Rota não encontrada.');
   const f = lerFiltros(c);
   const hoje = hojeFortaleza();
-  if (f.ate > hoje) f.ate = hoje;
-  if (f.de > f.ate) f.de = f.ate;
+  // publicações olham para frente (planejadas, agendadas…); Instagram e Tráfego só existem até hoje
+  const ateDados = f.ate > hoje ? hoje : f.ate;
+  const fDados = { ...f, ate: ateDados < f.de ? f.de : ateDados };
 
   const todos = (await listRows('conteudos')).filter((r) => conteudoCabe(r, f) && statusAtual(r.status) !== 'ARQUIVADO');
   const noPeriodo = todos.filter((r) => dia(r) >= f.de && dia(r) <= f.ate);
@@ -45,27 +46,28 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   };
   const proximas = abertas(todos).filter((r) => dia(r) >= hoje).sort((a, b) => strv(a.publicacaoEm).localeCompare(strv(b.publicacaoEm))).slice(0, 8).map(pub);
 
-  const org = await organico(f);
+  const org = await organico(fDados);
   const ig = {
     conectado: (await metaConnected()) && (await setting('meta_token_invalido')) !== '1', ultimaSync: await setting('ig_last_sync'),
     contas: org.contas.map((x) => x.usuario), ...resumoOrganico(org), melhor: melhorPost(org),
     semEfeito: org.semEfeito,
-    origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), natureza: 'publicações do período sincronizadas' },
+    origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${fDados.ate}`, atualizadoEm: await setting('ig_last_sync'), natureza: 'publicações do período sincronizadas' },
   };
 
   // Tráfego: consulta somente leitura (o filtro de perfil/segmento/formato/campanha editorial não existe na Meta; o aviso diz isso)
   let trafego: Row;
   const semEfeito = (['perfil', 'segmento', 'formato', 'campanha'] as const).filter((k) => f[k]);
   try {
-    const t = await resumoTrafego(f.de, f.ate);
+    if (f.de > hoje) throw Object.assign(new Error('O período escolhido ainda não começou: a Meta só informa dias que já passaram.'), { status: 409 });
+    const t = await resumoTrafego(f.de, ateDados);
     trafego = { disponivel: true, ...pickTrafego(t), semEfeito, origem: t.origem, avisos: t.avisos, _completo: t };
   } catch (e: any) {
-    const ult = await resumoDaUltimaSincronizacao(f.de, f.ate).catch(() => null);
+    const ult = f.de > hoje ? null : await resumoDaUltimaSincronizacao(f.de, ateDados).catch(() => null);
     trafego = ult
-      ? { disponivel: true, atual: ult, anterior: null, variacoes: null, campanhas: [], semEfeito, avisos: ['Consulta direta indisponível agora (' + String(e.message).replace(/access_token=[^&\s"]+/g, '***') + '); mostrando o que foi guardado na última sincronização.'], origem: { fonte: 'Meta Ads (última sincronização guardada)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('meta_ads_ultima_sync'), natureza: 'acumulado do período' } }
+      ? { disponivel: true, atual: ult, anterior: null, variacoes: null, campanhas: [], semEfeito, avisos: ['Consulta direta indisponível agora (' + String(e.message).replace(/access_token=[^&\s"]+/g, '***') + '); mostrando o que foi guardado na última sincronização.'], origem: { fonte: 'Meta Ads (última sincronização guardada)', periodo: `${f.de} a ${ateDados}`, atualizadoEm: await setting('meta_ads_ultima_sync'), natureza: 'acumulado do período' } }
       : { disponivel: false, motivo: String(e.message).replace(/access_token=[^&\s"]+/g, '***'), status: e.status ?? 502, semEfeito };
   }
-  const insights = await gerarInsights(f, (trafego as Row)._completo ?? null, hoje);
+  const insights = await gerarInsights(fDados, (trafego as Row)._completo ?? null, hoje);
   delete (trafego as Row)._completo;
 
   const alertas: Row[] = [];

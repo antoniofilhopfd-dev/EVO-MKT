@@ -11,10 +11,11 @@ import { json } from './handlers';
 
 /** Instagram orgânico: visão geral e desempenho por dimensão, sempre a partir de publicações já sincronizadas. */
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const FMT_BR = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Fortaleza', weekday: 'short', hour: '2-digit', hourCycle: 'h23' });
 const partesBR = (iso: string) => {
   const d = new Date(iso.replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
   if (isNaN(d.getTime())) return null;
-  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Fortaleza', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(d);
+  const p = FMT_BR.formatToParts(d);
   const w: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return { dia: w[p.find((x) => x.type === 'weekday')!.value], hora: +p.find((x) => x.type === 'hour')!.value };
 };

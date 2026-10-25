@@ -96,6 +96,11 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  await call('/data?module=calendario',{m:'POST',ck:G,b:{titulo:'Reunião de pauta',status:'NOVO',dataInicio:fut1,inicioEm:fut1+'T14:00',fimEm:fut1+'T15:00'}});
  await call('/data?module=conteudos',{m:'POST',ck:G,b:{titulo:'Reel da feira',status:'EM PRODUÇÃO',publicacaoEm:fut1+'T18:00'}});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: sem agenda escolhida, não cria nenhuma',r.s>=400&&!/cal1/.test(JSON.stringify(await mock('/__state'))),r);
+ r=await call('/integrations/google/agendas-leitura',{ck:G});t('lista todas as agendas visíveis, com o papel de acesso',r.s===200&&r.j.agendas.some(a=>a.id==='cal1'&&'papel' in a&&'gravavel' in a),r);
+ r=await call('/integrations/google/agendas-leitura',{m:'POST',ck:G,b:{ids:['cal1']}});t('marca uma agenda como somente leitura',r.s===200);
+ r=await call('/integrations/google/eventos-leitura?de=2020-01-01&ate=2099-12-31',{ck:G});t('eventos das agendas somente leitura chegam sem entrar no sistema',r.s===200&&Array.isArray(r.j.rows)&&!(await rows('calendario')).some(c=>c.origem==='GOOGLE_AGENDA'),r);
+ r=await call('/integrations/google/eventos-leitura?de=2026-05-10&ate=2026-05-01',{ck:G});t('período inválido nos eventos de leitura: 400',r.s===400);
+ r=await call('/integrations/google/agendas-leitura',{m:'POST',ck:G,b:{ids:[]}});
  r=await call('/integrations/google/calendars',{ck:G});t('lista as agendas da conta',r.s===200&&r.j.rows.some(a=>a.id==='cal1'),r);
  r=await call('/integrations/google/calendar/choose',{m:'POST',ck:G,b:{id:'cal1'}});t('escolhe uma agenda existente',r.s===200,r);
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: envia itens do EVO ao Google (compromisso e publicação)',r.s===200&&r.j.para_google>=2,r);

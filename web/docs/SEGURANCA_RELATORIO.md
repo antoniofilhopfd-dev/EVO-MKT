@@ -67,3 +67,11 @@ Ver tabela: PostgreSQL/RLS, GraphQL, Kubernetes, NoSQL, mobile, JWT e webhooks *
 
 ## 9. Arquivos alterados nesta auditoria
 `lib/ctx.ts`, `lib/files.ts`, `lib/api/handlers.ts`, `lib/api/integrations.ts`, `lib/mail.ts`, `app/api/[...path]/route.ts`, `next.config.mjs`, `public/operacao.js`, `public/portal.css`, `public/design.css`, `package.json`/`package-lock.json`, `.env.example`, `tests/seguranca*.test.js`, `tests/xss.test.js`, `tests/contraste.test.js`, `tests/migracoes.test.js`.
+
+
+## Atualização v6 (cinco áreas)
+- Superfície reduzida: Portal, aprovação por link externo, Solicitações, Planejamento, Arquivos (biblioteca), Gerenciador de Anúncios com escrita na Meta, exportação para Planilhas e envio ao Drive foram removidos; as rotas respondem 404 (`removidos.test.js`).
+- Tráfego Pago é somente leitura (405 em qualquer escrita; `trafego.test.js`). Escopo do Google reduzido a `calendar`.
+- Campos protegidos da publicação (aprovação, materiais, versões, link e confirmação de publicação) só mudam pelas rotas próprias; criação e edição comuns os ignoram (`seguranca.test.js`).
+- Nenhum `alert/confirm/prompt` do navegador; diálogos internos com foco preso e Esc (`removidos.test.js`, `a11y.js`).
+- Varredura de rotas das cinco áreas sem sessão (401), sem `X-EVO` (403) e como Equipe nas rotas do Administrador (403): `auditoria.test.js`.

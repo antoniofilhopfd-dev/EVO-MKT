@@ -231,10 +231,10 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
         if ((ex as Row[]).length) await c.query('DELETE FROM sessions WHERE NOT (tipo=? AND codigo=?)', ['int', ator]);
         else await c.query('DELETE FROM sessions');
         await c.query('DELETE FROM trusted_devices WHERE codigo NOT IN (SELECT codigo FROM users)');
-        // backups de versões anteriores trazem registros de módulos que não existem mais: não voltam ao sistema
-        const mods = Object.keys(MODULES);
-        await c.query(`DELETE FROM records WHERE modulo NOT IN (${mods.map(() => '?').join(',')})`, mods);
       }
+      // backups de versões anteriores trazem registros de módulos que não existem mais: não voltam ao sistema
+      const mods = Object.keys(MODULES);
+      await c.query(`DELETE FROM records WHERE modulo NOT IN (${mods.map(() => '?').join(',')})`, mods);
     });
   } catch (e: any) {
     await logBackup('restaurar', nome, 'ERRO', 'falhou e foi desfeito: ' + String(e?.message ?? e));
