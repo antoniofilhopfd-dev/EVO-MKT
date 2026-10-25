@@ -6,7 +6,7 @@ const { t, fim } = U.contador();
 const br = iso => iso.split('-').reverse().join('/');
 (async () => {
   const G = await U.entrar(process.argv[2]), dia = U.dia, hoje = U.hoje();
-  const conta = (await (async () => { await G.post('/integrations/meta/token', { token: 'GOOD_TOKEN' }); return (await G.get('/integrations/status')).instagram.igUserId; })());
+  await require('./lib/ig-seed').semear(G);
   const b = await U.abrir(); const p = await U.pagina(b, 'NAT-3301', G.nova);
   const pref = k => p.evaluate(x => JSON.parse(localStorage.getItem('evo.' + x) || 'null'), k);
   const per = async k => (await pref(k) || {}).p;
@@ -51,7 +51,7 @@ const br = iso => iso.split('-').reverse().join('/');
   await U.ir(p, 'igvisao', 500); t('Visão Geral continua em 7 dias depois de limpar o Ranking', (await ativoRapido()).join() === '7');
 
   // 5/12. intervalos exatos e consultas com as datas certas
-  const pedidos = []; p.on('request', r => { if (/\/api\/instagram\/visao/.test(r.url())) pedidos.push(new URL(r.url()).searchParams); });
+  const pedidos = []; p.on('request', r => { if (/\/api\/instagram\/geral/.test(r.url())) pedidos.push(new URL(r.url()).searchParams); });
   await trocar('igvisao', () => p.click('[data-fbp="mes"]'));
   t('Este mês: do dia 1 até hoje, no texto e na consulta', (await p.innerText('#fbInfo')).includes(`${br(hoje.slice(0, 8) + '01')} a ${br(hoje)}`) && pedidos.some(q => q.get('de') === hoje.slice(0, 8) + '01' && q.get('ate') === hoje));
   await trocar('igvisao', () => p.selectOption('#fbMes', 'm:2026-09'));
@@ -63,12 +63,13 @@ const br = iso => iso.split('-').reverse().join('/');
 
   if (process.env.CAPTURAS) { fs.mkdirSync(process.env.CAPTURAS, { recursive: true }); await p.screenshot({ path: process.env.CAPTURAS + '/filtros-visao-geral.png' }); await U.ir(p, 'igranking', 600); await p.screenshot({ path: process.env.CAPTURAS + '/filtros-ranking.png' }); await U.ir(p, 'trafego', 600); await p.screenshot({ path: process.env.CAPTURAS + '/filtros-trafego.png' }); await U.ir(p, 'igvisao', 500); }
   // 11. resposta antiga não sobrescreve a mais nova
-  let n = 0; await p.route('**/api/instagram/visao*', async rt => { if (++n === 1) await new Promise(r => setTimeout(r, 1800)); rt.continue(); });
+  let n = 0; await p.route('**/api/instagram/geral*', async rt => { if (++n === 1) await new Promise(r => setTimeout(r, 1800)); rt.continue(); });
   await U.ir(p, 'igvisao', 300); n = 0;
   await p.click('[data-fbp="7"]'); await p.waitForTimeout(150); await p.click('[data-fbp="30"]'); await p.waitForTimeout(3500);
-  const texto = await p.innerText('#content');
-  t('consulta lenta antiga não sobrescreve a seleção mais recente (Últimos 30 dias)', texto.includes(br(dia(-29))) && !texto.includes(`período ${br(dia(-6))} a`), texto.slice(0, 300));
-  await p.unroute('**/api/instagram/visao*');
+  const n30 = (await G.get(`/instagram/geral?de=${dia(-29)}&ate=${hoje}&perfil=@evolucaopb`)).atual.publicacoes, n7 = (await G.get(`/instagram/geral?de=${dia(-6)}&ate=${hoje}&perfil=@evolucaopb`)).atual.publicacoes;
+  const mostrado = await p.$$eval('.kpi-ig', e => { const k = e.find(x => /PUBLICAÇÕES REALIZADAS/i.test(x.innerText)); return k ? Number(k.querySelector('strong').innerText.replace(/\D/g, '')) : null; });
+  t('consulta lenta antiga não sobrescreve a seleção mais recente (Últimos 30 dias)', n30 !== n7 && mostrado === n30, [n7, n30, mostrado]);
+  await p.unroute('**/api/instagram/geral*');
 
   // filtro próprio de cada tela e Limpar do Tráfego
   await U.ir(p, 'tfcampanhas', 500); const temStatus = (await p.$$('#tfStatus')).length;

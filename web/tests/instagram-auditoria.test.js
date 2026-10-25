@@ -38,11 +38,11 @@ const API = (process.env.BASE || 'http://127.0.0.1:8080') + '/api';
 
   const b = await U.abrir(); const p = await U.pagina(b, 'NAT-3301', G.nova);
   await U.ir(p, 'igconteudos', 900);
-  t('Conteúdos: a postagem ligada não aparece duplicada na seção da Meta', (await p.$$('.igc-meta .ig-post')).length === 2 && /Reels da feira/.test(await p.innerText('.igc-meta')) && !/Aula aberta de ciências/.test(await p.innerText('.igc-meta')));
+  t('Conteúdos: a postagem ligada não aparece duplicada na seção da Meta', (await p.$$('.igl tbody tr')).length === 4 && !/Aula aberta de ciências/.test(await p.innerText('.igl')) && /Reels da feira/.test(await p.innerText('.igl')), await p.innerText('.igl'));
   await U.ir(p, 'igcalendario', 900);
   t('Calendário: a postagem ligada aparece uma única vez', (await p.$$eval('.igcal-item', e => e.filter(x => /Aula aberta de ciências/.test(x.title)).length)) === 1);
   await U.ir(p, 'igranking', 900);
-  t('Ranking: sem sublinhado azul nos títulos e nada cortado na tabela', await p.$$eval('.igr-tab a', e => e.every(x => getComputedStyle(x).textDecorationLine === 'none')) && await p.$eval('.igr-tab', e => e.parentElement.scrollWidth <= e.parentElement.clientWidth + 2));
+  t('Ranking: sem sublinhado azul nos títulos e nada cortado na tabela', await p.$$eval('.igr-tab a', e => e.every(x => getComputedStyle(x).textDecorationLine === 'none')) && await p.$eval('.igr-tab', e => e.parentElement.scrollWidth <= e.parentElement.clientWidth + 2), await p.$eval('.igr-tab', e => [e.parentElement.scrollWidth, e.parentElement.clientWidth]));
 
   // ---- estado vazio do perfil sem dados ----
   await p.selectOption('#igPerfilCabecalho', '@geracaoevolucao'); await p.waitForTimeout(500);

@@ -263,3 +263,7 @@ a.btn,a.btn:hover{text-decoration:none}
 .igr-par{display:grid;gap:3px;justify-items:end}.igr-par span{display:flex;align-items:center;white-space:nowrap}
 .igr-hist th.num,.igr-hist td.num{text-align:right}.igr-per b{display:block}.igr-per small{display:block;color:var(--ink-3);font-weight:400}.igr-sd,.igr-sd-td{color:var(--ink-3);font-style:italic}.igr-sd-td{text-align:center}.igr-futuro{opacity:.65}
 .igr-hist .igr-per{min-width:170px}
+/* Ranking de publicações: 12 colunas sem corte */
+.igr-tab th{white-space:normal!important;line-height:1.15;vertical-align:bottom;font-size:12px}.igr-tab th,.igr-tab td{padding:8px 6px!important}
+.igr-tab td:nth-child(3){min-width:160px!important;max-width:220px!important}.igr-tab .rk-thumb img{width:38px;height:38px}
+#chMes svg{max-height:280px}
