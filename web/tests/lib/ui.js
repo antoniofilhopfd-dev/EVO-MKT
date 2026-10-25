@@ -28,6 +28,7 @@ async function pagina(browser, cod, senha, vp = { width: 1440, height: 900 }) {
   const p = await ctx.newPage(); p.errs = []; p.on('pageerror', e => p.errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) p.errs.push(m.text()); }); p.on('dialog', d => { p.errs.push('DIALOGO NATIVO: ' + d.type()); d.dismiss(); });
   await p.goto(BASE + '/'); await p.fill('#internalCode', cod); await p.fill('#internalPass', senha); await p.click('#internalLoginBtn');
   await p.waitForSelector('#nav .navitem', { timeout: 15000 });
+  await p.waitForFunction(() => document.querySelector('#content') && !document.querySelector('#content .loading') && document.querySelector('#content').innerText.length > 20, null, { timeout: 20000 }).catch(() => {});
   return p;
 }
 async function ir(p, pg, espera = 600) {
