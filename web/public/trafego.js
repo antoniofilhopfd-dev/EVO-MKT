@@ -25,7 +25,7 @@ async function tfCarregar(forcar = false) {
 }
 function tfCabecalho(d, extra = '') {
   const o = d.origem;
-  return `<div class="tf-topo"><p class="kpi-note">Somente consulta · ${esc(fmtDate(d.periodo.de))} a ${esc(fmtDate(d.periodo.ate))} (${d.periodo.dias} dia(s)) · comparado a ${esc(fmtDate(d.anterior.de))} – ${esc(fmtDate(d.anterior.ate))} ${origem(o)}</p><div class="tf-acoes">${extra}<button type="button" class="btn soft" id="tfAtualiza">Atualizar agora</button><a class="btn soft" target="_blank" rel="noopener" href="/relatorio-trafego.html?de=${d.periodo.de}&ate=${d.periodo.ate}">Relatório em PDF (A4)</a></div></div>${(d.avisos || []).map(a => `<p class="foco-chip" role="note">${esc(a)}</p>`).join('')}`;
+  return `<div class="tf-topo"><p class="kpi-note">Somente consulta · ${esc(fmtDate(d.periodo.de))} a ${esc(fmtDate(d.periodo.ate))} (${d.periodo.dias} dia(s)) · comparado a ${esc(fmtDate(d.anterior.de))} – ${esc(fmtDate(d.anterior.ate))} ${origem(o)}</p><div class="tf-acoes">${extra}<button type="button" class="btn soft" id="tfAtualiza">Atualizar agora</button><a class="btn soft" target="_blank" rel="noopener" href="/relatorio-trafego.html?de=${d.periodo.de}&ate=${d.periodo.ate}">Relatório em PDF (A4)</a></div></div>${avisoAtualizacao(o)}${(d.avisos || []).map(a => `<p class="foco-chip" role="note">${esc(a)}</p>`).join('')}`;
 }
 async function tfPagina(corpo) {
   let d;

@@ -9,6 +9,7 @@ PAGINAS.igvisao = async function () {
   const vazio = !s.publicacoes && !seg;
   $('#content').innerHTML = `<div class="ig-acoes"><a class="btn soft" target="_blank" rel="noopener" href="/relatorio-instagram.html">Relatório mensal (PDF)</a>${botaoNova()}</div>
     <p class="kpi-note ig-escopo">Somente orgânico: publicações do ${esc(d.contas.map(c => '@' + c.replace(/^@/, '')).join(' e ') || 'perfil')} no período ${esc(Filtros.descricao())}, comparadas ao período anterior (${esc(fmtDate(d.anteriorPeriodo.de))} a ${esc(fmtDate(d.anteriorPeriodo.ate))}). ${origem(d.origem)}</p>
+    ${avisoAtualizacao(d.origem)}
     ${d.somenteVinculadas ? '<p class="foco-chip">Com segmento ou campanha editorial escolhidos, só contam as publicações do Instagram ligadas a uma publicação do EVO MKT.</p>' : ''}
     ${vazio ? `<div class="empty-rich"><strong>Sem dados do Instagram neste período</strong><p>Conecte o perfil em Configurações › Instagram e sincronize, ou amplie o período.</p><button class="btn soft" data-go="configuracoes">Abrir Configurações</button></div>` : `
     <div class="kpis kpis4">${kpi('Publicações', 'publicacoes')}${kpi('Interações', 'interacoes')}${kpi('Alcance', 'alcance')}${kpi('Visualizações', 'visualizacoes')}${kpi('Curtidas', 'curtidas')}${kpi('Comentários', 'comentarios')}${kpi('Salvamentos', 'salvamentos')}${kpi('Seguidores gerados', 'seguidoresGerados')}</div>
