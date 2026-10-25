@@ -52,11 +52,12 @@ const Filtros = (() => {
 /** Quais filtros cada página aceita e, para os que não aceita, por quê. */
 const FILTROS_PAGINA = {
   hoje: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
-  calendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O calendário tem a própria navegação por mês, semana e dia.' } },
+  calendario: { aplica: ['segmento'], motivo: { periodo: 'O calendário tem a própria navegação.', perfil: 'O calendário é exclusivamente escolar.', formato: 'O calendário é exclusivamente escolar.', campanha: 'O calendário é exclusivamente escolar.' } },
   igvisao: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
   igconteudos: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'Esta lista mostra todas as publicações; use os filtros da lista para a data.' } },
   igplan: { aplica: ['perfil', 'segmento', 'formato', 'campanha'], motivo: { periodo: 'O planejamento navega por mês.' } },
   igdesempenho: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
+  igranking: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'], motivo: {} },
   trafego: { aplica: ['periodo'], motivo: { perfil: 'A Meta Ads não separa por perfil do Instagram.', segmento: 'A Meta Ads não informa o segmento (ele só aparece no nome da campanha).', formato: 'Os anúncios não têm o formato das publicações do EVO MKT.', campanha: 'A campanha editorial é do EVO MKT; a Meta tem as próprias campanhas.' } },
   tfcampanhas: { aplica: ['periodo'], motivo: { perfil: 'A Meta Ads não separa por perfil do Instagram.', segmento: 'A Meta Ads não informa o segmento.', formato: 'Os anúncios não têm o formato das publicações.', campanha: 'A campanha editorial é do EVO MKT; a Meta tem as próprias campanhas.' } },
   tfanuncios: { aplica: ['periodo'], motivo: { perfil: 'A Meta Ads não separa por perfil do Instagram.', segmento: 'A Meta Ads não informa o segmento.', formato: 'Os anúncios não têm o formato das publicações.', campanha: 'A campanha editorial é do EVO MKT; a Meta tem as próprias campanhas.' } },
@@ -77,12 +78,12 @@ async function montarFiltros() {
   const n = Filtros.ativos(), aberto = window.innerWidth >= 860;
   box.innerHTML = `<details class="fb-det" ${aberto ? 'open' : ''}><summary>Filtros${n ? ` · ${n} ativo(s)` : ''} <small>${esc(dis('periodo') ? 'período próprio da tela' : Filtros.descricao())}</small></summary><div class="fb-linha">
     <label class="fb-campo ${dis('periodo') ? 'fb-off' : ''}"${dica('periodo')}><span>Período</span><select class="control" id="fbP" ${dis('periodo') ? 'disabled' : ''} aria-label="Período">${PERIODOS.map(([v, l]) => `<option value="${v}" ${f.p === v ? 'selected' : ''}>${v === 'x' && f.p === 'x' ? esc(rotP) : esc(l)}</option>`).join('')}</select></label>
-    ${sel('fbPerfil', 'perfil', 'Perfil', PERFIL_LISTA)}${sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA)}
+    ${sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA)}${sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA)}
     ${sel('fbFmt', 'formato', 'Formato', [['', 'Todos os formatos'], ...FORMATO_LISTA.map(x => [x, x])])}
     ${sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])])}
     <button type="button" class="btn soft fb-limpar" id="fbLimpar" ${Filtros.ativos() ? '' : 'disabled'}>Limpar filtros</button>
   </div>
-  <div class="fb-info" id="fbInfo"><b>${dis('periodo') ? 'Período: navegação própria desta tela' : 'Período: ' + esc(Filtros.descricao())}</b>${f.p !== 'x' && !dis('periodo') ? ' · fuso America/Fortaleza' : ''}${semEfeito.length ? ` · <span class="fb-aviso">Sem efeito aqui: ${semEfeito.map(k => ({ perfil: 'perfil', segmento: 'segmento', formato: 'formato', campanha: 'campanha editorial' }[k])).join(', ')} (${esc(cfg.motivo[semEfeito[0]] || '')})</span>` : ''}</div></details>`;
+  <div class="fb-info" id="fbInfo">${state.page.startsWith('ig') ? `<span class="fb-perfil-atual">Perfil: <b>${esc((PERFIL_LISTA.find(x=>x[0]===f.perfil)||PERFIL_LISTA[0])[1])}</b></span> · ` : ''}<b>${dis('periodo') ? 'Período: navegação própria desta tela' : 'Período: ' + esc(Filtros.descricao())}</b>${f.p !== 'x' && !dis('periodo') ? ' · fuso America/Fortaleza' : ''}${semEfeito.length ? ` · <span class="fb-aviso">Sem efeito aqui: ${semEfeito.map(k => ({ perfil: 'perfil', segmento: 'segmento', formato: 'formato', campanha: 'campanha editorial' }[k])).join(', ')} (${esc(cfg.motivo[semEfeito[0]] || '')})</span>` : ''}</div></details>`;
   const liga = (id, k) => { const e = $('#' + id, box); if (e) e.onchange = () => Filtros.set({ [k]: e.value }); };
   liga('fbPerfil', 'perfil'); liga('fbSeg', 'segmento'); liga('fbFmt', 'formato'); liga('fbCamp', 'campanha');
   $('#fbP', box).onchange = e => {
