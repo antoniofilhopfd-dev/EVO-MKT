@@ -140,7 +140,7 @@ function renderInternalUser() {
 const PAGINAS = {}; // página → função que desenha (registrada pelos outros arquivos)
 const ROTULOS = {
   hoje: 'Dashboard', calendario: 'Calendário',
-  igvisao: 'Visão geral', igconteudos: 'Conteúdos', igplan: 'Planejamento', igdesempenho: 'Desempenho',
+  igvisao: 'Visão geral', igconteudos: 'Conteúdos', igplan: 'Planejamento', igdesempenho: 'Desempenho', igranking: 'Ranking',
   trafego: 'Visão geral', tfcampanhas: 'Campanhas', tfanuncios: 'Anúncios',
   configuracoes: 'Configurações',
 };
@@ -155,13 +155,13 @@ const DESCRICOES = {
 const AREAS = [
   { k: 'visao', label: 'Dashboard', icon: '◉', pages: ['hoje'] },
   { k: 'calendario', label: 'Calendário', icon: '▤', pages: ['calendario'] },
-  { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igplan', 'igdesempenho'] },
+  { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igplan', 'igdesempenho', 'igranking'] },
   { k: 'trafego', label: 'Tráfego Pago', icon: '↗', pages: ['trafego', 'tfcampanhas', 'tfanuncios'] },
   { k: 'configuracoes', label: 'Configurações', icon: '⚙', pages: ['configuracoes'] },
 ];
 const areaOf = p => AREAS.find(a => a.pages.includes(p));
 /** Endereços antigos que ainda podem estar salvos nos favoritos do navegador. */
-const REDIRECIONA = { studio: 'igconteudos', conteudos: 'igconteudos', ideias: 'igplan', editorial: 'igplan', templates: 'igplan', instagram: 'igdesempenho', igposts: 'igdesempenho', igranking: 'igdesempenho', gerenciador: 'tfcampanhas', tfcriativos: 'tfanuncios', tfanalises: 'trafego', tfrelatorios: 'trafego', calescolar: 'calendario', datacom: 'calendario', agenda: 'calendario', dashboard: 'hoje' };
+const REDIRECIONA = { studio: 'igconteudos', conteudos: 'igconteudos', ideias: 'igplan', editorial: 'igplan', templates: 'igplan', instagram: 'igdesempenho', igposts: 'igdesempenho', gerenciador: 'tfcampanhas', tfcriativos: 'tfanuncios', tfanalises: 'trafego', tfrelatorios: 'trafego', calescolar: 'calendario', datacom: 'calendario', agenda: 'calendario', dashboard: 'hoje' };
 const canAccess = p => !!internalSession && !!ROTULOS[p];
 
 function renderNav() {
