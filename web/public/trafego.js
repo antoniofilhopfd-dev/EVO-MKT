@@ -56,15 +56,34 @@ async function tfPagina(corpo) {
   return d;
 }
 
+const tfFotoAnuncio = a => a.miniatura ? `<button class="tf-foto" type="button" data-tffoto="${attr(a.imagem || a.miniatura)}" aria-label="Ampliar foto de ${attr(a.nome)}"><img src="${attr(a.miniatura)}" alt="Criativo: ${attr(a.nome)}" loading="lazy" referrerpolicy="no-referrer" width="64" height="80"></button>` : '<span class="tf-sem">Sem imagem</span>';
+const tfBadge = a => `<span class="badge ${a.status === 'ACTIVE' ? 'ok' : /PAUSED|ARCHIVED|DELETED/.test(a.status) ? 'mute' : 'warn'}">${esc(a.statusRotulo || 'Status indisponível')}</span>`;
+function tfResumoLista(d, anuncios = false) {
+  const rows = anuncios ? d.anuncios : d.campanhas, limite = 6;
+  if (!rows.length) return '<div class="empty compact">Sem veiculação no período escolhido.</div>';
+  const cab = `${anuncios ? '<th>Foto</th>' : ''}<th>${anuncios ? 'Anúncio' : 'Campanha'}</th><th>Status atual</th><th class="num">Investimento</th><th class="num">Conversas</th><th class="num">Custo/conversa</th><th class="num">CTR</th>`;
+  return `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${cab}</tr></thead><tbody>${rows.slice(0, limite).map(r => `<tr>${anuncios ? `<td class="tf-fotocel">${tfFotoAnuncio(r)}</td>` : ''}<td class="titlecell"><b>${esc(r.nome)}</b>${anuncios ? `<br><small>${esc(r.campanha)}</small>` : ''}</td><td>${tfBadge(r)}</td><td class="num">${money(r.investimento)}</td><td class="num">${fmtN(r.conversas)}</td><td class="num">${r.custoConversa === null ? '—' : money(r.custoConversa)}</td><td class="num">${r.ctr === null ? '—' : pct(r.ctr)}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">${Math.min(limite, rows.length)} de ${rows.length} ${anuncios ? 'anúncio(s)' : 'campanha(s)'} · maiores investimentos no período</p>`;
+}
+function tfAlertasVisao(d) {
+  const alertas = [];
+  for (const a of d.anuncios) if (['DISAPPROVED', 'WITH_ISSUES', 'PENDING_BILLING_INFO'].includes(a.status)) alertas.push({ titulo: a.statusRotulo, texto: `${a.nome} · confira a situação atual no Gerenciador da Meta.`, tipo: 'problema' });
+  for (const c of d.campanhas) if (c.investimento >= 100 && c.impressoes >= 1000 && c.conversas === 0) alertas.push({ titulo: 'Investimento sem conversas', texto: `${c.nome}: ${money(c.investimento)} no período. Confira se conversas são o objetivo desta campanha.`, tipo: 'revisar' });
+  for (const aviso of d.avisos || []) alertas.push({ titulo: 'Aviso dos dados', texto: aviso, tipo: 'revisar' });
+  return alertas.length ? `<div class="tf-vis-alertas">${alertas.slice(0, 6).map(a => `<article class="tf-vis-alerta ${a.tipo}"><span class="badge ${a.tipo === 'problema' ? 'warn' : 'info'}">${a.tipo === 'problema' ? 'Atenção' : 'Conferir'}</span><div><b>${esc(a.titulo)}</b><p>${esc(a.texto)}</p></div></article>`).join('')}</div>${alertas.length > 6 ? `<p class="kpi-note">Mais ${alertas.length - 6} aviso(s). Consulte a lista completa de anúncios.</p>` : ''}` : '<div class="empty compact">Nenhum alerta pelos critérios desta visão. Os dados podem ser atualizados pela Meta.</div>';
+}
 PAGINAS.trafego = async function () {
   const d = await tfPagina(d => {
-    const a = d.atual, v = d.variacoes, ds = d.destaques;
-    const kpis = TF_INDICADORES.map(([k, rot, fmt, bom]) => `<div class="kpi"><small>${rot}</small><strong>${a[k] === null || a[k] === undefined ? '—' : fmt(a[k])}</strong>${delta(v[k], { bomSubir: bom })}</div>`).join('');
-    const dest = (rot, c, texto) => `<div class="tf-dest"><small>${rot}</small>${c ? `<b>${esc(c.nome)}</b><span>${texto(c)}</span>` : '<span class="kpi-note">Sem dados suficientes</span>'}</div>`;
-    return `${tfCabecalho(d)}<div class="kpis kpis4">${kpis}</div>
-      <section class="card"><div class="db-tit"><h2>Investimento diário por campanha</h2>${origem(d.origem)}</div><div id="tfDiario"></div><details class="tf-tabela"><summary>Ver como tabela</summary><div id="tfDiarioTabela"></div></details></section>
-      <div class="tf-destaques">${dest('Mais investiu', ds.maisGastou, c => `${money(c.investimento)} no período`)}${dest('Melhor custo por conversa', ds.melhorCampanha, c => `${money(c.custoConversa)} · ${fmtN(c.conversas)} conversas`)}${dest('Pior custo por conversa', ds.piorCampanha, c => `${money(c.custoConversa)} · ${fmtN(c.conversas)} conversas`)}</div>
-      <p class="kpi-note">Alcance do total não soma o alcance das campanhas (pessoas se repetem). CTR, CPC e custo por conversa são recalculados dos valores absolutos. Conversas iniciadas contam uma vez por conversa (sem repetir variações da mesma ação). Nada aqui vem do EVO CRM: leads, matrículas e funil ficam lá.</p>`;
+    const a = d.atual, v = d.variacoes;
+    const ordem = ['conversas', 'custoConversa', 'cpc', 'ctr', 'alcance', 'impressoes', 'cliques'];
+    const kpis = ordem.map(k => { const [, rot, fmt, bom] = TF_INDICADORES.find(x => x[0] === k); return `<div class="kpi"><small>${rot}</small><strong>${a[k] === null || a[k] === undefined ? '—' : fmt(a[k])}</strong>${delta(v[k], { bomSubir: bom })}</div>`; }).join('');
+    return `${tfCabecalho(d)}<div class="tf-visao">
+      <section class="card tf-vis-hero"><div><small>Investimento no período</small><strong>${money(a.investimento)}</strong>${delta(v.investimento, { bomSubir: true })}</div><div class="tf-vis-contexto"><b>${esc(fmtDate(d.periodo.de))} a ${esc(fmtDate(d.periodo.ate))}</b><span>${d.campanhas.length} campanha(s) · ${d.anuncios.length} anúncio(s) com veiculação</span><small>Status atual na Meta; valores do período escolhido.</small></div></section>
+      <div class="kpis kpis4 tf-vis-kpis">${kpis}<div class="kpi"><small>Campanhas com veiculação</small><strong>${fmtN(d.campanhas.length)}</strong><i class="kd flat">no período escolhido</i></div></div>
+      <div class="tf-vis-graficos"><section class="card"><div class="db-tit"><h2>Investimento diário por campanha</h2>${origem(d.origem)}</div><div id="tfDiario"></div><details class="tf-tabela"><summary>Ver como tabela</summary><div id="tfDiarioTabela"></div></details></section><section class="card"><div class="db-tit"><h2>Investimento por campanha</h2></div><div id="tfBarrasCamp"></div></section></div>
+      <section class="card" id="tfVisCampanhas"><div class="db-tit"><h2>Campanhas</h2><button class="btn soft" data-go="tfcampanhas">Ver todas e filtrar</button></div>${tfResumoLista(d)}</section>
+      <section class="card" id="tfVisAnuncios"><div class="db-tit"><h2>Anúncios</h2><button class="btn soft" data-go="tfanuncios">Ver todos e filtrar</button></div>${tfResumoLista(d, true)}</section>
+      <section class="card"><div class="db-tit"><h2>Alertas e pontos de atenção</h2><small>Baseados nos dados consultados</small></div>${tfAlertasVisao(d)}</section>
+      <p class="kpi-note">Alcance total vem da conta e não soma as campanhas. CTR, CPC e custo por conversa são recalculados dos valores absolutos. As listas completas e seus filtros continuam nas abas Campanhas e Anúncios.</p></div>`;
   });
   if (!d) return;
   const diario = d.diario, cores = ['#063996', '#00A1F3', '#FF7800', '#793A8C'];
@@ -72,6 +91,7 @@ PAGINAS.trafego = async function () {
   series.push({ k: 'total', nome: 'Total', cor: '#00275F', fmt: money, tracejado: true, marcadores: true });
   const dados = diario.dias.map((x, i) => Object.fromEntries([['x', x], ['total', diario.total[i]], ...diario.series.map((s, n) => ['camp' + n, s.valores[i]])]));
   EvoCharts.linha($('#tfDiario'), { dados, series, sombreado: false, altura: 280, rotuloAcessivel: 'Investimento diário por campanha, com total tracejado' });
+  EvoCharts.barras($('#tfBarrasCamp'), { itens: d.campanhas.map(c => ({ nome: c.codigo || c.nome, sub: c.nome, v: c.investimento, cor: '#063996' })), fmt: money, rotuloAcessivel: 'Investimento por campanha' });
   $('#tfDiarioTabela').innerHTML = `<div class="tablewrap"><table class="datatable"><thead><tr><th>Dia</th>${series.map(s => `<th>${esc(s.nome)}</th>`).join('')}</tr></thead><tbody>${dados.map(r => `<tr><td>${esc(fmtDate(r.x))}</td>${series.map(s => `<td>${money(r[s.k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 };
 

@@ -1,0 +1,28 @@
+// Interface real com API interceptada e dados de exemplo; não depende de MySQL nem acessa a Meta.
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const root=path.resolve(__dirname, '../public');
+const screenshots=process.env.EVO_SCREENSHOT_DIR || '/tmp/evo-trafego-visao';fs.mkdirSync(screenshots,{recursive:true});
+(async()=>{
+const {chromium}=require(process.env.PLAYWRIGHT || '/opt/node-tools/node_modules/playwright');
+const b=await chromium.launch({executablePath:process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:JSON.parse(process.env.CHROME_ARGS || '[]'),headless:true});
+const rows=[['01 - EI | Matrículas',420,12,'ACTIVE'],['02 - AF | Matrículas',320,10,'ACTIVE'],['03 - EM | Matrículas',510,22,'PAUSED'],['04 - AI | Matrículas',240,0,'ACTIVE']].map(([nome,investimento,conversas,status],i)=>({id:'c'+i,nome,codigo:nome.split(' | ')[0],investimento,conversas,status,statusRotulo:status==='ACTIVE'?'Ativo':'Pausado',impressoes:10000,alcance:7000,cliques:100,ctr:1,cpc:investimento/100,custoConversa:conversas?investimento/conversas:null}));
+const soma=k=>rows.reduce((s,r)=>s+r[k],0),atual={investimento:soma('investimento'),conversas:soma('conversas'),impressoes:40000,alcance:20000,cliques:400,ctr:1,cpc:soma('investimento')/400,custoConversa:soma('investimento')/soma('conversas')};
+const dias=Array.from({length:14},(_,i)=>'2026-10-'+String(i+1).padStart(2,'0'));const series=rows.map((r,j)=>({nome:r.nome,codigo:r.codigo,valores:(()=>{const pesos=dias.map((_,i)=>[10,18,24,13,15,12,10][i%7]+j*2),total=pesos.reduce((a,b)=>a+b,0);return pesos.map(v=>r.investimento*v/total)})()}));
+const d={periodo:{de:dias[0],ate:dias.at(-1),dias:dias.length},anterior:{de:'2026-09-17',ate:'2026-09-30'},atual,variacoes:Object.fromEntries(Object.keys(atual).map(k=>[k,{tipo:'subiu',percentual:12}])),campanhas:rows,anuncios:rows.map((r,i)=>({...r,id:'a'+i,nome:['Reels de matrículas','Depoimento de família','Tour pela escola','Visita ao Colégio'][i],campanha:r.nome,status:i===2?'DISAPPROVED':r.status,statusRotulo:i===2?'Reprovado':r.statusRotulo,miniatura:i===0?'https://scontent.fbcdn.net/demo.png':'',imagem:i===0?'https://scontent.fbcdn.net/demo.png':''})),diario:{dias,series,total:dias.map((_,i)=>series.reduce((s,r)=>s+r.valores[i],0))},avisos:[],origem:{fonte:'Dados de exemplo para validação visual',periodo:dias[0]+' a '+dias.at(-1),atualizadoEm:new Date().toISOString()}};
+const errors=[];
+for(const [name,width,height]of [['desktop',1440,900],['ipad',820,1180],['celular',390,844]]){
+const p=await b.newPage({viewport:{width,height},deviceScaleFactor:1});p.on('pageerror',e=>errors.push(name+': '+e.message));
+await p.route('**/*',async route=>{const u=new URL(route.request().url());
+if(u.hostname==='scontent.fbcdn.net')return route.fulfill({contentType:'image/png',body:fs.readFileSync(root+'/img/logo-colegio.png')});
+if(u.pathname.startsWith('/api/')){const endpoint=u.pathname.slice(4);let data={};if(endpoint==='/auth/me')data={user:{code:'DEMO',name:'Equipe de Marketing',role:'admin',label:'Administrador',admin:true}};else if(endpoint==='/trafego/resumo')data=d;else if(endpoint==='/notificacoes')data={rows:[],naoLidas:0};else if(endpoint==='/data')data={rows:[],headers:[]};else if(endpoint==='/trafego/estado')data={conectado:true,contaEscolhida:true};else if(endpoint==='/auth/mode')data={modo:'senha'};return route.fulfill({json:data});}
+const file=path.join(root,u.pathname==='/'?'index.html':u.pathname);if(!file.startsWith(root)||!fs.existsSync(file))return route.fulfill({status:404,body:''});const ext=path.extname(file),type={'.js':'application/javascript','.css':'text/css','.html':'text/html','.png':'image/png','.woff2':'font/woff2'}[ext]||'application/octet-stream';return route.fulfill({body:fs.readFileSync(file),contentType:type});});
+await p.addInitScript(()=>localStorage.setItem('evo.filtros',JSON.stringify({p:'x',de:'2026-10-01',ate:'2026-10-14'})));await p.goto('http://evo.test/?page=trafego');await p.waitForSelector('#tfVisAnuncios');await p.locator('#tfVisAnuncios').scrollIntoViewIfNeeded();await p.waitForTimeout(100);await p.evaluate(()=>document.fonts.ready);
+assert.equal(await p.locator('.tf-visao .kpi').count(),8);assert.equal(await p.locator('#tfVisCampanhas tbody tr').count(),4);assert.equal(await p.locator('#tfVisAnuncios tbody tr').count(),4);assert.equal(await p.locator('#tfDiario svg').count(),1);assert.equal(await p.locator('#tfBarrasCamp li').count(),4);
+const overflow=await p.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);assert(overflow<3,name+' horizontal overflow '+overflow);
+await p.locator('[data-tffoto]').first().click();await p.waitForSelector('.tf-foto-ampliada');await p.locator('[data-close]').last().click();
+await p.evaluate(()=>{document.querySelectorAll('*').forEach(e=>{if(e.scrollTop)e.scrollTop=0});window.scrollTo(0,0)});await p.waitForTimeout(100);
+await p.addStyleTag({content:'html,body{height:auto!important;overflow:visible!important}#app,main{height:auto!important;overflow:visible!important}'});await p.evaluate(()=>window.scrollTo(0,0));await p.screenshot({path:path.join(screenshots,'visao-geral-'+name+'.png'),fullPage:true});console.log(name,'OK');
+if(name==='desktop'){await p.evaluate(()=>go('tfcampanhas'));await p.waitForSelector('#tfStatus');await p.selectOption('#tfStatus','ativos');await p.waitForSelector('#tfStatus');assert.equal(await p.locator('#tfStatus').inputValue(),'ativos');}
+}
+assert.deepEqual(errors,[]);await b.close();console.log('OK: cartões, tabelas, fotos/ampliação, gráfico, filtros e ausência de erros nos três tamanhos.');
+})().catch(e=>{console.error(e);process.exit(1)});
