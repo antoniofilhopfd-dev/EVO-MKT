@@ -8,7 +8,7 @@ import { json } from './handlers';
 /**
  * Calendário Escolar: eventos e atividades OFICIAIS do Colégio. Módulo próprio (`calescolar`), separado do Calendário de Marketing
  * e do futuro Calendário de Datas Comemorativas. Nenhum evento é criado pelo sistema: o calendário oficial é cadastrado pela Gerência.
- * Consulta: toda a equipe. Cadastro, edição, reagendamento e exclusão: só a Gerência/Administração.
+ * SOMENTE LEITURA desde que o Calendário Geral passou a usar o Google Agenda: os eventos antigos continuam visíveis, mas ninguém cria, edita, move nem exclui por aqui.
  */
 export const SEGMENTOS_ESCOLARES: [string, string][] = SEGMENTOS;
 export const TIPOS_ESCOLARES: [string, string][] = [
@@ -71,10 +71,12 @@ export async function escolarRoute(c: Ctx): Promise<Response> {
     return json({
       rows: (await listRows('calescolar')).map((e) => ({ ...e, publicacoes: vinc[String(e.id)] ?? [] })),
       opcoes: { segmentos: SEGMENTOS_ESCOLARES, tipos: TIPOS_ESCOLARES },
-      eu: { nome: u.nome, role: u.role }, podeEditar: true, hoje: fmtDate(new Date()),
+      eu: { nome: u.nome, role: u.role }, podeEditar: false, hoje: fmtDate(new Date()),
     });
   }
 
+  // Somente leitura: o Calendário Geral agora vive no Google Agenda e só a agenda do Marketing aceita alterações.
+  if (['/escolar/salvar', '/escolar/mover', '/escolar/excluir'].includes(path) && method === 'POST') fail(403, 'Este calendário escolar anterior ficou somente leitura. Crie e edite eventos no Calendário Geral (agenda do Marketing no Google Agenda).');
   if (path === '/escolar/salvar' && method === 'POST') {
     await requireInternal(c);
     const b = await c.body();

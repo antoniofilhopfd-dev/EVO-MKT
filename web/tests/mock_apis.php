@@ -13,6 +13,8 @@ $raw = file_get_contents('php://input');
 $in = json_decode($raw, true) ?: [];
 if ($m !== 'GET' && !$in && $raw !== '' && !str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'multipart') && !str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'json')) { parse_str($raw, $in); }
 $S['calls'][] = "$m $p";
+if ($p === '/__gcal_seed' && $m === 'POST') { $S['cev'][$in['id']] = $in['events']; j(['ok' => true]); }
+if ($p === '/__gcal_role' && $m === 'POST') { $S['roles'][$in['id']] = $in['role']; j(['ok' => true]); }
 if ($p === '/__reset') { $S = ['seq' => 0, 'containers' => [], 'published' => [], 'events' => [], 'folders' => [], 'files' => [], 'sheets' => [], 'values' => [], 'calls' => []]; j(['ok' => true]); }
 if ($p === '/__state') { j($S); }
 // ---------------- META ----------------
@@ -183,13 +185,27 @@ if (str_starts_with($p, '/google')) {
     $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     if (!str_starts_with($auth, 'Bearer AT')) j(['error' => ['message' => 'unauthorized']], 401);
     $now = gmdate('Y-m-d\TH:i:s.000\Z');
-    if ($g === '/calendar/v3/users/me/calendarList' && $m === 'GET') j(['items' => [['id' => 'cal1', 'summary' => 'Marketing', 'accessRole' => 'owner']]]);
+    // Várias agendas (Calendário Geral): Marketing (owner) e as demais somente leitura; lista paginada; agendas com erro e removida.
+    $CALS = ['cal1' => ['Marketing', 'owner'], 'cal_mat' => ['Maternais – Infantil 1, 2 e 3', 'reader'], 'cal_jar' => ['Jardins – Infantil 4, 5 e 1º ano', 'reader'], 'cal_ini' => ['Anos Iniciais – 2º ao 5º ano', 'reader'], 'cal_fin' => ['Anos Finais – 6º ao 9º ano', 'reader'], 'cal_err' => ['Agenda com erro', 'reader'], 'cal_gone' => ['Agenda removida', 'reader']];
+    foreach (($S['roles'] ?? []) as $k => $r) if (isset($CALS[$k])) $CALS[$k][1] = $r;
+    $calitem = function ($id) use ($CALS) { return ['id' => $id, 'summary' => $CALS[$id][0], 'accessRole' => $CALS[$id][1]]; };
+    if ($g === '/calendar/v3/users/me/calendarList' && $m === 'GET') {
+        $ids = array_keys($CALS); $pg = $_GET['pageToken'] ?? ''; $out = ['items' => array_map($calitem, array_slice($ids, $pg === 'p2' ? 4 : 0, 4))]; if (!$pg) $out['nextPageToken'] = 'p2'; j($out);
+    }
+    if ($g === '/calendar/v3/users/me/calendarList' && $m === 'POST') { $id = $in['id'] ?? ''; if ($id === 'cal_compartilhada') j(['id' => $id, 'summary' => 'Agenda compartilhada', 'accessRole' => 'reader']); j(['error' => ['message' => 'Not Found']], 404); }
+    if (preg_match('#^/calendar/v3/users/me/calendarList/(.+)$#', $g, $mm) && $m === 'GET') { $id = rawurldecode($mm[1]); if (isset($CALS[$id])) j($calitem($id)); j(['error' => ['message' => 'Not Found']], 404); }
+    if (preg_match('#^/calendar/v3/calendars/(cal_[a-z0-9_]+)/events(/.+)?$#', $g, $mm) && $m !== 'GET') j(['error' => ['errors' => [['reason' => 'forbidden']], 'message' => 'Forbidden']], 403);
+    if (preg_match('#^/calendar/v3/calendars/(cal_[a-z0-9_]+)/events$#', $g, $mm) && $m === 'GET') {
+        $id = $mm[1]; if ($id === 'cal_err') j(['error' => ['message' => 'Backend Error']], 500); if ($id === 'cal_gone') j(['error' => ['message' => 'Not Found']], 404);
+        $ev = $S['cev'][$id] ?? []; $pg = (int)($_GET['pageToken'] ?? 0); $mx = min(250, (int)($_GET['maxResults'] ?? 250)); $out = ['items' => array_slice($ev, $pg * $mx, $mx)]; if (($pg + 1) * $mx < count($ev)) $out['nextPageToken'] = (string)($pg + 1); j($out);
+    }
     if ($g === '/calendar/v3/calendars/cal1' && $m === 'GET') j(['id' => 'cal1', 'summary' => 'Marketing']);
     if ($g === '/calendar/v3/calendars' && $m === 'POST') j(['id' => 'cal1', 'summary' => $in['summary'] ?? '']);
     if ($g === '/calendar/v3/calendars/cal1/events' && $m === 'GET') j(['items' => array_values($S['events'])]);
     if ($g === '/calendar/v3/calendars/cal1/events' && $m === 'POST') { $id = nid('ev'); $in['id'] = $id; $in['updated'] = $now; $in['status'] = 'confirmed'; $S['events'][$id] = $in; j($in); }
     if (preg_match('#^/calendar/v3/calendars/cal1/events/(.+)$#', $g, $mm)) {
         $id = rawurldecode($mm[1]);
+        if ($m === 'GET') { if (isset($S['events'][$id])) j($S['events'][$id]); j(['error' => ['message' => 'Not Found']], 404); }
         if ($m === 'DELETE') { if (isset($S['events'][$id])) { $S['events'][$id]['status'] = 'cancelled'; $S['events'][$id]['updated'] = $now; } http_response_code(204); exit; }
         if ($m === 'PUT' || $m === 'PATCH') { $in['id'] = $id; $in['updated'] = $now; $in['status'] = 'confirmed'; $S['events'][$id] = $in; j($in); }
     }

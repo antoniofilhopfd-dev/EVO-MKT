@@ -63,6 +63,15 @@ async function gApi(method: string, path: string, body: any = null, extra: Recor
   return httpOk([st, j], `Google ${method} ${path}`) as Row;
 }
 
+/** Como gApi, mas devolve [status, corpo] sem lançar erro: quem chama decide a mensagem (401, 403, 404, 429, 5xx). */
+export async function gApiStatus(method: string, path: string, body: any = null): Promise<[number, any]> {
+  const base = gUrl('GOOGLE_API_BASE', 'https://www.googleapis.com');
+  const h: Record<string, string> = { Authorization: 'Bearer ' + (await gToken()) };
+  let payload: BodyInit | null = null;
+  if (body !== null) { payload = JSON.stringify(body); h['Content-Type'] = 'application/json'; }
+  return httpCall(method, base + path, h, payload, 40);
+}
+
 // ---------- Agenda ----------
 export const GCAL_MODULES = ['calendario', 'conteudos'];
 async function gCalendarId(): Promise<string> {
@@ -116,7 +125,7 @@ export async function gCalendarChoose(id: string): Promise<void> {
   if (novo) await gApi('GET', `/calendar/v3/calendars/${encodeURIComponent(novo)}`); // falha se não existir ou sem acesso
   if (novo === (await setting('g_calendar_id'))) return;
   await setSetting('g_calendar_id', novo);
-  await run('DELETE FROM google_event_map'); // os vínculos eram da agenda anterior; os eventos lá ficam como estão
+  // Os vínculos ficam guardados por agenda (coluna calendar_id): nada é apagado ao trocar de agenda.
 }
 function gEventFromRow(mod: string, r: Row): Row | null {
   const label: Record<string, string> = { calendario: '', conteudos: '[Publicação] ' };
@@ -163,7 +172,7 @@ function gApplyEventToRow(mod: string, row: Row, ev: Row): Row {
 const closed = /CONCLU|CANCEL|ARQUIV/i;
 
 export async function gCalendarSync(): Promise<Row> {
-  const cal = encodeURIComponent(await gCalendarId());
+  const calRaw = await gCalendarId(), cal = encodeURIComponent(calRaw);
   // Eventos criados direto no Google entram no Calendário (ligado por padrão; dá para desligar em Integrações).
   const importar = (await setting('g_importar')) !== '0';
   const chaveEv = (r: Row) => `${String(r.titulo ?? '').trim().toLowerCase()}|${String(r.inicioEm || r.dataInicio || '').slice(0, 16)}`;
@@ -171,7 +180,7 @@ export async function gCalendarSync(): Promise<Row> {
   if (importar) for (const r of await listRows('calendario')) if (r.origem === 'GOOGLE_AGENDA') jaImportados.add(chaveEv(r));
   const stat = { do_google: 0, para_google: 0, criados: 0, removidos: 0 };
   const map: Record<string, Row> = {};
-  for (const m of await q('SELECT * FROM google_event_map')) map[`${m.modulo}|${m.id}`] = m;
+  for (const m of await q('SELECT * FROM google_event_map WHERE calendar_id=?', [calRaw])) map[`${m.modulo}|${m.id}`] = m;
   const byEvent: Record<string, Row> = {};
   for (const m of Object.values(map)) byEvent[m.event_id] = m;
   // 1) Google → EVO
@@ -192,7 +201,7 @@ export async function gCalendarSync(): Promise<Row> {
     const id: string | null = priv.evoId ?? known?.id ?? null;
     if (ev.status === 'cancelled') {
       if (known) {
-        await run('DELETE FROM google_event_map WHERE modulo=? AND id=?', [known.modulo, known.id]);
+        await run('DELETE FROM google_event_map WHERE modulo=? AND id=? AND calendar_id=?', [known.modulo, known.id, calRaw]);
         delete map[`${known.modulo}|${known.id}`];
         await intLog('google', 'ok', `Evento removido no Google; item ${known.id} mantido no EVO`);
       }
@@ -208,7 +217,7 @@ export async function gCalendarSync(): Promise<Row> {
           await updateRow(mod, id, { dataFim: ultimo }, 'integracao:google');
           row = (await getRow(mod, id))!;
           const nh = md5(gEventFromRow(mod, row) ?? []);
-          await run('UPDATE google_event_map SET hash=? WHERE modulo=? AND id=?', [nh, mod, id]);
+          await run('UPDATE google_event_map SET hash=? WHERE modulo=? AND id=? AND calendar_id=?', [nh, mod, id, calRaw]);
           if (map[`${mod}|${id}`]) map[`${mod}|${id}`].hash = nh;
           stat.do_google++;
           continue;
@@ -224,7 +233,7 @@ export async function gCalendarSync(): Promise<Row> {
         await updateRow(mod, id, gApplyEventToRow(mod, row, ev), 'integracao:google');
         row = (await getRow(mod, id))!;
         const nh = md5(gEventFromRow(mod, row) ?? []);
-        await run('UPDATE google_event_map SET hash=? WHERE modulo=? AND id=?', [nh, mod, id]);
+        await run('UPDATE google_event_map SET hash=? WHERE modulo=? AND id=? AND calendar_id=?', [nh, mod, id, calRaw]);
         map[`${mod}|${id}`].hash = nh;
         stat.do_google++;
       }
@@ -234,7 +243,7 @@ export async function gCalendarSync(): Promise<Row> {
       jaImportados.add(chaveEv(patch));
       const nw = await insertRow('calendario', { ...patch, status: 'NOVO', origem: 'GOOGLE_AGENDA', idExterno: evId, descricao: String(ev.description ?? '') }, 'integracao:google');
       const h = md5(gEventFromRow('calendario', nw) ?? []);
-      await run('INSERT INTO google_event_map(modulo,id,event_id,hash) VALUES(?,?,?,?)', ['calendario', nw.id, evId, h]);
+      await run('INSERT INTO google_event_map(modulo,id,event_id,hash,calendar_id) VALUES(?,?,?,?,?)', ['calendario', nw.id, evId, h, calRaw]);
       map[`calendario|${nw.id}`] = { modulo: 'calendario', id: nw.id, event_id: evId, hash: h };
       stat.criados++;
     }
@@ -251,11 +260,11 @@ export async function gCalendarSync(): Promise<Row> {
       const h = md5(ev);
       if (!map[key]) {
         const res = await gApi('POST', `/calendar/v3/calendars/${cal}/events`, ev);
-        await run('INSERT INTO google_event_map(modulo,id,event_id,hash) VALUES(?,?,?,?)', [mod, r.id, res.id, h]);
+        await run('INSERT INTO google_event_map(modulo,id,event_id,hash,calendar_id) VALUES(?,?,?,?,?)', [mod, r.id, res.id, h, calRaw]);
         stat.para_google++;
       } else if (map[key].hash !== h) {
         await gApi('PUT', `/calendar/v3/calendars/${cal}/events/${encodeURIComponent(map[key].event_id)}`, ev);
-        await run('UPDATE google_event_map SET hash=? WHERE modulo=? AND id=?', [h, mod, r.id]);
+        await run('UPDATE google_event_map SET hash=? WHERE modulo=? AND id=? AND calendar_id=?', [h, mod, r.id, calRaw]);
         stat.para_google++;
       }
     }
@@ -268,7 +277,7 @@ export async function gCalendarSync(): Promise<Row> {
     const noDate = !!row && !gEventFromRow(m.modulo, row);
     if (gone || noDate) {
       await gApi('DELETE', `/calendar/v3/calendars/${cal}/events/${encodeURIComponent(m.event_id)}`);
-      await run('DELETE FROM google_event_map WHERE modulo=? AND id=?', [m.modulo, m.id]);
+      await run('DELETE FROM google_event_map WHERE modulo=? AND id=? AND calendar_id=?', [m.modulo, m.id, calRaw]);
       stat.removidos++;
     }
   }

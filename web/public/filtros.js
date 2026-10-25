@@ -98,7 +98,7 @@ const Filtros = (() => {
 /** Filtros que cada aba oferece. A barra só mostra os que funcionam na aba; o perfil do Instagram fica no cabeçalho. */
 const FILTROS_PAGINA = {
   hoje: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'] },
-  calendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'] },
+  calendario: { aplica: [] },
   igvisao: { aplica: ['periodo', 'formato'] },
   igconteudos: { aplica: ['periodo', 'formato'] },
   igplan: { aplica: ['formato'] },

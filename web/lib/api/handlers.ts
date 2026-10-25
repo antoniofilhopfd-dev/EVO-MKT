@@ -26,6 +26,7 @@ import { comentariosRoute } from './comentarios';
 import { conteudoRoute } from './conteudo';
 import { calendarioPublicoRoute } from './calendarioPublico';
 import { trafegoRoute } from './trafego';
+import { agendasRoute } from './agendas';
 import { escolarRoute } from './escolar';
 import { datacomRoute } from './datacom';
 import { dashboardRoute } from './dashboard';
@@ -54,6 +55,8 @@ export async function route(c: Ctx): Promise<Out> {
       return calendarioPublicoRoute(c);
     case path.startsWith('/ads/') || path.startsWith('/trafego/'):
       return trafegoRoute(c);
+    case path === '/agendas' || path.startsWith('/agendas/') || path === '/agenda/eventos' || path === '/agenda/evento' || path === '/agenda/evento/excluir':
+      return agendasRoute(c);
     case path.startsWith('/escolar/'):
       return escolarRoute(c);
     case path.startsWith('/datacom/'):

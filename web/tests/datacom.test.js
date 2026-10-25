@@ -106,18 +106,6 @@ const J={'Content-Type':'application/json','X-EVO':'1'};const cookie=r=>r.header
  t('cria publicação (Ideia) com a data e a origem',s===201&&r.status==='IDEIA'&&r.publicacaoEm===NATAL26&&r.origemTipo==='datacom'&&r.origemId==='natal'&&r.origemNome==='Natal',r);
  [s,r]=await call('POST','/datacom/publicacao',{id:'natal',data:NATAL26,titulo:'Natal: mensagem do Colégio'});t('publicação repetida é barrada (409)',s===409);
  [s]=await call('POST','/datacom/publicacao',{id:'natal',data:NATAL26,titulo:'Natal: vídeo curto'});t('outra publicação para a mesma data é permitida',s===201);
- // ---- camada no Calendário ----
- const U=require('./lib/ui');const br=await U.abrir();const p=await U.pagina(br,'NAT-3301','Nat26ab');
- await U.ir(p,'calendario');
- t('legenda do calendário tem datas comemorativas e feriados como camadas',/Datas comemorativas/.test(await p.innerText('.cm-tipos'))&&/Feriados/.test(await p.innerText('.cm-tipos')));
- await p.evaluate(()=>CAL_UNICO.definirFiltro('modo','list'));await p.waitForTimeout(500);
- t('a lista do ano traz feriados do catálogo (Natal)',/Natal/.test(await U.textoConteudo(p)));
- await p.click('.cm-item >> text=Natal').catch(()=>{});await p.waitForSelector('.dc-det',{timeout:8000}).catch(()=>{});
- t('abrir uma data mostra regra, validação e “Criar publicação desta data”',await p.$('#dcPub')!==null&&/Regra/.test(await p.innerText('.dc-det')));
- t('sem erros de script nem diálogos nativos',p.errs.length===0,p.errs);
- await br.close();
- const br2=await U.abrir();const pc=await U.pagina(br2,'NAT-3301','Nat26ab',{width:390,height:800});await U.ir(pc,'calendario');
- t('celular: sem rolagem horizontal',await pc.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
- await br2.close();
+ // (a camada visual antiga no Calendário foi substituída pelo Calendário Geral; ver calendario-geral.test.js)
  console.log(`${ok} ok, ${bad} falhas`);process.exit(bad?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
