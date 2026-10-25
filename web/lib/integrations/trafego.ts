@@ -57,6 +57,15 @@ export function periodoAnterior(de: string, ate: string, tipo = ''): { de: strin
     const dia = Math.min(Number(ate.slice(8)), ultimo);
     return { de: ymd(ini), ate: ymd(Date.UTC(y, m - 2, dia)) };
   }
+  if (tipo === 'mes_ant') {
+    const y = Number(de.slice(0, 4)), m = Number(de.slice(5, 7));
+    return { de: ymd(Date.UTC(y, m - 2, 1)), ate: ymd(Date.UTC(y, m - 1, 0)) };
+  }
+  if (tipo === 'semana_ant') return { de: ymd(utc(de) - 7 * DIA), ate: ymd(utc(ate) - 7 * DIA) };
+  if (tipo === 'ano' || /^a:\d{4}$/.test(tipo)) {
+    const y = Number(de.slice(0, 4)) - 1, fimAnt = ate.slice(5) === '02-29' ? '02-28' : ate.slice(5);
+    return { de: `${y}-${de.slice(5)}`, ate: `${y}-${fimAnt}` };
+  }
   const dias = Math.round((utc(ate) - utc(de)) / DIA) + 1;
   const fim = utc(de) - DIA;
   return { de: ymd(fim - (dias - 1) * DIA), ate: ymd(fim) };
@@ -117,8 +126,8 @@ async function contaDeAnuncios(): Promise<string> {
   return conta;
 }
 
-async function insights(conta: string, nivel: 'campaign' | 'ad' | 'account', de: string, ate: string, diario = false): Promise<{ linhas: Row[]; truncado: boolean }> {
-  const campos = nivel === 'account' ? 'spend,impressions,reach,clicks,actions' : nivel === 'campaign' ? 'campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : 'ad_id,ad_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions';
+async function insights(conta: string, nivel: 'campaign' | 'adset' | 'ad' | 'account', de: string, ate: string, diario = false): Promise<{ linhas: Row[]; truncado: boolean }> {
+  const campos = nivel === 'account' ? 'spend,impressions,reach,clicks,actions' : nivel === 'campaign' ? 'campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : nivel === 'adset' ? 'adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : 'ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions';
   const linhas: Row[] = [];
   let after = '', truncado = false;
   for (let pagina = 0; pagina < 12; pagina++) {
@@ -131,12 +140,12 @@ async function insights(conta: string, nivel: 'campaign' | 'ad' | 'account', de:
   return { linhas, truncado };
 }
 
-async function anunciosDetalhe(conta: string, ids: string[], campanhas = false): Promise<Map<string, Row>> {
+async function anunciosDetalhe(conta: string, ids: string[], tipo: 'ads' | 'campaigns' | 'adsets' = 'ads'): Promise<Map<string, Row>> {
   const mapa = new Map<string, Row>();
-  const campos = campanhas ? 'id,effective_status' : 'id,effective_status,creative.thumbnail_width(300).thumbnail_height(380){thumbnail_url,image_url}';
+  const campos = tipo !== 'ads' ? 'id,effective_status' : 'id,effective_status,creative.thumbnail_width(300).thumbnail_height(380){id,thumbnail_url,image_url}';
   try {
     for (let i = 0; i < ids.length; i += 40) {
-      const r = await metaGet(`/act_${conta}/${campanhas ? 'campaigns' : 'ads'}`, { fields: campos, filtering: JSON.stringify([{ field: 'id', operator: 'IN', value: ids.slice(i, i + 40) }]), limit: 100 });
+      const r = await metaGet(`/act_${conta}/${tipo}`, { fields: campos, filtering: JSON.stringify([{ field: 'id', operator: 'IN', value: ids.slice(i, i + 40) }]), limit: 100 });
       for (const a of (r.data ?? []) as Row[]) mapa.set(String(a.id), a);
     }
   } catch { /* sem foto/estado: o painel sai assim mesmo, com aviso */ }
@@ -157,25 +166,30 @@ export async function resumoTrafego(de: string, ate: string, tipo = '', forcar =
   const conta = await contaDeAnuncios();
   const ant = periodoAnterior(de, ate, tipo);
   const avisos: string[] = [];
-  const [camp, contaAtual, anunc, dia, campAnt, contaAnt] = await Promise.all([
+  const [camp, contaAtual, anunc, dia, campAnt, contaAnt, conj] = await Promise.all([
     insights(conta, 'campaign', de, ate), insights(conta, 'account', de, ate), insights(conta, 'ad', de, ate), insights(conta, 'campaign', de, ate, true),
-    insights(conta, 'campaign', ant.de, ant.ate), insights(conta, 'account', ant.de, ant.ate),
+    insights(conta, 'campaign', ant.de, ant.ate), insights(conta, 'account', ant.de, ant.ate), insights(conta, 'adset', de, ate),
   ]);
-  if ([camp, contaAtual, anunc, dia, campAnt, contaAnt].some((x) => x.truncado)) avisos.push('Há mais resultados do que o limite de consulta; os números podem estar incompletos. Reduza o período.');
+  if ([camp, contaAtual, anunc, dia, campAnt, contaAnt, conj].some((x) => x.truncado)) avisos.push('Há mais resultados do que o limite de consulta; os números podem estar incompletos. Reduza o período.');
   const alcance = contaAtual.linhas.length ? num(contaAtual.linhas[0].reach) : null;
   const alcanceAnt = contaAnt.linhas.length ? num(contaAnt.linhas[0].reach) : null;
   const atual = totais(camp.linhas, alcance), anterior = totais(campAnt.linhas, alcanceAnt);
   if (!camp.linhas.length) avisos.push('A Meta não devolveu campanhas com veiculação neste período.');
   const detalhe = await anunciosDetalhe(conta, [...new Set(anunc.linhas.map((l) => String(l.ad_id ?? '')).filter(Boolean))]);
   if (anunc.linhas.length && !detalhe.size) avisos.push('Não foi possível ler as miniaturas e o status dos anúncios agora.');
-  const detalheCamp = await anunciosDetalhe(conta, [...new Set(camp.linhas.map(l => String(l.campaign_id ?? '')).filter(Boolean))], true);
+  const detalheCamp = await anunciosDetalhe(conta, [...new Set(camp.linhas.map(l => String(l.campaign_id ?? '')).filter(Boolean))], 'campaigns');
   if (camp.linhas.length && detalheCamp.size < new Set(camp.linhas.map(l => String(l.campaign_id))).size) avisos.push('O status de algumas campanhas não está disponível; elas aparecem em Todos ou Status indisponível.');
   const linhaCamp = (l: Row) => { const status = String(detalheCamp.get(String(l.campaign_id))?.effective_status ?? ''); const t = totais([l], num(l.reach)); return { id: String(l.campaign_id ?? ''), nome: String(l.campaign_name ?? ''), status, statusRotulo: rotuloStatus(status), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), ...t }; };
   const campanhas = camp.linhas.map(linhaCamp).filter((c) => c.investimento > 0 || c.impressoes > 0).sort((a, b) => b.investimento - a.investimento);
+  const detalheConj = await anunciosDetalhe(conta, [...new Set(conj.linhas.map((l) => String(l.adset_id ?? '')).filter(Boolean))], 'adsets');
+  const conjuntos = conj.linhas.map((l) => {
+    const t = totais([l], num(l.reach));
+    return { id: String(l.adset_id ?? ''), nome: String(l.adset_name ?? ''), campanha: String(l.campaign_name ?? ''), campanhaId: String(l.campaign_id ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), status: String(detalheConj.get(String(l.adset_id))?.effective_status ?? ''), statusRotulo: rotuloStatus(detalheConj.get(String(l.adset_id))?.effective_status), ...t };
+  }).filter((a) => a.investimento > 0 || a.impressoes > 0).sort((a, b) => b.investimento - a.investimento);
   const anuncios = anunc.linhas.map((l) => {
     const d = detalhe.get(String(l.ad_id)) ?? {};
     const t = totais([l], num(l.reach));
-    return { id: String(l.ad_id ?? ''), nome: String(l.ad_name ?? ''), campanha: String(l.campaign_name ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), status: String(d.effective_status ?? ''), statusRotulo: rotuloStatus(d.effective_status), miniatura: urlDeImagemMeta(d.creative?.thumbnail_url) || urlDeImagemMeta(d.creative?.image_url), imagem: urlDeImagemMeta(d.creative?.image_url) || urlDeImagemMeta(d.creative?.thumbnail_url), ...t };
+    return { id: String(l.ad_id ?? ''), nome: String(l.ad_name ?? ''), conjunto: String(l.adset_name ?? ''), conjuntoId: String(l.adset_id ?? ''), campanhaId: String(l.campaign_id ?? ''), criativoId: String(d.creative?.id ?? ''), campanha: String(l.campaign_name ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), status: String(d.effective_status ?? ''), statusRotulo: rotuloStatus(d.effective_status), miniatura: urlDeImagemMeta(d.creative?.thumbnail_url) || urlDeImagemMeta(d.creative?.image_url), imagem: urlDeImagemMeta(d.creative?.image_url) || urlDeImagemMeta(d.creative?.thumbnail_url), ...t };
   }).filter((a) => a.investimento > 0 || a.impressoes > 0).sort((a, b) => b.investimento - a.investimento);
   const pausadosComGasto = anuncios.filter((a) => /PAUSED/.test(a.status)).length;
   if (pausadosComGasto) avisos.push(`${pausadosComGasto} anúncio(s) estão pausados hoje, mas tiveram gasto no período.`);
@@ -187,11 +201,17 @@ export async function resumoTrafego(de: string, ate: string, tipo = '', forcar =
   const idx = new Map(dias.map((d, i) => [d, i]));
   for (const l of dia.linhas) { const i = idx.get(String(l.date_start ?? '').slice(0, 10)); const s = series.find((x) => x.nome === String(l.campaign_name ?? l.campaign_id ?? 'Sem identificação')); if (i !== undefined && s) s.valores[i] += num(l.spend); }
   const total = dias.map((_, i) => series.reduce((s, x) => s + x.valores[i], 0));
+  const conversasDia = dias.map(() => 0);
+  for (const l of dia.linhas) { const i = idx.get(String(l.date_start ?? '').slice(0, 10)); if (i !== undefined) conversasDia[i] += conversasIniciadas(l.actions); }
+  // investimento e resultado por segmento (o segmento é deduzido do nome da campanha; sem segmento reconhecido entra em "Sem segmento")
+  const porSeg = new Map<string, { segmento: string; investimento: number; conversas: number; campanhas: number }>();
+  for (const c of campanhas) { const k = c.segmento || 'SEM'; const x = porSeg.get(k) ?? { segmento: k, investimento: 0, conversas: 0, campanhas: 0 }; x.investimento += c.investimento; x.conversas += c.conversas; x.campanhas++; porSeg.set(k, x); }
+  const segmentos = [...porSeg.values()].map((x) => ({ ...x, custoConversa: x.conversas ? x.investimento / x.conversas : null })).sort((a, b) => b.investimento - a.investimento);
   const comConversa = campanhas.filter((c) => c.conversas > 0);
   const dados: Row = {
     periodo: { de, ate, dias: dias.length }, anterior: ant, atual, anteriorTotais: anterior,
     variacoes: Object.fromEntries((['investimento', 'impressoes', 'alcance', 'cliques', 'ctr', 'cpc', 'conversas', 'custoConversa'] as const).map((k) => [k, variacao(atual[k], anterior[k])])),
-    campanhas, anuncios, diario: { dias, series, total },
+    campanhas, conjuntos, anuncios, segmentos, diario: { dias, series, total, conversas: conversasDia },
     destaques: {
       melhorCampanha: comConversa.length ? [...comConversa].sort((a, b) => (a.custoConversa ?? 0) - (b.custoConversa ?? 0))[0] : null,
       piorCampanha: comConversa.length > 1 ? [...comConversa].sort((a, b) => (b.custoConversa ?? 0) - (a.custoConversa ?? 0))[0] : null,
@@ -215,7 +235,7 @@ export async function resumoDaUltimaSincronizacao(de: string, ate: string): Prom
 /** O status é o efetivo ATUAL informado pela Meta, e não o status histórico no período. */
 export const FILTROS_STATUS: Record<string, string> = { todos: 'Todos', ativos: 'Ativos', pausados: 'Pausados', analise: 'Em análise', problemas: 'Com problemas ou reprovados', arquivados: 'Arquivados ou excluídos', desconhecidos: 'Status indisponível' };
 export function validarFiltroStatus(status: string, nivel: string): void {
-  if (!Object.hasOwn(FILTROS_STATUS, status) || !['campanhas', 'anuncios'].includes(nivel)) fail(400, 'Filtro de status ou nível inválido.');
+  if (!Object.hasOwn(FILTROS_STATUS, status) || !['campanhas', 'conjuntos', 'anuncios'].includes(nivel)) fail(400, 'Filtro de status ou nível inválido.');
 }
 export function filtrarTabelaTrafego(d: Row, status = 'todos', nivel = 'campanhas'): Row {
   validarFiltroStatus(status, nivel);

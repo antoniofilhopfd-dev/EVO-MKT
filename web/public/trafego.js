@@ -1,11 +1,12 @@
-/* Tráfego Pago: SOMENTE CONSULTA à Meta Ads. Aqui não se cria, edita, ativa nem pausa nada: isso continua no Gerenciador de Anúncios da Meta.
-   Leads, matrículas e funil comercial não aparecem aqui: pertencem ao EVO CRM. */
-const TF_STATUS = [['todos', 'Todos os status'], ['ativos', 'Ativos'], ['pausados', 'Pausados'], ['analise', 'Em análise'], ['problemas', 'Com problemas ou reprovados'], ['arquivados', 'Arquivados ou excluídos'], ['desconhecidos', 'Status indisponível']];
-const tfNivel = () => state.page === 'tfcampanhas' ? 'campanhas' : state.page === 'tfanuncios' ? 'anuncios' : '';
-const tfStatus = () => { const v = Filtros.localGet({ status: 'todos' }).status; return TF_STATUS.some(x => x[0] === v) ? v : 'todos'; };
-const tfParametrosStatus = () => tfNivel() ? `&nivel=${tfNivel()}&status=${tfStatus()}` : '';
-const TF_CACHE = { chave: '', dados: null, estado: null };
-const TF_INDICADORES = [['investimento', 'Investimento', money, true], ['impressoes', 'Impressões', fmtN, true], ['alcance', 'Alcance', fmtN, true], ['cliques', 'Cliques', fmtN, true], ['ctr', 'CTR médio', pct, true], ['cpc', 'CPC médio', money, false], ['conversas', 'Conversas iniciadas', fmtN, true], ['custoConversa', 'Custo por conversa', money, false]];
+/* Tráfego Pago: SOMENTE CONSULTA à Meta Ads. Aqui não se cria, edita, ativa, pausa nem duplica nada: isso continua no Gerenciador de Anúncios da Meta.
+   Três abas: Visão Geral (este arquivo), Desempenho (tfdesempenho.js) e Relatórios (tfrelatorios.js). Campanha, conjunto e anúncio são níveis DENTRO do Desempenho.
+   Leads, matrículas e funil comercial não aparecem aqui: pertencem ao EVO CRM. Métricas do Instagram orgânico também não se misturam com as dos anúncios. */
+const TF_CACHE = { chave: '', dados: null, estado: null, em: 0 };
+const tfPct = v => v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+const tfN = v => v === null || v === undefined ? '—' : fmtN(v);
+const tfMoney = v => v === null || v === undefined ? '—' : money(v);
+const TF_INDICADORES = [['investimento', 'Investimento', money, true], ['impressoes', 'Impressões', fmtN, true], ['alcance', 'Alcance', fmtN, true], ['cliques', 'Cliques', fmtN, true], ['ctr', 'CTR médio', tfPct, true], ['cpc', 'CPC médio', money, false], ['conversas', 'Conversas iniciadas', fmtN, true], ['custoConversa', 'Custo por conversa', money, false]];
+const TF_ICONES = { investimento: '＄', impressoes: '◉', alcance: '☺', cliques: '⌖', ctr: '%', cpc: '⚙', conversas: '✉', custoConversa: '◎' };
 
 async function tfEstado() {
   const e = await api('/trafego/estado').catch(() => null);
@@ -19,157 +20,128 @@ function tfVazio(e, motivoErro) {
   else if (e && !e.contaEscolhida) { titulo = 'Conta de anúncios não escolhida'; texto = 'Escolha a conta de anúncios em Configurações › Meta Ads.'; }
   return `<div class="empty-rich"><strong>${esc(titulo)}</strong><p>${esc(texto)}</p><button class="btn soft" data-go="configuracoes">Abrir Configurações</button></div>`;
 }
+/** Dados do período escolhido no filtro da aba (uma consulta só; status, segmento e campanha filtram na tela, sem nova consulta). */
 async function tfCarregar(forcar = false) {
   const f0 = Filtros.get(), hoje = hojeBR(), f = { ...f0, ate: f0.ate > hoje ? hoje : f0.ate };
   if (f0.de > hoje) throw new Error('O período escolhido ainda não começou: a Meta só informa dias que já passaram. Escolha um período até hoje.');
-  const chave = `${f.de}|${f.ate}|${f.p}|${tfNivel()}|${tfStatus()}`;
-  if (!forcar && TF_CACHE.chave === chave && TF_CACHE.dados && Date.now() - (TF_CACHE.em || 0) < 60000) return TF_CACHE.dados;
-  const d = await api(`/trafego/resumo?de=${f.de}&ate=${f.ate}&tipo=${encodeURIComponent(f.p)}${tfParametrosStatus()}${forcar ? '&forcar=1' : ''}`);
+  const chave = `${f.de}|${f.ate}|${f.p}`;
+  if (!forcar && TF_CACHE.chave === chave && TF_CACHE.dados && Date.now() - TF_CACHE.em < 60000) return TF_CACHE.dados;
+  const d = await api(`/trafego/resumo?de=${f.de}&ate=${f.ate}&tipo=${encodeURIComponent(f.p)}${forcar ? '&forcar=1' : ''}`);
   TF_CACHE.chave = chave; TF_CACHE.dados = d; TF_CACHE.em = Date.now(); return d;
 }
-function tfCabecalho(d, extra = '') {
-  const o = d.origem;
-  return `<div class="tf-topo"><p class="kpi-note">Somente consulta · ${esc(fmtDate(d.periodo.de))} a ${esc(fmtDate(d.periodo.ate))} (${d.periodo.dias} dia(s)) · comparado a ${esc(fmtDate(d.anterior.de))} – ${esc(fmtDate(d.anterior.ate))} ${origem(o)}</p><div class="tf-acoes">${extra}<button type="button" class="btn soft" id="tfAtualiza">Atualizar agora</button><a class="btn soft" target="_blank" rel="noopener" href="/relatorio-trafego.html?de=${d.periodo.de}&ate=${d.periodo.ate}">${tfNivel() ? 'Relatório geral em PDF' : 'Relatório em PDF (A4)'}</a></div></div>${tfNivel() ? tfFiltrosTabela(d) : ''}${avisoAtualizacao(o)}${(d.avisos || []).map(a => `<p class="foco-chip" role="note">${esc(a)}</p>`).join('')}`;
+const tfSemanaTxt = iso => { const s = tfSemanaEpi(iso); return `Semana ${s.semana}`; };
+/** Faixa do período: nome do filtro, datas com dia da semana, número da semana quando é semana e período de comparação. */
+function tfFaixaPeriodo(d) {
+  const f = Filtros.get(), p = d.periodo, a = d.anterior;
+  const nome = f.p === 'x' ? 'Período personalizado' : (typeof PERIODOS !== 'undefined' ? (PERIODOS.find(x => x[0] === f.p) || [, 'Período'])[1] : 'Período');
+  const ehSemana = f.p === 'semana' || f.p === 'semana_ant';
+  const ini = tfInicioSemana(p.de), fimSem = tfSomaDias(ini, 6);
+  const faixa = ehSemana ? `${tfDiaLongo(ini)} – ${tfDiaLongo(fimSem)}${fimSem > p.ate ? ` (dados até ${tfDM(p.ate)}, a Meta só informa dias que já passaram)` : ''}` : `${tfDiaLongo(p.de)} – ${tfDiaLongo(p.ate)}`;
+  const semana = ehSemana ? ` · ${tfSemanaTxt(p.de)}` : '';
+  return { nome, faixa, semana, comparacao: `${fmtDate(a.de)} a ${fmtDate(a.ate)}` };
 }
-function tfFiltrosTabela(d) {
-  return `<div class="ig-barra"><label>Período <button type="button" class="btn soft" id="tfPeriodo">${esc(fmtDate(d.periodo.de))} a ${esc(fmtDate(d.periodo.ate))}</button></label><label>Status atual <select class="control" id="tfStatus" aria-label="Filtrar por status atual">${TF_STATUS.map(([v, l]) => `<option value="${v}" ${tfStatus() === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label><small class="kpi-note">Status atual na Meta · valores do período escolhido</small></div>`;
+function tfCabecalho(d, estado) {
+  const x = tfFaixaPeriodo(d), o = d.origem;
+  const conectado = estado ? estado.conectado && !estado.tokenInvalido : true;
+  return `<div class="tf-topo2"><div class="tf-topo2-per"><small>${esc(x.nome)}${esc(x.semana)}</small><b>${esc(x.faixa)}</b><span>Comparado a ${esc(x.comparacao)} <small>(${d.periodo.dias} dia(s) no período)</small></span></div>
+    <div class="tf-topo2-meta"><span class="tf-conexao ${conectado ? 'on' : ''}"><i></i>Meta Ads · ${conectado ? 'Conectado' : 'Desconectado'}</span><span class="kpi-note">Somente consulta · lido da Meta em ${esc(fmtDateTime(o.atualizadoEm))} ${origem(o)}</span><button type="button" class="btn soft" id="tfAtualiza">Atualizar agora</button></div></div>${avisoAtualizacao(o)}${(d.avisos || []).map(a => `<p class="foco-chip" role="note">${esc(a)}</p>`).join('')}`;
 }
+/** Carrega, desenha o corpo e liga o que é comum às três abas (atualizar, foto ampliada). */
 async function tfPagina(corpo) {
-  let d;
-  try { d = await tfCarregar(); } catch (e) {
+  let d, estado;
+  try { [d, estado] = await Promise.all([tfCarregar(), TF_CACHE.estado ? Promise.resolve(TF_CACHE.estado) : tfEstado()]); } catch (e) {
     const est = await tfEstado();
-    $('#content').innerHTML = tfVazio(est, e.message); bindGoButtons(); return;
+    $('#content').innerHTML = tfVazio(est, e.message); bindGoButtons(); return null;
   }
-  $('#content').innerHTML = corpo(d); bindGoButtons();
-  $$('[data-tffoto]').forEach(b => {
+  $('#content').innerHTML = tfCabecalho(d, estado) + corpo(d); bindGoButtons(); tfLigarComum();
+  return d;
+}
+function tfLigarComum() {
+  const b = $('#tfAtualiza'); if (b) b.onclick = async () => { b.disabled = true; try { await tfCarregar(true); toast('Dados atualizados'); go(state.page); } catch (e) { toast(e.message, 'warn'); b.disabled = false; } };
+  tfLigarFotos(document);
+}
+function tfLigarFotos(raiz) {
+  raiz.querySelectorAll('[data-tffoto]').forEach(b => {
     const img = b.querySelector('img');
     const falhou = () => { b.textContent = 'Sem imagem'; b.disabled = true; b.setAttribute('aria-label', 'Imagem indisponível'); };
-    img.onerror = falhou; if (img.complete && !img.naturalWidth) falhou();
+    if (img) { img.onerror = falhou; if (img.complete && !img.naturalWidth) falhou(); }
     b.onclick = () => {
-      const dlg = dialogo(`<h3>Imagem do anúncio</h3><img class="tf-foto-ampliada" src="${attr(b.dataset.tffoto)}" alt="${attr(img.alt)}" referrerpolicy="no-referrer"><div class="actions"><button class="btn" data-close>Fechar</button></div>`, { larga: true });
+      const dlg = dialogo(`<h3>Imagem do anúncio</h3><img class="tf-foto-ampliada" src="${attr(b.dataset.tffoto)}" alt="${attr(img ? img.alt : '')}" referrerpolicy="no-referrer"><div class="actions"><button class="btn" data-close>Fechar</button></div>`, { larga: true });
       const foto = dlg.el.querySelector('img'); foto.onerror = () => { foto.replaceWith(Object.assign(document.createElement('p'), { textContent: 'A Meta não disponibilizou esta imagem agora. Atualize os dados e tente novamente.' })); };
     };
   });
-  const status = $('#tfStatus'); if (status) status.onchange = () => { Filtros.localSet({ status: status.value }); go(state.page); };
-  const periodo = $('#tfPeriodo'); if (periodo) periodo.onclick = () => PeriodoPicker.abrir({ de: d.periodo.de, ate: d.periodo.ate, titulo: 'Período de veiculação', max: hojeBR() }, (de, ate) => Filtros.set({ p: 'x', de, ate }));
-  const b = $('#tfAtualiza'); if (b) b.onclick = async () => { b.disabled = true; try { await tfCarregar(true); toast('Dados atualizados'); go(state.page); } catch (e) { toast(e.message, 'warn'); b.disabled = false; } };
-  return d;
 }
-
-const tfFotoAnuncio = a => a.miniatura ? `<button class="tf-foto" type="button" data-tffoto="${attr(a.imagem || a.miniatura)}" aria-label="Ampliar foto de ${attr(a.nome)}"><img src="${attr(a.miniatura)}" alt="Criativo: ${attr(a.nome)}" loading="lazy" referrerpolicy="no-referrer" width="64" height="80"></button>` : '<span class="tf-sem">Sem imagem</span>';
+/** Foto real do criativo (nunca de outro anúncio); sem URL acessível, mostra o texto "Sem imagem". */
+const tfFotoAnuncio = a => a.miniatura ? `<button class="tf-foto" type="button" data-tffoto="${attr(a.imagem || a.miniatura)}" aria-label="Ampliar foto de ${attr(a.nome)}"><img src="${attr(a.miniatura)}" alt="Criativo: ${attr(a.nome)}" loading="lazy" referrerpolicy="no-referrer"></button>` : '<span class="tf-sem">Sem imagem</span>';
 const tfBadge = a => `<span class="badge ${a.status === 'ACTIVE' ? 'ok' : /PAUSED|ARCHIVED|DELETED/.test(a.status) ? 'mute' : 'warn'}">${esc(a.statusRotulo || 'Status indisponível')}</span>`;
+const tfCelulasMetricas = r => `<td class="num">${money(r.investimento)}</td><td class="num">${fmtN(r.impressoes)}</td><td class="num">${tfN(r.alcance)}</td><td class="num">${fmtN(r.cliques)}</td><td class="num">${tfPct(r.ctr)}</td><td class="num">${tfMoney(r.cpc)}</td><td class="num">${fmtN(r.conversas)}</td><td class="num">${tfMoney(r.custoConversa)}</td>`;
 
-const TF_VIS_FILTRO={campanhas:{busca:'',status:'todos',ordem:'investimento',expandido:false},anuncios:{busca:'',status:'todos',ordem:'investimento',expandido:false,campanha:''}};
-function tfVisLinhas(d,tipo) {
- const f=TF_VIS_FILTRO[tipo],norm=x=>String(x||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
- return (tipo==='anuncios'?d.anuncios:d.campanhas).filter(r=>
-   norm(r.nome).includes(norm(f.busca))&&(!f.campanha||r.campanha===f.campanha)&&
-   (f.status==='todos'||(f.status==='ativos'&&r.status==='ACTIVE')||(f.status==='pausados'&&String(r.status).includes('PAUSED'))||(f.status==='problemas'&&/DISAPPROVED|WITH_ISSUES|PENDING_BILLING/.test(r.status)))
- ).sort((x,y)=>f.ordem==='status'?String(x.statusRotulo||x.status).localeCompare(String(y.statusRotulo||y.status),'pt-BR'):((y[f.ordem]??-Infinity)-(x[f.ordem]??-Infinity)));
+/* ---------------- gráfico de evolução (linha, barras ou área) ---------------- */
+function tfGraficoTempo(el, { grupos, estilo = 'linha', fmt = money, nome = 'Valor', modo = 'dia' }) {
+  if (!grupos.length) { el.innerHTML = '<div class="ch-vazio">Sem dados no período.</div>'; return; }
+  const W = 720, H = 260, m = { t: 16, r: 16, b: 34, l: 58 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const max = Math.max(1e-9, ...grupos.map(g => g.valor)), passo = (() => { const bruto = max / 4, mag = 10 ** Math.floor(Math.log10(bruto)); return [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= bruto) || bruto; })(), topo = passo * 4;
+  const n = grupos.length, larg = iw / n;
+  const X = i => estilo === 'barras' ? m.l + larg * i + larg / 2 : m.l + (n === 1 ? iw / 2 : i * iw / (n - 1)), Y = v => m.t + ih * (1 - v / topo);
+  const rot = g => modo === 'dia' ? tfDM(g.de) : modo === 'semana' ? `${tfSemanaTxt(g.de)} · ${tfDM(g.de)}` : `${TF_MESES[Number(g.chave.slice(5, 7)) - 1].slice(0, 3)}/${g.chave.slice(2, 4)}`;
+  const grade = [0, 1, 2, 3, 4].map(i => `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(passo * i).toFixed(1)}" y2="${Y(passo * i).toFixed(1)}" stroke="#E6E9F0"/><text x="${m.l - 6}" y="${(Y(passo * i) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="#5E6678">${esc(fmt(passo * i))}</text>`).join('');
+  const cada = Math.max(1, Math.ceil(n / 8));
+  const eixo = grupos.map((g, i) => i % cada === 0 ? `<text x="${X(i).toFixed(1)}" y="${H - 10}" text-anchor="middle" font-size="11" fill="#5E6678">${esc(modo === 'semana' ? tfDM(g.de) : rot(g))}</text>` : '').join('');
+  const pts = grupos.map((g, i) => `${X(i).toFixed(1)},${Y(g.valor).toFixed(1)}`).join(' ');
+  let corpo = '';
+  if (estilo === 'barras') corpo = grupos.map((g, i) => `<rect x="${(m.l + larg * i + larg * 0.18).toFixed(1)}" y="${Y(g.valor).toFixed(1)}" width="${(larg * 0.64).toFixed(1)}" height="${Math.max(0, m.t + ih - Y(g.valor)).toFixed(1)}" rx="3" fill="#063996"><title>${esc(rot(g))}: ${esc(fmt(g.valor))}</title></rect>`).join('');
+  else {
+    if (estilo === 'area') corpo += `<polygon points="${X(0).toFixed(1)},${m.t + ih} ${pts} ${X(n - 1).toFixed(1)},${m.t + ih}" fill="#063996" opacity=".14"/>`;
+    corpo += `<polyline points="${pts}" fill="none" stroke="#063996" stroke-width="2.4" stroke-linejoin="round"/>` + grupos.map((g, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(g.valor).toFixed(1)}" r="${n > 40 ? 0 : 3.5}" fill="#fff" stroke="#063996" stroke-width="2"><title>${esc(rot(g))}: ${esc(fmt(g.valor))}</title></circle>`).join('');
+  }
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="tf-svg" role="img" aria-label="${attr(`${nome} por ${modo === 'dia' ? 'dia' : modo === 'semana' ? 'semana' : 'mês'}, em ${estilo}`)}">${grade}${corpo}${eixo}</svg>`;
 }
-function tfResumoLista(d,anuncios=false) {
- const tipo=anuncios?'anuncios':'campanhas',f=TF_VIS_FILTRO[tipo],rows=tfVisLinhas(d,tipo),shown=f.expandido?rows:rows.slice(0,6);
- const campos=[['investimento','Investimento'],['conversas','Conversas'],['custoConversa','Custo por conversa'],['status','Status']];
- return `<div class="ig-barra tf-vis-filtros">
- <label>Buscar por nome <input class="control" data-tf-busca="${tipo}" placeholder="Nome ${anuncios?'do anúncio':'da campanha'}" value="${attr(f.busca)}"></label>
- <label>Status <select class="control" data-tf-status="${tipo}">${[['todos','Todos'],['ativos','Ativos'],['pausados','Pausados'],['problemas','Problemas']].map(([k,v])=>`<option value="${k}" ${f.status===k?'selected':''}>${v}</option>`).join('')}</select></label>
- <label>Ordenar <select class="control" data-tf-ordem="${tipo}">${campos.map(([k,v])=>`<option value="${k}" ${f.ordem===k?'selected':''}>${v}</option>`).join('')}</select></label>
- ${anuncios&&f.campanha?`<button class="btn soft" data-tf-limpar>Limpar campanha: ${esc(f.campanha)} ×</button>`:''}</div>
- <div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${anuncios?'<th>Foto</th>':''}<th>${anuncios?'Anúncio':'Campanha'}</th><th>Status</th><th class="num">Investimento</th><th class="num">Conversas</th><th class="num">Custo/conversa</th></tr></thead><tbody>${shown.length?shown.map((r,i)=>`<tr>${anuncios?`<td class="tf-fotocel">${tfFotoAnuncio(r)}</td>`:''}<td><button class="btn soft" type="button" data-tf-${anuncios?'detalhe':'campanha'}="${i}">${esc(r.nome)}</button>${anuncios?`<br><small>${esc(r.campanha)}</small>`:''}</td><td>${tfBadge(r)}</td><td class="num">${money(r.investimento)}</td><td class="num">${fmtN(r.conversas)}</td><td class="num">${r.custoConversa===null?'—':money(r.custoConversa)}</td></tr>`).join(''):'<tr><td colspan="7">Nenhum registro corresponde aos filtros.</td></tr>'}</tbody></table></div>
- <div class="tf-vis-rodape"><small class="kpi-note">${shown.length} de ${rows.length} registros</small><button class="btn soft" data-tf-csv="${tipo}">Exportar CSV filtrado</button><button class="btn soft" data-tf-pdf="${tipo}">PDF filtrado</button>${rows.length>6?`<button class="btn soft" data-tf-expand="${tipo}">${f.expandido?'Mostrar seis':'Ver todos nesta seção'}</button>`:''}</div>`;
-}
-function tfLigarVisao(d) {
- const render=tipo=>{
-   const sec=document.getElementById(tipo==='campanhas'?'tfVisCampanhas':'tfVisAnuncios');
-   const body=sec?.querySelector('.tf-vis-body');if(!body)return;
-   body.innerHTML=tfResumoLista(d,tipo==='anuncios');ligar(tipo);
- };
- const ligar=tipo=>{
-  const sec=document.getElementById(tipo==='campanhas'?'tfVisCampanhas':'tfVisAnuncios');if(!sec)return;
-  const f=TF_VIS_FILTRO[tipo];
-  const busca=sec.querySelector('[data-tf-busca]');busca.oninput=()=>{if(f._timer)clearTimeout(f._timer);f._timer=setTimeout(()=>{f.busca=busca.value;render(tipo);const novo=sec.querySelector('[data-tf-busca]');if(novo){novo.focus();novo.setSelectionRange(novo.value.length,novo.value.length);}},250);};
-  sec.querySelector('[data-tf-status]').onchange=e=>{f.status=e.target.value;render(tipo);};
-  sec.querySelector('[data-tf-ordem]').onchange=e=>{f.ordem=e.target.value;render(tipo);};
-  const csv=sec.querySelector('[data-tf-csv]');
-  if(csv)csv.onclick=()=>{
-    const rows=tfVisLinhas(d,tipo);
-    const header=['Nome','Campanha','Status','Investimento','Impressões','Cliques','Conversas','Custo por conversa','CTR'];
-    const cel=v=>'"'+String(v===null||v===undefined?'':v).replace(/"/g,'""')+'"';
-    const linhas=[header,...rows.map(r=>[r.nome,tipo==='anuncios'?r.campanha:'',r.statusRotulo||r.status,r.investimento,r.impressoes,r.cliques,r.conversas,r.custoConversa,r.ctr])];
-    const conteudo='\\uFEFF'+linhas.map(l=>l.map(cel).join(';')).join('\\r\\n');
-    const url=URL.createObjectURL(new Blob([conteudo],{type:'text/csv;charset=utf-8'}));
-    const a=document.createElement('a');a.href=url;a.download='evo-mkt-'+tipo+'-'+d.periodo.de+'-'+d.periodo.ate+'.csv';a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
-  };
-  const pdf=sec.querySelector('[data-tf-pdf]');
-  if(pdf)pdf.onclick=()=>{
-    const q=new URLSearchParams({de:d.periodo.de,ate:d.periodo.ate,visao:tipo,busca:f.busca,status:f.status,ordem:f.ordem});
-    if(tipo==='anuncios'&&f.campanha)q.set('campanha',f.campanha);
-    window.open('/relatorio-trafego.html?'+q.toString(),'_blank','noopener');
-  };
-  const exp=sec.querySelector('[data-tf-expand]');if(exp)exp.onclick=()=>{f.expandido=!f.expandido;render(tipo);};
-  const limpar=sec.querySelector('[data-tf-limpar]');if(limpar)limpar.onclick=()=>{f.campanha='';render(tipo);};
-  sec.querySelectorAll('[data-tf-campanha]').forEach(btn=>btn.onclick=()=>{
-    const c=tfVisLinhas(d,'campanhas')[Number(btn.dataset.tfCampanha)];
-    if(!c)return;TF_VIS_FILTRO.anuncios.campanha=c.nome;TF_VIS_FILTRO.anuncios.expandido=true;
-    render('anuncios');document.getElementById('tfVisAnuncios').scrollIntoView({behavior:'smooth'});
-  });
-  sec.querySelectorAll('[data-tf-detalhe]').forEach(btn=>btn.onclick=()=>{
-   const x=tfVisLinhas(d,'anuncios')[Number(btn.dataset.tfDetalhe)];if(!x)return;
-   dialogo(`<h3>${esc(x.nome)}</h3>${x.imagem||x.miniatura?`<img class="tf-foto-ampliada" src="${attr(x.imagem||x.miniatura)}" alt="Foto do anúncio" referrerpolicy="no-referrer">`:''}<p><b>Campanha:</b> ${esc(x.campanha)}</p><p><b>Status:</b> ${esc(x.statusRotulo||'—')}</p><p>Investimento: ${money(x.investimento)} · Conversas: ${fmtN(x.conversas)} · Custo por conversa: ${x.custoConversa===null?'—':money(x.custoConversa)} · CTR: ${x.ctr===null?'—':pct(x.ctr)}</p><button class="btn" data-close>Fechar</button>`,{larga:true});
-  });
-  sec.querySelectorAll('[data-tffoto]').forEach(btn=>btn.onclick=()=>dialogo(`<h3>Imagem do anúncio</h3><img class="tf-foto-ampliada" src="${attr(btn.dataset.tffoto)}" alt="Imagem ampliada"><button class="btn" data-close>Fechar</button>`,{larga:true}));
- };
- ligar('campanhas');ligar('anuncios');
-}
+
+/* ---------------- Visão Geral ---------------- */
+const TF_VIS = { indicador: 'investimento', estilo: 'linha', modo: 'dia' };
 function tfAlertasVisao(d) {
   const alertas = [];
   for (const a of d.anuncios) if (['DISAPPROVED', 'WITH_ISSUES', 'PENDING_BILLING_INFO'].includes(a.status)) alertas.push({ titulo: a.statusRotulo, texto: `${a.nome} · confira a situação atual no Gerenciador da Meta.`, tipo: 'problema' });
   for (const c of d.campanhas) if (c.investimento >= 100 && c.impressoes >= 1000 && c.conversas === 0) alertas.push({ titulo: 'Investimento sem conversas', texto: `${c.nome}: ${money(c.investimento)} no período. Confira se conversas são o objetivo desta campanha.`, tipo: 'revisar' });
-  for (const aviso of d.avisos || []) alertas.push({ titulo: 'Aviso dos dados', texto: aviso, tipo: 'revisar' });
-  return alertas.length ? `<div class="tf-vis-alertas">${alertas.slice(0, 6).map(a => `<article class="tf-vis-alerta ${a.tipo}"><span class="badge ${a.tipo === 'problema' ? 'warn' : 'info'}">${a.tipo === 'problema' ? 'Atenção' : 'Conferir'}</span><div><b>${esc(a.titulo)}</b><p>${esc(a.texto)}</p></div></article>`).join('')}</div>${alertas.length > 6 ? `<p class="kpi-note">Mais ${alertas.length - 6} aviso(s). Consulte a lista completa de anúncios.</p>` : ''}` : '<div class="empty compact">Nenhum alerta pelos critérios desta visão. Os dados podem ser atualizados pela Meta.</div>';
+  return alertas.length ? `<div class="tf-vis-alertas">${alertas.slice(0, 6).map(a => `<article class="tf-vis-alerta ${a.tipo}"><span class="badge ${a.tipo === 'problema' ? 'warn' : 'info'}">${a.tipo === 'problema' ? 'Atenção' : 'Conferir'}</span><div><b>${esc(a.titulo)}</b><p>${esc(a.texto)}</p></div></article>`).join('')}</div>` : '<div class="empty compact">Nenhum ponto de atenção nos dados deste período.</div>';
 }
 PAGINAS.trafego = async function () {
   const d = await tfPagina(d => {
     const a = d.atual, v = d.variacoes;
-    const ordem = ['conversas', 'custoConversa', 'cpc', 'ctr', 'alcance', 'impressoes', 'cliques'];
-    const kpis = ordem.map(k => { const [, rot, fmt, bom] = TF_INDICADORES.find(x => x[0] === k); return `<div class="kpi"><small>${rot}</small><strong>${a[k] === null || a[k] === undefined ? '—' : fmt(a[k])}</strong>${delta(v[k], { bomSubir: bom })}</div>`; }).join('');
-    return `${tfCabecalho(d)}<div class="tf-visao">
-      <section class="card tf-vis-hero"><div><small>Investimento no período</small><strong>${money(a.investimento)}</strong>${delta(v.investimento, { bomSubir: true })}</div><div class="tf-vis-contexto"><b>${esc(fmtDate(d.periodo.de))} a ${esc(fmtDate(d.periodo.ate))}</b><span>${d.campanhas.length} campanha(s) · ${d.anuncios.length} anúncio(s) com veiculação</span><small>Status atual na Meta; valores do período escolhido.</small></div></section>
-      <div class="kpis kpis4 tf-vis-kpis">${kpis}<div class="kpi"><small>Campanhas com veiculação</small><strong>${fmtN(d.campanhas.length)}</strong><i class="kd flat">no período escolhido</i></div></div>
-      <div class="tf-vis-graficos"><section class="card"><div class="db-tit"><h2>Investimento diário por campanha</h2>${origem(d.origem)}</div><div id="tfDiario"></div><details class="tf-tabela"><summary>Ver como tabela</summary><div id="tfDiarioTabela"></div></details></section><section class="card"><div class="db-tit"><h2>Investimento por campanha</h2></div><div id="tfBarrasCamp"></div></section></div>
-      <section class="card" id="tfVisCampanhas"><div class="db-tit"><h2>Campanhas</h2><small>Clique numa campanha para ver seus anúncios</small></div><div class="tf-vis-body">${tfResumoLista(d)}</div></section>
-      <section class="card" id="tfVisAnuncios"><div class="db-tit"><h2>Anúncios</h2><small>Detalhes e fotos disponíveis</small></div><div class="tf-vis-body">${tfResumoLista(d, true)}</div></section>
+    const kpis = TF_INDICADORES.map(([k, rot, fmt, bom]) => `<div class="kpi tf-kpi"><span class="tf-ico" aria-hidden="true">${TF_ICONES[k]}</span><small>${rot}</small><strong>${a[k] === null || a[k] === undefined ? '—' : fmt(a[k])}</strong>${delta(v[k], { bomSubir: bom })}<i class="kd flat">vs. ${esc(k === 'investimento' ? tfMoney(d.anteriorTotais?.investimento) : (d.anteriorTotais && d.anteriorTotais[k] !== null && d.anteriorTotais[k] !== undefined ? fmt(d.anteriorTotais[k]) : 'sem base'))}</i></div>`).join('');
+    const linhas = d.campanhas.map(c => `<tr><td class="titlecell"><b>${esc(c.nome)}</b>${c.segmento ? `<br><small>${esc(tfSegRotulo(c.segmento))}</small>` : ''}</td><td>${tfBadge(c)}</td>${tfCelulasMetricas(c)}</tr>`).join('');
+    const t = d.atual;
+    const total = `<tr><th colspan="2">Total (${d.campanhas.length} campanha(s))</th><th class="num">${money(t.investimento)}</th><th class="num">${fmtN(t.impressoes)}</th><th class="num">${tfN(t.alcance)}*</th><th class="num">${fmtN(t.cliques)}</th><th class="num">${tfPct(t.ctr)}</th><th class="num">${tfMoney(t.cpc)}</th><th class="num">${fmtN(t.conversas)}</th><th class="num">${tfMoney(t.custoConversa)}</th></tr>`;
+    return `<div class="tf-visao"><div class="kpis kpis4 tf-vis-kpis tf-kpis8">${kpis}</div>
+      <section class="card"><div class="db-tit"><h2>Evolução no período</h2>${origem(d.origem)}<div class="tf-controles">
+        <label>Indicador <select class="control" id="tfVInd" aria-label="Indicador do gráfico"><option value="investimento">Investimento (R$)</option><option value="conversas">Conversas iniciadas</option></select></label>
+        <label>Estilo <select class="control" id="tfVEst" aria-label="Estilo do gráfico"><option value="linha">Linha</option><option value="barras">Barras</option><option value="area">Área</option></select></label>
+        <label>Agrupar por <select class="control" id="tfVModo" aria-label="Granularidade"><option value="dia">Dia</option><option value="semana">Semana (dom–sáb)</option><option value="mes">Mês</option></select></label></div></div>
+        <div id="tfTempo"></div><details class="tf-tabela"><summary>Ver como tabela</summary><div id="tfTempoTabela"></div></details></section>
+      <div class="tf-vis-graficos"><section class="card"><div class="db-tit"><h2>Investimento por campanha</h2></div><div id="tfBarrasCamp"></div></section>
+      <section class="card"><div class="db-tit"><h2>Investimento e resultado por segmento</h2></div><div id="tfSegmentos"></div></section></div>
       <section class="card"><div class="db-tit"><h2>Alertas e pontos de atenção</h2><small>Baseados nos dados consultados</small></div>${tfAlertasVisao(d)}</section>
-      <p class="kpi-note">Alcance total vem da conta e não soma as campanhas. CTR, CPC e custo por conversa são recalculados dos valores absolutos. Os filtros das seções são aplicados na própria Visão Geral.</p></div>`;
+      <section class="card" id="tfVisCampanhas"><div class="db-tit"><h2>Campanhas</h2><button class="btn soft" data-go="tfdesempenho">Ver desempenho detalhado</button></div>${d.campanhas.length ? `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr><th>Campanha</th><th>Status</th><th class="num">Investimento</th><th class="num">Impressões</th><th class="num">Alcance</th><th class="num">Cliques</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Conversas</th><th class="num">Custo/conversa</th></tr></thead><tbody>${linhas}</tbody><tfoot>${total}</tfoot></table></div>` : '<div class="empty compact">Nenhuma campanha com veiculação neste período.</div>'}</section>
+      <p class="kpi-note">*Alcance total vem da conta (pessoas únicas) e não é a soma das campanhas. CTR, CPC e custo por conversa são recalculados dos valores absolutos. Conversas = conversas iniciadas pelos anúncios. Status é o atual na Meta.</p></div>`;
   });
   if (!d) return;
-  tfLigarVisao(d);
-  const diario = d.diario, cores = ['#063996', '#00A1F3', '#FF7800', '#793A8C'];
-  const series = diario.series.map((s, i) => ({ k: 'camp' + i, nome: s.codigo || s.nome, cor: cores[i % cores.length], fmt: money, marcadores: true }));
-  series.push({ k: 'total', nome: 'Total', cor: '#00275F', fmt: money, tracejado: true, marcadores: true });
-  const dados = diario.dias.map((x, i) => Object.fromEntries([['x', x], ['total', diario.total[i]], ...diario.series.map((s, n) => ['camp' + n, s.valores[i]])]));
-  EvoCharts.linha($('#tfDiario'), { dados, series, sombreado: false, altura: 280, rotuloAcessivel: 'Investimento diário por campanha, com total tracejado' });
+  const total = d.diario.total, conv = d.diario.conversas || d.diario.dias.map(() => 0);
+  const desenhar = () => {
+    const ehInv = TF_VIS.indicador === 'investimento';
+    const grupos = tfAgrupar(d.diario.dias, ehInv ? total : conv, TF_VIS.modo);
+    tfGraficoTempo($('#tfTempo'), { grupos, estilo: TF_VIS.estilo, fmt: ehInv ? money : fmtN, nome: ehInv ? 'Investimento' : 'Conversas iniciadas', modo: TF_VIS.modo });
+    const tot = grupos.reduce((s, g) => s + g.valor, 0), f = ehInv ? money : fmtN;
+    $('#tfTempoTabela').innerHTML = `<div class="tablewrap"><table class="datatable"><thead><tr><th>${TF_VIS.modo === 'dia' ? 'Dia' : TF_VIS.modo === 'semana' ? 'Semana' : 'Mês'}</th><th class="num">${ehInv ? 'Investimento' : 'Conversas'}</th></tr></thead><tbody>${grupos.map(g => `<tr><td>${esc(TF_VIS.modo === 'dia' ? fmtDate(g.de) : TF_VIS.modo === 'semana' ? `${tfSemanaTxt(g.de)} · ${fmtDate(g.de)} a ${fmtDate(g.ate)}` : `${TF_MESES[Number(g.chave.slice(5, 7)) - 1]} de ${g.chave.slice(0, 4)}`)}</td><td class="num">${f(g.valor)}</td></tr>`).join('')}</tbody><tfoot><tr><th>Total</th><th class="num">${f(tot)}</th></tr></tfoot></table></div>`;
+  };
+  $('#tfVInd').value = TF_VIS.indicador; $('#tfVEst').value = TF_VIS.estilo; $('#tfVModo').value = TF_VIS.modo;
+  $('#tfVInd').onchange = e => { TF_VIS.indicador = e.target.value; desenhar(); };
+  $('#tfVEst').onchange = e => { TF_VIS.estilo = e.target.value; desenhar(); };
+  $('#tfVModo').onchange = e => { TF_VIS.modo = e.target.value; desenhar(); };
+  desenhar();
   EvoCharts.barras($('#tfBarrasCamp'), { itens: d.campanhas.map(c => ({ nome: c.codigo || c.nome, sub: c.nome, v: c.investimento, cor: '#063996' })), fmt: money, rotuloAcessivel: 'Investimento por campanha' });
-  $('#tfDiarioTabela').innerHTML = `<div class="tablewrap"><table class="datatable"><thead><tr><th>Dia</th>${series.map(s => `<th>${esc(s.nome)}</th>`).join('')}</tr></thead><tbody>${dados.map(r => `<tr><td>${esc(fmtDate(r.x))}</td>${series.map(s => `<td>${money(r[s.k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-};
-
-const tfTabela = (cab, linhas, total) => `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${cab.map(c => `<th class="${c.num ? 'num' : ''}">${esc(c.t)}</th>`).join('')}</tr></thead><tbody>${linhas}</tbody><tfoot>${total}</tfoot></table></div>`;
-PAGINAS.tfcampanhas = async function () {
-  await tfPagina(d => {
-    const cab = [{ t: 'Campanha' }, { t: 'Status' }, { t: 'Investimento', num: 1 }, { t: 'Impressões', num: 1 }, { t: 'Alcance', num: 1 }, { t: 'Cliques', num: 1 }, { t: 'CTR', num: 1 }, { t: 'CPC', num: 1 }, { t: 'Conversas', num: 1 }, { t: 'Custo/conversa', num: 1 }];
-    const l = c => `<tr><td class="titlecell"><b>${esc(c.nome)}</b>${c.segmento ? `<br><small>${esc(c.segmento)}</small>` : ''}</td><td><span class="badge">${esc(c.statusRotulo || '—')}</span></td><td class="num">${money(c.investimento)}</td><td class="num">${fmtN(c.impressoes)}</td><td class="num">${c.alcance === null ? '—' : fmtN(c.alcance)}</td><td class="num">${fmtN(c.cliques)}</td><td class="num">${c.ctr === null ? '—' : pct(c.ctr)}</td><td class="num">${c.cpc === null ? '—' : money(c.cpc)}</td><td class="num">${fmtN(c.conversas)}</td><td class="num">${c.custoConversa === null ? '—' : money(c.custoConversa)}</td></tr>`;
-    const t = d.tabela?.total || d.atual;
-    const total = `<tr><th colspan="2">Total (${d.campanhas.length} campanhas)</th><th class="num">${money(t.investimento)}</th><th class="num">${fmtN(t.impressoes)}</th><th class="num">${t.alcance === null ? '—' : fmtN(t.alcance)}</th><th class="num">${fmtN(t.cliques)}</th><th class="num">${t.ctr === null ? '—' : pct(t.ctr)}</th><th class="num">${t.cpc === null ? '—' : money(t.cpc)}</th><th class="num">${fmtN(t.conversas)}</th><th class="num">${t.custoConversa === null ? '—' : money(t.custoConversa)}</th></tr>`;
-    return `${tfCabecalho(d, `<a class="btn soft" href="/api/trafego/csv?de=${d.periodo.de}&ate=${d.periodo.ate}${tfParametrosStatus()}">Baixar CSV</a>`)}<section class="card"><div class="db-tit"><h2>Resumo por campanha</h2>${origem(d.origem)}</div>${d.campanhas.length ? tfTabela(cab, d.campanhas.map(l).join(''), total) : '<div class="empty compact">Nenhuma campanha com veiculação neste período e status.</div>'}</section>`;
-  });
-};
-PAGINAS.tfanuncios = async function () {
-  await tfPagina(d => {
-    const cab = [{ t: 'Foto' }, { t: 'Anúncio' }, { t: 'Status' }, { t: 'Investimento', num: 1 }, { t: 'Impressões', num: 1 }, { t: 'Alcance', num: 1 }, { t: 'Cliques', num: 1 }, { t: 'CTR', num: 1 }, { t: 'CPC', num: 1 }, { t: 'Conversas', num: 1 }, { t: 'Custo/conversa', num: 1 }];
-    const l = a => `<tr><td class="tf-fotocel">${a.miniatura ? `<button class="tf-foto" type="button" data-tffoto="${attr(a.imagem || a.miniatura)}" aria-label="Ampliar foto de ${attr(a.nome)}"><img src="${attr(a.miniatura)}" alt="Criativo: ${attr(a.nome)}" loading="lazy" referrerpolicy="no-referrer" width="64" height="80"></button>` : '<span class="tf-sem">Sem imagem</span>'}</td><td class="titlecell"><b>${esc(a.nome)}</b><br><small>${esc(a.campanha)} · ID ${esc(a.id)}</small></td><td><span class="badge ${/ACTIVE/.test(a.status) ? 'ok' : /PAUSED|ARCHIVED|DELETED/.test(a.status) ? 'mute' : 'warn'}">${esc(a.statusRotulo)}</span></td><td class="num">${money(a.investimento)}</td><td class="num">${fmtN(a.impressoes)}</td><td class="num">${a.alcance === null ? '—' : fmtN(a.alcance)}</td><td class="num">${fmtN(a.cliques)}</td><td class="num">${a.ctr === null ? '—' : pct(a.ctr)}</td><td class="num">${a.cpc === null ? '—' : money(a.cpc)}</td><td class="num">${fmtN(a.conversas)}</td><td class="num">${a.custoConversa === null ? '—' : money(a.custoConversa)}</td></tr>`;
-    const t = d.tabela?.total || d.atual;
-    const total = `<tr><th colspan="3">Total (${d.anuncios.length} anúncios)</th><th class="num">${money(t.investimento)}</th><th class="num">${fmtN(t.impressoes)}</th><th class="num">${t.alcance === null ? '—' : fmtN(t.alcance)}</th><th class="num">${fmtN(t.cliques)}</th><th class="num">${t.ctr === null ? '—' : pct(t.ctr)}</th><th class="num">${t.cpc === null ? '—' : money(t.cpc)}</th><th class="num">${fmtN(t.conversas)}</th><th class="num">${t.custoConversa === null ? '—' : money(t.custoConversa)}</th></tr>`;
-    return `${tfCabecalho(d, `<a class="btn soft" href="/api/trafego/csv?de=${d.periodo.de}&ate=${d.periodo.ate}${tfParametrosStatus()}">Baixar CSV</a>`)}<section class="card"><div class="db-tit"><h2>Detalhamento por anúncio</h2>${origem(d.origem)}</div>${d.anuncios.length ? tfTabela(cab, d.anuncios.map(l).join(''), total) : '<div class="empty compact">Nenhum anúncio com veiculação neste período e status.</div>'}</section>`;
-  });
+  const segs = d.segmentos || [];
+  if (segs.length) {
+    $('#tfSegmentos').innerHTML = `<div id="tfRoscaSeg"></div><ul class="tf-seg-lista">${segs.map(s => `<li><b>${esc(tfSegRotulo(s.segmento))}</b><span>${money(s.investimento)}</span><small>${fmtN(s.conversas)} conversa(s) · ${s.custoConversa === null ? 'sem custo por conversa' : money(s.custoConversa) + ' por conversa'}</small></li>`).join('')}</ul><small class="kpi-note">O segmento é reconhecido pelo nome da campanha (EI, AI, AF, EM).</small>`;
+    EvoCharts.rosca($('#tfRoscaSeg'), { itens: segs.map(s => ({ nome: tfSegRotulo(s.segmento), v: s.investimento })), centro: String(segs.length), sub: segs.length === 1 ? 'segmento' : 'segmentos', rotuloAcessivel: 'Distribuição do investimento por segmento' });
+  } else $('#tfSegmentos').innerHTML = '<div class="empty compact">Sem investimento por segmento neste período.</div>';
 };

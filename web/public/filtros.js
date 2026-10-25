@@ -19,13 +19,13 @@ const PERIODOS = [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 3
 const Filtros = (() => {
   /* Cada aba tem os próprios filtros, guardados à parte no navegador (`filtros.<aba>`). Só o perfil do Instagram é
      compartilhado entre as abas do Instagram (`filtros.instagram.perfil`). Mudar o filtro de uma aba não toca nas outras. */
-  const CHAVES = { hoje: 'dashboard', calendario: 'calendario', igvisao: 'instagram.visao', igconteudos: 'instagram.conteudos', igplan: 'instagram.planejamento', igcalendario: 'instagram.calendario', igdesempenho: 'instagram.desempenho', igranking: 'instagram.ranking', trafego: 'trafego.visao', tfcampanhas: 'trafego.campanhas', tfanuncios: 'trafego.anuncios' };
+  const CHAVES = { hoje: 'dashboard', calendario: 'calendario', igvisao: 'instagram.visao', igconteudos: 'instagram.conteudos', igplan: 'instagram.planejamento', igcalendario: 'instagram.calendario', igdesempenho: 'instagram.desempenho', igranking: 'instagram.ranking', trafego: 'trafego.visao', tfdesempenho: 'trafego.desempenho', tfrelatorios: 'trafego.relatorios' };
   const chaveDe = pg => CHAVES[pg] || 'geral';
   const ehIg = chave => chave.startsWith('instagram.');
   const PADRAO = { p: '30', de: '', ate: '', perfil: '', segmento: '', formato: '', campanha: '' };
   const CAMPOS = Object.keys(PADRAO);
   /** Padrões próprios de cada aba (a lista de Publicações mostra os últimos 12 meses). */
-  const PADRAO_P = { 'instagram.conteudos': '365' };
+  const PADRAO_P = { 'instagram.conteudos': '365', 'trafego.visao': 'semana', 'trafego.desempenho': 'semana', 'trafego.relatorios': 'semana' };
   const padraoDe = chave => ({ ...PADRAO, p: PADRAO_P[chave] || PADRAO.p });
   const memoria = {};
   const ouvintes = [];
@@ -106,10 +106,11 @@ const FILTROS_PAGINA = {
   igdesempenho: { aplica: ['periodo', 'formato'] },
   igranking: { aplica: ['periodo', 'formato'] },
   trafego: { aplica: ['periodo'] },
-  tfcampanhas: { aplica: ['periodo'] },
-  tfanuncios: { aplica: ['periodo'] },
+  tfdesempenho: { aplica: ['periodo'] },
+  tfrelatorios: { aplica: ['periodo'] },
   configuracoes: null,
 };
+const PERIODOS_TRAFEGO = [['semana', 'Esta semana'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano']];
 const PERIODOS_RAPIDOS = [['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['semana', 'Esta semana'], ['mes', 'Este mês']];
 
 async function montarFiltros() {
@@ -129,9 +130,10 @@ async function montarFiltros() {
     <label class="fb-campo"><span>Ano</span><select class="control" id="fbAno" aria-label="Ano"><option value="">Escolha o ano</option>${[anoAtual, anoAtual - 1, anoAtual - 2].map(y => `<option value="a:${y}" ${f.p === 'a:' + y ? 'selected' : ''}>${y}</option>`).join('')}</select></label>
     <div class="fb-rapidos" role="group" aria-label="Períodos rápidos">${PERIODOS_RAPIDOS.map(([v, l]) => `<button type="button" class="pill ${f.p === v ? 'on' : ''}" data-fbp="${v}" aria-pressed="${f.p === v}">${l}</button>`).join('')}</div>`;
   const periodoLista = () => `<label class="fb-campo"><span>Período</span><select class="control" id="fbP" aria-label="Período">${PERIODOS.map(([v, l]) => `<option value="${v}" ${f.p === v ? 'selected' : ''}>${v === 'x' && f.p === 'x' ? esc(rotP) : esc(l)}</option>`).join('')}</select></label>`;
+  const periodoTrafego = () => `<div class="fb-rapidos tf-periodos" role="group" aria-label="Período">${PERIODOS_TRAFEGO.map(([v, l]) => `<button type="button" class="pill ${f.p === v ? 'on' : ''}" data-fbp="${v}" aria-pressed="${f.p === v}">${l}</button>`).join('')}<button type="button" class="pill ${f.p === 'x' ? 'on' : ''}" id="fbPers" aria-pressed="${f.p === 'x'}">${f.p === 'x' ? esc(rotP) : 'Personalizado'}</button>${!PERIODOS_TRAFEGO.some(x => x[0] === f.p) && f.p !== 'x' ? `<span class="kpi-note">${esc(rotP)}</span>` : ''}</div>`;
   const n = Filtros.ativos(), aberto = window.innerWidth >= 860;
   box.innerHTML = `<details class="fb-det" ${aberto ? 'open' : ''}><summary>Filtros${n ? ` · ${n} ativo(s)` : ''} ${tem('periodo') ? `<small>${esc(Filtros.descricao())}</small>` : ''}</summary><div class="fb-linha">
-    ${tem('periodo') ? (pagina === 'igvisao' ? periodoVisao() : periodoLista()) : ''}
+    ${tem('periodo') ? (pagina === 'igvisao' ? periodoVisao() : (pagina === 'trafego' || pagina.startsWith('tf')) ? periodoTrafego() : periodoLista()) : ''}
     ${tem('perfil') && !ig ? sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA) : ''}${tem('segmento') ? sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA) : ''}
     ${tem('formato') ? sel('fbFmt', 'formato', 'Formato', [['', 'Todos os formatos'], ...FORMATO_LISTA.map(x => [x, x])]) : ''}
     ${tem('campanha') ? sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])]) : ''}
@@ -144,6 +146,7 @@ async function montarFiltros() {
   if (mes) mes.onchange = () => { if (mes.value) Filtros.set({ p: mes.value, de: '', ate: '' }); };
   if (ano) ano.onchange = () => { if (ano.value) Filtros.set({ p: ano.value, de: '', ate: '' }); };
   $$('[data-fbp]', box).forEach(b => { b.onclick = () => Filtros.set({ p: b.dataset.fbp, de: '', ate: '' }); });
+  const pers = $('#fbPers', box); if (pers) pers.onclick = () => PeriodoPicker.abrir({ de: f.de, ate: f.ate, titulo: 'Escolha o período', max: hojeBR() }, (a, b) => Filtros.set({ p: 'x', de: a, ate: b }));
   const lista = $('#fbP', box);
   if (lista) lista.onchange = e => {
     const v = e.target.value;

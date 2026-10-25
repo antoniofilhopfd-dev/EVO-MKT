@@ -15,19 +15,19 @@ const br = iso => iso.split('-').reverse().join('/');
 
   // 1-5. períodos diferentes em cada aba
   await trocar('igvisao', () => p.click('[data-fbp="7"]'));
-  await trocar('trafego', () => p.selectOption('#fbP', 'mes'));
+  await trocar('trafego', () => p.click('[data-fbp="mes"]'));
   await trocar('hoje', () => p.selectOption('#fbP', '90'));
   await trocar('igdesempenho', () => p.selectOption('#fbP', 'm:' + hoje.slice(0, 7)));
   await trocar('igranking', () => p.selectOption('#fbP', '365'));
-  await trocar('tfcampanhas', () => p.selectOption('#fbP', 'semana'));
-  await trocar('tfanuncios', () => p.selectOption('#fbP', '7'));
-  t('cada aba guarda o próprio período (chaves separadas no navegador)', (await per('filtros.instagram.visao')) === '7' && (await per('filtros.trafego.visao')) === 'mes' && (await per('filtros.dashboard')) === '90' && (await per('filtros.instagram.desempenho')) === 'm:' + hoje.slice(0, 7) && (await per('filtros.instagram.ranking')) === '365' && (await per('filtros.trafego.campanhas')) === 'semana' && (await per('filtros.trafego.anuncios')) === '7', await p.evaluate(() => Object.keys(localStorage).filter(k => k.includes('filtros'))));
+  await trocar('tfdesempenho', () => p.click('[data-fbp="mes_ant"]'));
+  await trocar('tfrelatorios', () => p.click('[data-fbp="ano"]'));
+  t('cada aba guarda o próprio período (chaves separadas no navegador)', (await per('filtros.instagram.visao')) === '7' && (await per('filtros.trafego.visao')) === 'mes' && (await per('filtros.dashboard')) === '90' && (await per('filtros.instagram.desempenho')) === 'm:' + hoje.slice(0, 7) && (await per('filtros.instagram.ranking')) === '365' && (await per('filtros.trafego.desempenho')) === 'mes_ant' && (await per('filtros.trafego.relatorios')) === 'ano', await p.evaluate(() => Object.keys(localStorage).filter(k => k.includes('filtros'))));
   await U.ir(p, 'igvisao', 500); t('Instagram › Visão Geral continua em Últimos 7 dias depois de ir ao Tráfego e ao Dashboard', (await ativoRapido()).join() === '7');
-  await U.ir(p, 'trafego', 500); t('Tráfego Pago › Visão Geral continua em Este mês', (await p.$eval('#fbP', e => e.value)) === 'mes');
+  await U.ir(p, 'trafego', 500); t('Tráfego Pago › Visão Geral continua em Este mês', (await ativoRapido()).join() === 'mes');
   await U.ir(p, 'hoje', 500); t('Dashboard continua em Últimos 90 dias', (await p.$eval('#fbP', e => e.value)) === '90');
-  await U.ir(p, 'tfcampanhas', 500); const c1 = await p.$eval('#fbP', e => e.value);
-  await U.ir(p, 'tfanuncios', 500); const c2 = await p.$eval('#fbP', e => e.value);
-  t('Campanhas e Anúncios têm períodos diferentes', c1 === 'semana' && c2 === '7', [c1, c2]);
+  await U.ir(p, 'tfdesempenho', 500); const c1 = (await ativoRapido()).join();
+  await U.ir(p, 'tfrelatorios', 500); const c2 = (await ativoRapido()).join();
+  t('Desempenho e Relatórios têm períodos diferentes', c1 === 'mes_ant' && c2 === 'ano', [c1, c2]);
   await U.ir(p, 'igdesempenho', 500); const d1 = await p.$eval('#fbP', e => e.value);
   await U.ir(p, 'igranking', 500); const d2 = await p.$eval('#fbP', e => e.value);
   t('Visão Geral, Desempenho e Ranking do Instagram têm períodos diferentes', d1 === 'm:' + hoje.slice(0, 7) && d2 === '365', [d1, d2]);
@@ -35,7 +35,7 @@ const br = iso => iso.split('-').reverse().join('/');
   // 6. persistência ao recarregar
   await p.reload(); await p.waitForSelector('#nav .navitem', { timeout: 15000 });
   await U.ir(p, 'igvisao', 500); const r1 = (await ativoRapido()).join();
-  await U.ir(p, 'trafego', 500); const r2 = await p.$eval('#fbP', e => e.value);
+  await U.ir(p, 'trafego', 500); const r2 = (await ativoRapido()).join();
   t('as escolhas continuam depois de recarregar a página', r1 === '7' && r2 === 'mes', [r1, r2]);
 
   // 9. perfil compartilhado só no Instagram, sem mexer nos períodos
@@ -72,8 +72,8 @@ const br = iso => iso.split('-').reverse().join('/');
   await p.unroute('**/api/instagram/geral*');
 
   // filtro próprio de cada tela e Limpar do Tráfego
-  await U.ir(p, 'tfcampanhas', 500); const temStatus = (await p.$$('#tfStatus')).length;
-  if (temStatus) { await p.selectOption('#tfStatus', (await p.$$eval('#tfStatus option', e => e.map(x => x.value))).find(v => v !== 'todos')); await p.waitForTimeout(600); await U.ir(p, 'tfanuncios', 500); t('o status de Campanhas não aparece em Anúncios', (await p.$eval('#tfStatus', e => e.value)) === 'todos'); }
+  await U.ir(p, 'tfdesempenho', 500);
+  t('o Tráfego usa os botões de período (Esta semana, Este mês, Mês anterior, Este ano, Personalizado), sem a lista de períodos do Instagram', (await p.$$('#fbP')).length === 0 && (await p.$$('#filtros .tf-periodos [data-fbp]')).length === 4 && (await p.$$('#fbPers')).length === 1);
   t('sem erros de script', p.errs.length === 0, p.errs);
   await b.close();
 

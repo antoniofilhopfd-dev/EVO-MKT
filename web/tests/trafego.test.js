@@ -66,17 +66,80 @@ const { t, fim } = U.contador();
   t('depois de desconectar: erro claro e sem token na resposta', r.status === 409 && !/GOOD_TOKEN|access_token/.test(await r.text()));
   // ---- tela ----
   await G.post('/integrations/meta/token', { token: 'GOOD_TOKEN' });
+  await G.get('/integrations/ads/accounts'); // recarrega a lista de contas depois de reconectar
   await G.post('/integrations/ads/account', { conta: contas[0].id });
   const b = await U.abrir(); const p = await U.pagina(b, 'NAT-3301', G.nova);
   await U.ir(p, 'trafego', 1500); let txt = await U.textoConteudo(p);
-  t('Visão geral mostra os 8 indicadores, evolução diária e a origem', ['Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR médio', 'CPC médio', 'Conversas iniciadas', 'Custo por conversa'].every(k => new RegExp(k, 'i').test(txt)) && /Investimento por dia/.test(txt) && (await p.$('.origem-btn')) !== null, txt.slice(0, 300));
+  t('Visão Geral mostra os 8 indicadores, evolução e a origem', ['Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR médio', 'CPC médio', 'Conversas iniciadas', 'Custo por conversa'].every(k => new RegExp(k, 'i').test(txt)) && /Evolução no período/.test(txt) && (await p.$('.origem-btn')) !== null, txt.slice(0, 300));
   t('a tela não oferece criar, editar, ativar nem pausar', !/Criar campanha|Pausar|Ativar|Editar orçamento|Impulsionar/i.test(txt) && /somente consulta/i.test(txt));
-  await U.ir(p, 'tfcampanhas', 800); txt = await U.textoConteudo(p);
-  t('Campanhas: tabela com linha de total e download CSV', /Total \(\d+ campanhas\)/.test(txt) && (await p.$('a[href*="/api/trafego/csv"]')) !== null);
-  await U.ir(p, 'tfanuncios', 800); txt = await U.textoConteudo(p);
-  t('Anúncios: status e total', /Total \(\d+ anúncios\)/.test(txt) && /Ativo|Pausado|Em análise|Sem status|—/.test(txt));
-  t('o filtro de perfil/segmento aparece desativado em Tráfego, com o motivo', await p.$eval('#fbPerfil', e => e.disabled) === true && /Sem efeito|não separa|não informa/.test(await p.innerText('#filtros')) || await p.$eval('#fbPerfil', e => e.disabled) === true);
+  t('exatamente três abas: Visão Geral, Desempenho e Relatórios', JSON.stringify(await p.$$eval('#subtabs .subtab', e => e.map(x => x.textContent))) === JSON.stringify(['Visão Geral', 'Desempenho', 'Relatórios']));
+  t('filtro de período do Tráfego: Esta semana, Este mês, Mês anterior, Este ano e Personalizado', JSON.stringify(await p.$$eval('#filtros .tf-periodos .pill', e => e.map(x => x.textContent))) === JSON.stringify(['Esta semana', 'Este mês', 'Mês anterior', 'Este ano', 'Personalizado']));
+  t('a semana mostra o número e vai de domingo a sábado', /Semana \d+/.test(txt) && /Dom, \d+ \w+ – Sáb, \d+ \w+/.test(txt), txt.slice(0, 200));
+  // evolução: estilo e granularidade não mudam o total
+  const totalTab = async () => (await p.$eval('#tfTempoTabela tfoot', e => e.innerText)).replace(/\s+/g, ' ');
+  await p.evaluate(() => { document.querySelector('.tf-visao details summary').click(); });
+  const t0 = await totalTab();
+  await p.selectOption('#tfVEst', 'barras'); await p.waitForTimeout(200);
+  t('estilo Barras desenha colunas', (await p.$$('#tfTempo svg rect')).length > 0);
+  await p.selectOption('#tfVEst', 'area'); await p.waitForTimeout(200);
+  t('estilo Área desenha o preenchimento', (await p.$$('#tfTempo svg polygon')).length === 1);
+  await p.selectOption('#tfVModo', 'semana'); await p.waitForTimeout(200);
+  t('agrupar por semana mantém o mesmo total do período', (await totalTab()) === t0 && /Semana \d+/.test(await p.innerText('#tfTempoTabela')), [t0, await totalTab()]);
+  await p.selectOption('#tfVModo', 'mes'); await p.waitForTimeout(200);
+  t('agrupar por mês mantém o mesmo total do período', (await totalTab()) === t0);
+  t('há investimento e resultado por segmento e a tabela de campanhas ao final', (await p.$('#tfRoscaSeg svg')) !== null && /Total \(\d+ campanha/.test(await p.innerText('#tfVisCampanhas')));
+  // ---- Desempenho ----
+  await U.ir(p, 'tfdesempenho', 900); txt = await U.textoConteudo(p);
+  t('Desempenho: campanha → conjunto → anúncio na mesma aba', JSON.stringify(await p.$$eval('[data-tf-nivel]', e => e.map(x => x.textContent))) === JSON.stringify(['Campanhas', 'Conjuntos', 'Anúncios']) && /Total \(\d+\)/.test(txt));
+  await p.click('[data-tf-abre]'); await p.waitForTimeout(400);
+  t('clicar numa campanha abre os conjuntos dela (filtro, sem nova aba)', (await p.$eval('[data-tf-nivel].on', e => e.textContent)) === 'Conjuntos' && /Todas as campanhas/.test(await p.innerText('.tf-migalha')));
+  await p.click('[data-tf-abre]'); await p.waitForTimeout(400);
+  t('clicar num conjunto abre os anúncios, com a foto real do criativo', (await p.$eval('[data-tf-nivel].on', e => e.textContent)) === 'Anúncios' && (await p.$$('[data-tffoto]')).length >= 1);
+  await p.click('[data-tf-lim="tudo"]'); await p.click('[data-tf-nivel="anuncios"]'); await p.waitForTimeout(300);
+  const nAn = (await p.$$('#tfDes tbody tr')).length;
+  t('Anúncios: foto quando existe e texto “Sem imagem” quando a Meta não informa', (await p.$$('[data-tffoto]')).length >= 1 && /Sem imagem/.test(await p.innerText('#tfDes tbody')) && nAn >= 3);
+  await p.click('[data-tf-abre]:text("Vídeo depoimento")'); await p.waitForSelector('.tf-det', { timeout: 5000 });
+  t('detalhe do anúncio mostra campanha, conjunto e a mesma peça em outra campanha sem misturar', /Conjunto matrículas/.test(await p.innerText('.tf-det')) && /também roda em outras campanhas/.test(await p.innerText('body')) && /Cartaz antigo/.test(await p.innerText('body')) , (await p.innerText('body')).slice(-300));
+  await p.keyboard.press('Escape'); await p.evaluate(() => document.querySelector('[data-close]')?.click()); await p.waitForTimeout(200);
+  await p.selectOption('#tfdStatus', 'problemas'); await p.waitForTimeout(300);
+  t('filtro de status usa o status atual da Meta (reprovado aparece em problemas)', /Cartaz antigo/.test(await p.innerText('#tfDes tbody')) && (await p.$$('#tfDes tbody tr')).length === 1);
+  await p.click('#tfdLimpar'); await p.fill('#tfdBusca', 'carrossel'); await p.waitForTimeout(600);
+  t('busca filtra por nome', (await p.$$('#tfDes tbody tr')).length === 1);
+  await p.click('#tfdLimpar'); await p.fill('#tfdBusca', 'zzzz'); await p.waitForTimeout(600);
+  t('sem resultado: estado vazio claro', /Nenhum resultado com estes filtros/.test(await p.innerText('#tfDes')));
+  await p.click('#tfdLimpar'); await p.waitForTimeout(200);
+  await p.click('[data-tf-ord="investimento"]'); await p.waitForTimeout(200);
+  t('ordenação por coluna (crescente depois de clicar de novo)', (await p.$eval('[data-tf-ord="investimento"]', e => e.closest('th').getAttribute('aria-sort'))) === 'ascending');
+  // ---- Relatórios ----
+  await U.ir(p, 'tfrelatorios', 1500); txt = await U.textoConteudo(p);
+  t('Relatórios: tipos, filtros e pré-visualização antes de imprimir', ['Relatório geral', 'Relatório por campanha', 'Relatório por conjunto', 'Relatório por anúncio', 'Relatório por segmento'].every(k => txt.includes(k)) && (await p.$('#tfrPrevia')) !== null && /Imprimir/.test(txt));
+  const quadro = async () => { await p.waitForFunction(() => { const r = document.querySelector('#tfrPrevia')?.shadowRoot; return r && r.querySelector('.pg'); }, null, { timeout: 20000 }); return { evaluate: fn => p.evaluate(() => document.querySelector('#tfrPrevia').shadowRoot.querySelector('.previa-pg').innerText) }; };
+  const fr = await quadro();
+  const ftxt = await fr.evaluate();
+  t('pré-visualização traz indicadores, gráfico diário, resumo por campanha e detalhamento por anúncio', /Indicadores do período/.test(ftxt) && /Investimento diário/.test(ftxt) && /Resumo por campanha/.test(ftxt) && /Detalhamento por anúncio/.test(ftxt));
+  t('a pré-visualização usa datas em pt-BR, reais (R$) e % com vírgula', /R\$ [\d.]+,\d{2}/.test(ftxt) && /\d+,\d{2}%/.test(ftxt) && /\d{2}\/\d{2}\/\d{4}/.test(ftxt));
+  await p.click('input[value="segmento"]'); await p.waitForTimeout(1500);
+  const fr2 = await quadro();
+  t('relatório por segmento mostra a tabela por segmento', /Resumo por segmento/.test(await fr2.evaluate()));
+  await p.click('input[value="geral"]'); await p.waitForTimeout(800);
+  await p.selectOption('#tfrStatus', 'ativos'); await p.waitForTimeout(1500);
+  const fr3 = await quadro();
+  t('o filtro de status vale na pré-visualização (recorte filtrado avisado)', /Recorte filtrado/.test(await fr3.evaluate()));
   t('o PDF A4 abre com o período escolhido', (await p.evaluate(async () => (await fetch('/relatorio-trafego.html')).status)) === 200);
+  // ---- capturas reais (desktop e tablet) quando CAPTURAS=pasta ----
+  if (process.env.CAPTURAS) {
+    const fs = require('fs'); fs.mkdirSync(process.env.CAPTURAS, { recursive: true });
+    const foto = async (pg, nome) => { await pg.addStyleTag({ content: 'html,body{height:auto!important;overflow:visible!important}#app,main,.main,#content{height:auto!important;max-height:none!important;overflow:visible!important}' }); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.screenshot({ path: `${process.env.CAPTURAS}/${nome}.png`, fullPage: true }); };
+    const b2 = await U.abrir();
+    for (const [nome, vp] of [['desktop', { width: 1440, height: 900 }], ['tablet', { width: 820, height: 1180 }]]) {
+      const q = await U.pagina(b2, 'NAT-3301', G.nova, vp);
+      await U.ir(q, 'trafego', 1800); await foto(q, `visao-geral-${nome}`);
+      await U.ir(q, 'tfdesempenho', 1200); await foto(q, `desempenho-campanhas-${nome}`);
+      await q.click('[data-tf-nivel="anuncios"]'); await q.waitForTimeout(500); await foto(q, `desempenho-anuncios-${nome}`);
+      await U.ir(q, 'tfrelatorios', 2000); await foto(q, `relatorios-${nome}`);
+    }
+    await b2.close();
+  }
   t('sem erros de script nem diálogos nativos', p.errs.length === 0, p.errs);
   await b.close();
   fim();
