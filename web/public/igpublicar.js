@@ -9,11 +9,11 @@ const IGPUB_FORMATOS = [
 const igpubPerfilRotulo = usuario => { const u = String(usuario || '').replace(/^@/, ''), s = u.replace(/[._]/g, '').toLowerCase(); return s === 'geracaoevolucao' ? '@geracaoevolucao' : '@' + u; };
 
 /** modo: 'agora' | 'agendar'. `existente`: publicação já criada (rascunho) para continuar. */
-async function abrirPublicacao(modo = 'agora', existente = null) {
+async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
   const contas = (await api('/instagram/contas')).contas || [];
   if (!contas.length) { toast('Conecte o Instagram em Configurações antes de publicar.', 'warn'); return; }
   const amanha = somaDias(hojeBR(), 1);
-  const est = { modo, conta: 0, collab: false, formato: existente?.formato || 'Reels', arquivos: [], legenda: existente?.legenda || '', dia: existente?.publicacaoEm ? existente.publicacaoEm.slice(0, 10) : amanha, hora: existente?.publicacaoEm ? existente.publicacaoEm.slice(11, 16) : '09:00', id: existente?.id || '', previa: 0 };
+  const est = { modo, conta: 0, collab: false, formato: existente?.formato || 'Reels', arquivos: [], legenda: existente?.legenda || '', dia: existente?.publicacaoEm ? existente.publicacaoEm.slice(0, 10) : opc.dia || amanha, hora: existente?.publicacaoEm ? existente.publicacaoEm.slice(11, 16) : '09:00', id: existente?.id || '', previa: 0 };
   if (existente?.contaInstagram) { const i = contas.findIndex(c => c.ig === existente.contaInstagram); if (i >= 0) est.conta = i; }
   const dlg = dialogo('<div id="igpub"></div>', { larga: true });
   const raiz = $('#igpub', dlg.el);

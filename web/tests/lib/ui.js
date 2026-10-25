@@ -5,6 +5,7 @@ const BASE = process.env.BASE || 'http://127.0.0.1:8080', B = BASE + '/api';
 const J = { 'Content-Type': 'application/json', 'X-EVO': '1' };
 const cookie = r => r.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
 const hoje = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date());
+const somaDia = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const dia = n => { const d = new Date(hoje() + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 function contador() {
   let ok = 0, bad = 0;
@@ -37,4 +38,4 @@ async function ir(p, pg, espera = 600) {
   await p.waitForTimeout(espera);
 }
 const textoConteudo = p => p.evaluate(() => document.querySelector('#content').innerText);
-module.exports = { BASE, B, J, dia, hoje, contador, entrar, abrir, pagina, ir, textoConteudo, cookie };
+module.exports = { BASE, B, J, somaDia, dia, hoje, contador, entrar, abrir, pagina, ir, textoConteudo, cookie };

@@ -8,7 +8,7 @@ const CORES = [['#063996', '#00A1F3'], ['#FF7800', '#FAB900'], ['#793A8C', '#d63
 const mini = (i, rot) => { const [a, b] = CORES[i % CORES.length]; return "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="42" r="16" fill="#fff" opacity=".85"/><text x="50" y="82" font-size="11" text-anchor="middle" fill="#fff" font-family="Arial">${rot}</text></svg>`); };
 const TIPOS = ['FEED', 'REELS', 'CAROUSEL_ALBUM', 'REELS', 'FEED', 'CAROUSEL_ALBUM', 'REELS'];
 const LEGENDAS = ['Quando esforço vira reconhecimento! Premiação 10+', 'O que faz uma escola ser inesquecível', 'A verdadeira força do Evolução está nas conquistas', 'Um novo ciclo está prestes a começar', 'Um mundo encantado diante dos nossos olhos', 'Dia das Crianças no Paraíso dos Colibris', 'Matrículas 2027 abertas', 'Aula aberta de ciências', 'Festival de Dança 2026', 'Ser criança é encontrar felicidade', 'Bastidores da feira cultural', 'Nossos professores contam'];
-async function semear(G, { posts = 30, dias = 56 } = {}) {
+async function semear(G, { posts = 30 } = {}) {
   await G.post('/integrations/meta/token', { token: 'GOOD_TOKEN' });
   const ig1 = (await G.get('/integrations/status')).instagram.igUserId, ig2 = 'IG_GERACAO_2';
   const set = (k, v) => `INSERT INTO integration_settings(k,v) VALUES('${k}','${esc(v)}') ON DUPLICATE KEY UPDATE v=VALUES(v);`;
@@ -24,10 +24,16 @@ async function semear(G, { posts = 30, dias = 56 } = {}) {
     }
   });
   q += `INSERT INTO ig_posts(conta,media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,seguidores_novos,visitas_perfil,permalink,miniatura,atualizado_em) VALUES ${linhas.join(',')};`;
-  const snaps = [];
-  for (let d = dias; d >= 0; d--) { snaps.push(`('${U.dia(-d)}',${8200 + (dias - d) * 14},0,0,'x','${ig1}')`); snaps.push(`('${U.dia(-d)}',${4100 + (dias - d) * 9},0,0,'x','${ig2}')`); }
+  const snaps = [], inicioSeg = '2026-10-11', hoje = U.dia(0);
+  for (let d = inicioSeg, k = 0; d <= hoje; d = U.somaDia(d, 1), k++) { snaps.push(`('${d}',${8200 + k * 14},0,0,'x','${ig1}')`); snaps.push(`('${d}',${4100 + k * 9},0,0,'x','${ig2}')`); }
   q += `INSERT INTO ig_seguidores(dia,seguidores,seguindo,midias,atualizado_em,conta) VALUES ${snaps.join(',')};`;
+  // métricas semanais (domingo a sábado) desde a Semana 41 de 2026 e meses de agosto a outubro
+  q += `DELETE FROM ig_conta_semana;`;
+  const semanas = []; [['2026-10-04', 1], ['2026-10-11', 1.1], ['2026-10-18', 1.25], ['2026-10-25', 0.3]].forEach(([ini, f]) => { [[ig1, 1], [ig2, 0.62]].forEach(([c, m]) => { const a = Math.round(28000 * f * m); semanas.push(`('${c}','${ini}','${U.somaDia(ini, 6)}',${a},${Math.round(a * 1.9)},${Math.round(a / 11)},${Math.round(a / 9)},${Math.round(a / 15)},${Math.round(a / 90)},${Math.round(a / 70)},${Math.round(a / 60)},'x')`); }); });
+  q += `INSERT INTO ig_conta_semana(conta,inicio,fim,alcance,visualizacoes,visitas_perfil,interacoes,curtidas,comentarios,compartilhamentos,salvamentos,atualizado_em) VALUES ${semanas.join(',')};`;
   sql(q);
+  const mes = (per, ig, f, m) => G.post('/data?module=instagram', { titulo: per + ' · ' + ig, periodo: per, dataInicio: per + '-01', origem: 'INSTAGRAM_API', idExterno: ig, status: 'ATIVO', alcance: String(Math.round(110000 * f * m)), impressoes: String(Math.round(210000 * f * m)), visitasPerfil: String(Math.round(9000 * f * m)), interacoes: String(Math.round(15000 * f * m)), curtidas: '1', comentarios: '1', compartilhamentos: '1', salvamentos: '1', posts: '8', reels: '5' });
+  for (const [per, f] of [['2026-07', 0.7], ['2026-08', 0.85], ['2026-09', 1], ['2026-10', 1.2]]) { await mes(per, ig1, f, 1); await mes(per, ig2, f, 0.6); }
   return { ig1, ig2 };
 }
 module.exports = { semear, sql, mini };

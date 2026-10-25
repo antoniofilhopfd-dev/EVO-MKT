@@ -1,7 +1,7 @@
 /* Instagram › Calendário: publicações do EVO MKT (programadas e em preparação com data) e as já postadas, sincronizadas com a Meta.
    Não mistura com o Calendário Escolar. Visões Mês, Semana, Dia e Lista. */
-const IGCAL = { ref: hojeBR(), modo: pref('igCalModo', 'mes'), posts: {} };
-const IGCAL_MODOS = [['mes', 'Mês'], ['semana', 'Semana'], ['dia', 'Dia'], ['lista', 'Lista']];
+const IGCAL = { ref: hojeBR(), modo: ['dia', 'semana', 'mes'].includes(pref('igCalModo', 'mes')) ? pref('igCalModo', 'mes') : 'mes', posts: {} };
+const IGCAL_MODOS = [['mes', 'Mês'], ['semana', 'Semana'], ['dia', 'Dia']];
 const IGCAL_DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const IGCAL_BR = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -37,18 +37,18 @@ function igcalItens(de, ate) {
   const itens = [];
   IGC.rows.forEach(r => {
     const estado = stLimpo(r.status), dia = String(r.publicacaoEm || '').slice(0, 10);
-    if (!dia || dia < de || dia > ate || estado === 'ARQUIVADO' || !calPubCabe(r, f)) return;
-    itens.push({ origem: 'evo', id: r.id, dia, hora: String(r.publicacaoEm).slice(11, 16), titulo: r.titulo || '(sem título)', perfil: r.perfil || '', formato: r.formato || '', mini: igcalMini(r), estado, rotulo: IG_ESTADO_ROTULO[estado] || estado || '—' });
+    if (!dia || dia < de || dia > ate || estado === 'ARQUIVADO' || /stor/i.test(r.formato || '') || !calPubCabe(r, f)) return;
+    itens.push({ origem: 'evo', arrasta: estado !== 'PUBLICADO', id: r.id, dia, hora: String(r.publicacaoEm).slice(11, 16), titulo: r.titulo || '(sem título)', perfil: r.perfil || '', formato: r.formato || '', mini: igcalMini(r), estado, rotulo: IG_ESTADO_ROTULO[estado] || estado || '—' });
   });
   (IGCAL.posts[igcalQuery(de, ate)] || []).forEach(p => {
-    if (ligadas.has(String(p.id))) return;
+    if (ligadas.has(String(p.id)) || /stor/i.test(p.formato || '')) return;
     const q = igcalQuando(p.quando);
     itens.push({ origem: 'meta', id: p.id, dia: q.dia, hora: q.hora, titulo: p.titulo || p.legenda || '(sem legenda)', perfil: p.perfil || '', formato: p.formato || '', mini: p.miniatura || '', link: p.link || '', estado: 'PUBLICADO', rotulo: 'Publicado no Instagram' });
   });
   return itens.sort((a, b) => (a.dia + (a.hora || '99:99')).localeCompare(b.dia + (b.hora || '99:99')));
 }
 const igcalBadge = i => `<span class="badge ${estadoClasse(i.estado)}">${esc(i.rotulo)}</span>`;
-const igcalAbrir = i => (i.origem === 'meta' ? `<a class="igcal-item igcal-meta" href="${attr(i.link || '#')}" target="_blank" rel="noopener noreferrer"` : `<button type="button" class="igcal-item ${estadoClasse(i.estado)}" data-pub="${attr(i.id)}"`);
+const igcalAbrir = i => (i.origem === 'meta' ? `<a class="igcal-item igcal-meta" href="${attr(i.link || '#')}" target="_blank" rel="noopener noreferrer"` : `<button type="button" class="igcal-item ${estadoClasse(i.estado)}" data-pub="${attr(i.id)}" ${i.arrasta ? `draggable="true" data-arrasta="${attr(i.id)}|${attr(i.hora || '09:00')}"` : ''}`);
 const igcalFecha = i => (i.origem === 'meta' ? '</a>' : '</button>');
 const igcalPerfilCurto = p => (p ? '@' + p.replace(/^@/, '').slice(0, 10) : '');
 
@@ -64,15 +64,13 @@ function igcalLinha(i, comData) {
 function igcalCorpo(itens, de, ate) {
   const hoje = hojeBR(), porDia = new Map();
   itens.forEach(i => (porDia.get(i.dia) || porDia.set(i.dia, []).get(i.dia)).push(i));
-  if (!itens.length && IGCAL.modo !== 'dia') return '<div class="empty compact">Nenhuma publicação neste período com os filtros escolhidos.</div>';
-  if (IGCAL.modo === 'lista') return `<div class="igcal-lista">${itens.map(i => igcalLinha(i, true)).join('')}</div>`;
   if (IGCAL.modo === 'dia') return `<div class="igcal-lista">${itens.map(i => igcalLinha(i, false)).join('') || '<div class="empty compact">Nada programado nem postado neste dia.</div>'}</div>`;
   const celulas = [];
   const inicio = new Date(de + 'T12:00:00Z').getUTCDay();
   if (IGCAL.modo === 'mes') for (let i = 0; i < inicio; i++) celulas.push('<div class="igcal-dia vazio"></div>');
   for (let k = de; k <= ate; k = somaDias(k, 1)) {
     const lista = porDia.get(k) || [], max = IGCAL.modo === 'semana' ? 99 : 3;
-    celulas.push(`<div class="igcal-dia ${k === hoje ? 'hoje' : ''} ${IGCAL.modo === 'semana' ? 'alto' : ''}"><button type="button" class="igcal-num" data-dia="${k}" aria-label="Abrir o dia ${attr(fmtDate(k))}">${IGCAL.modo === 'semana' ? esc(IGCAL_DIAS[new Date(k + 'T12:00:00Z').getUTCDay()].slice(0, 3)) + ' ' : ''}${+k.slice(8)}</button>${lista.slice(0, max).map(igcalChip).join('')}${lista.length > max ? `<button type="button" class="igcal-mais" data-dia="${k}">+${lista.length - max} mais</button>` : ''}</div>`);
+    celulas.push(`<div class="igcal-dia ${k === hoje ? 'hoje' : ''} ${IGCAL.modo === 'semana' ? 'alto' : ''}" data-solta="${k}">${k >= hoje ? `<button type="button" class="igcal-add" data-add="${k}" aria-label="Agendar publicação em ${attr(fmtDate(k))}" title="Agendar neste dia">+</button>` : ''}<button type="button" class="igcal-num" data-dia="${k}" aria-label="Abrir o dia ${attr(fmtDate(k))}">${IGCAL.modo === 'semana' ? esc(IGCAL_DIAS[new Date(k + 'T12:00:00Z').getUTCDay()].slice(0, 3)) + ' ' : ''}${+k.slice(8)}</button>${lista.slice(0, max).map(igcalChip).join('')}${lista.length > max ? `<button type="button" class="igcal-mais" data-dia="${k}">+${lista.length - max} mais</button>` : ''}</div>`);
   }
   return `<div class="igcal">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(x => `<div class="igcal-cab">${x}</div>`).join('')}${celulas.join('')}</div>`;
 }
@@ -85,7 +83,8 @@ PAGINAS.igcalendario = async function () {
     const rot = IGCAL.modo === 'dia' ? `${IGCAL_DIAS[new Date(IGCAL.ref + 'T12:00:00Z').getUTCDay()]}, ${fmtDate(IGCAL.ref)}` : IGCAL.modo === 'semana' ? `${fmtDate(de)} a ${fmtDate(ate)}` : mesRotulo(de.slice(0, 7));
     const modos = IGCAL_MODOS.map(([k, n]) => `<button type="button" class="btn ${IGCAL.modo === k ? '' : 'soft'}" data-modo="${k}" aria-pressed="${IGCAL.modo === k}">${n}</button>`).join('');
     $('#content').innerHTML = `<div class="ig-barra"><button type="button" class="btn soft" data-nav="-1" aria-label="Anterior">‹</button><b class="mes-rot">${esc(rot)}</b><button type="button" class="btn soft" data-nav="1" aria-label="Próximo">›</button><button type="button" class="btn soft" data-nav="hoje">Hoje</button><span class="igcal-modos" role="group" aria-label="Visão do calendário">${modos}</span></div>
-      <p class="kpi-note">Programadas e em preparação (com data definida) do EVO MKT e já postadas no Instagram, inclusive as sincronizadas com a Meta. Este calendário não inclui o Calendário Escolar. ${origem({ fonte: 'EVO MKT e Instagram (API oficial da Meta)', periodo: `${de} a ${ate}`, atualizadoEm: IGCAL.sync })}</p>
+      <div class="igcal-leg"><span><i class="ok"></i>Publicada</span><span><i class="info"></i>Agendada</span><span><i class="warn"></i>Em preparação</span></div>
+      <p class="kpi-note">Programadas, em preparação (com data definida) e já postadas no Instagram, inclusive as sincronizadas com a Meta. Stories não entram na pauta. Arraste uma publicação para outro dia para reagendar. Não inclui o Calendário Escolar. ${origem({ fonte: 'EVO MKT e Instagram (API oficial da Meta)', periodo: `${de} a ${ate}`, atualizadoEm: IGCAL.sync })}</p>
       <div id="igcalCorpo">${igcalCorpo(itens, de, ate)}</div>`;
     $$('[data-modo]').forEach(b => { b.onclick = () => { IGCAL.modo = b.dataset.modo; setPref('igCalModo', IGCAL.modo); desenha(); carrega(); }; });
     $$('[data-nav]').forEach(b => {
@@ -100,6 +99,18 @@ PAGINAS.igcalendario = async function () {
     });
     $$('[data-dia]').forEach(b => { b.onclick = () => { IGCAL.ref = b.dataset.dia; IGCAL.modo = 'dia'; setPref('igCalModo', 'dia'); desenha(); carrega(); }; });
     $$('[data-pub]', $('#igcalCorpo')).forEach(el => { el.onclick = () => editarPublicacao(el.dataset.pub); });
+    $$('[data-add]', $('#igcalCorpo')).forEach(b => { b.onclick = e => { e.stopPropagation(); abrirPublicacao('agendar', null, { dia: b.dataset.add }); }; });
+    /* reagendar arrastando uma publicação (não publicada) para outro dia: mantém o horário */
+    $$('[data-arrasta]', $('#igcalCorpo')).forEach(el => { el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.arrasta); e.dataTransfer.effectAllowed = 'move'; }; });
+    $$('[data-solta]', $('#igcalCorpo')).forEach(cel => {
+      cel.ondragover = e => { if (cel.dataset.solta >= hojeBR()) { e.preventDefault(); cel.classList.add('alvo'); } };
+      cel.ondragleave = () => cel.classList.remove('alvo');
+      cel.ondrop = async e => {
+        e.preventDefault(); cel.classList.remove('alvo');
+        const [id, hora] = (e.dataTransfer.getData('text/plain') || '').split('|'); if (!id || cel.dataset.solta < hojeBR()) return;
+        try { await put(`/data?module=conteudos&id=${encodeURIComponent(id)}`, { publicacaoEm: `${cel.dataset.solta}T${hora || '09:00'}` }); invalidate('conteudos'); toast('Publicação reagendada para ' + fmtDate(cel.dataset.solta)); await carregarConteudos(); desenha(); } catch (err) { toast(err.message, 'bad'); }
+      };
+    });
   };
   const carrega = async () => {
     const [de, ate] = igcalIntervalo(), chave = igcalQuery(de, ate);

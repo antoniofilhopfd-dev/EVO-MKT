@@ -5,6 +5,19 @@ const varPct = (a, b) => { if (a === null || a === undefined || b === null || b 
 const igvN = v => (v === null || v === undefined ? '—' : fmtN(v));
 const igvPct = v => (v === null || v === undefined ? '—' : String(v).replace('.', ',') + '%');
 
+/** Tabela de comparação entre as contas (também usada em Desempenho). */
+function igvComparacao(d) {
+  const a = d.atual, sg = d.seguidores;
+  const linhasContas = [['Seguidores atuais', 'seguidores', true], ['Novos seguidores', 'novosSeguidores', true], ['Alcance', 'alcance', false], ['Visualizações', 'visualizacoes', true], ['Visitas ao perfil', 'visitasPerfil', false], ['Interações', 'interacoes', true], ['Taxa de engajamento', 'engajamento', null], ['Publicações', 'publicacoes', true]];
+  const celulaTotal = (k, somavel) => {
+    if (k === 'engajamento') return igvPct(a.engajamento);
+    if (k === 'seguidores') return igvN(sg.atual);
+    if (k === 'novosSeguidores') return sg.novos === null ? '—' : (sg.novos > 0 ? '+' : '') + fmtN(sg.novos);
+    return igvN(a[k]) + (!somavel && d.contas.length > 1 && a[k] !== null ? '*' : '');
+  };
+  return d.contas.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Indicador</th>${d.contas.map(c => `<th class="num">@${esc(c.usuario.replace(/^@/, ''))}</th>`).join('')}${d.contas.length > 1 ? '<th class="num">Total</th>' : ''}</tr></thead><tbody>${linhasContas.map(([r, k, somavel]) => `<tr><td>${r}</td>${d.contas.map(c => `<td class="num">${k === 'engajamento' ? igvPct(c[k]) : k === 'novosSeguidores' ? (c[k] === null ? '—' : (c[k] > 0 ? '+' : '') + fmtN(c[k])) : igvN(c[k])}</td>`).join('')}${d.contas.length > 1 ? `<td class="num"><b>${celulaTotal(k, somavel)}</b></td>` : ''}</tr>`).join('')}</tbody></table></div>${d.contas.length > 1 ? '<p class="kpi-note">*Soma simples dos dois perfis: pessoas alcançadas nos dois são contadas duas vezes (o alcance é único por conta).</p>' : ''}` : '<div class="empty compact">Nenhuma conta do Instagram conectada.</div>';
+}
+
 PAGINAS.igvisao = async function () {
   const d = await api('/instagram/geral?' + Filtros.query());
   const a = d.atual, ant = d.anterior, sg = d.seguidores, vazio = !a.publicacoes && sg.atual === null;
@@ -27,14 +40,7 @@ PAGINAS.igvisao = async function () {
   ].join('');
   const detalhe = [['Curtidas', 'curtidas'], ['Comentários', 'comentarios'], ['Compartilhamentos', 'compartilhamentos'], ['Salvamentos', 'salvamentos']]
     .map(([r, k]) => `<div class="kpi"><small>${r}</small><strong>${igvN(a[k])}</strong>${a[k] === null ? nd('a Meta não informou') : dif(a[k], ant[k])}</div>`).join('');
-  const linhasContas = [['Seguidores atuais', 'seguidores', true], ['Novos seguidores', 'novosSeguidores', true], ['Alcance', 'alcance', false], ['Visualizações', 'visualizacoes', true], ['Visitas ao perfil', 'visitasPerfil', false], ['Interações', 'interacoes', true], ['Taxa de engajamento', 'engajamento', null], ['Publicações', 'publicacoes', true]];
-  const celulaTotal = (k, somavel) => {
-    if (k === 'engajamento') return igvPct(a.engajamento);
-    if (k === 'seguidores') return igvN(sg.atual);
-    if (k === 'novosSeguidores') return sg.novos === null ? '—' : (sg.novos > 0 ? '+' : '') + fmtN(sg.novos);
-    return igvN(a[k]) + (!somavel && d.contas.length > 1 && a[k] !== null ? '*' : '');
-  };
-  const comparacao = d.contas.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Indicador</th>${d.contas.map(c => `<th class="num">@${esc(c.usuario.replace(/^@/, ''))}</th>`).join('')}${d.contas.length > 1 ? '<th class="num">Total</th>' : ''}</tr></thead><tbody>${linhasContas.map(([r, k, somavel]) => `<tr><td>${r}</td>${d.contas.map(c => `<td class="num">${k === 'engajamento' ? igvPct(c[k]) : k === 'novosSeguidores' ? (c[k] === null ? '—' : (c[k] > 0 ? '+' : '') + fmtN(c[k])) : igvN(c[k])}</td>`).join('')}${d.contas.length > 1 ? `<td class="num"><b>${celulaTotal(k, somavel)}</b></td>` : ''}</tr>`).join('')}</tbody></table></div>${d.contas.length > 1 ? '<p class="kpi-note">*Soma simples dos dois perfis: pessoas alcançadas nos dois são contadas duas vezes (o alcance é único por conta).</p>' : ''}` : '<div class="empty compact">Nenhuma conta do Instagram conectada.</div>';
+  const comparacao = igvComparacao(d);
   const melhores = d.melhores.length ? d.melhores.map((p, i) => `<article class="ig-top"><b class="ig-top-pos">${i + 1}º</b>${p.miniatura ? `<img src="${attr(p.miniatura)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="db-sem-img">Sem imagem</div>'}<div class="ig-top-txt"><b>${esc(p.titulo || p.legenda || '(sem legenda)')}</b><small>${esc(p.formato)} · ${esc(fmtDate(igcalQuando(p.quando).dia))}${p.perfil ? ' · @' + esc(p.perfil.replace(/^@/, '')) : ''}</small></div><dl class="ig-top-met"><div><dt>Alcance</dt><dd>${igvN(p.alcance)}</dd></div><div><dt>Interações</dt><dd>${igvN(p.interacoes)}</dd></div><div><dt>Comentários</dt><dd>${igvN(p.comentarios)}</dd></div><div><dt>Salvamentos</dt><dd>${igvN(p.salvamentos)}</dd></div></dl>${p.link ? `<a class="ig-top-link" href="${attr(p.link)}" target="_blank" rel="noopener noreferrer" aria-label="Abrir no Instagram">↗</a>` : ''}</article>`).join('') : '<div class="empty compact">Nenhuma publicação no período com os filtros escolhidos.</div>';
   const sync = d.ultimaSync ? `Última sincronização com a Meta: <b>${esc(fmtDateTime(d.ultimaSync))}</b>` : 'Ainda não houve sincronização com a Meta';
   $('#content').innerHTML = `<div class="ig-acoes ig-sync"><span class="kpi-note">${sync} · dados do Instagram (API oficial da Meta) ${origem(d.origem)}</span><a class="btn soft" target="_blank" rel="noopener" href="/relatorio-instagram.html">Relatório mensal (PDF)</a></div>
