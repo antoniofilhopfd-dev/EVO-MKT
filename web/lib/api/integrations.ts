@@ -1,12 +1,12 @@
 import { Ctx } from '../ctx';
 import { q, q1, run } from '../db';
 import { requireInternal, requireAdmin, requireManager, stepUp } from '../auth';
-import { audit, getRow, listRows, MODULES } from '../records';
+import { audit, getRow, listRows } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { env, fail, now, Row, strv } from '../util';
 import { checkState, publicUrl, verifySignedMedia } from '../integrations/http';
 import { contasMonitoradas, contasOcultas, igMarkError, igPublish, igSaveMedia, igSync, metaConnectUrl, metaConnected, metaDiscoverAccount, metaFinishConnect, metaRefreshIfNeeded, metaUsarConta, MetaConta } from '../integrations/meta';
-import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gDriveSendEntregas, gFinishConnect, gSheetsExport, GSHEET_DEFAULT_MODULES } from '../integrations/google';
+import { gCalendarChoose, gCalendarList, gLimparImportados, gCalendarSync, gCalendarSyncSeNecessario, gConnectUrl, gConnected, gFinishConnect } from '../integrations/google';
 import { relatorioTrafego } from '../integrations/metarelatorio';
 import { adsAnuncios, adsDiario, adsPermitido, adsSnapshots, ContaAds, listarContasAds, adsSync, alertasTrafego, limitesAlerta, pacingMes, saudeConta } from '../integrations/metaads';
 import { json } from './handlers';
@@ -57,10 +57,8 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         google: {
           configurado: (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '',
           clientId: await setting('g_client_id'), conectado: await gConnected(), email: await setting('g_email'),
-          ultimaAgenda: await setting('g_last_cal_sync'), planilhaUrl: await setting('g_sheet_url'), ultimaPlanilha: await setting('g_last_sheet_export'),
+          ultimaAgenda: await setting('g_last_cal_sync'),
           calendarioId: await setting('g_calendar_id'), importar: (await setting('g_importar')) !== '0',
-          driveAuto: (await setting('g_auto_drive_entregas')) === '1', driveFolder: await setting('g_drive_folder_id'),
-          planilhaModulos: await setting('g_sheet_modules', GSHEET_DEFAULT_MODULES.join(',')),
         },
         ads: { modoCompleto: (await setting('trafego_gestao')) === '1', limites: await limitesAlerta(), ativar: (await setting('meta_ads_ativar')) === '1', conta: await setting('meta_ads_conta'), contas: JSON.parse((await setting('meta_ads_contas')) || '[]'), ultimaSync: await setting('meta_ads_ultima_sync'), permitido: (await metaConnected()) ? await adsPermitido() : false },
         redirectUris: { meta: publicUrl(c.url.origin) + '/api/integrations/meta/callback', google: publicUrl(c.url.origin) + '/api/integrations/google/callback' },
@@ -93,7 +91,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       add('meta_token', !metaOn || (exp * 1000 - Date.now()) / 86400000 > 10, 'aviso', 'Meta: token com mais de 10 dias de validade', 'O cron renova sozinho; se faltar menos de 10 dias, o cron não está rodando — reconecte.');
       const gCred = (await setting('g_client_id')) !== '' && (await setting('g_client_secret')) !== '';
       add('g_cred', gCred, 'erro', 'Google: Client ID e Client Secret salvos', 'Cole as credenciais na caixa Google (veja GUIA_INTEGRACOES.md).');
-      add('g_conn', await gConnected(), 'erro', 'Google: conta conectada (Agenda, Drive, Planilhas)', 'Clique em "Conectar com Google" e aceite as permissões.');
+      add('g_conn', await gConnected(), 'erro', 'Google: conta conectada (Agenda)', 'Clique em "Conectar com Google" e aceite as permissões.');
       const recente = async (k: string) => { const v = await setting(k); return v !== '' && Date.now() - new Date(v).getTime() < 2 * 86400000; };
       add('cron_roda', (!metaOn || (await recente('ig_last_sync'))) && (!(await gConnected()) || (await recente('g_last_cal_sync'))), 'aviso', 'Sincronização rodou nos últimos 2 dias', 'Crie o cron da Hostinger (comando abaixo) ou use os botões "Sincronizar agora".');
       const agendados = metaOn ? (await listRows('conteudos')).filter((r) => r.publicarInstagram === 'SIM' && !r.instagramMediaId && r.midiaInstagram && /APROVADO|PROGRAMADO/i.test(String(r.status ?? ''))).length : 0;
@@ -112,8 +110,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
       await stepUp(u, input);
       for (const k of ['meta_app_id', 'meta_app_secret', 'g_client_id', 'g_client_secret']) if (input[k] !== undefined && strv(input[k]).trim() !== '') await setSetting(k, strv(input[k]).trim());
       if (input.g_importar !== undefined) await setSetting('g_importar', input.g_importar ? '1' : '0');
-      if (input.g_auto_drive_entregas !== undefined) await setSetting('g_auto_drive_entregas', input.g_auto_drive_entregas ? '1' : '0');
-      if (input.g_sheet_modules !== undefined) await setSetting('g_sheet_modules', strv(input.g_sheet_modules).split(',').map((m) => m.trim()).filter((m) => m in MODULES).join(','));
       await audit(u.codigo, 'integracoes-config');
       return json({ ok: true });
     }
@@ -307,18 +303,6 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     case path === '/integrations/google/calendar/sync' && method === 'POST': {
       await requireInternal(c);
       try { return json(c.qs('leve') === '1' ? await gCalendarSyncSeNecessario(45) : await gCalendarSync()); } catch (e: any) { return bad('google', e); }
-    }
-    case path === '/integrations/google/sheets/export' && method === 'POST': {
-      await requireInternal(c);
-      try { return json({ abas: await gSheetsExport(), url: await setting('g_sheet_url') }); } catch (e: any) { return bad('google', e); }
-    }
-    case path === '/integrations/google/drive/send-entregas' && method === 'POST': {
-      await requireInternal(c);
-      let n = 0;
-      try {
-        for (const r of await listRows('solicitacoes')) if (r.arquivosEntrega) n += await gDriveSendEntregas(r.id);
-      } catch (e: any) { return bad('google', e); }
-      return json({ arquivos: n });
     }
     case path === '/integrations/log': {
       await requireInternal(c);

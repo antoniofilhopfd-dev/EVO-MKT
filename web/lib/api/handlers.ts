@@ -5,48 +5,37 @@ import { Ctx, setCookie } from '../ctx';
 import { q, q1, run } from '../db';
 import { genPassword, hashPassword, randHex, sha256, strongPassword, verifyPassword } from '../crypto';
 import {
-  allowedSegment, checkCsrf, codeLoginFail, codeLoginGuard, internalUser, issueAccessCode, loginMode, portalUser, rateCheck,
-  rateFail, registerDevice, requireAdmin, requireInternal, requireManager, requirePortal, sessionTokenFromCookie, setSessionCookie, startSession, stepUp, validCodeFormat,
+  checkCsrf, codeLoginFail, codeLoginGuard, issueAccessCode, loginMode, rateCheck,
+  rateFail, registerDevice, requireAdmin, requireInternal, sessionTokenFromCookie, setSessionCookie, startSession, stepUp, validCodeFormat,
 } from '../auth';
 import { accessHmac, decryptSecret, encryptSecret } from '../crypto';
 import { notifyMail } from '../mail';
 import {
-  ALLOWED_EXT, audit, CREATE_FIELDS, EVO_VERSION, getRow, headersOf, insertRow, listRows, logStatus, modifyRow, MODULES, notifyAssignment,
-  emailForPerson, publicRow, saveRow, seedEquipe, TEAM_WRITE, teamMayDelete, trashRow, UPDATE_FIELDS, updateRow,
+  ALLOWED_EXT, audit, deleteRow, emailForPerson, EVO_VERSION, getRow, headersOf, insertRow, listRows, logStatus, modifyRow, MODULES,
+  saveRow, TEAM_WRITE, teamMayDelete, updateRow,
 } from '../records';
-import { saveUploads, serveFile } from '../files';
+import { serveFile } from '../files';
 import { intLog, setSetting, setting } from '../settings';
 import { cleanInput, env, fail, HttpError, lower, now, Row, strv } from '../util';
 import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
-import { validarTransicaoSolicitacao } from '../fluxo';
 import { operacaoRoute } from './operacao';
-import { trabalhoRoute } from './trabalho';
+import { comentariosRoute } from './comentarios';
 import { conteudoRoute } from './conteudo';
-import { relatoriosRoute } from './relatorios';
 import { calendarioPublicoRoute } from './calendarioPublico';
 import { gestaoAnunciosRoute } from './gestaoAnuncios';
-import { solicitacoesRoute } from './solicitacoes';
-import { portalRoute } from './portal';
 import { escolarRoute } from './escolar';
 import { datacomRoute } from './datacom';
-import { planejamentoRoute } from './planejamento';
 import { dashboardRoute } from './dashboard';
 import { lgpdRoute } from './lgpd';
-import { arquivosRoute } from './arquivos';
 import { prefsRoute } from './prefs';
-import { exigirPortalAtivo } from '../portal';
-import { aprovacaoPublicaRoute } from './aprovacaoPublica';
-import { importModule } from '../xlsx';
 import { autoBackupIfDue, backupLog, makeBackup, restoreBackup, validateBackup } from '../backup';
-import { gConnected, gDriveSendEntregas } from '../integrations/google';
 
 export const json = (data: unknown, status = 200, headers: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
 
 type Out = Response;
 const asUser = (u: Row) => ({ code: u.codigo, name: u.nome, role: u.role, label: u.label, admin: u.role === 'manager' && !!Number(u.admin), perfil: u.role !== 'manager' ? 'Equipe' : Number(u.admin) ? 'Administrador' : 'Gerente' });
-const portalOut = (u: Row, segs: unknown) => ({ id: u.codigo, codigo: u.codigo, nome: u.nome, perfil: u.perfil, segmentos: segs, ativo: true });
 /** Perfis internos: 'admin' (Administrador), 'manager' (Gerente), 'team' (Equipe). */
 const nivelDe = (r: Row) => (r.role !== 'manager' ? 'team' : Number(r.admin) ? 'admin' : 'manager');
 const nivelEntrada = (v: unknown) => (v === 'admin' ? 'admin' : 'team');
@@ -54,47 +43,30 @@ const LABEL_NIVEL: Record<string, string> = { admin: 'Administrador', manager: '
 const adminsAtivos = async () => Number((await q1("SELECT COUNT(*) c FROM users WHERE role='manager' AND admin=1 AND ativo=1"))?.c);
 const upper = (v: unknown) => strv(v).trim().toUpperCase();
 
-/** Rotas usadas só por quem está fora (Coordenações). As de administração do Portal (/portal/users, /manager/notices) continuam internas. */
-const PORTAL_EXTERNO = ['/portal/login', '/portal/password', '/portal/requests', '/portal/upload', '/portal/file', '/portal/comments', '/portal/timeline', '/portal/notices'];
-
 export async function route(c: Ctx): Promise<Out> {
   const { method, path } = c;
-  // Portal das Coordenações suspenso (padrão): nenhuma rota externa dele responde, nem para quem tem código ou sessão antiga.
-  if (PORTAL_EXTERNO.includes(path)) await exigirPortalAtivo();
-  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checkCsrfOrPortal(c);
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') await checarCsrf(c);
 
   switch (true) {
-    case path === '/manager/approval-link' || path.startsWith('/public/approval'):
-      return aprovacaoPublicaRoute(c);
     case path === '/manager/calendario-link' || path === '/public/calendario':
       return calendarioPublicoRoute(c);
     case path.startsWith('/ads/'):
       return gestaoAnunciosRoute(c);
-    case path.startsWith('/solicitacoes/'):
-      return solicitacoesRoute(c);
     case path.startsWith('/escolar/'):
       return escolarRoute(c);
     case path.startsWith('/datacom/'):
       return datacomRoute(c);
-    case path.startsWith('/planejamento/'):
-      return planejamentoRoute(c);
     case path.startsWith('/admin/lgpd/'):
       return lgpdRoute(c);
-    case path.startsWith('/arquivos/'):
-      return arquivosRoute(c);
     case path === '/prefs':
       return prefsRoute(c);
     case path.startsWith('/dashboard/'):
       return dashboardRoute(c);
-    case path.startsWith('/portal/pagina/') || path === '/admin/portal':
-      return portalRoute(c);
-    case path.startsWith('/reports/'):
-      return relatoriosRoute(c);
     case path.startsWith('/content/'):
       return conteudoRoute(c);
-    case path === '/comments' || path === '/portal/comments' || path === '/checklist' || path === '/admin/automacoes':
-      return trabalhoRoute(c);
-    case path === '/fluxo' || path === '/notificacoes' || path === '/notificacoes/lida' || path === '/timeline' || path === '/portal/timeline' || path === '/sla' || path === '/indicadores' || path === '/insights' || path === '/admin/integridade' || path === '/ia/legenda' || path === '/datas' || path === '/studio/hashtags' || path === '/instagram/posts' || path === '/instagram/seguidores' || path === '/instagram/contas' || path === '/instagram/periodo' || path === '/instagram/seguidores/manual' || path === '/studio/modelos' || path === '/instagram/relatorio':
+    case path === '/comments' || path === '/checklist':
+      return comentariosRoute(c);
+    case ['/fluxo', '/notificacoes', '/notificacoes/lida', '/timeline', '/indicadores', '/insights', '/admin/integridade', '/datas', '/studio/hashtags', '/studio/modelos', '/team'].includes(path) || path.startsWith('/instagram/'):
       return operacaoRoute(c);
     case path.startsWith('/cron/'):
       return cronRoute(c);
@@ -251,81 +223,20 @@ export async function route(c: Ctx): Promise<Out> {
       if (!r) fail(404, 'Não encontrado.');
       return new Response(new Uint8Array(r.conteudo as Buffer), { headers: { 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${f}"`, 'Cache-Control': 'no-store' } });
     }
-    case path === '/portal/users': {
-      await requireAdmin(c);
-      const o = (await q('SELECT codigo,nome,perfil,segmentos,ativo FROM portal_users ORDER BY nome')).map((r) => ({ ...r, segmentos: JSON.parse(r.segmentos), id: r.codigo, ativo: !!r.ativo }));
-      return json(o);
-    }
-    case path === '/manager/upload' && method === 'POST': {
-      const u = await requireInternal(c);
-      const id = c.qs('id');
-      const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Solicitação não encontrada.');
-      const saved = await saveUploads(c, id, 'ENTREGA');
-      await modifyRow('solicitacoes', id, (r) => {
-        const cur = String(r.arquivosEntrega ?? '').split('|').map((s) => s.trim()).filter(Boolean);
-        return { ...r, arquivosEntrega: [...cur, ...saved].join(' | '), atualizadoEm: now() };
-      });
-      await audit(u.codigo, 'upload-entrega', 'solicitacoes', id);
-      if ((await setting('g_auto_drive_entregas')) === '1' && (await gConnected())) {
-        try { await gDriveSendEntregas(id); } catch (e: any) { await intLog('google', 'erro', 'Drive automático: ' + e.message); }
-      }
-      return json({ files: saved });
-    }
     case path === '/file': {
       await requireInternal(c);
-      return serveFile(c.qs('path'), null, ['ANEXOS/SOLICITACOES/', 'ANEXOS/CONTEUDOS/', 'BIBLIOTECA/']); // mídias dos posts também (prévia no Estúdio)
+      return serveFile(c.qs('path')); // anexos das publicações (prévia no Estúdio)
     }
 
     // ---------- Integrações (Instagram / Google) ----------
     case path.startsWith('/integrations/') || path === '/public/media' || path === '/traffic/snapshots' || path === '/traffic/painel' || path === '/traffic/semanal':
       return integrationsRoute(c);
 
-    // ---------- Portal do Solicitante ----------
-    case path === '/portal/login' && method === 'POST': {
-      const input = await c.body();
-      const cod = upper(input.codigo);
-      const sen = strv(input.senha);
-      if ((await loginMode()) === 'codigo') {
-        await codeLoginGuard(c);
-        const u = validCodeFormat(cod) ? await q1('SELECT * FROM portal_users WHERE acesso_hmac=? AND ativo=1', [accessHmac(cod)]) : undefined;
-        if (!u) return codeLoginFail(c, '?');
-        const tok = await startSession('por', u.codigo);
-        await audit(u.codigo, 'portal-login');
-        await registerDevice(c, 'por', u.codigo, u.nome);
-        return json({ token: tok, mustChange: false, user: portalOut(u, JSON.parse(u.segmentos)) });
-      }
-      const key = `por|${c.ip}|${cod}`;
-      await rateCheck(key);
-      await rateCheck('ip|' + c.ip, 40);
-      const u = await q1('SELECT * FROM portal_users WHERE codigo=? AND ativo=1', [cod]);
-      if (!u || !verifyPassword(sen, u.pass_hash)) {
-        await rateFail(key);
-        await rateFail('ip|' + c.ip);
-        await audit(cod || '?', 'portal-login-falhou');
-        fail(401, 'Código ou senha inválidos.');
-      }
-      const tok = await startSession('por', cod);
-      await audit(cod, 'portal-login');
-      return json({ token: tok, mustChange: !!u.must_change, user: portalOut(u, JSON.parse(u.segmentos)) });
-    }
-    case path === '/portal/password' && method === 'POST': {
-      const u = await requirePortal(c);
-      const input = await c.body();
-      const row = (await q1('SELECT pass_hash FROM portal_users WHERE codigo=?', [u.codigo]))!;
-      if (!verifyPassword(strv(input.atual), row.pass_hash)) fail(403, 'Senha atual incorreta.');
-      strongPassword(strv(input.nova));
-      await run('UPDATE portal_users SET pass_hash=?,must_change=0 WHERE codigo=?', [hashPassword(strv(input.nova)), u.codigo]);
-      await run('DELETE FROM sessions WHERE tipo=? AND codigo=? AND token_hash<>?', ['por', u.codigo, sha256(c.header('x-portal-token') || '-')]);
-      await audit(String(u.codigo), 'senha-alterada');
-      return json({ ok: true });
-    }
     case path === '/admin/users': {
       await requireAdmin(c);
       const o: Row[] = [];
       for (const r of await q('SELECT codigo,nome,role,label,admin,ativo,must_change,acesso_enc FROM users ORDER BY codigo'))
         o.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, role: r.role, nivel: nivelDe(r), perfil: r.label, ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: await emailForPerson(r.nome), acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
-      for (const r of await q('SELECT codigo,nome,perfil,segmentos,ativo,must_change,acesso_enc FROM portal_users ORDER BY codigo'))
-        o.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, perfil: JSON.parse(r.segmentos).join(', '), ativo: !!r.ativo, trocarSenha: !!r.must_change, pediuReset: await pediuReset(r.codigo), email: '', acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       return json(o);
     }
     case path === '/admin/user-active' && method === 'POST': {
@@ -356,21 +267,16 @@ export async function route(c: Ctx): Promise<Out> {
       const nome = strv(input.nome).trim().slice(0, 120);
       if (nome.length < 2) fail(400, 'Informe o nome.');
       const sigla = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase().padEnd(3, 'X').slice(0, 3);
-      // ficha: 3 letras do nome + número sequencial da série (equipe 33xx, portal 26xx), nunca repetido
+      // ficha: 3 letras do nome + número sequencial da série (equipe 33xx), nunca repetido
       const base = tipo === 'interno' ? 3300 : 2600;
       const used = (await q(`SELECT codigo FROM ${tab}`)).map((r) => parseInt(String(r.codigo).split('-')[1], 10) || 0);
       let n = Math.max(base, ...used) + 1;
       let codigo = `${sigla}-${n}`;
-      while (await q1('SELECT 1 FROM users WHERE codigo=? UNION SELECT 1 FROM portal_users WHERE codigo=?', [codigo, codigo])) codigo = `${sigla}-${++n}`;
+      while (await q1('SELECT 1 FROM users WHERE codigo=?', [codigo])) codigo = `${sigla}-${++n}`;
       const senha = genPassword();
       if (tipo === 'interno') {
         const nivel = nivelEntrada(input.perfil);
         await run('INSERT INTO users(codigo,nome,role,label,admin,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,?,1,1)', [codigo, nome, nivel === 'team' ? 'team' : 'manager', LABEL_NIVEL[nivel], nivel === 'admin' ? 1 : 0, hashPassword(senha)]);
-        await seedEquipe(m.codigo);
-      } else {
-        const segs = strv(input.segmentos).split(',').map((x) => x.trim()).filter(Boolean);
-        if (!segs.length) fail(400, 'Informe ao menos um segmento (ex.: Infantil, Anos Iniciais).');
-        await run('INSERT INTO portal_users(codigo,nome,perfil,segmentos,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [codigo, nome, 'COORDENACAO', JSON.stringify(segs), hashPassword(senha)]);
       }
       let acesso = senha;
       let modo: 'senha' | 'codigo' = 'senha';
@@ -408,7 +314,7 @@ export async function route(c: Ctx): Promise<Out> {
       if (!(await q1(`SELECT 1 FROM ${tab} WHERE codigo=?`, [cod]))) fail(404, 'Ficha não encontrada.');
       if (!validCodeFormat(novo)) fail(400, 'O código deve ter de 4 a 10 letras ou números, sem espaços nem acentos.');
       const h = accessHmac(novo);
-      const dono = (await q1('SELECT codigo FROM users WHERE acesso_hmac=?', [h])) ?? (await q1('SELECT codigo FROM portal_users WHERE acesso_hmac=?', [h]));
+      const dono = await q1('SELECT codigo FROM users WHERE acesso_hmac=?', [h]);
       if (dono && dono.codigo !== cod) fail(409, 'Esse código já está em uso por outra pessoa. Escolha outro.');
       await run(`UPDATE ${tab} SET acesso_hmac=?,acesso_enc=? WHERE codigo=?`, [h, encryptSecret(novo), cod]);
       if (cod !== m.codigo) {
@@ -446,8 +352,6 @@ export async function route(c: Ctx): Promise<Out> {
         // quem já tem código (gerado ou escolhido pela Gerente) mantém; só quem não tem recebe um novo
         for (const r of await q('SELECT codigo,nome,acesso_enc FROM users WHERE ativo=1 ORDER BY codigo'))
           codes.push({ tipo: 'interno', codigo: r.codigo, nome: r.nome, acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : await issueAccessCode('users', r.codigo, r.codigo !== m.codigo) });
-        for (const r of await q('SELECT codigo,nome,acesso_enc FROM portal_users WHERE ativo=1 ORDER BY codigo'))
-          codes.push({ tipo: 'portal', codigo: r.codigo, nome: r.nome, acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : await issueAccessCode('portal_users', r.codigo) });
         await run('UPDATE users SET must_change=0 WHERE role<>?', ['manager']);
         await run('DELETE FROM sessions WHERE codigo<>?', [m.codigo]);
       }
@@ -458,34 +362,16 @@ export async function route(c: Ctx): Promise<Out> {
     case path === '/admin/codes' && method === 'POST': {
       const m = await requireAdmin(c);
       const out: Row[] = [];
-      for (const [tab, tipo] of [['users', 'interno'], ['portal_users', 'portal']] as const)
+      for (const [tab, tipo] of [['users', 'interno']] as const)
         for (const r of await q(`SELECT codigo,nome,acesso_enc FROM ${tab} WHERE ativo=1 ORDER BY codigo`))
           out.push({ tipo, codigo: r.codigo, nome: r.nome, acesso: r.acesso_enc ? decryptSecret(r.acesso_enc) : '' });
       await audit(m.codigo, 'ver-codigos');
       return json({ modo: await loginMode(), codigos: out });
     }
-    case path === '/admin/import' && method === 'POST': {
-      // Importa planilhas EVO_MKT_<MODULO>.xlsx (sistema antigo). Não sobrescreve nada: IDs já usados são ignorados.
-      const m = await requireAdmin(c);
-      const form = await c.req.formData();
-      await stepUp(m, { senhaAdmin: form.get('senhaAdmin') ?? undefined });
-      const res: Row = {};
-      for (const f of form.getAll('files')) {
-        if (typeof f === 'string') continue;
-        const mod = f.name.match(/^EVO_MKT_([A-Z]+)\.xlsx$/i)?.[1].toLowerCase() ?? '';
-        if (!(mod in MODULES)) { res[f.name] = 'ignorado (nome fora do padrão EVO_MKT_MODULO.xlsx)'; continue; }
-        try { res[mod] = await importModule(mod, new Uint8Array(await f.arrayBuffer()), m.codigo); } catch (e: any) { res[f.name] = 'erro: ' + e.message; }
-      }
-      return json({ importados: res });
-    }
-    case path === '/admin/seed-equipe' && method === 'POST': {
-      const m = await requireAdmin(c);
-      return json({ criados: await seedEquipe(m.codigo) });
-    }
     case path === '/auth/forgot' && method === 'POST': {
       const input = await c.body();
       const cod = upper(input.codigo);
-      const tab = input.tipo === 'portal' ? 'portal_users' : 'users';
+      const tab = 'users';
       await rateCheck('forgot|' + c.ip, 10);
       await rateFail('forgot|' + c.ip);
       const u = cod ? await q1(`SELECT nome FROM ${tab} WHERE codigo=? AND ativo=1`, [cod]) : undefined;
@@ -499,81 +385,6 @@ export async function route(c: Ctx): Promise<Out> {
       await requireAdmin(c);
       const lim = Math.min(500, Math.max(10, parseInt(c.qs('limit'), 10) || 100));
       return json(await q('SELECT quando,ator,acao,modulo,registro,ip FROM audit_log ORDER BY id DESC LIMIT ' + lim));
-    }
-    case path === '/manager/notices/remove' && method === 'POST': {
-      const u = await requireAdmin(c);
-      const id = strv((await c.body()).id);
-      await run('DELETE FROM notices WHERE id=?', [id]);
-      await audit(u.codigo, 'aviso-removido', '', id);
-      return json({ ok: true });
-    }
-    case path === '/portal/notices': {
-      const u = await requirePortal(c);
-      const o: Row[] = [];
-      for (const r of await q('SELECT data FROM notices')) {
-        const n = JSON.parse(r.data);
-        if (!n.ativo) continue;
-        const segs: string[] = n.segmentos ?? [];
-        let ok = !segs.length;
-        for (const s of segs) if (s === '*' || allowedSegment(u, String(s))) ok = true;
-        if (ok) o.push(n);
-      }
-      o.sort((a, b) => String(b.criadoEm ?? '').localeCompare(String(a.criadoEm ?? '')));
-      return json({ rows: o });
-    }
-    case path === '/manager/notices': {
-      const u = await requireAdmin(c);
-      if (method === 'GET') return json({ rows: (await q('SELECT data FROM notices')).map((r) => JSON.parse(r.data)) });
-      const input = cleanInput(await c.body());
-      const id = input.id ?? 'AVI-' + randHex(6);
-      const n = {
-        id, titulo: input.titulo ?? '', mensagem: input.mensagem ?? '',
-        segmentos: String(input.segmentos ?? '').split(',').map((s) => s.trim()).filter(Boolean),
-        ativo: (input.ativo ?? 'true') !== 'false', criadoEm: now(),
-      };
-      if (!n.titulo.trim()) fail(400, 'Informe o título do aviso.');
-      await run('DELETE FROM notices WHERE id=?', [id]);
-      await run('INSERT INTO notices(id,data) VALUES(?,?)', [id, JSON.stringify(n)]);
-      await audit(u.codigo, 'aviso', '', id);
-      return json(n);
-    }
-    case path === '/portal/requests': {
-      const u = await requirePortal(c);
-      if (method === 'GET') return json({ rows: (await listRows('solicitacoes')).filter((r) => allowedSegment(u, r.segmento ?? '')).map(publicRow) });
-      if (method !== 'POST') fail(405, 'Método não permitido.');
-      const input = await c.body();
-      const seg = strv(input.segmento);
-      if (!allowedSegment(u, seg)) fail(403, 'Segmento não autorizado.');
-      if (!strv(input.titulo).trim() || !strv(input.objetivo).trim()) fail(400, 'Título e objetivo são obrigatórios.');
-      if (strv(input.prioridade).toUpperCase() === 'URGENTE' && !strv(input.motivoUrgencia).trim()) fail(400, 'Motivo da urgência é obrigatório.');
-      const row: Row = {
-        titulo: strv(input.titulo), status: 'AGUARDANDO TRIAGEM', prioridade: strv(input.prioridade), segmento: seg, prazo: strv(input.prazo),
-        descricao: strv(input.objetivo), origem: 'PORTAL_SOLICITANTE', solicitante: u.nome, coordenacao: u.nome, triagemStatus: 'AGUARDANDO TRIAGEM', gerenteTriagem: 'Gerente de Marketing',
-      };
-      for (const k of CREATE_FIELDS) if (k in input) row[k] = strv(input[k]);
-      if (row.dataPublicacao && !/^\d{4}-\d{2}-\d{2}$/.test(String(row.dataPublicacao))) fail(400, 'Data de publicação inválida.');
-      if (String(row.solicitanteNome ?? '').trim()) row.solicitante = row.solicitanteNome;
-      if (!row.aprovacaoSolicitante) row.aprovacaoSolicitante = 'PENDENTE';
-      const novo = await insertRow('solicitacoes', row, 'portal:' + u.codigo);
-      await notifyMail('Nova demanda: ' + novo.titulo, `Solicitante: ${novo.solicitante}\nSegmento: ${novo.segmento}\nPrioridade: ${novo.prioridade}\nPrazo desejado: ${novo.prazo}\nID: ${novo.id}`);
-      return json(publicRow(novo), 201);
-    }
-    case path === '/portal/upload' && method === 'POST': {
-      const u = await requirePortal(c);
-      const id = c.qs('id');
-      const row = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
-      if (!allowedSegment(u, row.segmento ?? '')) fail(403, 'Demanda de outro segmento.');
-      const saved = await saveUploads(c, id, '');
-      await modifyRow('solicitacoes', id, (r) => {
-        const cur = String(r.anexos ?? '').split('|').map((s) => s.trim()).filter(Boolean);
-        return { ...r, anexos: [...cur, ...saved].join(' | '), atualizadoEm: now() };
-      });
-      await audit('portal:' + u.codigo, 'upload', 'solicitacoes', id);
-      return json({ files: saved });
-    }
-    case path === '/portal/file': {
-      const u = await requirePortal(c);
-      return serveFile(c.qs('path'), u);
     }
     default:
       return fail(404, 'Rota não encontrada.');
@@ -633,29 +444,18 @@ async function setupRoute(c: Ctx): Promise<Response> {
     await run('INSERT INTO users(codigo,nome,role,label,admin,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,?,1,1)', [cod, nome, role, label, role === 'manager' ? 1 : 0, hashPassword(p)]);
     pw.push(` - interno ${cod} (${nome}): ${p}`);
   }
-  const portal: [string, string, string, string[]][] = [['INF-2601', 'Coordenação Infantil', 'COORDENACAO', ['Infantil']], ['INI-2602', 'Coordenação Anos Iniciais', 'COORDENACAO', ['Anos Iniciais']], ['FIN-2603', 'Coordenação Anos Finais', 'COORDENACAO', ['Anos Finais']], ['MED-2604', 'Coordenação Ensino Médio', 'COORDENACAO', ['Ensino Médio']], ['AUZ-2605', 'Auzilair', 'COORDENACAO_ATENDIMENTO_GRAFICA', ['Infantil', 'Gráfica Infantil']]];
-  for (const [cod, nome, perfil, segs] of portal) {
-    if (await q1('SELECT 1 FROM portal_users WHERE codigo=?', [cod])) continue;
-    const p = genPassword();
-    await run('INSERT INTO portal_users(codigo,nome,perfil,segmentos,pass_hash,must_change,ativo) VALUES(?,?,?,?,?,1,1)', [cod, nome, perfil, JSON.stringify(segs), hashPassword(p)]);
-    pw.push(` - portal ${cod} (${nome}): ${p}`);
-  }
-  const fichas = await seedEquipe('instalador');
   await run("INSERT INTO app_meta(k,v) VALUES('setup_done',?)", [now()]);
-  return text(`INSTALAÇÃO CONCLUÍDA\n\nSenhas temporárias (anote AGORA; não serão exibidas de novo; troque no primeiro acesso):\n${pw.join('\n')}\n\nFichas de Equipe criadas: ${fichas}.\n\nAgora remova a variável SETUP_KEY do painel da Hostinger e reinicie o app.\n`);
+  return text(`INSTALAÇÃO CONCLUÍDA\n\nSenhas temporárias (anote AGORA; não serão exibidas de novo; troque no primeiro acesso):\n${pw.join('\n')}\n\nAgora remova a variável SETUP_KEY do painel da Hostinger e reinicie o app.\n`);
 }
 
-function tabOf(tipo: string): 'users' | 'portal_users' {
-  if (tipo === 'portal') return 'portal_users';
+function tabOf(tipo: string): 'users' {
   if (tipo === 'interno') return 'users';
   return fail(400, 'Tipo inválido.');
 }
 
-async function checkCsrfOrPortal(c: Ctx): Promise<void> {
-  // Rotas públicas de login e chamadas do Portal (token em cabeçalho) não dependem de cookie.
-  if (['/auth/login', '/portal/login', '/auth/forgot'].includes(c.path) || c.path.startsWith('/cron/')) return;
-  if (c.path === '/public/approval' && !c.header('cookie')) return; // resposta pelo link: sem cookie, o token é a credencial
-  if (c.header('x-portal-token') && (await portalUser(c)) !== null && (await internalUser(c)) === null) return;
+async function checarCsrf(c: Ctx): Promise<void> {
+  // login, recuperação de senha e o cron (com segredo próprio) não dependem de cookie
+  if (['/auth/login', '/auth/forgot'].includes(c.path) || c.path.startsWith('/cron/')) return;
   checkCsrf(c);
 }
 
@@ -670,8 +470,6 @@ async function dataRoute(c: Ctx): Promise<Response> {
   const { method } = c;
   const mod = c.qs('module');
   const id = c.qs('id');
-  const portal = await portalUser(c);
-  if (portal && !(await internalUser(c))) return portalRestrictedUpdate(c, portal, mod, id);
   const u = await requireInternal(c);
   if (!(mod in MODULES)) fail(404, 'Módulo desconhecido.');
   if (mod === 'configuracoes' && !Number(u.admin)) fail(403, 'As informações da instituição são restritas ao Administrador.');
@@ -679,107 +477,24 @@ async function dataRoute(c: Ctx): Promise<Response> {
     if (id) return json((await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.'));
     return json({ headers: await headersOf(mod), rows: await listRows(mod) });
   }
-  if (!Number(u.admin) && !TEAM_WRITE.includes(mod) && mod !== 'lixeira') fail(403, 'Seu perfil não pode alterar este módulo.');
-  if (!Number(u.admin) && mod === 'lixeira' && method === 'DELETE') fail(403, 'Exclusão permanente apenas para o Administrador.');
+  if (!Number(u.admin) && !TEAM_WRITE.includes(mod)) fail(403, 'Seu perfil não pode alterar este módulo.');
   if (mod === 'calescolar' && (method === 'POST' || method === 'PUT')) fail(400, 'O Calendário Escolar é editado pela própria tela (com validação de datas, segmentos e duplicidade).');
   if (mod === 'datacom' && (method === 'POST' || method === 'PUT')) fail(400, 'As Datas Comemorativas são editadas pela própria tela (com validação das regras e de duplicidade).');
   await autoBackupIfDue();
-  if (method === 'POST') {
-    const novo = await insertRow(mod, await c.body(), u.codigo);
-    await notifyAssignment(mod, novo, null, u.nome);
-    return json(novo, 201);
-  }
+  if (method === 'POST') return json(await insertRow(mod, await c.body(), u.codigo), 201);
   if (!id) fail(400, 'Informe o id.');
   if (method === 'PUT') {
-    const patch = await c.body();
-    const antes = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
-    if (false && 'responsavel' in patch) {
-      const dono = String(antes.responsavel ?? '').trim();
-      const novoResp = strv(patch.responsavel).trim();
-      if (dono && lower(dono) !== lower(u.nome) && novoResp !== dono) fail(403, 'Só a Gerente ou o responsável atual pode reatribuir este item.');
-    }
-    if (mod === 'projetos' && u.role !== 'manager') {
-      const dono = String(antes.responsavel ?? '').trim();
-      if (String(antes.criadoPor ?? '') !== String(u.codigo) && (dono === '' || lower(dono) !== lower(u.nome))) fail(403, 'Só a Gerência, o responsável ou quem criou a ação pode alterá-la.');
-    }
-    if (mod === 'solicitacoes' && u.role !== 'manager') {
-      const dono = String(antes.responsavel ?? '').trim();
-      if (dono === '' || lower(dono) !== lower(u.nome)) fail(403, 'Só a Gerente ou o responsável pode alterar esta solicitação.');
-    }
-    const dep = await updateRow(mod, id, patch, u.codigo);
-    await notifyAssignment(mod, dep, antes, u.nome);
-    return json(dep);
+    await (getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
+    return json(await updateRow(mod, id, await c.body(), u.codigo));
   }
   if (method === 'DELETE') {
     const alvo = (await getRow(mod, id)) ?? fail(404, 'Registro não encontrado.');
     if (!teamMayDelete(u, alvo)) fail(403, 'Você só pode excluir itens criados por você ou atribuídos a você.');
-    if (mod === 'lixeira') await makeBackup('preexclusao');
-    await trashRow(mod, id, u.codigo);
+    await makeBackup('preexclusao');
+    await deleteRow(mod, id, u.codigo);
     return json({ ok: true });
   }
   return fail(405, 'Método não permitido.');
-}
-
-async function portalRestrictedUpdate(c: Ctx, u: Row, mod: string, id: string): Promise<Response> {
-  if (c.method !== 'PUT') fail(403, 'Operação não permitida ao Portal.');
-  if (mod !== 'solicitacoes') fail(403, 'Módulo não permitido.');
-  const input = await c.body();
-  const antes = (await getRow('solicitacoes', id)) ?? fail(404, 'Demanda não encontrada.');
-  if (!allowedSegment(u, antes.segmento ?? '')) fail(403, 'Demanda de outro segmento.');
-  const ator = 'portal:' + u.codigo;
-  // Tudo dentro de UMA transação com trava: o status, o histórico e os campos mudam juntos.
-  const row = await modifyRow('solicitacoes', id, async (cur0, conn) => {
-    const row: Row = { ...cur0 };
-    const cur = `${row.status ?? ''} ${row.triagemStatus ?? ''}`.toLocaleUpperCase('pt-BR');
-    const nota = strv(input.avaliacaoNota).trim();
-    if (nota) {
-      if (!cur.includes('CONCLUÍDA')) fail(409, 'A avaliação só pode ser enviada após a conclusão.');
-      if (!/^\d+$/.test(nota) || +nota < 1 || +nota > 5) fail(400, 'Avaliação deve estar entre 1 e 5.');
-    }
-    const nps = strv(input.npsNota).trim();
-    if (nps) {
-      if (!cur.includes('CONCLUÍDA')) fail(409, 'A pesquisa só pode ser respondida após a conclusão.');
-      if (!/^\d+$/.test(nps) || +nps > 10) fail(400, 'A nota da pesquisa deve estar entre 0 e 10.');
-      if (cur0.npsNota !== undefined && String(cur0.npsNota) !== '') fail(409, 'A pesquisa já foi respondida.');
-    }
-    for (const k of UPDATE_FIELDS) if (k in input) row[k] = strv(input[k]);
-    const ap = String(row.aprovacaoSolicitante ?? '').trim().toLocaleUpperCase('pt-BR');
-    const t = now();
-    const traz = (k: string) => k in input; // só avalia transições quando o pedido traz o campo
-    const de = String(cur0.status ?? '');
-    let para = '';
-    let motivo = '';
-    if (traz('aprovacaoSolicitante') && ap === 'APROVADO') {
-      if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
-      para = 'CONCLUÍDA'; motivo = 'Entrega aprovada pelo solicitante';
-      row.triagemStatus = 'CONCLUÍDA';
-      if (!row.aprovadoSolicitanteEm) row.aprovadoSolicitanteEm = t;
-    } else if (traz('aprovacaoSolicitante') && ap === 'AJUSTES SOLICITADOS') {
-      if (!cur.includes('AGUARDANDO APROVAÇÃO')) fail(409, 'Esta demanda não está aguardando aprovação.');
-      para = 'EM EXECUÇÃO'; motivo = 'Ajustes solicitados pelo solicitante' + (strv(input.respostaSolicitante).trim() ? ': ' + strv(input.respostaSolicitante).trim().slice(0, 300) : '');
-      row.triagemStatus = 'DISTRIBUÍDA';
-      if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
-    } else if (traz('respostaSolicitante') && String(row.respostaSolicitante ?? '').trim()) {
-      if (!(cur.includes('AGUARDANDO SOLICITANTE') || cur.includes('DEVOLVIDA PARA AJUSTES'))) fail(409, 'Esta demanda não está aguardando resposta.');
-      para = 'EM ANÁLISE'; motivo = 'Solicitante respondeu ao pedido de complementação';
-      row.triagemStatus = 'EM TRIAGEM';
-      if (!row.respondidoSolicitanteEm) row.respondidoSolicitanteEm = t;
-    }
-    if (para) {
-      // a mesma regra única de transições vale para o Portal (retornos feitos pelo Portal têm motivo automático)
-      validarTransicaoSolicitacao(para === 'EM ANÁLISE' ? 'AGUARDANDO SOLICITANTE' : 'AGUARDANDO APROVAÇÃO DO SOLICITANTE', para, motivo, true);
-      row.status = para;
-      await logStatus(conn, 'solicitacoes', id, de, para, ator, motivo);
-    }
-    row.atualizadoEm = t;
-    return row;
-  });
-  const ap = String(row.aprovacaoSolicitante ?? '').trim().toLocaleUpperCase('pt-BR');
-  await audit(ator, 'editar', 'solicitacoes', id);
-  if (String(row.status ?? '') !== String(antes.status ?? '')) await registrarNotificacao('resposta_solicitante', 'gerencia', 'Resposta do solicitante', `"${row.titulo ?? id}" teve retorno do solicitante (${row.status}).`, 'solicitacoes', id);
-  if ('aprovacaoSolicitante' in input && (ap === 'APROVADO' || ap === 'AJUSTES SOLICITADOS'))
-    await notifyMail(`Demanda ${ap === 'APROVADO' ? 'aprovada' : 'com ajustes solicitados'}: ${row.titulo ?? id}`, `ID: ${id} · Segmento: ${row.segmento ?? ''}`);
-  return json({ ok: true });
 }
 
 export { HttpError, ALLOWED_EXT, EVO_VERSION, intLog, setting };

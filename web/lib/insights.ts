@@ -1,39 +1,8 @@
 import { q } from './db';
-import { FINAL_SOLICITACAO } from './fluxo';
 import { listRows } from './records';
-import { HistRow, hojeLocal, slaInfo } from './sla';
 import { addDays, env, fmtDate, Row } from './util';
 
-const ymd = (s: unknown) => String(s ?? '').slice(0, 10);
-
-/** Saúde (0–100) por segmento, só com dados reais: SLA vencido, devoluções, reaberturas e avaliação. */
-export async function saudePorSegmento(): Promise<Row[]> {
-  const hoje = hojeLocal();
-  const desde = fmtDate(addDays(new Date(), -90));
-  const sols = (await listRows('solicitacoes')).filter((r) => !String(r.segmento ?? '').trim() ? false : true);
-  const hist = new Map<string, HistRow[]>();
-  for (const h of await q("SELECT registro,campo,de,para,quando FROM status_history WHERE modulo='solicitacoes' ORDER BY id")) {
-    if (!hist.has(h.registro)) hist.set(h.registro, []);
-    hist.get(h.registro)!.push(h as HistRow);
-  }
-  const segs = [...new Set(sols.map((r) => String(r.segmento)))];
-  return segs.map((seg) => {
-    const rs = sols.filter((r) => r.segmento === seg && (ymd(r.criadoEm) >= desde || !FINAL_SOLICITACAO.includes(String(r.status).toUpperCase())));
-    const abertas = rs.filter((r) => !FINAL_SOLICITACAO.includes(String(r.status).toUpperCase()));
-    const vencidas = abertas.filter((r) => slaInfo(r, hist.get(r.id) ?? [], hoje).estado === 'vencido');
-    const devolvidas = rs.filter((r) => (hist.get(r.id) ?? []).some((h) => h.campo === 'status' && h.para === 'AGUARDANDO SOLICITANTE'));
-    const reabertas = rs.filter((r) => (hist.get(r.id) ?? []).some((h) => h.campo === 'status' && h.de === 'CONCLUÍDA'));
-    const notas = rs.map((r) => Number(r.avaliacaoNota)).filter((n) => n > 0);
-    const media = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null;
-    let score = 100;
-    const sinais: string[] = [];
-    if (abertas.length && vencidas.length) { score -= Math.round((vencidas.length / abertas.length) * 40); sinais.push(`${vencidas.length} demanda(s) com SLA vencido`); }
-    if (rs.length && devolvidas.length / rs.length > 0.3) { score -= Math.round((devolvidas.length / rs.length) * 15); sinais.push('Muitas demandas devolvidas para complementação'); }
-    if (reabertas.length) { score -= Math.min(20, reabertas.length * 5); sinais.push(`${reabertas.length} demanda(s) reaberta(s)`); }
-    if (media !== null && media < 3.5) { score -= 15; sinais.push(`Avaliação média baixa (${media.toFixed(1)} de 5)`); }
-    return { segmento: seg, score: Math.max(0, Math.min(100, score)), sinais, demandas: rs.length, abertas: abertas.length, avaliacaoMedia: media === null ? null : Math.round(media * 10) / 10, ids: vencidas.map((r) => r.id).slice(0, 100) };
-  }).sort((a, b) => a.score - b.score);
-}
+export const hojeLocal = () => fmtDate(new Date());
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const MIN_AMOSTRA = 8, MIN_BUCKET = 3;
@@ -121,25 +90,19 @@ export function proximasDatas(dias = 60, hojeYmd = hojeLocal()): { data: string;
     .map((d) => ({ ...d, planejarAte: iso(new Date(new Date(d.data + 'T00:00:00Z').getTime() - 30 * 86400000)) }));
 }
 
-/** Linhas do resumo diário da Gerência (só o que tem algo a dizer). */
+/** Linhas do resumo diário do Marketing (só o que tem algo a dizer). */
 export async function resumoOperacional(): Promise<string[]> {
   const hoje = hojeLocal();
-  const sols = await listRows('solicitacoes');
-  const hist = new Map<string, HistRow[]>();
-  for (const h of await q("SELECT registro,campo,de,para,quando FROM status_history WHERE modulo='solicitacoes' ORDER BY id")) {
-    if (!hist.has(h.registro)) hist.set(h.registro, []);
-    hist.get(h.registro)!.push(h as HistRow);
-  }
-  const abertas = sols.filter((r) => !FINAL_SOLICITACAO.includes(String(r.status).toUpperCase()));
-  const est = (e: string) => abertas.filter((r) => slaInfo(r, hist.get(r.id) ?? [], hoje).estado === e).length;
-  const triagem = abertas.filter((r) => ['AGUARDANDO TRIAGEM', 'NOVA'].includes(String(r.status).toUpperCase())).length;
-  const aprov = abertas.filter((r) => String(r.status).toUpperCase() === 'AGUARDANDO APROVAÇÃO DO SOLICITANTE').length;
+  const pubs = (await listRows('conteudos')).filter((r) => !/PUBLICADO|ARQUIVADO/i.test(String(r.status ?? '')));
+  const dia = (r: Row) => String(r.publicacaoEm ?? '').slice(0, 10);
+  const emRevisao = pubs.filter((r) => /REVIS/i.test(String(r.status))).length;
+  const atrasadas = pubs.filter((r) => dia(r) && dia(r) < hoje).length;
+  const hoje0 = pubs.filter((r) => dia(r) === hoje).length;
   const falhas = (await q("SELECT COUNT(*) n FROM notifications WHERE tipo='integracao_falha' AND quando >= ?", [fmtDate(addDays(new Date(), -1))]))[0]?.n ?? 0;
   const out: string[] = [];
-  if (triagem) out.push(`- ${triagem} demanda(s) aguardando triagem`);
-  if (est('vencido')) out.push(`- ${est('vencido')} demanda(s) com SLA vencido`);
-  if (est('atencao')) out.push(`- ${est('atencao')} demanda(s) vencem em até 1 dia útil`);
-  if (aprov) out.push(`- ${aprov} entrega(s) aguardando aprovação do solicitante`);
+  if (hoje0) out.push(`- ${hoje0} publicação(ões) prevista(s) para hoje`);
+  if (atrasadas) out.push(`- ${atrasadas} publicação(ões) com a data vencida e ainda não publicadas`);
+  if (emRevisao) out.push(`- ${emRevisao} publicação(ões) aguardando revisão`);
   if (Number(falhas)) out.push(`- ${falhas} falha(s) de integração nas últimas 24 h`);
   return out;
 }

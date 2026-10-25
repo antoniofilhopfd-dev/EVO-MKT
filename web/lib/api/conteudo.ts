@@ -3,7 +3,7 @@ import { q } from '../db';
 import { requireInternal } from '../auth';
 import { audit, getRow, listRows, logStatus, modifyRow } from '../records';
 import { registrarNotificacao } from '../notificacoes';
-import { adicionarComentario } from '../trabalho';
+import { adicionarComentario } from '../comentarios';
 import { fail, lower, now, Row, strv } from '../util';
 import { json } from './handlers';
 
@@ -63,7 +63,7 @@ export async function conteudoRoute(c: Ctx) {
       await logStatus(conn, 'conteudos', id, strv(r.status), para, String(u.codigo), motivo);
       return { ...r, status: para, aprovacaoDecisao: decisao, aprovadoPor: String(u.nome), aprovadoEm: now(), versaoAprovada: strv(b.versao).trim().slice(0, 60) || strv(r.versao), aprovacaoComentario: comentario, atualizadoEm: now(), atualizadoPor: String(u.codigo) };
     });
-    if (comentario) await adicionarComentario('conteudos', id, String(u.nome), 'int', `[${decisao}] ${comentario}`, true);
+    if (comentario) await adicionarComentario('conteudos', id, String(u.nome), `[${decisao}] ${comentario}`);
     await audit(String(u.codigo), 'decisao-conteudo', 'conteudos', id);
     if (strv(cur.responsavel).trim()) await registrarNotificacao('responsavel', strv(cur.responsavel), `Conteúdo ${decisao === 'APROVADO' ? 'aprovado' : decisao === 'REPROVADO' ? 'reprovado' : 'com ajustes'}`, `"${cur.titulo}": ${motivo}`, 'conteudos', id);
     return json({ ok: true, status: para });

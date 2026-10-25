@@ -1,4 +1,3 @@
-import { portalAtivo } from './portal';
 import { randomInt } from 'node:crypto';
 import { Ctx, setCookie } from './ctx';
 import { q, q1, run } from './db';
@@ -6,7 +5,7 @@ import { accessHmac, decryptSecret, encryptSecret, randHex, sha256, signValue, u
 import { setting } from './settings';
 import { notifyMail } from './mail';
 import { emailForPerson, audit } from './records';
-import { envInt, fail, lower, now, nowSec, Row } from './util';
+import { envInt, fail, now, nowSec, Row } from './util';
 
 // ---------- limite de tentativas ----------
 export async function rateCheck(chave: string, max = 5): Promise<void> {
@@ -19,21 +18,17 @@ export const rateFail = (chave: string) => run('INSERT INTO login_attempts(chave
 // ---------- sessão ----------
 const sessionHours = () => envInt('SESSION_HOURS', 12);
 
-export async function startSession(tipo: 'int' | 'por', codigo: string): Promise<string> {
+export async function startSession(tipo: 'int', codigo: string): Promise<string> {
   const tok = randHex(32);
   await run('INSERT INTO sessions(token_hash,tipo,codigo,expira) VALUES(?,?,?,?)', [sha256(tok), tipo, codigo, nowSec() + sessionHours() * 3600]);
   await run('DELETE FROM sessions WHERE expira<?', [nowSec()]);
   return tok;
 }
-async function sessionFor(tok: string, tipo: 'int' | 'por'): Promise<Row | null> {
+async function sessionFor(tok: string): Promise<Row | null> {
   if (!tok) return null;
-  const s = await q1('SELECT * FROM sessions WHERE token_hash=? AND tipo=? AND expira>?', [sha256(tok), tipo, nowSec()]);
+  const s = await q1("SELECT * FROM sessions WHERE token_hash=? AND tipo='int' AND expira>?", [sha256(tok), nowSec()]);
   if (!s) return null;
-  if (tipo === 'int') return (await q1('SELECT codigo,nome,role,label,admin,must_change FROM users WHERE codigo=? AND ativo=1', [s.codigo])) ?? null;
-  const u = await q1('SELECT codigo,nome,perfil,segmentos,must_change FROM portal_users WHERE codigo=? AND ativo=1', [s.codigo]);
-  if (!u) return null;
-  u.segmentos = JSON.parse(u.segmentos);
-  return u;
+  return (await q1('SELECT codigo,nome,role,label,admin,must_change FROM users WHERE codigo=? AND ativo=1', [s.codigo])) ?? null;
 }
 /** Define o cookie de sessão interna (valor assinado com SESSION_SECRET). */
 export function setSessionCookie(c: Ctx, tok: string): void {
@@ -43,9 +38,7 @@ export function sessionTokenFromCookie(c: Ctx): string {
   const raw = c.cookies['evo_sid'];
   return raw ? unsignValue(raw) : '';
 }
-export const internalUser = (c: Ctx) => sessionFor(sessionTokenFromCookie(c), 'int');
-/** Com o Portal suspenso ninguém é reconhecido como solicitante, mesmo com sessão ou código válidos. */
-export const portalUser = async (c: Ctx) => ((await portalAtivo()) ? sessionFor(c.header('x-portal-token'), 'por') : null);
+export const internalUser = (c: Ctx) => sessionFor(sessionTokenFromCookie(c));
 export async function requireInternal(c: Ctx): Promise<Row> {
   return (await internalUser(c)) ?? fail(401, 'Sessão expirada. Entre novamente.');
 }
@@ -54,20 +47,14 @@ export async function requireManager(c: Ctx): Promise<Row> {
   if (u.role !== 'manager') fail(403, 'Ação disponível apenas para a Gerente.');
   return u;
 }
-/** Administração do sistema (usuários, integrações, backup, auditoria, Portal): só quem tem a marca de Administrador. */
+/** Administração do sistema (usuários, integrações, backup, auditoria): só quem tem a marca de Administrador. */
 export async function requireAdmin(c: Ctx): Promise<Row> {
   const u = await requireManager(c);
   if (!Number(u.admin)) fail(403, 'Ação disponível apenas para o Administrador.');
   return u;
 }
-export async function requirePortal(c: Ctx): Promise<Row> {
-  return (await portalUser(c)) ?? fail(401, 'Sessão expirada');
-}
 export function checkCsrf(c: Ctx): void {
   if (c.header('x-evo') !== '1') fail(403, 'Requisição inválida.');
-}
-export function allowedSegment(u: Row, seg: string): boolean {
-  return (u.segmentos as string[]).some((s) => lower(s.trim()) === lower(String(seg).trim()));
 }
 
 // ---------- modo de acesso (senha | codigo) ----------
@@ -85,11 +72,11 @@ export async function genAccessCode(): Promise<string> {
     if (/^(\d)\1{3}$/.test(n) || ['1234', '4321', '0123', '3210'].includes(n)) continue;
     const c = L[randomInt(24)] + L[randomInt(24)] + n;
     const h = accessHmac(c);
-    if (!(await q1('SELECT 1 FROM users WHERE acesso_hmac=?', [h])) && !(await q1('SELECT 1 FROM portal_users WHERE acesso_hmac=?', [h]))) return c;
+    if (!(await q1('SELECT 1 FROM users WHERE acesso_hmac=?', [h]))) return c;
   }
   throw new Error('Não foi possível gerar um código único.');
 }
-export async function issueAccessCode(tab: 'users' | 'portal_users', codigo: string, dropSessions = true): Promise<string> {
+export async function issueAccessCode(tab: 'users', codigo: string, dropSessions = true): Promise<string> {
   const c = await genAccessCode();
   await run(`UPDATE ${tab} SET acesso_hmac=?,acesso_enc=? WHERE codigo=?`, [accessHmac(c), encryptSecret(c), codigo]);
   if (dropSessions) {
@@ -105,7 +92,7 @@ async function knownDevice(c: Ctx): Promise<boolean> {
   const d = c.cookies['evo_dev'];
   return !!d && !!(await q1('SELECT 1 FROM trusted_devices WHERE hash=?', [sha256(d)]));
 }
-export async function registerDevice(c: Ctx, tipo: 'int' | 'por', codigo: string, nome: string): Promise<void> {
+export async function registerDevice(c: Ctx, tipo: 'int', codigo: string, nome: string): Promise<void> {
   let dev = c.cookies['evo_dev'] || '';
   const row = dev ? await q1('SELECT 1 FROM trusted_devices WHERE hash=? AND codigo=?', [sha256(dev), codigo]) : undefined;
   if (!row) {
