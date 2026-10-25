@@ -7,7 +7,7 @@ PAGINAS.igvisao = async function () {
   const kpi = (rot, k) => `<div class="kpi"><small>${rot}</small><strong>${s[k] === null || s[k] === undefined ? '—' : fmtN(s[k])}</strong>${s[k] === null || s[k] === undefined ? '<i class="kd flat">a Meta ainda não informou</i>' : delta(varPct(s[k], a[k]))}</div>`;
   const seg = d.seguidores;
   const vazio = !s.publicacoes && !seg;
-  $('#content').innerHTML = `<div class="ig-acoes"><a class="btn soft" target="_blank" rel="noopener" href="/relatorio-instagram.html">Relatório mensal (PDF)</a>${botaoNova()}</div>
+  $('#content').innerHTML = `<div class="ig-acoes"><a class="btn soft" target="_blank" rel="noopener" href="/relatorio-instagram.html">Relatório mensal (PDF)</a></div>
     <p class="kpi-note ig-escopo">Somente orgânico: publicações do ${esc(d.contas.map(c => '@' + c.replace(/^@/, '')).join(' e ') || 'perfil')} no período ${esc(Filtros.descricao())}, comparadas ao período anterior (${esc(fmtDate(d.anteriorPeriodo.de))} a ${esc(fmtDate(d.anteriorPeriodo.ate))}). ${origem(d.origem)}</p>
     ${avisoAtualizacao(d.origem)}
     ${d.somenteVinculadas ? '<p class="foco-chip">Com segmento ou campanha editorial escolhidos, só contam as publicações do Instagram ligadas a uma publicação do EVO MKT.</p>' : ''}
@@ -18,7 +18,7 @@ PAGINAS.igvisao = async function () {
       <section class="card"><div class="db-tit"><h2>Interações por dia</h2>${origem(d.origem)}</div><div id="chInt"></div></section>
     </div>
     <section class="card"><div class="db-tit"><h2>Publicações do período</h2><small>${d.recentes.length} mais recentes</small></div>${d.recentes.length ? `<div class="ig-grade">${d.recentes.map(p => `<article class="ig-post">${p.miniatura ? `<img src="${attr(p.miniatura)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="db-sem-img">Sem imagem</div>'}<div><span class="badge">${esc(p.formato)}</span> <small>${esc(fmtDate(p.quando))}</small><p>${esc(p.titulo || p.legenda || '(sem legenda)')}</p><small>${fmtN(p.interacoes)} interações${p.alcance !== null ? ` · alcance ${fmtN(p.alcance)}` : ''}</small>${p.link ? `<a href="${attr(p.link)}" target="_blank" rel="noopener noreferrer">Ver no Instagram ↗</a>` : ''}</div></article>`).join('')}</div>` : '<div class="empty compact">Nenhuma publicação no período com os filtros escolhidos.</div>'}</section>`}`;
-  bindGoButtons(); ligaNova();
+  bindGoButtons();
   if (seg && $('#chSeg')) EvoCharts.linha($('#chSeg'), { dados: seg.serie.map(x => ({ x: x.dia, seguidores: x.seguidores })), series: [{ k: 'seguidores', nome: 'Seguidores' }], zero: false, rotuloAcessivel: 'Seguidores por dia' });
   if ($('#chInt')) EvoCharts.linha($('#chInt'), { dados: d.interacoesPorDia.map(x => ({ x: x.dia, interacoes: x.interacoes })), series: [{ k: 'interacoes', nome: 'Interações' }], rotuloAcessivel: 'Interações por dia' });
 };
