@@ -24,6 +24,9 @@ const Filtros = (() => {
   const ehIg = chave => chave.startsWith('instagram.');
   const PADRAO = { p: '30', de: '', ate: '', perfil: '', segmento: '', formato: '', campanha: '' };
   const CAMPOS = Object.keys(PADRAO);
+  /** Padrões próprios de cada aba (a lista de Publicações mostra os últimos 12 meses). */
+  const PADRAO_P = { 'instagram.conteudos': '365' };
+  const padraoDe = chave => ({ ...PADRAO, p: PADRAO_P[chave] || PADRAO.p });
   const memoria = {};
   const ouvintes = [];
   let campanhas = null;
@@ -48,7 +51,7 @@ const Filtros = (() => {
   }
 
   const carregar = chave => {
-    if (!memoria[chave]) { const g = pref('filtros.' + chave, null) || {}; memoria[chave] = Object.fromEntries(CAMPOS.map(k => [k, typeof g[k] === 'string' ? g[k] : PADRAO[k]])); }
+    if (!memoria[chave]) { const g = pref('filtros.' + chave, null) || {}; memoria[chave] = Object.fromEntries(CAMPOS.map(k => [k, typeof g[k] === 'string' ? g[k] : padraoDe(chave)[k]])); }
     return memoria[chave];
   };
   const chaveAtual = () => chaveDe(typeof state !== 'undefined' ? state.page : '');
@@ -64,7 +67,7 @@ const Filtros = (() => {
     get: calc,
     chave: chaveAtual,
     /** Quantos filtros da aba atual fogem do padrão (o perfil compartilhado do Instagram não conta). */
-    ativos: () => { const f = calc(), chave = chaveAtual(); return ['perfil', 'segmento', 'formato', 'campanha'].filter(k => f[k] && !(k === 'perfil' && ehIg(chave))).length + (carregar(chave).p !== PADRAO.p ? 1 : 0); },
+    ativos: () => { const f = calc(), chave = chaveAtual(); return ['perfil', 'segmento', 'formato', 'campanha'].filter(k => f[k] && !(k === 'perfil' && ehIg(chave))).length + (carregar(chave).p !== padraoDe(chave).p ? 1 : 0); },
     /** Parâmetros para a consulta ao servidor, da aba atual. `campos` limita aos filtros que a tela aceita. */
     query(campos = ['periodo', 'perfil', 'segmento', 'formato', 'campanha']) {
       const f = calc(), q = new URLSearchParams();
@@ -80,7 +83,7 @@ const Filtros = (() => {
       salvar(chave); disparar();
     },
     /** Restaura os padrões da aba atual. Não mexe nas outras abas nem no perfil compartilhado do Instagram. */
-    limpar() { const chave = chaveAtual(); memoria[chave] = { ...PADRAO }; salvar(chave); setPref('filtros.' + chave + '.local', {}); disparar(); },
+    limpar() { const chave = chaveAtual(); memoria[chave] = padraoDe(chave); salvar(chave); setPref('filtros.' + chave + '.local', {}); disparar(); },
     /** Filtros próprios de uma tela (status, busca, ordenação…): ficam guardados na aba e voltam ao padrão em "Limpar filtros". */
     localGet(padrao) { const l = pref('filtros.' + chaveAtual() + '.local', null) || {}; return Object.fromEntries(Object.keys(padrao).map(k => [k, k in l ? l[k] : padrao[k]])); },
     localSet(patch) { const c = chaveAtual(); setPref('filtros.' + c + '.local', { ...(pref('filtros.' + c + '.local', null) || {}), ...patch }); },
@@ -97,7 +100,7 @@ const FILTROS_PAGINA = {
   hoje: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'] },
   calendario: { aplica: ['perfil', 'segmento', 'formato', 'campanha'] },
   igvisao: { aplica: ['periodo', 'formato'] },
-  igconteudos: { aplica: ['formato'] },
+  igconteudos: { aplica: ['periodo', 'formato'] },
   igplan: { aplica: ['formato'] },
   igcalendario: { aplica: ['formato'] },
   igdesempenho: { aplica: ['periodo', 'formato'] },

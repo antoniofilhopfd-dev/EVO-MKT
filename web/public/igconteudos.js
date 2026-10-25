@@ -34,47 +34,88 @@ function filtrarConteudos() {
 const badgeEstado = r => { const s = stLimpo(r.status); return `<span class="badge ${estadoClasse(s)}">${esc(IG_ESTADO_ROTULO[s] || s || '—')}</span>`; };
 const faltasDe = r => (IGC.estados.get(r.id)?.pendencias || []).map(p => p.texto);
 
+/** Situação simples da publicação, para a lista: Rascunho, Agendada, Publicada ou Falha. */
+const IGC_SITUACOES = [['', 'Todos os status'], ['RASCUNHO', 'Rascunho'], ['AGENDADA', 'Agendada'], ['PUBLICADA', 'Publicada'], ['FALHA', 'Falha']];
+const igcSituacao = r => {
+  const e = IGC.estados.get(r.id), s = stLimpo(r.status);
+  if (e && /FALHA/i.test(String(e.estado || ''))) return 'FALHA';
+  return s === 'PUBLICADO' ? 'PUBLICADA' : s === 'AGENDADO' ? 'AGENDADA' : s === 'ARQUIVADO' ? 'ARQUIVADA' : 'RASCUNHO';
+};
+const igcBadge = sit => `<span class="badge ${{ PUBLICADA: 'ok', AGENDADA: 'info', FALHA: 'bad', ARQUIVADA: '' }[sit] ?? 'warn'}">${esc((IGC_SITUACOES.find(x => x[0] === sit) || [, sit === 'ARQUIVADA' ? 'Arquivada' : sit])[1])}</span>`;
+
+/** Lista única: publicações do EVO MKT (rascunhos, agendadas e publicadas) e as já postadas que vieram da Meta, sem duplicar. */
+function igcItens() {
+  const f = Filtros.get(), b = IGC.busca.trim().toLowerCase(), [de, ate] = [f.de, f.ate];
+  const ligadas = new Set(IGC.rows.map(r => String(r.instagramMediaId || '')).filter(Boolean));
+  const dentro = dia => !dia || (dia >= de && dia <= ate);
+  const foco = window.IG_FOCO ? new Set(window.IG_FOCO.ids.map(String)) : null, itens = [];
+  IGC.rows.forEach(r => {
+    if (foco && !foco.has(String(r.id))) return;
+    const sit = igcSituacao(r), dia = String(r.publicacaoEm || '').slice(0, 10);
+    /* o período vale para o histórico (publicadas); agendadas, rascunhos e falhas aparecem sempre, mesmo no futuro */
+    if (sit === 'ARQUIVADA' || !calPubCabe(r, f) || (sit === 'PUBLICADA' && !dentro(dia))) return;
+    if (IGC.status && sit !== IGC.status) return;
+    if (b && !`${qDoPub(r)} ${r.perfil || ''}`.toLowerCase().includes(b)) return;
+    itens.push({ origem: 'evo', id: r.id, dia, hora: String(r.publicacaoEm || '').slice(11, 16), legenda: r.legenda || r.titulo || '', perfil: r.perfil || '', formato: r.formato || '', mini: igcalMini(r), sit, link: r.instagramLink || r.linkPublicacao || '', registro: r });
+  });
+  (foco ? [] : IGC.meta).forEach(p => {
+    if (ligadas.has(String(p.id))) return;
+    const q = igcalQuando(p.quando);
+    if (!dentro(q.dia) || (IGC.status && IGC.status !== 'PUBLICADA')) return;
+    if (f.formato && String(p.formato).toLowerCase() !== f.formato.toLowerCase()) return;
+    if (b && !`${p.legenda} ${p.perfil}`.toLowerCase().includes(b)) return;
+    itens.push({ origem: 'meta', id: p.id, dia: q.dia, hora: q.hora, legenda: p.legenda || '', perfil: p.perfil, formato: p.formato, mini: p.miniatura, sit: 'PUBLICADA', link: p.link });
+  });
+  return itens.sort((a, b) => (b.dia ? b.dia + (b.hora || '') : '0').localeCompare(a.dia ? a.dia + (a.hora || '') : '0'));
+}
+function igcLinha(i) {
+  const publicada = i.sit === 'PUBLICADA';
+  const acoes = [
+    i.origem === 'evo' ? `<button type="button" data-ac="editar" data-id="${attr(i.id)}">Editar</button>` : '',
+    i.origem === 'evo' && !publicada ? `<button type="button" data-ac="agora" data-id="${attr(i.id)}">Publicar agora</button><button type="button" data-ac="agendar" data-id="${attr(i.id)}">${i.sit === 'AGENDADA' ? 'Reagendar' : 'Agendar'}</button>` : '',
+    i.origem === 'evo' ? `<button type="button" data-ac="duplicar" data-id="${attr(i.id)}">Duplicar</button>` : '',
+    i.link ? `<a href="${attr(i.link)}" target="_blank" rel="noopener noreferrer">Ver no Instagram</a>` : '',
+  ].join('');
+  return `<tr><td class="igl-mini">${i.mini ? `<img src="${attr(i.mini)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="igl-sem">◇</span>'}</td>
+    <td class="igl-leg">${i.origem === 'evo' ? `<button type="button" class="igl-abrir" data-ac="editar" data-id="${attr(i.id)}">${esc(i.legenda || '(sem legenda)')}</button>` : `<span>${esc(i.legenda || '(sem legenda)')}</span>`}</td>
+    <td>${esc(i.perfil || '—')}</td><td>${esc(i.formato || '—')}</td><td class="igl-data">${i.dia ? `${esc(fmtDate(i.dia))}${i.hora ? `<small>${esc(i.hora)}</small>` : ''}` : '<small>sem data</small>'}</td><td>${igcBadge(i.sit)}</td>
+    <td class="igl-acoes"><details class="igl-menu"><summary aria-label="Ações da publicação">⋯</summary><div>${acoes}</div></details></td></tr>`;
+}
+
 PAGINAS.igconteudos = async function () {
-  Object.assign(IGC, Filtros.localGet({ busca: '', status: '', resp: '', vista: pref('igVista', 'lista') }));
+  Object.assign(IGC, Filtros.localGet({ busca: '', status: '' }));
   await carregarConteudos();
   await igcCarregaMeta();
-  const equipe = (await api('/team').catch(() => ({ rows: [] }))).rows.map(x => x.nome);
-  const foco = window.IG_FOCO;
   const desenha = () => {
-    const rows = filtrarConteudos().sort((a, b) => String(b.publicacaoEm || '').localeCompare(String(a.publicacaoEm || '')));
-    const corpo = rows.length ? (IGC.vista === 'quadro' ? quadro(rows) : lista(rows)) : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>${IGC.rows.length ? 'Nenhuma publicação combina com os filtros. Limpe os filtros para ver todas.' : 'Comece pela primeira ideia de publicação.'}</p>${botaoNova()}</div>`;
-    $('#igcLista').innerHTML = corpo + igcMetaSecao();
-    $('#igcCont').textContent = `${rows.length} de ${IGC.rows.length} publicação(ões)`;
-    $$('[data-pub]', $('#igcLista')).forEach(el => { const abre = () => editarPublicacao(el.dataset.pub); el.onclick = abre; el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abre(); } }; });
-
-    ligaNova($('#igcLista'));
+    const itens = igcItens();
+    $('#igcLista').innerHTML = itens.length ? `<div class="tablewrap"><table class="datatable igl"><thead><tr><th></th><th>Legenda</th><th>Perfil</th><th>Formato</th><th>Data e hora</th><th>Status</th><th></th></tr></thead><tbody>${itens.map(igcLinha).join('')}</tbody></table></div>` : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>${IGC.rows.length || IGC.meta.length ? 'Nenhuma publicação combina com a busca e os filtros. Amplie o período ou limpe os filtros.' : 'Quando você publicar ou sincronizar o Instagram, as publicações aparecem aqui.'}</p></div>`;
+    $('#igcCont').textContent = `${itens.length} publicação(ões) · ${Filtros.descricao()}`;
+    $$('[data-ac]', $('#igcLista')).forEach(b => {
+      b.onclick = async () => {
+        const menu = b.closest('details'); if (menu) menu.open = false;
+        const id = b.dataset.id, r = IGC.rows.find(x => String(x.id) === String(id));
+        if (b.dataset.ac === 'editar') return editarPublicacao(id);
+        if (b.dataset.ac === 'agora') return abrirPublicacao('agora', r);
+        if (b.dataset.ac === 'agendar') return abrirPublicacao('agendar', r);
+        if (b.dataset.ac === 'duplicar') { try { await post('/content/duplicate', { id }); invalidate('conteudos'); toast('Publicação duplicada como rascunho'); go('igconteudos'); } catch (e) { toast(e.message, 'bad'); } }
+      };
+    });
   };
-  $('#content').innerHTML = `${abasInstagramAcoes()}
-    ${window.IG_FOCO ? `<div class="foco-chip" role="status">Mostrando só: <b>${esc(foco.titulo)}</b> (${foco.ids.length}) <button class="btn soft" id="igcLimparFoco">Ver todas</button></div>` : ''}
-    <div class="ig-barra">
-      <input type="search" class="control" id="igcBusca" placeholder="Buscar por título, legenda ou hashtag" aria-label="Buscar publicações" value="${attr(IGC.busca)}">
-      <select class="control" id="igcSt" aria-label="Estado"><option value="">Todos os estados</option>${IG_ETAPAS.concat(['ARQUIVADO']).map(s => `<option value="${s}" ${IGC.status === s ? 'selected' : ''}>${IG_ESTADO_ROTULO[s]}</option>`).join('')}</select>
-      <select class="control" id="igcResp" aria-label="Responsável"><option value="">Todos os responsáveis</option>${equipe.map(n => `<option ${IGC.resp === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-      <div class="view-switch" role="group" aria-label="Vista"><button type="button" data-vista="lista" class="${IGC.vista === 'lista' ? 'active' : ''}" aria-pressed="${IGC.vista === 'lista'}">Lista</button><button type="button" data-vista="quadro" class="${IGC.vista === 'quadro' ? 'active' : ''}" aria-pressed="${IGC.vista === 'quadro'}">Quadro</button></div>
+  $('#content').innerHTML = `${window.IG_FOCO ? `<div class="foco-chip" role="status">Mostrando só: <b>${esc(window.IG_FOCO.titulo)}</b> <button class="btn soft" id="igcLimparFoco">Ver todas</button></div>` : ''}
+    <div class="ig-barra igl-barra">
+      <input type="search" class="control" id="igcBusca" placeholder="Buscar por legenda ou perfil" aria-label="Buscar publicações" value="${attr(IGC.busca)}">
+      <select class="control" id="igcSt" aria-label="Status">${IGC_SITUACOES.map(([v, l]) => `<option value="${v}" ${IGC.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <span class="kpi-note" id="igcCont" aria-live="polite"></span>
+      <span class="igl-botoes"><button type="button" class="btn soft" id="igcAgendar">Agendar</button><button type="button" class="btn" id="igcAgora">Publicar agora</button></span>
     </div><div id="igcLista"></div>`;
   $('#igcBusca').oninput = debounce(e => { IGC.busca = e.target.value; Filtros.localSet({ busca: IGC.busca }); desenha(); }, 200);
   $('#igcSt').onchange = e => { IGC.status = e.target.value; Filtros.localSet({ status: IGC.status }); desenha(); };
-  $('#igcResp').onchange = e => { IGC.resp = e.target.value; Filtros.localSet({ resp: IGC.resp }); desenha(); };
-  $$('[data-vista]').forEach(b => { b.onclick = () => { IGC.vista = b.dataset.vista; Filtros.localSet({ vista: IGC.vista }); $$('[data-vista]').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', x === b); }); desenha(); }; });
+  $('#igcAgora').onclick = () => abrirPublicacao('agora');
+  $('#igcAgendar').onclick = () => abrirPublicacao('agendar');
   const lf = $('#igcLimparFoco'); if (lf) lf.onclick = () => { window.IG_FOCO = null; go('igconteudos'); };
-  desenha(); ligaNova();
+  desenha();
   if (window.IG_ABRIR) { const id = window.IG_ABRIR; window.IG_ABRIR = null; editarPublicacao(id); }
 };
-function lista(rows) {
-  return `<div class="tablewrap"><table class="datatable"><thead><tr><th>Título</th><th>Estado</th><th>Perfil</th><th>Segmento</th><th>Formato</th><th>Publicação</th><th>Responsável</th><th>O que falta</th></tr></thead><tbody>${rows.map(r => {
-    const f = faltasDe(r); return `<tr data-pub="${attr(r.id)}" tabindex="0" role="button" aria-label="Abrir ${attr(r.titulo)}"><td class="titlecell">${esc(r.titulo || '(sem título)')}${r.compartilhado === 'SIM' ? ' <span class="badge info">nos dois perfis</span>' : ''}</td><td>${badgeEstado(r)}</td><td>${esc(r.perfil || '—')}</td><td>${esc(r.segmento || '—')}</td><td>${esc(r.formato || '—')}</td><td>${r.publicacaoEm ? esc(fmtDateTime(r.publicacaoEm)) : '—'}</td><td>${esc(r.responsavel || '—')}</td><td>${f.length ? f.map(x => `<span class="falta">${esc(x)}</span>`).join('') : '<span class="ok-txt">—</span>'}</td></tr>`;
-  }).join('')}</tbody></table></div>`;
-}
-function quadro(rows) {
-  const cols = IG_ETAPAS.map(e => [e, rows.filter(r => stLimpo(r.status) === e)]);
-  return `<div class="quadro" role="list">${cols.map(([e, rs]) => `<section class="quadro-col" aria-label="${IG_ESTADO_ROTULO[e]}"><h3>${IG_ESTADO_ROTULO[e]} <span>${rs.length}</span></h3>${rs.map(r => `<button type="button" class="quadro-card" data-pub="${attr(r.id)}"><b>${esc(r.titulo || '(sem título)')}</b><small>${esc(r.perfil || '—')} · ${esc(r.formato || '—')}${r.publicacaoEm ? ' · ' + esc(fmtDateTime(r.publicacaoEm)) : ''}</small>${faltasDe(r).length ? `<span class="falta">${esc(faltasDe(r)[0])}${faltasDe(r).length > 1 ? ` +${faltasDe(r).length - 1}` : ''}</span>` : ''}</button>`).join('') || '<div class="quadro-vazio">Nada aqui</div>'}</section>`).join('')}</div>`;
-}
 
 /* ================= Estúdio: editor da publicação ================= */
 function novaPublicacao(opc = {}) { return abrirEstudio(null, opc); }
@@ -345,16 +386,5 @@ async function abrirEstudio(row, opc = {}) {
 
 /** Publicações já postadas no Instagram (sincronizadas com a Meta) que não foram criadas no EVO MKT. */
 async function igcCarregaMeta() {
-  const f = Filtros.get(), qs = new URLSearchParams({ de: somaDias(hojeBR(), -364), ate: hojeBR() });
-  ['perfil', 'segmento', 'formato', 'campanha'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
-  try { IGC.meta = (await api('/instagram/ranking?' + qs.toString())).rows || []; } catch { IGC.meta = []; }
-}
-function igcMetaSecao() {
-  if (IGC.status && IGC.status !== 'PUBLICADO') return '';
-  if (IGC.resp) return '';
-  const ligadas = new Set(IGC.rows.map(r => String(r.instagramMediaId || '')).filter(Boolean)), b = IGC.busca.trim().toLowerCase();
-  const posts = IGC.meta.filter(p => !ligadas.has(String(p.id)) && (!b || `${p.legenda} ${p.perfil}`.toLowerCase().includes(b)));
-  if (!posts.length) return '';
-  return `<section class="card igc-meta"><div class="db-tit"><h2>Já postadas no Instagram</h2><small>${posts.length} publicação(ões) dos últimos 12 meses sincronizadas com a Meta, ainda sem ficha no EVO MKT</small></div>
-    <div class="ig-grade">${posts.slice(0, 60).map(p => `<article class="ig-post">${p.miniatura ? `<img src="${attr(p.miniatura)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="db-sem-img">Sem imagem</div>'}<div><span class="badge ok">Publicado</span> <small>${esc(p.perfil)} · ${esc(p.formato)} · ${esc(fmtDate(igcalQuando(p.quando).dia))}</small><p>${esc(p.legenda || '(sem legenda)')}</p><small>${fmtN(p.interacoes)} interações${p.alcance !== null ? ` · alcance ${fmtN(p.alcance)}` : ''}</small>${p.link ? `<a href="${attr(p.link)}" target="_blank" rel="noopener noreferrer">Ver no Instagram ↗</a>` : ''}</div></article>`).join('')}</div>${posts.length > 60 ? '<p class="kpi-note">Mostrando as 60 mais recentes; use a busca ou o Ranking para ver as demais.</p>' : ''}</section>`;
+  try { IGC.meta = (await api('/instagram/ranking?' + Filtros.query(['periodo', 'perfil', 'formato']))).rows || []; } catch { IGC.meta = []; }
 }

@@ -145,14 +145,14 @@ function renderInternalUser() {
 const PAGINAS = {}; // página → função que desenha (registrada pelos outros arquivos)
 const ROTULOS = {
   hoje: 'Dashboard', calendario: 'Calendário',
-  igvisao: 'Visão geral', igconteudos: 'Conteúdos', igplan: 'Planejamento', igcalendario: 'Calendário', igdesempenho: 'Desempenho', igranking: 'Ranking',
+  igvisao: 'Visão geral', igconteudos: 'Publicações', igplan: 'Planejamento', igcalendario: 'Calendário', igdesempenho: 'Desempenho', igranking: 'Ranking',
   trafego: 'Visão geral', tfcampanhas: 'Campanhas', tfanuncios: 'Anúncios',
   configuracoes: 'Configurações',
 };
 const DESCRICOES = {
   hoje: 'Decisões do Marketing: publicações, calendário, Instagram e tráfego em um só lugar.',
   calendario: 'Publicações, planejamento editorial, calendário escolar, datas comemorativas e Google Agenda.',
-  igvisao: 'Desempenho orgânico dos perfis do Instagram.', igconteudos: 'Da ideia à publicação, com revisão e aprovação.',
+  igvisao: 'Desempenho orgânico dos perfis do Instagram.', igconteudos: 'Rascunhos, agendadas e já postadas no Instagram, com publicar agora e agendar.',
   igplan: 'Pauta do mês, ideias, campanhas editoriais e modelos.', igcalendario: 'Publicações programadas e já postadas no Instagram, com status, horário e perfil.', igranking: 'As melhores publicações do período, por alcance, interações, engajamento e visualizações.', igdesempenho: 'O que funcionou, por perfil, segmento, formato, tema e horário.',
   trafego: 'Anúncios da Meta: somente consulta. Criar e editar anúncios continua no Gerenciador de Anúncios da Meta.', tfcampanhas: 'Resumo por campanha.', tfanuncios: 'Detalhamento por anúncio.',
   configuracoes: 'Acessos, integrações, backup, auditoria e prontidão do sistema.',

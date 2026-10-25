@@ -9,6 +9,7 @@ import { adicionarComentario } from '../comentarios';
 import { adicionarMaterial, copiaParaNova, materiaisAtivos, materiaisDe, pendencias, PAPEIS, requisitosDeAgendamento, sincronizarMidia, statusAtual, tipoDeLink, urlPermitida } from '../conteudo';
 import { conteudoCoerente } from '../files';
 import { envInt, fail, now, Row, safePart, strv } from '../util';
+import { igMarkError, igPublish } from '../integrations/meta';
 import { json } from './handlers';
 
 export const CANAIS = ['Instagram', 'TikTok', 'YouTube'];
@@ -128,6 +129,39 @@ export async function conteudoRoute(c: Ctx) {
     });
     await audit(String(u.codigo), 'agendar-conteudo', 'conteudos', id);
     return json({ ok: true, status: 'AGENDADO' });
+  }
+  if (path === '/content/publicar-rapido' && method === 'POST') {
+    /** "Publicar agora" e "Agendar" em um passo (sem etapa de aprovação): confere os requisitos, agenda e, se for agora, envia ao Instagram. */
+    const b = await c.body();
+    const id = strv(b.id);
+    const cur = await conteudo(id);
+    const agora = b.modo === 'agora';
+    const st = statusAtual(cur.status);
+    if (['PUBLICADO', 'ARQUIVADO'].includes(st)) fail(409, 'Esta publicação já foi publicada ou arquivada.');
+    const quando = agora ? now().slice(0, 16) : strv(b.quando).trim();
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(quando)) fail(400, 'Escolha a data e o horário da publicação.');
+    if (!agora && quando <= now().slice(0, 16)) fail(400, 'Escolha uma data e um horário no futuro.');
+    const alvo: Row = { ...cur, publicacaoEm: quando, publicarInstagram: 'SIM' };
+    sincronizarMidia(alvo);
+    const falta = requisitosDeAgendamento(alvo);
+    if (falta.length) fail(409, `Para ${agora ? 'publicar' : 'agendar'} falta: ${falta.join(', ')}.`);
+    const fmt = strv(alvo.formato).toLowerCase();
+    if (fmt.includes('carrossel') && materiaisAtivos(alvo, 'final').length < 2) fail(409, 'O carrossel precisa de 2 a 20 fotos.');
+    await modifyRow('conteudos', id, async (r, conn) => {
+      await logStatus(conn, 'conteudos', id, strv(r.status), 'AGENDADO', String(u.codigo), `${agora ? 'Publicação imediata' : 'Agendada'} por ${u.nome} para ${quando.replace('T', ' ')}`);
+      const nova: Row = { ...r, publicacaoEm: quando, publicarInstagram: 'SIM', status: 'AGENDADO', aprovadoPor: String(u.nome), aprovadoEm: now(), atualizadoEm: now(), atualizadoPor: String(u.codigo) };
+      sincronizarMidia(nova);
+      return nova;
+    });
+    await audit(String(u.codigo), agora ? 'publicar-agora' : 'agendar-rapido', 'conteudos', id);
+    if (!agora) return json({ ok: true, status: 'AGENDADO' });
+    try {
+      const r = await igPublish(id, String(u.codigo));
+      return json({ ok: true, status: r.status, link: r.link });
+    } catch (e: any) {
+      await igMarkError(id, e.message);
+      return fail(502, String(e.message).replace(/access_token=[^&\s"]+/g, 'access_token=***'));
+    }
   }
   if (path === '/content/confirm' && method === 'POST') {
     const b = await c.body();

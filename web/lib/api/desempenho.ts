@@ -52,7 +52,7 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
     const posts = o.posts.slice(0, 1000).map((p) => ({
       id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda), miniatura: strv(p.miniatura), link: strv(p.permalink),
       perfil: usuario.get(p.conta) ?? p.conta, curtidas: num(p.curtidas), comentarios: num(p.comentarios), salvos: num(p.salvos), compartilhamentos: num(p.compartilhamentos),
-      alcance: num(p.alcance), visualizacoes: num(p.visualizacoes), interacoes: p.interacoes,
+      alcance: num(p.alcance), visualizacoes: num(p.visualizacoes), visitasPerfil: num(p.visitas_perfil), seguidoresNovos: num(p.seguidores_novos), interacoes: p.interacoes,
       engajamento: num(p.alcance) ? Math.round((p.interacoes / Number(p.alcance)) * 1000) / 10 : null,
       conteudoId: p.conteudo ? strv(p.conteudo.id) : '', titulo: p.conteudo ? strv(p.conteudo.titulo) : '',
     }));
@@ -98,6 +98,48 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
       mensal, anual, contas: contas.map((x) => x.usuario), atual: snaps.length ? mensal.filter((o) => o.seguidores !== null).slice(-1)[0]?.seguidores ?? null : null,
       primeiroRegistro: snaps[0] ? strv(snaps[0].dia) : '', ultimaSync: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'),
       origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: 'todos os meses sincronizados', atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'métricas da conta por mês; seguidores só existem desde a primeira sincronização' },
+    });
+  }
+  if (c.path === '/instagram/geral') {
+    /** Visão Geral do Instagram: indicadores, comparação das contas, formatos e melhores publicações. Nada é inventado: sem dado vira null. */
+    const o = await organico(f), oAnt = await organico(anterior(f));
+    const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const somaN = (ps: PostFiltrado[], k: string) => (ps.some((x) => x[k] !== null && x[k] !== undefined) ? ps.reduce((a, x) => a + (Number(x[k]) || 0), 0) : null);
+    const kp = (ps: PostFiltrado[]) => {
+      const alcance = somaN(ps, 'alcance'), interacoes = ps.reduce((a, x) => a + x.interacoes, 0);
+      return { publicacoes: ps.length, alcance, visualizacoes: somaN(ps, 'visualizacoes'), visitasPerfil: somaN(ps, 'visitas_perfil'), interacoes, curtidas: somaN(ps, 'curtidas'), comentarios: somaN(ps, 'comentarios'), compartilhamentos: somaN(ps, 'compartilhamentos'), salvamentos: somaN(ps, 'salvos'), seguidoresGerados: somaN(ps, 'seguidores_novos'), engajamento: alcance ? Math.round((interacoes / alcance) * 1000) / 10 : null };
+    };
+    const ids = o.contas.map((x) => x.ig);
+    const snaps = ids.length ? await q(`SELECT conta,dia,seguidores FROM ig_seguidores WHERE conta IN (${ids.map(() => '?').join(',')}) AND dia<=? ORDER BY dia`, [...ids, f.ate]) : [];
+    const porContaSeg = (ig: string) => {
+      const l = snaps.filter((x) => strv(x.conta) === ig);
+      const atual = l.length ? Number(l[l.length - 1].seguidores) : null;
+      const antes = l.filter((x) => strv(x.dia) < f.de), dentro = l.filter((x) => strv(x.dia) >= f.de);
+      const base = antes.length ? antes[antes.length - 1] : dentro[0];
+      return { atual, base: base ? Number(base.seguidores) : null, desde: base ? strv(base.dia) : '', completo: antes.length > 0 };
+    };
+    const contas = o.contas.map((x) => {
+      const ps = o.posts.filter((p) => p.conta === x.ig), sg = porContaSeg(x.ig);
+      return { usuario: x.usuario, ...kp(ps), seguidores: sg.atual, novosSeguidores: sg.atual !== null && sg.base !== null ? sg.atual - sg.base : null, novosDesde: sg.desde, novosCompleto: sg.completo };
+    });
+    const total = kp(o.posts), totalAnt = kp(oAnt.posts);
+    const sgTot = contas.every((x) => x.seguidores !== null) && contas.length ? contas.reduce((a, x) => a + Number(x.seguidores), 0) : null;
+    const novosTot = contas.length && contas.every((x) => x.novosSeguidores !== null) ? contas.reduce((a, x) => a + Number(x.novosSeguidores), 0) : null;
+    const baseTot = sgTot !== null && novosTot !== null ? sgTot - novosTot : null;
+    const serieSeg = new Map<string, number>();
+    for (const sn of snaps) if (strv(sn.dia) >= f.de) serieSeg.set(strv(sn.dia), (serieSeg.get(strv(sn.dia)) ?? 0) + Number(sn.seguidores));
+    const porDia = new Map<string, { alcance: number; visualizacoes: number; interacoes: number }>();
+    for (const p of o.posts) { const d = diaLocal(p.publicado_em), x = porDia.get(d) ?? { alcance: 0, visualizacoes: 0, interacoes: 0 }; x.alcance += Number(p.alcance) || 0; x.visualizacoes += Number(p.visualizacoes) || 0; x.interacoes += p.interacoes; porDia.set(d, x); }
+    const formatos = new Map<string, number>(); for (const p of o.posts) formatos.set(p.formato, (formatos.get(p.formato) ?? 0) + 1);
+    const melhores = [...o.posts].sort((a, b) => b.interacoes - a.interacoes).slice(0, 3).map((p) => ({ id: p.media_id, quando: p.publicado_em, formato: p.formato, legenda: strv(p.legenda).slice(0, 110), titulo: p.conteudo ? strv(p.conteudo.titulo) : '', miniatura: strv(p.miniatura), link: strv(p.permalink), perfil: o.contas.find((x) => x.ig === p.conta)?.usuario ?? '', alcance: n(p.alcance), interacoes: p.interacoes, comentarios: n(p.comentarios), salvamentos: n(p.salvos), curtidas: n(p.curtidas) }));
+    return json({
+      filtros: f, anteriorPeriodo: { de: anterior(f).de, ate: anterior(f).ate }, naoDeduplicado: contas.length > 1,
+      atual: total, anterior: totalAnt,
+      seguidores: { atual: sgTot, novos: novosTot, base: baseTot, desde: contas.map((x) => x.novosDesde).filter(Boolean).sort()[0] ?? '', completo: contas.length > 0 && contas.every((x) => x.novosCompleto), serie: [...serieSeg.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, seguidores]) => ({ dia, seguidores })) },
+      contas, formatos: [...formatos.entries()].map(([formato, publicacoes]) => ({ formato, publicacoes })).sort((a, b) => b.publicacoes - a.publicacoes),
+      porDia: [...porDia.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, x]) => ({ dia, ...x })), melhores,
+      ultimaSync: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'),
+      origem: { fonte: 'Instagram (API oficial da Meta, orgânico)', periodo: `${f.de} a ${f.ate}`, atualizadoEm: await setting('ig_last_sync'), aviso: await setting('ig_sync_warning'), natureza: 'publicações do período (não inclui anúncios); seguidores desde a primeira sincronização' },
     });
   }
   if (c.path === '/instagram/visao') {

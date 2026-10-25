@@ -70,5 +70,14 @@ const EvoCharts=(()=>{
   el.classList.add('ch-box');
   el.innerHTML=`<svg class="ch-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc_(rotuloAcessivel)}">${grade}${bars}</svg><div class="ch-leg">${series.map((s,si)=>`<span><i style="background:${s.tracejado?'transparent':s.cor||COR[si%COR.length]};${s.tracejado?'border-top:2px dashed '+(s.cor||COR[si%COR.length]):''}"></i>${esc_(s.nome)}</span>`).join('')}</div>`;
  }
- return {linha,barras,empilhadas,spark,COR,nf,abrev,fmtDia};
+ /** Rosca (distribuição). itens: [{nome,v}], centro/sub: texto no meio. Sem dado: mensagem, nunca fatia zerada. */
+ function rosca(el,{itens,centro='',sub='',rotuloAcessivel='Distribuição'}){
+  const l=itens.filter(i=>Number(i.v)>0),tot=l.reduce((a,i)=>a+Number(i.v),0);
+  if(!tot){el.innerHTML='<div class="ch-vazio">Sem publicações no período.</div>';return}
+  const R=62,C=2*Math.PI*R;let acc=0;
+  const fatias=l.map((i,k)=>{const f=Number(i.v)/tot,seg=`<circle r="${R}" cx="80" cy="80" fill="none" stroke="${i.cor||COR[k%COR.length]}" stroke-width="22" stroke-dasharray="${(f*C).toFixed(2)} ${(C-f*C).toFixed(2)}" stroke-dashoffset="${(-acc*C).toFixed(2)}" transform="rotate(-90 80 80)"><title>${esc_(i.nome)}: ${nf(i.v)} (${nf(f*100,1)}%)</title></circle>`;acc+=f;return seg}).join('');
+  el.classList.add('ch-rosca');
+  el.innerHTML=`<svg viewBox="0 0 160 160" role="img" aria-label="${esc_(rotuloAcessivel)}" class="ch-rosca-svg">${fatias}<text x="80" y="82" text-anchor="middle" font-size="26" font-weight="700" fill="#1B2330">${esc_(centro)}</text><text x="80" y="100" text-anchor="middle" font-size="11" fill="#5E6678">${esc_(sub)}</text></svg><ul class="ch-rosca-leg">${l.map((i,k)=>`<li><i style="background:${i.cor||COR[k%COR.length]}"></i><span>${esc_(i.nome)}</span><b>${nf(i.v)}</b> <small>(${nf(Number(i.v)/tot*100,1)}%)</small></li>`).join('')}</ul>`;
+ }
+ return {linha,barras,empilhadas,spark,rosca,COR,nf,abrev,fmtDia};
 })();

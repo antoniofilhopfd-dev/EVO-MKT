@@ -1,5 +1,5 @@
 /* Instagram › Ranking: as melhores publicações do período (já postadas, lidas da Meta), com imagem e classificação por métrica. */
-const IGR_ORDEM = [['alcance', 'Alcance'], ['interacoes', 'Interações'], ['engajamento', 'Engajamento'], ['visualizacoes', 'Visualizações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['salvos', 'Salvamentos'], ['compartilhamentos', 'Compartilhamentos']];
+const IGR_ORDEM = [['alcance', 'Alcance'], ['interacoes', 'Interações'], ['engajamento', 'Engajamento'], ['visualizacoes', 'Visualizações'], ['visitasPerfil', 'Visitas ao perfil'], ['seguidoresNovos', 'Seguidores adquiridos'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['salvos', 'Salvamentos'], ['compartilhamentos', 'Compartilhamentos']];
 const IGR = { ordem: 'interacoes', visao: 'mes' };
 const IGR_COLS = [['seguidores', 'Seguidores'], ['variacao', 'Variação'], ['posts', 'Posts'], ['reels', 'Reels'], ['alcance', 'Alcance'], ['impressoes', 'Visualizações'], ['visitasPerfil', 'Visitas ao perfil'], ['interacoes', 'Interações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['compartilhamentos', 'Compartilh.'], ['salvamentos', 'Salvamentos']];
 const igrRotulo = per => (per.length === 4 ? per : new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(per + '-01T12:00:00Z')));
@@ -19,8 +19,8 @@ PAGINAS.igranking = async function () {
   const ranking = [...todas].sort((a, b) => (b[k] ?? -1) - (a[k] ?? -1) || String(b.quando).localeCompare(String(a.quando))).slice(0, 100);
   const mini = p => (p.miniatura ? `<img src="${attr(p.miniatura)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="db-sem-img">Sem imagem</span>');
   const link = (p, txt) => (p.link ? `<a href="${attr(p.link)}" target="_blank" rel="noopener noreferrer">${txt}</a>` : txt);
-  const valor = (p, key) => (key === 'engajamento' ? (p.engajamento === null ? '—' : String(p.engajamento).replace('.', ',') + '%') : igrN(p[key]));
-  const colunas = IGR_ORDEM.filter(([c]) => disponivel(c) || ['interacoes', 'curtidas'].includes(c));
+  const valor = (p, key) => (key === 'seguidoresNovos' && p[key] !== null && p[key] !== undefined ? '+' + fmtN(p[key]) : key === 'engajamento' ? (p.engajamento === null ? '—' : String(p.engajamento).replace('.', ',') + '%') : igrN(p[key]));
+  const colunas = IGR_ORDEM.filter(([c]) => disponivel(c) || ['interacoes', 'curtidas', 'visitasPerfil', 'seguidoresNovos'].includes(c));
   const podio = ranking.slice(0, 3).map((p, i) => `<article class="igr-podio"><b class="igr-pos">${i + 1}º</b><div class="igr-img">${link(p, mini(p))}</div><div><small>${esc(p.perfil)} · ${esc(p.formato)} · ${esc(fmtDate(igcalQuando(p.quando).dia))}</small><p>${esc(igrCorta(p.titulo || p.legenda, 90))}</p><strong>${valor(p, k)}</strong> <small>${esc((ordens.find(o => o[0] === k) || [])[1] || '')}</small></div></article>`).join('');
   $('#content').innerHTML = `<div class="ig-barra"><label class="igr-ord">Classificar por <select class="control" id="igrOrdem" aria-label="Classificar por">${ordens.map(([c, n]) => `<option value="${c}" ${c === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label><span class="kpi-note">${todas.length} publicação(ões) · ${esc(Filtros.descricao())}</span></div>
     ${d.aviso ? `<p class="foco-chip">${esc(d.aviso)}</p>` : ''}
