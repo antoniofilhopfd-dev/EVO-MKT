@@ -125,7 +125,7 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
       await p.click('#cgEx'); await p.waitForSelector('.cg-conf'); t('excluir pede confirmação e avisa que exclui no Google', /exclui o evento no Google Agenda/.test(await p.innerText('.cg-conf'))); await p.click('#cgExOk'); await p.waitForTimeout(500); await espera();
       t('evento excluído some do calendário', !/Reunião com pais – Jardins/.test(await p.innerText('.cg-principal')));
       // Configurações › Agendas Google
-      await U.ir(p, 'configuracoes', 900); await p.click('[data-cfg="agendas"]'); await p.waitForSelector('.ag-tab', { timeout: 10000 });
+      await U.ir(p, 'configuracoes', 900); await p.click('[data-cfg-sec="integracoes"]'); await p.waitForSelector('[data-cfg-conf="google"]'); await p.click('[data-cfg-conf="google"]'); await p.waitForSelector('.ag-tab', { timeout: 10000 });
       t('Agendas Google: lista, permissão efetiva, status e regras', (await p.$$('.ag-tab tbody tr')).length >= 7 && /Leitura e edição/.test(await p.innerText('.ag-tab')) && /Somente leitura/.test(await p.innerText('.ag-tab')) && /Sem acesso/.test(await p.innerText('.ag-tab')));
       if (dir) await p.screenshot({ path: `${dir}/agendas-google-${nome}.png` });
       await p.click('#agAdd'); await p.waitForSelector('#agId'); if (dir) await p.screenshot({ path: `${dir}/agendas-google-adicionar-${nome}.png` }); await p.click('.cg-conf [data-close]');

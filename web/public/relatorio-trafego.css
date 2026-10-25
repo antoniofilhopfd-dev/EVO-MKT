@@ -1,5 +1,5 @@
 /* Dashboard de Tráfego (A4). Cores chapadas; a impressão mantém as cores. */
-:root{--navy:#00275F;--blue:#0B3C9E;--orange:#FF7800;--teal:#00798C;--ink:#1D2433;--line:#D9DEE8}
+:root,:host{--navy:#00275F;--blue:#0B3C9E;--orange:#FF7800;--teal:#00798C;--ink:#1D2433;--line:#D9DEE8}
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{margin:0;background:#EEF1F6;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
 .barra{max-width:794px;margin:12px auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
@@ -57,3 +57,10 @@ td.foto{width:70px;padding:4px}td img{width:60px;height:76px;object-fit:contain;
 .tf-rel-legenda{display:flex;gap:6px 16px;justify-content:flex-end;flex-wrap:wrap;font-size:10px}.tf-rel-legenda span{display:inline-flex;align-items:center;gap:4px}
 
 .tf-rel-legenda svg{width:22px;height:10px;min-width:22px;max-width:22px;margin:0;flex:0 0 22px}
+
+tfoot .tot td{background:#F1F4FA;border-top:2px solid var(--navy)}
+.embed .barra,.embed .x{display:none}.embed{background:#fff}.embed .pg{box-shadow:none;margin:0 auto}
+
+:host{display:block}
+.sec.det table{font-size:9.5px}.sec.det th{font-size:9.5px;padding:6px 2px}.sec.det td{padding:5px 2px;font-size:9.5px}.sec.det td.foto{width:52px;padding:3px}.sec.det td img{width:46px;height:58px}.sec.det td.l{min-width:80px;max-width:110px}
+.tw{overflow-x:auto}

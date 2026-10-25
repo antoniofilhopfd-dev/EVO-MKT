@@ -37,14 +37,14 @@ export async function trafegoRoute(c: Ctx): Promise<Response> {
   if (path === '/trafego/csv') {
     let d: Row;
     try { d = recortar(await resumoTrafego(c.qs('de'), c.qs('ate'), c.qs('tipo'))); } catch (e: any) { if (e.status) throw e; return fail(502, String(e.message).replace(/access_token=[^&\s"]+/g, 'access_token=***')); }
-    const anuncios = c.qs('nivel') === 'anuncios';
-    const cab = anuncios ? ['Anúncio', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR (%)', 'CPC', 'Conversas iniciadas', 'Custo por conversa'] : ['Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR (%)', 'CPC', 'Conversas iniciadas', 'Custo por conversa'];
-    const linhas = ((anuncios ? d.anuncios : d.campanhas) as Row[]).map((x) => (anuncios ? [x.nome, x.campanha, x.statusRotulo] : [x.nome, x.statusRotulo]).concat([br(x.investimento), String(x.impressoes), x.alcance === null ? '' : String(x.alcance), String(x.cliques), br(x.ctr), br(x.cpc), String(x.conversas), br(x.custoConversa)]));
+    const nivelCsv = ['anuncios', 'conjuntos'].includes(c.qs('nivel')) ? c.qs('nivel') : 'campanhas', anuncios = nivelCsv !== 'campanhas';
+    const cab = anuncios ? [nivelCsv === 'conjuntos' ? 'Conjunto' : 'Anúncio', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR (%)', 'CPC', 'Conversas iniciadas', 'Custo por conversa'] : ['Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR (%)', 'CPC', 'Conversas iniciadas', 'Custo por conversa'];
+    const linhas = ((d[nivelCsv] ?? []) as Row[]).map((x) => (anuncios ? [x.nome, x.campanha, x.statusRotulo] : [x.nome, x.statusRotulo]).concat([br(x.investimento), String(x.impressoes), x.alcance === null ? '' : String(x.alcance), String(x.cliques), br(x.ctr), br(x.cpc), String(x.conversas), br(x.custoConversa)]));
     const t = (d.tabela?.total || d.atual) as Row;
     linhas.push((anuncios ? ['TOTAL', '', ''] : ['TOTAL', '']).concat([br(t.investimento as number), String(t.impressoes), t.alcance === null ? '' : String(t.alcance), String(t.cliques), br(t.ctr as number | null), br(t.cpc as number | null), String(t.conversas), br(t.custoConversa as number | null)]));
     const p = d.periodo as Row;
     const csv = '﻿' + [cab, ...linhas].map((l) => l.map(csvCel).join(';')).join('\r\n') + '\r\n';
-    return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="trafego_${anuncios ? 'anuncios' : 'campanhas'}_${p.de}_${p.ate}.csv"`, 'Cache-Control': 'no-store' } });
+    return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="trafego_${nivelCsv}_${p.de}_${p.ate}.csv"`, 'Cache-Control': 'no-store' } });
   }
   return fail(404, 'Rota não encontrada.');
 }

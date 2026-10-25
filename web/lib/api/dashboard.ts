@@ -5,6 +5,7 @@ import { setting } from '../settings';
 import { fail, Row, strv } from '../util';
 import { saudeConta } from '../integrations/metaads';
 import { metaConnected } from '../integrations/meta';
+import { gConnected } from '../integrations/google';
 import { hojeFortaleza, resumoDaUltimaSincronizacao, resumoTrafego } from '../integrations/trafego';
 import { conteudoCabe, lerFiltros } from '../filtros';
 import { materiaisAtivos, pendencias, statusAtual } from '../conteudo';
@@ -23,6 +24,7 @@ const pub = (r: Row) => ({ id: r.id, titulo: strv(r.titulo) || '(sem título)', 
 export async function dashboardRoute(c: Ctx): Promise<Response> {
   await requireInternal(c);
   if (c.path !== '/dashboard/resumo') return fail(404, 'Rota não encontrada.');
+  if (c.method !== 'GET') return fail(405, 'O Dashboard é somente consulta.');
   const f = lerFiltros(c);
   const hoje = hojeFortaleza();
   // publicações olham para frente (planejadas, agendadas…); Instagram e Tráfego só existem até hoje
@@ -79,9 +81,19 @@ export async function dashboardRoute(c: Ctx): Promise<Response> {
   const google = await setting('google_token_invalido');
   if (google === '1') alertas.push({ nome: 'Google Agenda', msg: 'O acesso ao Google expirou. Reconecte em Configurações › Google.', pagina: 'configuracoes' });
 
-  return json({ hoje, filtros: f, publicacoes, proximas, instagram: ig, trafego, insights, alertas });
+  // publicações recentes do Instagram já sincronizadas (nada de dado inventado: sem sincronização, a lista vem vazia)
+  const recentes = [...org.posts].sort((a, b) => strv(b.publicado_em).localeCompare(strv(a.publicado_em))).slice(0, 4)
+    .map((m) => ({ id: m.media_id, titulo: m.conteudo ? strv(m.conteudo.titulo) : '', legenda: strv(m.legenda).slice(0, 90), formato: m.formato, miniatura: strv(m.miniatura), link: strv(m.permalink), quando: m.publicado_em, interacoes: m.interacoes, alcance: m.alcance ?? null, perfil: strv(m.conta) }));
+  const metaOn = await metaConnected(), metaInvalida = (await setting('meta_token_invalido')) === '1', gOn = await gConnected();
+  const integracoes = [
+    { chave: 'google', nome: 'Google Agenda', conectado: gOn && google !== '1', problema: google === '1', ultimaSync: await setting('g_last_cal_sync') },
+    { chave: 'meta', nome: 'Meta (Instagram e Tráfego Pago)', conectado: metaOn && !metaInvalida, problema: metaInvalida, ultimaSync: (await setting('ig_last_sync')) || '', ultimaSyncAds: await setting('meta_ads_ultima_sync') },
+  ];
+  return json({ hoje, filtros: f, publicacoes, proximas, instagram: ig, trafego, insights, alertas, recentes, integracoes });
 }
 
 function pickTrafego(t: Row): Row {
-  return { periodo: t.periodo, anterior: t.anterior, atual: t.atual, anteriorTotais: t.anteriorTotais, variacoes: t.variacoes, campanhas: (t.campanhas as Row[]).slice(0, 3), diario: t.diario };
+  return { periodo: t.periodo, anterior: t.anterior, atual: t.atual, anteriorTotais: t.anteriorTotais, variacoes: t.variacoes, campanhas: (t.campanhas as Row[]).slice(0, 3), diario: t.diario,
+    // campanhas em veiculação agora (status atual da Meta), com a foto do primeiro anúncio que a Meta devolveu para ela
+    campanhasAtivas: (t.campanhas as Row[]).filter((c) => c.status === 'ACTIVE').slice(0, 3).map((c) => ({ id: c.id, nome: c.nome, statusRotulo: c.statusRotulo, investimento: c.investimento, conversas: c.conversas, custoConversa: c.custoConversa, miniatura: ((t.anuncios as Row[]).find((a) => a.campanhaId === c.id && a.miniatura) ?? {}).miniatura ?? '' })) };
 }
