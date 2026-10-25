@@ -36,7 +36,7 @@ function tabelaAnuncios(d){
   return `<table><thead><tr><th>Foto</th><th>Anúncio</th><th>Campanha</th><th>Status</th><th>Custo (R$)</th><th>Impress.</th><th>Cliques</th><th>CTR</th><th>Conv.</th><th>Custo/Conv.</th></tr></thead><tbody>${d.anuncios.map(a=>`<tr><td class="foto">${a.miniatura?`<img alt="" referrerpolicy="no-referrer" src="${esc(a.imagem||a.miniatura)}">`:'<span>Sem imagem</span>'}</td><td class="l">${esc(a.nome)}</td><td>${esc(a.codigo||a.campanha)}</td><td>${esc(a.statusRotulo)}</td><td>${MONEY(a.investimento)}</td><td>${N0(a.impressoes)}</td><td>${N0(a.cliques)}</td><td>${PCT(a.ctr)}</td><td>${N0(a.conversas)}</td><td>${MONEY(a.custoConversa)}</td></tr>`).join('')||'<tr><td colspan="10" class="vazio">Nenhum anúncio com veiculação neste período.</td></tr>'}</tbody></table>`;
 }
 function html(d,sub,obs){
-  const p=d.periodo,ant=d.anterior,agora=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+  const p=d.periodo,ant=d.anterior,agora=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Fortaleza',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date());
   const sec=(t,corpo,cls='')=>`<section class="sec ${cls}"><div class="bloco"><h2>${t}</h2><span class="tag s">${DM(p.de)} a ${DMA(p.ate)}</span></div>${corpo}</section>`;
   return `<div class="pg"><header class="cab"><img class="logo" src="/img/logo-colegio.png" alt="Colégio Evolução"><div class="tit"><h1>Tráfego Pago — Meta Ads</h1><p class="sub">${esc(sub)}</p></div></header>
   ${sec('Indicadores do período (comparados a '+DM(ant.de)+' – '+DMA(ant.ate)+')',kpis(d))}
@@ -47,6 +47,29 @@ function html(d,sub,obs){
   <div class="fim"><span>Colégio Evolução · EVO MKT · fonte: ${esc(d.origem.fonte)} · versão da API ${esc(d.origem.versaoApi)}</span><span>Gerado em ${esc(agora)}</span></div></div>`;
 }
 const obsPadrao=()=>'Conversas = conversas iniciadas pelos anúncios (não inclui leads de formulário). CTR, CPC e custo por conversa são calculados dos valores absolutos. O alcance do total não soma o das campanhas. Dados lidos da Meta, somente leitura; a Meta pode ajustar números por até 72 horas.';
+function filtrarRelatorio(d){
+ const q=new URLSearchParams(location.search),visao=q.get('visao');
+ if(!['campanhas','anuncios'].includes(visao))return d;
+ const nome=(q.get('busca')||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+ const status=q.get('status')||'todos',campanha=q.get('campanha')||'';
+ const campo=q.get('ordem')||'investimento';
+ const linhas=(visao==='anuncios'?d.anuncios:d.campanhas).filter(x=>{
+  const st=String(x.status||'');
+  return x.nome.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().includes(nome)
+   &&(!campanha||visao!=='anuncios'||x.campanha===campanha)
+   &&(status==='todos'||(status==='ativos'&&st==='ACTIVE')||(status==='pausados'&&st.includes('PAUSED'))||(status==='problemas'&&/DISAPPROVED|WITH_ISSUES|PENDING_BILLING/.test(st)));
+ }).sort((a,b)=>campo==='status'?String(a.statusRotulo||a.status).localeCompare(String(b.statusRotulo||b.status),'pt-BR'):(b[campo]??-Infinity)-(a[campo]??-Infinity));
+ const r={...d,campanhas:visao==='campanhas'?linhas:[],anuncios:visao==='anuncios'?linhas:[]};
+ const inv=linhas.reduce((n,x)=>n+(Number(x.investimento)||0),0);
+ const imp=linhas.reduce((n,x)=>n+(Number(x.impressoes)||0),0);
+ const cl=linhas.reduce((n,x)=>n+(Number(x.cliques)||0),0);
+ const conv=linhas.reduce((n,x)=>n+(Number(x.conversas)||0),0);
+ r.atual={investimento:inv,impressoes:imp,alcance:null,cliques:cl,conversas:conv,ctr:imp?cl/imp*100:null,cpc:cl?inv/cl:null,custoConversa:conv?inv/conv:null};
+ r.variacoes=Object.fromEntries(Object.keys(r.atual).map(k=>[k,{tipo:'sem'}]));
+ r.diario={dias:[],series:[],total:[]};
+ r.avisos=[...(d.avisos||[]),'Relatório filtrado por '+(visao==='anuncios'?'anúncios':'campanhas')+'. Totais recalculados a partir das linhas filtradas. Alcance e comparação histórica sem base para este recorte. Gráfico omitido porque a série diária não foi filtrada.'];
+ return r;
+}
 let ultimo=null;
 async function carregar(){
   const de=$('#de').value,ate=$('#ate').value;$('#rel').innerHTML='<div class="msg">Carregando da Meta…</div>';
@@ -54,7 +77,7 @@ async function carregar(){
     const r=await fetch(`/api/trafego/relatorio?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`,{credentials:'same-origin',headers:{'X-EVO':'1'}});let d={};try{d=await r.json()}catch{}
     if(r.status===401){$('#rel').innerHTML='<div class="msg">Entre no EVO MKT e abra este relatório de novo.</div>';return}
     if(!r.ok)throw new Error(d.error||'Não foi possível ler a Meta.');
-    ultimo=d;desenhar();
+    ultimo=filtrarRelatorio(d);desenhar();
   }catch(e){$('#rel').innerHTML=`<div class="msg">${esc(e.message)}</div>`}
 }
 function desenhar(){if(!ultimo)return;$('#rel').innerHTML=html(ultimo,$('#sub').value,$('#obs').value.trim());document.querySelectorAll('#rel td.foto img').forEach(img=>{img.onerror=()=>img.replaceWith(Object.assign(document.createElement('span'),{textContent:'Imagem indisponível'}))})}
