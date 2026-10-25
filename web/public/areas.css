@@ -158,3 +158,16 @@ main{background:#f5f7fc}
 .igcal-dia{min-height:76px;border:1px solid var(--line,#e3e7ef);border-radius:10px;padding:4px;background:#fff;display:flex;flex-direction:column;gap:3px;overflow:hidden}.igcal-dia.vazio{background:transparent;border-color:transparent}.igcal-dia.hoje{border-color:var(--brand,#06379a);box-shadow:0 0 0 1px var(--brand,#06379a)}
 .igcal-dia>b{font-size:12px}.igcal-item{border:0;border-radius:6px;padding:2px 4px;font-size:11px;text-align:left;cursor:pointer;background:#eef2fb;color:#12306f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:22px}.igcal-item.ok{background:#e4f5ea;color:#14532d}.igcal-item.info{background:#e6f0ff}.igcal-item.warn{background:#fff3d6;color:#7a4b00}
 .igcal-dia.alto{min-height:180px}a.igcal-item{display:block;text-decoration:none}
+/* Instagram › Calendário e Ranking */
+.igcal-modos{display:inline-flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.igcal-item{display:flex;align-items:center;gap:6px;width:100%;border:0;border-radius:8px;padding:3px 5px;font-size:11px;text-align:left;cursor:pointer;background:#eef2fb;color:#12306f;text-decoration:none;min-height:28px;overflow:hidden}
+.igcal-item img{width:24px;height:24px;border-radius:5px;object-fit:cover;flex:none}.igcal-item i{width:24px;height:24px;display:grid;place-items:center;flex:none}
+.igcal-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.igcal-item small{display:block;opacity:.8;overflow:hidden;text-overflow:ellipsis}
+.igcal-item.ok,.igcal-meta{background:#e4f5ea;color:#14532d}.igcal-item.info{background:#e6f0ff}.igcal-item.warn{background:#fff3d6;color:#7a4b00}
+.igcal-num,.igcal-mais{border:0;background:none;font-weight:700;font-size:12px;text-align:left;cursor:pointer;padding:0;min-height:24px;color:inherit}.igcal-mais{color:var(--brand,#06379a);font-weight:600}
+.igcal-lista{display:grid;gap:8px;margin-top:10px}.igcal-lista .igcal-item{padding:8px 10px;font-size:14px;border:1px solid var(--line,#e3e7ef);background:#fff;color:inherit;border-radius:12px}
+.igcal-img{width:56px;height:56px;border-radius:10px;object-fit:cover;flex:none;display:grid;place-items:center;background:#eef2fb}.igcal-txt{flex:1;white-space:normal!important}.igcal-txt small{white-space:normal}
+.igr-podios{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:12px 0}.igr-podio{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--line,#e3e7ef);border-radius:16px;padding:12px;position:relative}
+.igr-pos{font-size:20px;color:var(--brand,#06379a)}.igr-img img,.igr-img .db-sem-img{width:84px;height:84px;border-radius:12px;object-fit:cover;display:grid;place-items:center;background:#eef2fb;font-size:11px}
+.igr-ord{display:inline-flex;align-items:center;gap:8px;font-weight:600}.igr-tab td.num,.igr-tab th.num{text-align:right}.igr-sel{background:#f2f6ff;font-weight:700}
+.igr-tab .rk-thumb img{width:44px;height:44px;border-radius:8px;object-fit:cover}

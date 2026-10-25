@@ -8,7 +8,7 @@ function abrirRegistros(ids, titulo) { window.IG_FOCO = { ids, titulo }; go('igc
 const IG_ESTADO_ROTULO = { ...ESTADO_ROTULO };
 const IG_PAPEIS = { referencia: 'Referência', producao: 'Arquivo em produção', final: 'Arquivo final', miniatura: 'Miniatura' };
 const SEG_NOMES = SEG_LISTA.filter(s => s[0]).map(s => s[1]).concat(['Todos']);
-const IGC = { rows: [], estados: new Map(), busca: '', status: '', resp: '', vista: pref('igVista', 'lista'), ref: hojeBR(), modoCal: pref('igCalModo', 'mes'), igPosts: {} };
+const IGC = { rows: [], estados: new Map(), busca: '', status: '', resp: '', vista: pref('igVista', 'lista'), meta: [] };
 
 const qDoPub = r => `${r.titulo || ''} ${r.legenda || ''} ${r.hashtags || ''}`.toLowerCase();
 const stLimpo = s => ({ BRIEFING: 'RASCUNHO', 'PRODUÇÃO': 'EM PRODUÇÃO', 'REVISÃO': 'EM REVISÃO', PROGRAMADO: 'AGENDADO' }[String(s || '').toUpperCase()] || String(s || '').toUpperCase());
@@ -19,7 +19,8 @@ const ehImagem = m => m.tipo === 'arquivo' && /\.(jpe?g|png|gif|webp)$/i.test(m.
 /** Botão "Nova publicação" presente nas quatro abas do Instagram. */
 const botaoNova = () => '<button type="button" class="btn" data-nova>+ Nova publicação</button>';
 function ligaNova(raiz = document) { $$('[data-nova]', raiz).forEach(b => { b.onclick = () => novaPublicacao(); }); }
-function abasInstagramAcoes() { return `<div class="ig-acoes">${botaoNova()}</div>`; }
+/** O botão "+ Nova publicação" do cabeçalho vale para todo o Instagram; as abas não repetem o botão. */
+function abasInstagramAcoes() { return ''; }
 
 async function carregarConteudos(force = true) {
   const [d, est] = await Promise.all([getRows('conteudos', force), api('/content/states').catch(() => ({ rows: [] }))]);
@@ -35,22 +36,16 @@ const faltasDe = r => (IGC.estados.get(r.id)?.pendencias || []).map(p => p.texto
 
 PAGINAS.igconteudos = async function () {
   await carregarConteudos();
+  await igcCarregaMeta();
   const equipe = (await api('/team').catch(() => ({ rows: [] }))).rows.map(x => x.nome);
   const foco = window.IG_FOCO;
   const desenha = () => {
     const rows = filtrarConteudos().sort((a, b) => String(b.publicacaoEm || '').localeCompare(String(a.publicacaoEm || '')));
-    const corpo = rows.length ? (IGC.vista === 'quadro' ? quadro(rows) : IGC.vista === 'calendario' ? calendarioIG(rows) : lista(rows)) : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>${IGC.rows.length ? 'Nenhuma publicação combina com os filtros. Limpe os filtros para ver todas.' : 'Comece pela primeira ideia de publicação.'}</p>${botaoNova()}</div>`;
-    $('#igcLista').innerHTML = corpo;
+    const corpo = rows.length ? (IGC.vista === 'quadro' ? quadro(rows) : lista(rows)) : `<div class="empty-rich"><strong>Nenhuma publicação encontrada</strong><p>${IGC.rows.length ? 'Nenhuma publicação combina com os filtros. Limpe os filtros para ver todas.' : 'Comece pela primeira ideia de publicação.'}</p>${botaoNova()}</div>`;
+    $('#igcLista').innerHTML = corpo + igcMetaSecao();
     $('#igcCont').textContent = `${rows.length} de ${IGC.rows.length} publicação(ões)`;
     $$('[data-pub]', $('#igcLista')).forEach(el => { const abre = () => editarPublicacao(el.dataset.pub); el.onclick = abre; el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abre(); } }; });
-    $$('[data-cal]', $('#igcLista')).forEach(b => { b.onclick = () => {
-      const v = b.dataset.cal;
-      if (v === 'mes' || v === 'semana') { IGC.modoCal = v; setPref('igCalModo', v); }
-      else if (v === 'hoje') IGC.ref = hojeBR();
-      else IGC.ref = IGC.modoCal === 'semana' ? somaDias(IGC.ref, 7 * +v) : somaMes(IGC.ref.slice(0, 7), +v) + '-01';
-      desenha();
-    }; });
-    if (IGC.vista === 'calendario') igCalCarregaPosts(desenha);
+
     ligaNova($('#igcLista'));
   };
   $('#content').innerHTML = `${abasInstagramAcoes()}
@@ -59,7 +54,7 @@ PAGINAS.igconteudos = async function () {
       <input type="search" class="control" id="igcBusca" placeholder="Buscar por título, legenda ou hashtag" aria-label="Buscar publicações" value="${attr(IGC.busca)}">
       <select class="control" id="igcSt" aria-label="Estado"><option value="">Todos os estados</option>${IG_ETAPAS.concat(['ARQUIVADO']).map(s => `<option value="${s}" ${IGC.status === s ? 'selected' : ''}>${IG_ESTADO_ROTULO[s]}</option>`).join('')}</select>
       <select class="control" id="igcResp" aria-label="Responsável"><option value="">Todos os responsáveis</option>${equipe.map(n => `<option ${IGC.resp === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-      <div class="view-switch" role="group" aria-label="Vista"><button type="button" data-vista="lista" class="${IGC.vista === 'lista' ? 'active' : ''}" aria-pressed="${IGC.vista === 'lista'}">Lista</button><button type="button" data-vista="quadro" class="${IGC.vista === 'quadro' ? 'active' : ''}" aria-pressed="${IGC.vista === 'quadro'}">Quadro</button><button type="button" data-vista="calendario" class="${IGC.vista === 'calendario' ? 'active' : ''}" aria-pressed="${IGC.vista === 'calendario'}">Calendário</button></div>
+      <div class="view-switch" role="group" aria-label="Vista"><button type="button" data-vista="lista" class="${IGC.vista === 'lista' ? 'active' : ''}" aria-pressed="${IGC.vista === 'lista'}">Lista</button><button type="button" data-vista="quadro" class="${IGC.vista === 'quadro' ? 'active' : ''}" aria-pressed="${IGC.vista === 'quadro'}">Quadro</button></div>
       <span class="kpi-note" id="igcCont" aria-live="polite"></span>
     </div><div id="igcLista"></div>`;
   $('#igcBusca').oninput = debounce(e => { IGC.busca = e.target.value; desenha(); }, 200);
@@ -347,38 +342,18 @@ async function abrirEstudio(row, opc = {}) {
   return dlg;
 }
 
-/** Intervalo visível do calendário: mês inteiro ou semana (domingo a sábado). */
-function igCalIntervalo() {
-  const ref = IGC.ref;
-  if (IGC.modoCal === 'semana') { const ini = somaDias(ref, -new Date(ref + 'T12:00:00Z').getUTCDay()); return [ini, somaDias(ini, 6)]; }
-  const ym = ref.slice(0, 7); return [ym + '-01', new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5), 0)).toISOString().slice(0, 10)];
-}
-/** Busca no Instagram as publicações já postadas do intervalo (inclusive as que não foram criadas no EVO MKT). */
-async function igCalCarregaPosts(redesenha) {
-  const [de, ate] = igCalIntervalo(), f = Filtros.get(), qs = new URLSearchParams({ de, ate });
+/** Publicações já postadas no Instagram (sincronizadas com a Meta) que não foram criadas no EVO MKT. */
+async function igcCarregaMeta() {
+  const f = Filtros.get(), qs = new URLSearchParams({ de: somaDias(hojeBR(), -364), ate: hojeBR() });
   ['perfil', 'segmento', 'formato', 'campanha'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
-  const chave = qs.toString();
-  if (IGC.igPosts[chave]) return;
-  IGC.igPosts[chave] = [];
-  try { IGC.igPosts[chave] = (await api('/instagram/visao?' + chave)).recentes || []; } catch { return; }
-  if (IGC.vista === 'calendario' && chave === new URLSearchParams([...qs].filter(() => true)).toString()) redesenha();
+  try { IGC.meta = (await api('/instagram/ranking?' + qs.toString())).rows || []; } catch { IGC.meta = []; }
 }
-/** Calendário (mês ou semana) com as publicações do EVO MKT e as já postadas no Instagram. */
-function calendarioIG(rows) {
-  const [de, ate] = igCalIntervalo(), hoje = hojeBR();
-  const f = Filtros.get(), qs = new URLSearchParams({ de, ate });
-  ['perfil', 'segmento', 'formato', 'campanha'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
-  const ligadas = new Set(IGC.rows.map(r => String(r.instagramMediaId || '')).filter(Boolean));
-  const postadas = (IGC.igPosts[qs.toString()] || []).filter(p => !ligadas.has(String(p.id)));
-  const dias = new Map(), poe = (k, h) => (dias.get(k) || dias.set(k, []).get(k)).push(h);
-  rows.forEach(r => { const k = String(r.publicacaoEm || '').slice(0, 10); if (k >= de && k <= ate) poe(k, `<button type="button" class="igcal-item ${estadoClasse(stLimpo(r.status))}" data-pub="${attr(r.id)}" title="${attr(r.titulo)}">${esc(r.titulo || '(sem título)')}</button>`); });
-  postadas.forEach(p => { const k = String(p.quando || '').slice(0, 10); poe(k, `<a class="igcal-item ok" href="${attr(p.link || '#')}" target="_blank" rel="noopener noreferrer" title="Postada no Instagram">${esc(p.titulo || p.legenda || '(sem legenda)')}</a>`); });
-  const lista = []; let d = IGC.modoCal === 'semana' ? de : somaDias(de, -new Date(de + 'T12:00:00Z').getUTCDay());
-  if (IGC.modoCal !== 'semana') for (let i = 0; i < new Date(de + 'T12:00:00Z').getUTCDay(); i++) lista.push('<div class="igcal-dia vazio"></div>');
-  for (let k = de; k <= ate; k = somaDias(k, 1)) lista.push(`<div class="igcal-dia ${k === hoje ? 'hoje' : ''} ${IGC.modoCal === 'semana' ? 'alto' : ''}"><b>${+k.slice(8)}</b>${(dias.get(k) || []).join('')}</div>`);
-  const rot = IGC.modoCal === 'semana' ? `${fmtDate(de)} a ${fmtDate(ate)}` : mesRotulo(de.slice(0, 7));
-  const modo = [['mes', 'Mês'], ['semana', 'Semana']].map(([k, n]) => `<button type="button" class="btn ${IGC.modoCal === k ? '' : 'soft'}" data-cal="${k}" aria-pressed="${IGC.modoCal === k}">${n}</button>`).join('');
-  return `<div class="ig-barra"><button type="button" class="btn soft" data-cal="-1" aria-label="Anterior">‹</button><b class="mes-rot">${esc(rot)}</b><button type="button" class="btn soft" data-cal="1" aria-label="Próximo">›</button><button type="button" class="btn soft" data-cal="hoje">Hoje</button>${modo}</div>
-  <div class="igcal">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(x => `<div class="igcal-cab">${x}</div>`).join('')}${lista.join('')}</div>
-  <p class="kpi-note">Verde-claro com seta ↗: publicações já postadas no Instagram. Os itens azuis e coloridos são publicações do EVO MKT.</p>`;
+function igcMetaSecao() {
+  if (IGC.status && IGC.status !== 'PUBLICADO') return '';
+  if (IGC.resp) return '';
+  const ligadas = new Set(IGC.rows.map(r => String(r.instagramMediaId || '')).filter(Boolean)), b = IGC.busca.trim().toLowerCase();
+  const posts = IGC.meta.filter(p => !ligadas.has(String(p.id)) && (!b || `${p.legenda} ${p.perfil}`.toLowerCase().includes(b)));
+  if (!posts.length) return '';
+  return `<section class="card igc-meta"><div class="db-tit"><h2>Já postadas no Instagram</h2><small>${posts.length} publicação(ões) dos últimos 12 meses sincronizadas com a Meta, ainda sem ficha no EVO MKT</small></div>
+    <div class="ig-grade">${posts.slice(0, 60).map(p => `<article class="ig-post">${p.miniatura ? `<img src="${attr(p.miniatura)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="db-sem-img">Sem imagem</div>'}<div><span class="badge ok">Publicado</span> <small>${esc(p.perfil)} · ${esc(p.formato)} · ${esc(fmtDate(igcalQuando(p.quando).dia))}</small><p>${esc(p.legenda || '(sem legenda)')}</p><small>${fmtN(p.interacoes)} interações${p.alcance !== null ? ` · alcance ${fmtN(p.alcance)}` : ''}</small>${p.link ? `<a href="${attr(p.link)}" target="_blank" rel="noopener noreferrer">Ver no Instagram ↗</a>` : ''}</div></article>`).join('')}</div>${posts.length > 60 ? '<p class="kpi-note">Mostrando as 60 mais recentes; use a busca ou o Ranking para ver as demais.</p>' : ''}</section>`;
 }
