@@ -58,11 +58,52 @@ async function tfPagina(corpo) {
 
 const tfFotoAnuncio = a => a.miniatura ? `<button class="tf-foto" type="button" data-tffoto="${attr(a.imagem || a.miniatura)}" aria-label="Ampliar foto de ${attr(a.nome)}"><img src="${attr(a.miniatura)}" alt="Criativo: ${attr(a.nome)}" loading="lazy" referrerpolicy="no-referrer" width="64" height="80"></button>` : '<span class="tf-sem">Sem imagem</span>';
 const tfBadge = a => `<span class="badge ${a.status === 'ACTIVE' ? 'ok' : /PAUSED|ARCHIVED|DELETED/.test(a.status) ? 'mute' : 'warn'}">${esc(a.statusRotulo || 'Status indisponível')}</span>`;
-function tfResumoLista(d, anuncios = false) {
-  const rows = anuncios ? d.anuncios : d.campanhas, limite = 6;
-  if (!rows.length) return '<div class="empty compact">Sem veiculação no período escolhido.</div>';
-  const cab = `${anuncios ? '<th>Foto</th>' : ''}<th>${anuncios ? 'Anúncio' : 'Campanha'}</th><th>Status atual</th><th class="num">Investimento</th><th class="num">Conversas</th><th class="num">Custo/conversa</th><th class="num">CTR</th>`;
-  return `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${cab}</tr></thead><tbody>${rows.slice(0, limite).map(r => `<tr>${anuncios ? `<td class="tf-fotocel">${tfFotoAnuncio(r)}</td>` : ''}<td class="titlecell"><b>${esc(r.nome)}</b>${anuncios ? `<br><small>${esc(r.campanha)}</small>` : ''}</td><td>${tfBadge(r)}</td><td class="num">${money(r.investimento)}</td><td class="num">${fmtN(r.conversas)}</td><td class="num">${r.custoConversa === null ? '—' : money(r.custoConversa)}</td><td class="num">${r.ctr === null ? '—' : pct(r.ctr)}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">${Math.min(limite, rows.length)} de ${rows.length} ${anuncios ? 'anúncio(s)' : 'campanha(s)'} · maiores investimentos no período</p>`;
+
+const TF_VIS_FILTRO={campanhas:{busca:'',status:'todos',ordem:'investimento',expandido:false},anuncios:{busca:'',status:'todos',ordem:'investimento',expandido:false,campanha:''}};
+function tfVisLinhas(d,tipo) {
+ const f=TF_VIS_FILTRO[tipo],norm=x=>String(x||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+ return (tipo==='anuncios'?d.anuncios:d.campanhas).filter(r=>
+   norm(r.nome).includes(norm(f.busca))&&(!f.campanha||r.campanha===f.campanha)&&
+   (f.status==='todos'||(f.status==='ativos'&&r.status==='ACTIVE')||(f.status==='pausados'&&String(r.status).includes('PAUSED'))||(f.status==='problemas'&&/DISAPPROVED|WITH_ISSUES|PENDING_BILLING/.test(r.status)))
+ ).sort((x,y)=>f.ordem==='status'?String(x.statusRotulo||x.status).localeCompare(String(y.statusRotulo||y.status),'pt-BR'):((y[f.ordem]??-Infinity)-(x[f.ordem]??-Infinity)));
+}
+function tfResumoLista(d,anuncios=false) {
+ const tipo=anuncios?'anuncios':'campanhas',f=TF_VIS_FILTRO[tipo],rows=tfVisLinhas(d,tipo),shown=f.expandido?rows:rows.slice(0,6);
+ const campos=[['investimento','Investimento'],['conversas','Conversas'],['custoConversa','Custo por conversa'],['status','Status']];
+ return `<div class="ig-barra tf-vis-filtros">
+ <label>Buscar por nome <input class="control" data-tf-busca="${tipo}" placeholder="Nome ${anuncios?'do anúncio':'da campanha'}" value="${attr(f.busca)}"></label>
+ <label>Status <select class="control" data-tf-status="${tipo}">${[['todos','Todos'],['ativos','Ativos'],['pausados','Pausados'],['problemas','Problemas']].map(([k,v])=>`<option value="${k}" ${f.status===k?'selected':''}>${v}</option>`).join('')}</select></label>
+ <label>Ordenar <select class="control" data-tf-ordem="${tipo}">${campos.map(([k,v])=>`<option value="${k}" ${f.ordem===k?'selected':''}>${v}</option>`).join('')}</select></label>
+ ${anuncios&&f.campanha?`<button class="btn soft" data-tf-limpar>Limpar campanha: ${esc(f.campanha)} ×</button>`:''}</div>
+ <div class="tablewrap"><table class="datatable tf-tab"><thead><tr>${anuncios?'<th>Foto</th>':''}<th>${anuncios?'Anúncio':'Campanha'}</th><th>Status</th><th class="num">Investimento</th><th class="num">Conversas</th><th class="num">Custo/conversa</th></tr></thead><tbody>${shown.length?shown.map((r,i)=>`<tr>${anuncios?`<td class="tf-fotocel">${tfFotoAnuncio(r)}</td>`:''}<td><button class="btn soft" type="button" data-tf-${anuncios?'detalhe':'campanha'}="${i}">${esc(r.nome)}</button>${anuncios?`<br><small>${esc(r.campanha)}</small>`:''}</td><td>${tfBadge(r)}</td><td class="num">${money(r.investimento)}</td><td class="num">${fmtN(r.conversas)}</td><td class="num">${r.custoConversa===null?'—':money(r.custoConversa)}</td></tr>`).join(''):'<tr><td colspan="7">Nenhum registro corresponde aos filtros.</td></tr>'}</tbody></table></div>
+ <div class="tf-vis-rodape"><small class="kpi-note">${shown.length} de ${rows.length} registros</small>${rows.length>6?`<button class="btn soft" data-tf-expand="${tipo}">${f.expandido?'Mostrar seis':'Ver todos nesta seção'}</button>`:''}</div>`;
+}
+function tfLigarVisao(d) {
+ const render=tipo=>{
+   const sec=document.getElementById(tipo==='campanhas'?'tfVisCampanhas':'tfVisAnuncios');
+   const body=sec?.querySelector('.tf-vis-body');if(!body)return;
+   body.innerHTML=tfResumoLista(d,tipo==='anuncios');ligar(tipo);
+ };
+ const ligar=tipo=>{
+  const sec=document.getElementById(tipo==='campanhas'?'tfVisCampanhas':'tfVisAnuncios');if(!sec)return;
+  const f=TF_VIS_FILTRO[tipo];
+  const busca=sec.querySelector('[data-tf-busca]');busca.onchange=()=>{f.busca=busca.value;render(tipo);};
+  sec.querySelector('[data-tf-status]').onchange=e=>{f.status=e.target.value;render(tipo);};
+  sec.querySelector('[data-tf-ordem]').onchange=e=>{f.ordem=e.target.value;render(tipo);};
+  const exp=sec.querySelector('[data-tf-expand]');if(exp)exp.onclick=()=>{f.expandido=!f.expandido;render(tipo);};
+  const limpar=sec.querySelector('[data-tf-limpar]');if(limpar)limpar.onclick=()=>{f.campanha='';render(tipo);};
+  sec.querySelectorAll('[data-tf-campanha]').forEach(btn=>btn.onclick=()=>{
+    const c=tfVisLinhas(d,'campanhas')[Number(btn.dataset.tfCampanha)];
+    if(!c)return;TF_VIS_FILTRO.anuncios.campanha=c.nome;TF_VIS_FILTRO.anuncios.expandido=true;
+    render('anuncios');document.getElementById('tfVisAnuncios').scrollIntoView({behavior:'smooth'});
+  });
+  sec.querySelectorAll('[data-tf-detalhe]').forEach(btn=>btn.onclick=()=>{
+   const x=tfVisLinhas(d,'anuncios')[Number(btn.dataset.tfDetalhe)];if(!x)return;
+   dialogo(`<h3>${esc(x.nome)}</h3>${x.imagem||x.miniatura?`<img class="tf-foto-ampliada" src="${attr(x.imagem||x.miniatura)}" alt="Foto do anúncio" referrerpolicy="no-referrer">`:''}<p><b>Campanha:</b> ${esc(x.campanha)}</p><p><b>Status:</b> ${esc(x.statusRotulo||'—')}</p><p>Investimento: ${money(x.investimento)} · Conversas: ${fmtN(x.conversas)} · Custo por conversa: ${x.custoConversa===null?'—':money(x.custoConversa)} · CTR: ${x.ctr===null?'—':pct(x.ctr)}</p><button class="btn" data-close>Fechar</button>`,{larga:true});
+  });
+  sec.querySelectorAll('[data-tffoto]').forEach(btn=>btn.onclick=()=>dialogo(`<h3>Imagem do anúncio</h3><img class="tf-foto-ampliada" src="${attr(btn.dataset.tffoto)}" alt="Imagem ampliada"><button class="btn" data-close>Fechar</button>`,{larga:true}));
+ };
+ ligar('campanhas');ligar('anuncios');
 }
 function tfAlertasVisao(d) {
   const alertas = [];
@@ -80,12 +121,13 @@ PAGINAS.trafego = async function () {
       <section class="card tf-vis-hero"><div><small>Investimento no período</small><strong>${money(a.investimento)}</strong>${delta(v.investimento, { bomSubir: true })}</div><div class="tf-vis-contexto"><b>${esc(fmtDate(d.periodo.de))} a ${esc(fmtDate(d.periodo.ate))}</b><span>${d.campanhas.length} campanha(s) · ${d.anuncios.length} anúncio(s) com veiculação</span><small>Status atual na Meta; valores do período escolhido.</small></div></section>
       <div class="kpis kpis4 tf-vis-kpis">${kpis}<div class="kpi"><small>Campanhas com veiculação</small><strong>${fmtN(d.campanhas.length)}</strong><i class="kd flat">no período escolhido</i></div></div>
       <div class="tf-vis-graficos"><section class="card"><div class="db-tit"><h2>Investimento diário por campanha</h2>${origem(d.origem)}</div><div id="tfDiario"></div><details class="tf-tabela"><summary>Ver como tabela</summary><div id="tfDiarioTabela"></div></details></section><section class="card"><div class="db-tit"><h2>Investimento por campanha</h2></div><div id="tfBarrasCamp"></div></section></div>
-      <section class="card" id="tfVisCampanhas"><div class="db-tit"><h2>Campanhas</h2><button class="btn soft" data-go="tfcampanhas">Ver todas e filtrar</button></div>${tfResumoLista(d)}</section>
-      <section class="card" id="tfVisAnuncios"><div class="db-tit"><h2>Anúncios</h2><button class="btn soft" data-go="tfanuncios">Ver todos e filtrar</button></div>${tfResumoLista(d, true)}</section>
+      <section class="card" id="tfVisCampanhas"><div class="db-tit"><h2>Campanhas</h2><small>Clique numa campanha para ver seus anúncios</small></div><div class="tf-vis-body">${tfResumoLista(d)}</div></section>
+      <section class="card" id="tfVisAnuncios"><div class="db-tit"><h2>Anúncios</h2><small>Detalhes e fotos disponíveis</small></div><div class="tf-vis-body">${tfResumoLista(d, true)}</div></section>
       <section class="card"><div class="db-tit"><h2>Alertas e pontos de atenção</h2><small>Baseados nos dados consultados</small></div>${tfAlertasVisao(d)}</section>
-      <p class="kpi-note">Alcance total vem da conta e não soma as campanhas. CTR, CPC e custo por conversa são recalculados dos valores absolutos. As listas completas e seus filtros continuam nas abas Campanhas e Anúncios.</p></div>`;
+      <p class="kpi-note">Alcance total vem da conta e não soma as campanhas. CTR, CPC e custo por conversa são recalculados dos valores absolutos. Os filtros das seções são aplicados na própria Visão Geral.</p></div>`;
   });
   if (!d) return;
+  tfLigarVisao(d);
   const diario = d.diario, cores = ['#063996', '#00A1F3', '#FF7800', '#793A8C'];
   const series = diario.series.map((s, i) => ({ k: 'camp' + i, nome: s.codigo || s.nome, cor: cores[i % cores.length], fmt: money, marcadores: true }));
   series.push({ k: 'total', nome: 'Total', cor: '#00275F', fmt: money, tracejado: true, marcadores: true });

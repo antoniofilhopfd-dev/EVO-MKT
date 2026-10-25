@@ -16,10 +16,7 @@ const kpiOrg = (rot, valor, nota = '') => `<div class="kpi"><small>${rot}</small
 PAGINAS.hoje = async function () {
   const d = await api('/dashboard/resumo?' + Filtros.query());
   const p = d.publicacoes, ig = d.instagram, t = d.trafego;
-  const cartoes = DB_CARTOES.map(([k, rot, dica, alerta]) => {
-    const c = p[k];
-    return `<button type="button" class="db-cartao ${alerta && c.total ? 'alerta' : ''} ${c.total ? '' : 'vazio'}" data-cartao="${k}" aria-label="${rot}: ${c.total}. ${c.total ? 'Abrir os registros' : 'Nenhum registro'}"><strong>${c.total}</strong><span>${rot}</span><small>${dica}</small></button>`;
-  }).join('');
+  
   const prox = d.proximas.length ? `<div class="tablewrap"><table class="datatable db-prox"><thead><tr><th>Quando</th><th>Perfil</th><th>Segmento</th><th>Formato</th><th>Título</th><th>Estado</th><th>Responsável</th><th>O que falta</th></tr></thead><tbody>${d.proximas.map(r => `<tr data-pub="${attr(r.id)}" tabindex="0" role="button" aria-label="Abrir ${attr(r.titulo)}"><td>${esc(fmtDateTime(r.quando))}</td><td>${esc(r.perfil || '—')}</td><td>${esc(r.segmento || '—')}</td><td>${esc(r.formato || '—')}</td><td class="titlecell">${esc(r.titulo)}</td><td><span class="badge ${estadoClasse(r.status)}">${esc(ESTADO_ROTULO[r.status] || r.status)}</span></td><td>${esc(r.responsavel || '—')}</td><td>${r.faltas.length ? r.faltas.map(f => `<span class="falta">${esc(f)}</span>`).join('') : '<span class="ok-txt">Tudo pronto</span>'}</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="empty-rich"><strong>Nenhuma publicação prevista</strong><p>Quando houver publicações com data a partir de hoje, elas aparecem aqui.</p><button class="btn" data-nova>Nova publicação</button></div>';
 
@@ -39,8 +36,7 @@ PAGINAS.hoje = async function () {
   const alertas = d.alertas.length ? d.alertas.map(a => `<div class="alerta-int"><b>${esc(a.nome)}</b><span>${esc(a.msg)}</span><button class="btn soft" data-go="${a.pagina}">Resolver</button></div>`).join('') : '<div class="ok-txt">Todas as integrações estão em ordem.</div>';
 
   $('#content').innerHTML = `<div class="db">
-    <section aria-labelledby="dbPub"><div class="db-tit"><h2 id="dbPub">Publicações</h2><small>${esc(Filtros.descricao())}</small></div><div class="db-cartoes">${cartoes}</div></section>
-    <section class="card" aria-labelledby="dbProx"><div class="db-tit"><h2 id="dbProx">Próximas publicações</h2><button class="btn soft" data-go="calendario">Abrir calendário</button></div>${prox}</section>
+    <section class="card" aria-labelledby="dbProx"><div class="db-tit"><h2 id="dbProx">Próximas publicações</h2><button class="btn soft" data-go="igconteudos">Ver conteúdos</button></div>${prox}</section>
     <div class="db-duas">
       <section class="card" aria-labelledby="dbOrg"><div class="db-tit"><h2 id="dbOrg">Instagram · orgânico</h2>${origem(ig.origem)}<button class="btn soft" data-go="igvisao">Ver Instagram</button></div>${orgHtml}</section>
       <section class="card" aria-labelledby="dbTr"><div class="db-tit"><h2 id="dbTr">Tráfego Pago</h2>${origem(t.origem)}<button class="btn soft" data-go="trafego">Ver Tráfego Pago</button></div>${trHtml}${t.semEfeito?.length ? `<p class="kpi-note">Os filtros de ${t.semEfeito.map(k => ({ perfil: 'perfil', segmento: 'segmento', formato: 'formato', campanha: 'campanha editorial' }[k])).join(', ')} não existem na Meta Ads e não se aplicam a este bloco.</p>` : ''}</section>
@@ -50,10 +46,9 @@ PAGINAS.hoje = async function () {
       <section class="card" aria-labelledby="dbIns"><div class="db-tit"><h2 id="dbIns">Insights</h2><small>até 3, calculados dos seus dados</small></div>${insights}</section>
     </div>
     <section class="card" aria-labelledby="dbAl"><div class="db-tit"><h2 id="dbAl">Integrações</h2></div>${alertas}</section>
-    <section aria-label="Atalhos"><div class="db-atalhos"><button class="btn" data-nova>Nova publicação</button><button class="btn soft" data-go="calendario">Calendário</button><button class="btn soft" data-go="igvisao">Instagram</button><button class="btn soft" data-go="trafego">Tráfego Pago</button></div></section>
+    <section aria-label="Atalhos"><div class="db-atalhos"><button class="btn" data-nova>Nova publicação</button><button class="btn soft" data-go="calendario">Calendário escolar</button><button class="btn soft" data-go="igvisao">Instagram</button><button class="btn soft" data-go="trafego">Tráfego Pago</button></div></section>
   </div>`;
   bindGoButtons();
   $$('[data-nova]').forEach(b => { b.onclick = () => novaPublicacao(); });
-  $$('[data-cartao]').forEach(b => { b.onclick = () => { const k = b.dataset.cartao, c = p[k]; if (!c.total) return toast('Nenhum registro neste cartão.', 'warn'); abrirRegistros(c.ids, DB_CARTOES.find(x => x[0] === k)[1]); }; });
   $$('[data-pub]').forEach(tr => { const abre = () => editarPublicacao(tr.dataset.pub); tr.onclick = abre; tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abre(); } }; });
 };
