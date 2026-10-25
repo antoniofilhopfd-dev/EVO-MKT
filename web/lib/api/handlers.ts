@@ -71,7 +71,7 @@ export async function route(c: Ctx): Promise<Out> {
       return conteudoRoute(c);
     case path === '/comments' || path === '/checklist':
       return comentariosRoute(c);
-    case path === '/ia/estado' || path === '/ia/variacoes' || ['/admin/users/email', '/admin/migracao', '/admin/arquivos-sem-vinculo', '/admin/arquivos-sem-vinculo/excluir'].includes(path):
+    case path === '/ia/estado' || path === '/ia/variacoes' || ['/admin/users/email', '/admin/sistema', '/admin/migracao', '/admin/arquivos-sem-vinculo', '/admin/arquivos-sem-vinculo/excluir'].includes(path):
       return sistemaRoute(c);
     case ['/instagram/visao', '/instagram/geral', '/instagram/ranking', '/instagram/ranking-contas', '/instagram/mensal', '/instagram/desempenho', '/instagram/impulsionados', '/instagram/vinculo'].includes(path):
       return desempenhoRoute(c);

@@ -5,7 +5,8 @@ import { audit } from '../records';
 import { makeBackup } from '../backup';
 import { iaAtiva, variacoesDeLegenda } from '../ia';
 import { setting } from '../settings';
-import { fail, Row, strv } from '../util';
+import { env, fail, Row, strv } from '../util';
+import { EVO_VERSION } from '../records';
 import { json } from './handlers';
 
 /** Apoio de Configurações: e-mail das pessoas, relatório da migração, arquivos sem vínculo e IA (rascunho). */
@@ -29,6 +30,20 @@ export async function sistemaRoute(c: Ctx): Promise<Response> {
     await run('UPDATE users SET email=? WHERE codigo=?', [email, cod]);
     await audit(String(u.codigo), 'email-usuario:' + cod);
     return json({ ok: true });
+  }
+  if (path === '/admin/sistema') {
+    // Somente leitura: nenhuma consulta altera dados. Valores reais do servidor e do banco (nada fixo).
+    await requireAdmin(c);
+    if (method !== 'GET') return fail(405, 'Somente consulta.');
+    const tabelas = await q1("SELECT COUNT(*) n, COALESCE(SUM(data_length+index_length),0) b FROM information_schema.tables WHERE table_schema=DATABASE()");
+    const regs = await q1('SELECT COUNT(*) n FROM records'), arq = await q1('SELECT COUNT(*) n, COALESCE(SUM(tamanho),0) b FROM arquivos');
+    const mig = await q1('SELECT COUNT(*) n, MAX(name) ultima FROM schema_migrations');
+    const bk = await q1('SELECT nome,criado_em FROM backups ORDER BY criado_em DESC LIMIT 1');
+    return json({
+      versao: EVO_VERSION, node: process.version, ambiente: env('NODE_ENV') === 'production' ? 'Produção' : 'Desenvolvimento ou teste', fuso: env('TIMEZONE', 'America/Fortaleza'),
+      banco: { tabelas: Number(tabelas?.n ?? 0), bytes: Number(tabelas?.b ?? 0) }, registros: Number(regs?.n ?? 0), arquivos: { total: Number(arq?.n ?? 0), bytes: Number(arq?.b ?? 0) },
+      migracoes: { aplicadas: Number(mig?.n ?? 0), ultima: strv(mig?.ultima) }, ultimoBackup: bk ? { nome: strv(bk.nome), criadoEm: strv(bk.criado_em) } : null,
+    });
   }
   if (path === '/admin/migracao') {
     const r = await q1("SELECT v,criado_em FROM relatorio_migracao WHERE k='cinco_areas'");

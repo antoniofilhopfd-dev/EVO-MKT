@@ -1,26 +1,23 @@
-/* Configurações: tudo o que não é trabalho do dia a dia.
-   Geral · Perfis e segmentos · Acessos internos · Instagram · Meta Ads · Google · IA · E-mail · Backup e restauração · Auditoria · Prontidão.
-   Só o Administrador vê o que mexe em acessos, integrações, backup e auditoria (o servidor confere de novo em cada rota). */
-const CFG_SECOES = [['geral', 'Geral', false], ['perfis', 'Perfis e segmentos', false], ['acessos', 'Acessos internos', true], ['instagram', 'Instagram', true], ['metaads', 'Meta Ads', true], ['google', 'Google', true], ['agendas', 'Agendas Google', true], ['ia', 'IA', true], ['email', 'E-mail', true], ['backup', 'Backup e restauração', true], ['auditoria', 'Auditoria', true], ['prontidao', 'Prontidão', false]];
-const CFG = { aba: pref('cfgAba', 'geral') };
-const cfgVisiveis = () => CFG_SECOES.filter(([, , adm]) => !adm || internalSession?.admin);
+/* Configurações: cinco áreas (Geral, Usuários e Permissões, Integrações, Segurança e Dados do Sistema), cada uma com as próprias abas.
+   O que mexe em acessos, integrações, backup e logs é só do Administrador; o servidor confere de novo em cada rota.
+   E-mail (SMTP) não é mais configurado aqui. Google Drive aparece como integração ainda não implementada, sem afirmar nada que não exista. */
+const CFG_AREAS = [
+  { k: 'geral', t: 'Geral', d: 'Informações da escola, aparência, preferências e segmentos.', ic: '⚙', adm: false, abas: [['escola', 'Informações da Escola'], ['aparencia', 'Aparência'], ['preferencias', 'Preferências'], ['segmentos', 'Segmentos']] },
+  { k: 'usuarios', t: 'Usuários e Permissões', d: 'Gerencie usuários, perfis e permissões de acesso.', ic: '☺', adm: true, abas: [['usuarios', 'Usuários'], ['perfis', 'Perfis'], ['permissoes', 'Permissões']] },
+  { k: 'integracoes', t: 'Integrações', d: 'Conecte e gerencie Google Agenda, Meta (Instagram e Tráfego Pago) e Google Drive.', ic: '∞', adm: true, abas: [] },
+  { k: 'seguranca', t: 'Segurança', d: 'Autenticação, backups e logs de acesso e alterações.', ic: '◈', adm: true, abas: [['autenticacao', 'Autenticação'], ['backups', 'Backups'], ['logs', 'Logs de Acesso']] },
+  { k: 'dados', t: 'Dados do Sistema', d: 'Informações do sistema, diagnóstico e manutenção.', ic: '▤', adm: false, abas: [['informacoes', 'Informações'], ['diagnostico', 'Diagnóstico'], ['manutencao', 'Manutenção']] },
+];
+const CFG = { sec: '', aba: '', sub: '', interno: false };
+/** Redesenha Configurações mantendo a área e a aba abertas; chegar de outra página (menu ou atalho) volta à tela inicial. */
+const cfgIr = () => { CFG.interno = true; go('configuracoes'); };
+const cfgAdm = () => !!internalSession?.admin;
+const cfgAreasVisiveis = () => CFG_AREAS.filter(a => !a.adm || cfgAdm());
+/** Abas de uma área para esta pessoa: quem não é Administrador só vê o Diagnóstico (prontidão) em Dados do Sistema. */
+const cfgAbasDe = a => a.k === 'dados' && !cfgAdm() ? a.abas.filter(x => x[0] === 'diagnostico') : a.abas;
 const cfgBadge = (on, ok, nao = 'Não conectado') => `<span class="badge ${on ? 'ok' : 'mute'}">${on ? esc(ok) : esc(nao)}</span>`;
 const cfgUri = (rot, u) => `<div class="uri-row"><small>${esc(rot)}</small><code>${esc(u)}</code><button type="button" class="btn soft" data-copiar="${attr(u)}">Copiar</button></div>`;
-
-PAGINAS.configuracoes = async function () {
-  const vis = cfgVisiveis();
-  if (!vis.some(x => x[0] === CFG.aba)) CFG.aba = 'geral';
-  const q = new URLSearchParams(location.search), retorno = q.get('int');
-  $('#content').innerHTML = `<div class="cfg"><nav class="cfg-nav" aria-label="Seções de Configurações">${vis.map(([k, l]) => `<button type="button" data-cfg="${k}" class="${CFG.aba === k ? 'active' : ''}" ${CFG.aba === k ? 'aria-current="page"' : ''}>${esc(l)}</button>`).join('')}</nav><div class="cfg-body" id="cfgCorpo"><div class="loading"><span></span><b>Carregando…</b></div></div></div>`;
-  $$('[data-cfg]').forEach(b => { b.onclick = () => { CFG.aba = b.dataset.cfg; setPref('cfgAba', CFG.aba); go('configuracoes'); }; });
-  const corpo = $('#cfgCorpo');
-  try {
-    await ({ geral: cfgGeral, perfis: cfgPerfis, acessos: cfgAcessos, instagram: cfgInstagram, metaads: cfgMetaAds, google: cfgGoogle, agendas: cfgAgendas, ia: cfgIA, email: cfgEmail, backup: cfgBackup, auditoria: cfgAuditoria, prontidao: cfgProntidao }[CFG.aba] || cfgGeral)(corpo);
-  } catch (e) { corpo.innerHTML = `<div class="error-state"><h2>Não foi possível carregar</h2><p>${esc(e.message)}</p></div>`; }
-  $$('[data-copiar]', corpo).forEach(b => { b.onclick = () => copiar(b.dataset.copiar, 'Copiado'); });
-  if (retorno) { const msg = new URLSearchParams(location.search).get('msg'); toast(/_ok$/.test(retorno) ? 'Conexão concluída' : `Conexão não concluída${msg ? ': ' + msg : ''}`, /_ok$/.test(retorno) ? 'ok' : 'warn'); history.replaceState(null, '', '?page=configuracoes'); }
-};
-const salvaCred = async (formId, extra = {}) => { const f = Object.fromEntries(new FormData($(formId)).entries()); try { await post('/integrations/settings', { ...f, ...extra }); toast('Salvo'); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); } };
+const salvaCred = async (formId, extra = {}) => { const f = Object.fromEntries(new FormData($(formId)).entries()); try { await post('/integrations/settings', { ...f, ...extra }); toast('Salvo'); cfgIr(); } catch (e) { toast(e.message, 'warn'); } };
 
 /* ---- Geral ---- */
 async function cfgGeral(corpo) {
@@ -45,8 +42,8 @@ async function cfgGeral(corpo) {
   const form = r => {
     const e = !!r; r = r || {};
     const o = dialogo(`<h3>${e ? 'Editar informação' : 'Nova informação'}</h3><form class="cm-form" id="iForm"><label class="wide">Título *<input class="control" id="iT" maxlength="140" value="${attr(r.titulo || '')}"></label><label class="wide">Texto<textarea class="control" id="iD" rows="5" maxlength="2000">${esc(r.descricao || '')}</textarea></label><div class="cm-erro wide" id="iErr" role="alert"></div><div class="actions wide">${e ? '<button type="button" class="btn danger-soft" id="iDel">Excluir</button>' : ''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Cancelar</button><button class="btn" type="submit">Salvar</button></div></form>`);
-    $('#iForm', o.el).onsubmit = async ev => { ev.preventDefault(); const b = { titulo: $('#iT', o.el).value.trim(), descricao: $('#iD', o.el).value.trim() }; if (b.titulo.length < 3) { $('#iErr', o.el).textContent = 'Dê um título.'; return; } try { if (e) await put(`/data?module=configuracoes&id=${encodeURIComponent(r.id)}`, b); else await post('/data?module=configuracoes', b); invalidate('configuracoes'); o.close(); go('configuracoes'); } catch (er) { $('#iErr', o.el).textContent = er.message; } };
-    const d = $('#iDel', o.el); if (d) d.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Excluir informação', texto: `Excluir “${r.titulo}”?`, confirmar: 'Excluir', perigo: true })) return; try { await api(`/data?module=configuracoes&id=${encodeURIComponent(r.id)}`, { method: 'DELETE' }); invalidate('configuracoes'); o.close(); go('configuracoes'); } catch (er) { toast(er.message, 'warn'); } };
+    $('#iForm', o.el).onsubmit = async ev => { ev.preventDefault(); const b = { titulo: $('#iT', o.el).value.trim(), descricao: $('#iD', o.el).value.trim() }; if (b.titulo.length < 3) { $('#iErr', o.el).textContent = 'Dê um título.'; return; } try { if (e) await put(`/data?module=configuracoes&id=${encodeURIComponent(r.id)}`, b); else await post('/data?module=configuracoes', b); invalidate('configuracoes'); o.close(); cfgIr(); } catch (er) { $('#iErr', o.el).textContent = er.message; } };
+    const d = $('#iDel', o.el); if (d) d.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Excluir informação', texto: `Excluir “${r.titulo}”?`, confirmar: 'Excluir', perigo: true })) return; try { await api(`/data?module=configuracoes&id=${encodeURIComponent(r.id)}`, { method: 'DELETE' }); invalidate('configuracoes'); o.close(); cfgIr(); } catch (er) { toast(er.message, 'warn'); } };
   };
   $('#instNova').onclick = () => form(null);
   $$('[data-inst]').forEach(b => { b.onclick = () => form(inst.find(r => r.id === b.dataset.inst)); });
@@ -66,7 +63,7 @@ async function cfgAcessos(corpo) {
   corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Acessos internos</h2><div><button class="btn soft" id="modoBtn">${modo === 'codigo' ? 'Voltar a código + senha' : 'Entrar só com código'}</button> <button class="btn" id="novaFicha">+ Nova ficha</button></div></div>
     <p class="kpi-note">Só a equipe de Marketing tem acesso. Não existe Portal para outras áreas. O e-mail é usado para avisos de atribuição.</p>
     <div class="tablewrap"><table class="datatable"><thead><tr><th>Código</th>${modo === 'codigo' ? '<th>Acesso</th>' : ''}<th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th>Ações</th></tr></thead><tbody>${users.map(u => `<tr><td>${esc(u.codigo)}</td>${modo === 'codigo' ? `<td><code>${esc(u.acesso || '—')}</code></td>` : ''}<td class="titlecell">${esc(u.nome)}</td><td>${esc(u.email || '—')} <button class="btn soft" data-email="${attr(u.codigo)}|${attr(u.email || '')}" aria-label="Editar e-mail de ${attr(u.nome)}">Editar</button></td><td><select class="control" data-nivel="${attr(u.codigo)}" aria-label="Perfil de ${attr(u.nome)}"><option value="team" ${u.nivel !== 'admin' ? 'selected' : ''}>Equipe</option><option value="admin" ${u.nivel === 'admin' ? 'selected' : ''}>Administrador</option></select></td><td>${u.ativo ? '<span class="badge ok">Ativo</span>' : '<span class="badge mute">Inativo</span>'}${u.pediuReset ? ' <span class="badge warn">pediu nova senha</span>' : ''}</td><td class="acoes-cel"><button class="btn soft" data-reset="${attr(u.codigo)}">${modo === 'codigo' ? 'Novo código' : 'Nova senha'}</button><button class="btn soft" data-ativo="${attr(u.codigo)}|${u.ativo ? 0 : 1}">${u.ativo ? 'Desativar' : 'Ativar'}</button><button class="btn soft" data-exp="${attr(u.codigo)}">Exportar dados</button><button class="btn danger-soft" data-del="${attr(u.codigo)}|${attr(u.nome)}">Excluir</button></td></tr>`).join('')}</tbody></table></div></section>`;
-  const recarrega = () => go('configuracoes');
+  const recarrega = () => cfgIr();
   const mostraAcesso = (titulo, texto, valor) => dialogo(`<h3>${esc(titulo)}</h3><p>${esc(texto)}</p><div class="temp-pass">${esc(valor)}</div><p class="kpi-note">Anote agora: depois disso a senha temporária não aparece de novo.</p><div class="actions"><button class="btn soft" data-close id="okAcesso">Fechar</button></div>`, { aoFechar: recarrega });
   $('#modoBtn').onclick = async () => { const novo = modo === 'codigo' ? 'senha' : 'codigo'; if (!await Dlg.confirmar({ titulo: 'Mudar o modo de entrada', texto: novo === 'codigo' ? 'Entrar só com código: quem ainda não tem código recebe um novo; ninguém precisará de senha.' : 'Voltar a código + senha: cada pessoa precisará definir uma senha no próximo acesso.', confirmar: 'Mudar' })) return; try { await post('/admin/mode', { modo: novo }); toast('Modo atualizado'); recarrega(); } catch (e) { toast(e.message, 'warn'); } };
   $('#novaFicha').onclick = () => {
@@ -95,10 +92,10 @@ async function cfgInstagram(corpo) {
     <div class="actions"><button class="btn" id="igSync">Sincronizar agora</button></div>` : ''}</section>
     <section class="card"><div class="db-tit"><h2>Fila de publicação automática</h2></div>${fila.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Publicação</th><th>Quando</th><th>Estado</th><th></th></tr></thead><tbody>${fila.map(c => `<tr><td class="titlecell">${esc(c.titulo)}<br><small>${esc(c.id)}</small></td><td>${esc(fmtDateTime(c.publicacaoEm))}</td><td>${esc(c.estado || (c.publicado ? 'Publicado' : 'Aguardando'))}${c.erro ? `<br><small class="bad">${esc(c.erro)}</small>` : ''}</td><td>${c.estado === 'ERRO' ? `<button class="btn soft" data-retry="${attr(c.id)}">Tentar de novo</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty compact">Nenhuma publicação agendada para sair sozinha.</div>'}</section>`;
   $('#metaForm').onsubmit = e => { e.preventDefault(); salvaCred('#metaForm'); };
-  const d = $('#metaDesc'); if (d) d.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Desconectar a Meta', texto: 'O sistema deixa de ler o Instagram e os anúncios até reconectar. Nada é apagado na Meta.', confirmar: 'Desconectar', perigo: true })) return; try { await post('/integrations/meta/disconnect', {}); go('configuracoes'); } catch (er) { toast(er.message, 'warn'); } };
+  const d = $('#metaDesc'); if (d) d.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Desconectar a Meta', texto: 'O sistema deixa de ler o Instagram e os anúncios até reconectar. Nada é apagado na Meta.', confirmar: 'Desconectar', perigo: true })) return; try { await post('/integrations/meta/disconnect', {}); cfgIr(); } catch (er) { toast(er.message, 'warn'); } };
   $$('[data-mon]', corpo).forEach(cb => { cb.onchange = async () => { const ids = $$('[data-mon]', corpo).filter(x => x.checked).map(x => x.dataset.mon); try { await post('/integrations/meta/account', { monitorar: ids }); toast('Perfis acompanhados atualizados'); } catch (e) { toast(e.message, 'warn'); } }; });
-  const s = $('#igSync'); if (s) s.onclick = async () => { s.disabled = true; try { await post('/integrations/instagram/sync', {}); toast('Instagram sincronizado'); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); s.disabled = false; } };
-  $$('[data-retry]', corpo).forEach(b => { b.onclick = async () => { try { await post('/integrations/instagram/retry', { id: b.dataset.retry }); toast('Nova tentativa na próxima rodada'); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); } }; });
+  const s = $('#igSync'); if (s) s.onclick = async () => { s.disabled = true; try { await post('/integrations/instagram/sync', {}); toast('Instagram sincronizado'); cfgIr(); } catch (e) { toast(e.message, 'warn'); s.disabled = false; } };
+  $$('[data-retry]', corpo).forEach(b => { b.onclick = async () => { try { await post('/integrations/instagram/retry', { id: b.dataset.retry }); toast('Nova tentativa na próxima rodada'); cfgIr(); } catch (e) { toast(e.message, 'warn'); } }; });
 }
 
 /* ---- Meta Ads ---- */
@@ -112,8 +109,8 @@ async function cfgMetaAds(corpo) {
     <div class="actions"><button class="btn soft" id="adLista">Buscar contas na Meta</button><button class="btn" id="adSalva">Usar esta conta</button><button class="btn soft" id="adSync">Sincronizar agora</button></div></div>
     <p class="kpi-note">Última sincronização: ${ad.ultimaSync ? esc(fmtDateTime(ad.ultimaSync)) : 'nunca'}</p></section>`;
   $('#adLista').onclick = async () => { try { const r = await api('/integrations/ads/accounts'); contas = r.contas || []; const sel = $('#adConta'); sel.innerHTML = '<option value="">Escolha a conta</option>' + contas.map(c => `<option value="${attr(c.id)}">${esc(c.nome || c.id)}</option>`).join(''); toast(`${contas.length} conta(s) encontrada(s)`); } catch (e) { toast(e.message, 'warn'); } };
-  $('#adSalva').onclick = async () => { const v = $('#adConta').value; if (!v) return toast('Escolha a conta primeiro.', 'warn'); try { await post('/integrations/ads/account', { conta: v }); toast('Conta de anúncios definida'); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); } };
-  $('#adSync').onclick = async () => { try { await post('/integrations/ads/sync', {}); toast('Anúncios sincronizados'); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); } };
+  $('#adSalva').onclick = async () => { const v = $('#adConta').value; if (!v) return toast('Escolha a conta primeiro.', 'warn'); try { await post('/integrations/ads/account', { conta: v }); toast('Conta de anúncios definida'); cfgIr(); } catch (e) { toast(e.message, 'warn'); } };
+  $('#adSync').onclick = async () => { try { await post('/integrations/ads/sync', {}); toast('Anúncios sincronizados'); cfgIr(); } catch (e) { toast(e.message, 'warn'); } };
 }
 
 /* ---- Google ---- */
@@ -125,12 +122,12 @@ async function cfgGoogle(corpo) {
     ${gg.conectado ? `<div class="admin-form"><label>Agenda sincronizada (leitura e escrita)<select class="control" id="gCalSel"><option value="">${gg.calendarioId ? 'Agenda atual (carregando…)' : 'Nenhuma (sincronização desligada)'}</option></select></label><p class="kpi-note">Nesta agenda o sistema grava as publicações e compromissos e importa o que for criado no Google. Última sincronização: ${gg.ultimaAgenda ? esc(fmtDateTime(gg.ultimaAgenda)) : 'nunca'}.</p><label class="check-row"><input type="checkbox" id="gImp" ${gg.importar ? 'checked' : ''}> Importar para o Calendário os eventos criados direto no Google</label><div class="actions"><button class="btn" id="gSync">Sincronizar agora</button><button class="btn soft" id="gLimpa">Remover eventos importados do sistema</button></div></div>
       <p class="kpi-note">As agendas que aparecem no Calendário Geral são cadastradas em <b>Configurações › Agendas Google</b>.</p>` : ''}</section>`;
   $('#gForm').onsubmit = e => { e.preventDefault(); salvaCred('#gForm'); };
-  const d = $('#gDisc'); if (d) d.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Desconectar o Google', texto: 'A sincronização da Agenda para. Nada é apagado no Google.', confirmar: 'Desconectar', perigo: true })) return; try { await post('/integrations/google/disconnect', {}); go('configuracoes'); } catch (er) { toast(er.message, 'warn'); } };
+  const d = $('#gDisc'); if (d) d.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Desconectar o Google', texto: 'A sincronização da Agenda para. Nada é apagado no Google.', confirmar: 'Desconectar', perigo: true })) return; try { await post('/integrations/google/disconnect', {}); cfgIr(); } catch (er) { toast(er.message, 'warn'); } };
   if (!gg.conectado) return;
   api('/integrations/google/calendars').then(r => { const lista = r.calendarios || r.rows || r; const sel = $('#gCalSel'); if (!sel || !Array.isArray(lista)) return; sel.innerHTML = `<option value="">Nenhuma (sincronização desligada)</option>` + lista.map(c => `<option value="${attr(c.id)}" ${c.atual ? 'selected' : ''}>${esc(c.nome)}${c.principal ? ' (principal)' : ''}</option>`).join(''); }).catch(() => {});
-  $('#gCalSel').onchange = async e => { if (!await Dlg.confirmar({ titulo: 'Trocar a agenda', texto: 'Os vínculos da agenda anterior saem; os eventos que já estão lá continuam como estão. Em uma agenda que já tem eventos, o sistema só adiciona os seus.', confirmar: 'Trocar' })) return go('configuracoes'); try { await post('/integrations/google/calendar/choose', { id: e.target.value }); toast('Agenda escolhida'); go('configuracoes'); } catch (er) { toast(er.message, 'warn'); } };
+  $('#gCalSel').onchange = async e => { if (!await Dlg.confirmar({ titulo: 'Trocar a agenda', texto: 'Os vínculos da agenda anterior saem; os eventos que já estão lá continuam como estão. Em uma agenda que já tem eventos, o sistema só adiciona os seus.', confirmar: 'Trocar' })) return cfgIr(); try { await post('/integrations/google/calendar/choose', { id: e.target.value }); toast('Agenda escolhida'); cfgIr(); } catch (er) { toast(er.message, 'warn'); } };
   $('#gImp').onchange = async e => { try { await post('/integrations/settings', { g_importar: e.target.checked }); toast('Salvo'); } catch (er) { toast(er.message, 'warn'); } };
-  $('#gSync').onclick = async () => { try { const r = await post('/integrations/google/calendar/sync', {}); toast(`Agenda sincronizada (${(r.do_google || 0) + (r.para_google || 0)} mudanças)`); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); } };
+  $('#gSync').onclick = async () => { try { const r = await post('/integrations/google/calendar/sync', {}); toast(`Agenda sincronizada (${(r.do_google || 0) + (r.para_google || 0)} mudanças)`); cfgIr(); } catch (e) { toast(e.message, 'warn'); } };
   $('#gLimpa').onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Remover eventos importados', texto: 'Remove do sistema os eventos que vieram do Google. Não apaga nada no Google.', confirmar: 'Remover', perigo: true })) return; try { const r = await post('/integrations/google/calendar/limpar-importados', {}); toast(`${r.removidos ?? 0} evento(s) removido(s) do sistema`); } catch (e) { toast(e.message, 'warn'); } };
 }
 
@@ -141,16 +138,7 @@ async function cfgIA(corpo) {
     <p class="kpi-note">A IA só escreve <b>rascunhos</b> de variações de legenda dentro de uma publicação. Nada é salvo nem publicado sozinho. Fica desligada até você colar uma chave. A chave é guardada criptografada no servidor e não volta para a tela.</p>
     <form id="iaForm" class="admin-form"><label>Chave da API (Anthropic)<input name="anthropic_key" type="password" autocomplete="off" placeholder="${ia.ativa ? '•••••••• (já salva; deixe vazio para manter)' : 'Cole a chave'}"></label><label>Guia de voz do Colégio (opcional)<textarea class="control" name="ia_guia_voz" rows="5" maxlength="1500" placeholder="Ex.: tom acolhedor, trate as famílias por “vocês”, evite gírias.">${esc(ia.guiaVoz || '')}</textarea></label><div class="actions"><button class="btn" type="submit">Salvar</button>${ia.ativa ? '<button type="button" class="btn danger-soft" id="iaOff">Remover a chave e desligar</button>' : ''}</div></form></section>`;
   $('#iaForm').onsubmit = e => { e.preventDefault(); salvaCred('#iaForm'); };
-  const off = $('#iaOff'); if (off) off.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Desligar a IA', texto: 'A chave é apagada do servidor. As publicações não mudam.', confirmar: 'Desligar', perigo: true })) return; try { await post('/integrations/settings', { ia_remover_chave: true }); toast('IA desligada'); go('configuracoes'); } catch (er) { toast(er.message, 'warn'); } };
-}
-
-/* ---- E-mail ---- */
-async function cfgEmail(corpo) {
-  const pr = await api('/integrations/prontidao');
-  const smtp = pr.itens.find(i => i.id === 'smtp');
-  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>E-mail de avisos</h2>${cfgBadge(smtp?.ok, 'Configurado', 'Não configurado')}</div>
-    <p class="kpi-note">Usado para avisar a Gerência de falhas nas integrações e para avisar uma pessoa quando uma publicação é atribuída a ela (se ela tiver e-mail em Acessos internos). O servidor de e-mail é configurado nas variáveis de ambiente da hospedagem (SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT, MAIL_FROM e NOTIFY_TO); por segurança elas não ficam editáveis nesta tela.</p>
-    <div class="setting-row"><div><b>Situação</b><small>${smtp?.ok ? 'SMTP e destinatário da Gerência definidos.' : esc(smtp?.como || '')}</small></div></div></section>`;
+  const off = $('#iaOff'); if (off) off.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Desligar a IA', texto: 'A chave é apagada do servidor. As publicações não mudam.', confirmar: 'Desligar', perigo: true })) return; try { await post('/integrations/settings', { ia_remover_chave: true }); toast('IA desligada'); cfgIr(); } catch (er) { toast(er.message, 'warn'); } };
 }
 
 /* ---- Backup e restauração ---- */
@@ -162,7 +150,7 @@ async function cfgBackup(corpo) {
     <section class="card"><div class="db-tit"><h2>Migração para as cinco áreas</h2></div>${mig?.relatorio ? cfgRelatorioMigracao(mig.relatorio, mig.criadoEm) : '<div class="empty compact">Esta instalação não passou pela migração (instalação nova).</div>'}</section>
     <section class="card"><div class="db-tit"><h2>Arquivos sem vínculo</h2></div><p class="kpi-note">Arquivos guardados que nenhuma publicação usa. Nada é apagado sozinho: você escolhe, e um backup completo é feito antes.</p>${orf && orf.total ? `<p>${orf.total} arquivo(s), ${(orf.bytes / 1048576).toFixed(1)} MB</p><div class="tablewrap"><table class="datatable"><tbody>${orf.rows.map(r => `<tr><td><label><input type="checkbox" data-orf="${attr(r.caminho)}"> <code>${esc(r.caminho)}</code></label></td><td class="num">${(r.tamanho / 1024).toFixed(0)} KB</td></tr>`).join('')}</tbody></table></div><div class="actions"><button class="btn danger-soft" id="orfDel">Excluir os selecionados</button></div>` : '<div class="empty compact">Nenhum arquivo sem vínculo.</div>'}</section>
     <section class="card"><div class="db-tit"><h2>Histórico de backups</h2></div>${log.length ? `<div class="tablewrap"><table class="datatable"><tbody>${log.slice(0, 15).map(l => `<tr><td>${esc(fmtDateTime(l.quando))}</td><td>${esc(l.acao)}</td><td>${esc(l.status)}</td><td>${esc(l.detalhe || '')}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty compact">Sem registros.</div>'}</section>`;
-  const novo = async completo => { try { const r = await post('/backup', { completo }); toast('Backup criado: ' + r.file); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); } };
+  const novo = async completo => { try { const r = await post('/backup', { completo }); toast('Backup criado: ' + r.file); cfgIr(); } catch (e) { toast(e.message, 'warn'); } };
   $('#bkNovo').onclick = () => novo(false); $('#bkCompleto').onclick = () => novo(true);
   $$('[data-val]', corpo).forEach(b => { b.onclick = async () => {
     try {
@@ -171,7 +159,7 @@ async function cfgBackup(corpo) {
       $('#bkOk', o.el).onclick = async () => { $('#bkOk', o.el).disabled = true; try { const r = await post('/backup/restore', { file: b.dataset.val }); o.close(); await Dlg.aviso({ titulo: 'Backup restaurado', texto: `Pronto. Backup de segurança: ${r.seguranca}.` }); location.reload(); } catch (e) { toast(e.message, 'warn'); $('#bkOk', o.el).disabled = false; } };
     } catch (e) { toast(e.message, 'warn'); }
   }; });
-  const od = $('#orfDel'); if (od) od.onclick = async () => { const sel = $$('[data-orf]').filter(x => x.checked).map(x => x.dataset.orf); if (!sel.length) return toast('Escolha ao menos um arquivo.', 'warn'); if (!await Dlg.confirmar({ titulo: 'Excluir arquivos', texto: `Excluir ${sel.length} arquivo(s) sem vínculo? Um backup completo é feito antes.`, confirmar: 'Excluir', perigo: true })) return; try { const r = await post('/admin/arquivos-sem-vinculo/excluir', { caminhos: sel, confirmar: true }); toast(`${r.excluidos} arquivo(s) excluído(s)`); go('configuracoes'); } catch (e) { toast(e.message, 'warn'); } };
+  const od = $('#orfDel'); if (od) od.onclick = async () => { const sel = $$('[data-orf]').filter(x => x.checked).map(x => x.dataset.orf); if (!sel.length) return toast('Escolha ao menos um arquivo.', 'warn'); if (!await Dlg.confirmar({ titulo: 'Excluir arquivos', texto: `Excluir ${sel.length} arquivo(s) sem vínculo? Um backup completo é feito antes.`, confirmar: 'Excluir', perigo: true })) return; try { const r = await post('/admin/arquivos-sem-vinculo/excluir', { caminhos: sel, confirmar: true }); toast(`${r.excluidos} arquivo(s) excluído(s)`); cfgIr(); } catch (e) { toast(e.message, 'warn'); } };
 }
 function cfgRelatorioMigracao(r, quando) {
   const rem = Object.entries(r.removidos || {}).filter(([, n]) => n);
@@ -189,7 +177,8 @@ async function cfgAuditoria(corpo) {
 
 /* ---- Prontidão ---- */
 async function cfgProntidao(corpo) {
-  const pr = await api('/integrations/prontidao'), r = pr.resumo || {};
+  const pr0 = await api('/integrations/prontidao'), r = pr0.resumo || {};
+  const pr = { ...pr0, itens: pr0.itens.filter(i => i.id !== 'smtp') }; pr.pronto = !pr.itens.some(i => !i.ok && i.nivel === 'erro'); // e-mail (SMTP) não é mais configurado aqui
   const lin = (rot, v) => `<div class="setting-row"><div><b>${rot}</b></div><span class="pr-val">${esc(typeof v === 'object' ? Object.entries(v).map(([k, x]) => `${{ instagram: 'Instagram', anuncios: 'Anúncios', google: 'Google' }[k] || k}: ${x ? fmtDateTime(x) : 'nunca'}`).join(' · ') : v || '—')}</span></div>`;
   corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Prontidão do sistema</h2>${cfgBadge(pr.pronto, 'Pronto', 'Falta configurar')}</div>
     ${lin('Conexão com a Meta', r.conexaoMeta)}${lin('Conexão com o Google', r.conexaoGoogle)}${lin('Última sincronização', r.ultimaSincronizacao || {})}${lin('Próxima sincronização', r.proximaSincronizacao)}${lin('Última falha', r.ultimaFalha)}${lin('Validade do token da Meta', r.validadeToken ? (/^\d{4}-/.test(r.validadeToken) ? fmtDateTime(r.validadeToken) : r.validadeToken) : '—')}${lin('Versão da API da Meta', r.versaoApi)}${lin('Último backup', r.ultimoBackup)}${lin('Integridade do banco', r.integridade)}${lin('Versão instalada', r.versaoInstalada)}${lin('Ambiente', r.ambiente)}</section>
@@ -229,4 +218,166 @@ async function cfgAgendas(corpo) {
     $('#agSel', o.el).onchange = e => { if (e.target.value) $('#agId', o.el).value = e.target.value; };
     $('#agOk', o.el).onclick = async ev => { const b = ev.currentTarget, id = $('#agId', o.el).value.trim(); b.disabled = true; try { await post('/agendas/adicionar', { id }); o.close(); toast('Agenda cadastrada'); recarrega(); } catch (e) { const x = $('#agErro', o.el); x.textContent = e.message; x.hidden = false; b.disabled = false; } };
   };
+}
+
+
+/* ================= nova navegação: hub de cinco áreas ================= */
+/** Reaproveita uma tela antiga que desenha vários cartões, mantendo só os cartões pedidos (os eventos já foram ligados dentro dela). */
+async function cfgPartes(corpo, fn, indices) { await fn(corpo); [...corpo.querySelectorAll(':scope > section.card')].forEach((c, i) => { if (!indices.includes(i)) c.remove(); }); }
+const cfgVoltar = (rot, alvo) => `<button type="button" class="btn soft cfg-voltar" data-cfg-sec="${alvo}">‹ ${esc(rot)}</button>`;
+
+PAGINAS.configuracoes = async function () {
+  const q = new URLSearchParams(location.search), retorno = q.get('int');
+  if (!CFG.interno && !retorno) { CFG.sec = ''; CFG.aba = ''; CFG.sub = ''; }
+  CFG.interno = false;
+  if (retorno) { CFG.sec = 'integracoes'; CFG.sub = /^(g|google)/i.test(retorno) ? 'google' : 'meta'; }
+  const vis = cfgAreasVisiveis(), area = vis.find(a => a.k === CFG.sec);
+  if (!area) { CFG.sec = ''; CFG.aba = ''; CFG.sub = ''; }
+  if (area && !CFG.aba && area.abas.length) CFG.aba = cfgAbasDe(area)[0][0];
+  if (area && area.abas.length && !cfgAbasDe(area).some(x => x[0] === CFG.aba)) CFG.aba = cfgAbasDe(area)[0][0];
+  if (!CFG.sec) {
+    $('#content').innerHTML = `<div class="cfg2"><div class="cfg-cartoes">${vis.map(a => `<article class="card cfg-cartao"><span class="cfg-ico" aria-hidden="true">${a.ic}</span><div><h2>${esc(a.t)}</h2><p>${esc(a.d)}</p></div><button type="button" class="btn soft" data-cfg-sec="${a.k}">Acessar →</button></article>`).join('')}</div></div>`;
+  } else {
+    const abas = cfgAbasDe(area);
+    const trilha = `<nav class="cfg-mig" aria-label="Caminho"><button type="button" data-cfg-sec="">Configurações</button> › ${CFG.sub ? `<button type="button" data-cfg-sec="${area.k}" data-cfg-sub="">${esc(area.t)}</button> › <span>${esc({ google: 'Google Agenda', meta: 'Meta (Instagram e Tráfego Pago)', drive: 'Google Drive' }[CFG.sub] || '')}</span>` : `<span>${esc(area.t)}</span>`}</nav>`;
+    $('#content').innerHTML = `<div class="cfg2">${trilha}${abas.length > 1 ? `<div class="cfg-tabs" role="tablist" aria-label="Seções de ${attr(area.t)}">${abas.map(([k, l]) => `<button type="button" role="tab" data-cfg-aba="${k}" aria-selected="${CFG.aba === k}" class="${CFG.aba === k ? 'active' : ''}">${esc(l)}</button>`).join('')}</div>` : ''}<div class="cfg-body" id="cfgCorpo"><div class="loading"><span></span><b>Carregando…</b></div></div></div>`;
+  }
+  $$('[data-cfg-sec]').forEach(b => { b.onclick = () => { CFG.sec = b.dataset.cfgSec; CFG.aba = ''; CFG.sub = ''; cfgIr(); }; });
+  $$('[data-cfg-aba]').forEach(b => { b.onclick = () => { CFG.aba = b.dataset.cfgAba; cfgIr(); }; });
+  if (!CFG.sec) return;
+  const corpo = $('#cfgCorpo');
+  const mapa = {
+    'geral/escola': cfgEscola, 'geral/aparencia': cfgAparencia, 'geral/preferencias': cfgPreferencias, 'geral/segmentos': cfgSegmentos,
+    'usuarios/usuarios': cfgAcessos, 'usuarios/perfis': cfgPerfisAcesso, 'usuarios/permissoes': cfgPermissoes,
+    'integracoes/': cfgIntegracoes, 'seguranca/autenticacao': cfgAutenticacao, 'seguranca/backups': cfgBackup, 'seguranca/logs': cfgLogs,
+    'dados/informacoes': cfgInformacoes, 'dados/diagnostico': cfgDiagnostico, 'dados/manutencao': cfgManutencao,
+  };
+  try { await (mapa[`${CFG.sec}/${CFG.sec === 'integracoes' ? '' : CFG.aba}`] || cfgEscola)(corpo); }
+  catch (e) { corpo.innerHTML = `<div class="error-state"><h2>Não foi possível carregar</h2><p>${esc(e.message)}</p></div>`; }
+  $$('[data-copiar]', corpo).forEach(b => { b.onclick = () => copiar(b.dataset.copiar, 'Copiado'); });
+  if (retorno) { const msg = new URLSearchParams(location.search).get('msg'); toast(/_ok$/.test(retorno) ? 'Conexão concluída' : `Conexão não concluída${msg ? ': ' + msg : ''}`, /_ok$/.test(retorno) ? 'ok' : 'warn'); history.replaceState(null, '', '?page=configuracoes'); }
+};
+
+/* ---- Geral ---- */
+async function cfgEscola(corpo) {
+  corpo.innerHTML = '<section class="card"><div class="db-tit"><h2>Colégio Evolução</h2></div><p class="kpi-note">Cadastre abaixo os dados institucionais usados como referência pela equipe (CNPJ, telefone, e-mail institucional, endereço, missão, visão e valores). Nada aparece aqui sem ter sido cadastrado.</p></section><div id="cfgInst"></div>';
+  await cfgPartes($('#cfgInst'), cfgGeral, [2]);
+}
+async function cfgAparencia(corpo) {
+  const cores = [['Azul institucional', '#063996'], ['Laranja', '#FF7800'], ['Azul escuro', '#00275F'], ['Azul claro', '#00A1F3'], ['Amarelo', '#FAB900'], ['Roxo', '#793A8C'], ['Branco', '#FFFFFF']];
+  corpo.innerHTML = `<div class="cfg-duas"><section class="card"><div class="db-tit"><h2>Logo e identidade visual</h2></div><div class="cfg-logo"><img src="/img/logo-colegio.png" alt="Logo do Colégio Evolução"></div>
+    <p class="kpi-note">Logo atual do sistema, usada no menu, nos relatórios e nos PDFs. A troca da logo ainda não está disponível nesta tela: ela exige validar formato, dimensões e tamanho e confirmar a substituição, e não foi implementada nesta entrega.</p><button type="button" class="btn soft" disabled>Alterar logo (indisponível)</button></section>
+    <section class="card"><div class="db-tit"><h2>Cores do sistema</h2></div><p class="kpi-note">Paleta institucional fixa: as cores não são editáveis.</p><ul class="cfg-cores">${cores.map(([n, h]) => `<li><i style="background:${h}"></i><span>${n}</span><code>${h}</code></li>`).join('')}</ul></section></div>`;
+}
+async function cfgPreferencias(corpo) {
+  corpo.innerHTML = '<div id="cfgP"></div><div id="cfgIAbox"></div>';
+  await cfgPartes($('#cfgP'), cfgGeral, [0, 1]);
+  if (cfgAdm()) await cfgIA($('#cfgIAbox'));
+}
+async function cfgSegmentos(corpo) {
+  const segs = SEG_LISTA.filter(x => x[0] && x[0] !== 'TODOS');
+  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Segmentos escolares</h2></div><p class="kpi-note">Catálogo único usado em filtros, calendário, conteúdos e Tráfego. Alterar a taxonomia exige migração não destrutiva e testes, por isso a lista é somente leitura aqui; os cadastros e vínculos existentes são preservados.</p>
+    <ul class="cfg-segs">${segs.map(([k, n]) => `<li><b>${esc(n)}</b><code>${esc(k)}</code></li>`).join('')}</ul></section>
+    <section class="card"><div class="db-tit"><h2>Cores do Calendário Geral</h2></div><p class="kpi-note">Cada evento das agendas do Google usa a cor fixa do segmento (evento com mais de um segmento usa a cor institucional).</p><ul class="cfg-cores">${(typeof CG_GRUPOS !== 'undefined' ? CG_GRUPOS : []).map(([k, n, h]) => `<li><i style="background:${h}"></i><span>${esc(n)}</span><code>${h}</code></li>`).join('')}</ul></section><div id="cfgPerf"></div>`;
+  await cfgPerfis($('#cfgPerf'));
+}
+
+/* ---- Usuários e Permissões ---- */
+async function cfgPerfisAcesso(corpo) {
+  const users = await api('/admin/users'), adm = users.filter(u => u.nivel === 'admin' && u.ativo).length, eq = users.filter(u => u.nivel !== 'admin' && u.ativo).length;
+  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Perfis de acesso</h2></div><div class="tablewrap"><table class="datatable"><thead><tr><th>Perfil</th><th>O que pode</th><th class="num">Usuários ativos</th></tr></thead><tbody>
+    <tr><td><b>Administrador</b></td><td>Tudo da equipe, mais usuários e perfis, integrações, agendas do Google, backups e restauração, logs e dados do sistema.</td><td class="num">${adm}</td></tr>
+    <tr><td><b>Equipe de Marketing</b></td><td>Consulta Dashboard, Calendário, Instagram e Tráfego Pago; cria e edita publicações e eventos da agenda do Marketing; gera relatórios.</td><td class="num">${eq}</td></tr></tbody></table></div>
+    <p class="kpi-note">O sistema nunca deixa o último Administrador ativo ser rebaixado ou desativado. Mudanças de perfil ficam registradas nos logs. O acesso é por perfil: não há permissão separada por segmento.</p></section>`;
+}
+async function cfgPermissoes(corpo) {
+  const sim = '<span class="badge ok">Sim</span>', nao = '<span class="badge mute">Não</span>';
+  const L = [['Consultar Dashboard, Calendário, Instagram e Tráfego Pago', 1, 1], ['Criar e editar publicações e ideias', 1, 1], ['Criar, editar e excluir eventos na agenda do Marketing (Google)', 1, 1], ['Gerar relatórios do Tráfego Pago e do Instagram', 1, 1], ['Cadastrar e ajustar agendas do Google', 0, 1], ['Gerenciar usuários e perfis', 0, 1], ['Conectar ou desconectar Google e Meta', 0, 1], ['Fazer, baixar e restaurar backups', 0, 1], ['Ver logs de acesso e alterações', 0, 1], ['Ver dados do sistema e integridade', 0, 1]];
+  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Permissões por perfil</h2></div><div class="tablewrap"><table class="datatable"><thead><tr><th>Ação</th><th>Equipe de Marketing</th><th>Administrador</th></tr></thead><tbody>${L.map(([a, e, ad]) => `<tr><td>${esc(a)}</td><td>${e ? sim : nao}</td><td>${ad ? sim : nao}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">Estas regras são conferidas no servidor em cada rota; esconder um botão não é a proteção. Nas agendas do Google, só a agenda do Marketing aceita alterações; as demais são somente leitura.</p></section>`;
+}
+
+/* ---- Integrações: três cartões ---- */
+async function cfgIntegracoes(corpo) {
+  if (CFG.sub) {
+    const volta = `<div class="cfg-linha">${cfgVoltar('Integrações', 'integracoes')}</div>`;
+    corpo.innerHTML = volta + '<div id="cfgSubA"></div><div id="cfgSubB"></div>';
+    if (CFG.sub === 'google') { await cfgGoogle($('#cfgSubA')); await cfgAgendas($('#cfgSubB')); }
+    else if (CFG.sub === 'meta') { await cfgInstagram($('#cfgSubA')); await cfgMetaAds($('#cfgSubB')); }
+    else $('#cfgSubA').innerHTML = cfgDriveHtml();
+    $$('[data-cfg-sec]', corpo).forEach(b => { b.onclick = () => { CFG.sub = ''; cfgIr(); }; });
+    return;
+  }
+  const [st, pr] = await Promise.all([api('/integrations/status'), api('/integrations/prontidao').catch(() => null)]);
+  const sync = (pr && pr.resumo && pr.resumo.ultimaSincronizacao) || {};
+  const g = st.google, ig = st.instagram, ads = st.ads;
+  const estado = (on, invalido, configurado) => on ? ['ok', 'Conectado'] : invalido ? ['warn', 'Reconectar'] : configurado ? ['mute', 'Desconectado'] : ['mute', 'Pendente de configuração'];
+  const eg = estado(g.conectado, false, g.configurado), em = estado(ig.conectado && !ig.tokenInvalido, ig.tokenInvalido, ig.configurado);
+  const card = (k, nome, logo, txt, [cl, rot], conta, ult, podeDesconectar) => `<article class="card cfg-int"><div class="cfg-int-topo"><span class="cfg-int-logo" aria-hidden="true">${logo}</span><div><h2>${nome}</h2><span class="badge ${cl}">${esc(rot)}</span></div></div><p>${txt}</p>
+    <dl><div><dt>Conta conectada</dt><dd>${conta ? esc(conta) : '—'}</dd></div><div><dt>Última sincronização</dt><dd>${ult ? esc(fmtDateTime(ult)) : 'Ainda sem sincronização'}</dd></div></dl>
+    <div class="cfg-int-acoes"><button type="button" class="btn" data-cfg-conf="${k}">${k === 'drive' ? 'Ver detalhes' : cl === 'ok' ? 'Configurar' : cl === 'warn' ? 'Reconectar' : 'Conectar'}</button>${podeDesconectar ? `<button type="button" class="btn soft" data-cfg-desc="${k}" aria-label="Desconectar ${attr(nome)}">Desconectar</button>` : ''}</div></article>`;
+  corpo.innerHTML = `<div class="cfg-int-grade">${card('google', 'Google Agenda', '31', 'Calendário Geral escolar: lê os eventos das agendas cadastradas; só a agenda do Marketing aceita alterações.', eg, g.conectado ? g.email : '', g.ultimaAgenda || sync.google, g.conectado)}
+    ${card('meta', 'Meta (Instagram e Tráfego Pago)', '∞', 'Métricas do Instagram e dos anúncios. O Tráfego Pago é somente consulta: nada é criado, editado nem pausado.', em, ig.conectado ? [ig.pagina, ig.usuario ? '@' + ig.usuario : '', ads && ads.conta ? 'anúncios ' + ads.conta : ''].filter(Boolean).join(' · ') : '', ig.ultimaSync || sync.instagram, ig.conectado)}
+    ${card('drive', 'Google Drive', '▲', 'Os materiais das publicações aceitam o link de um arquivo do Drive. A conexão com a conta do Drive ainda não existe neste sistema.', ['mute', 'Não implementada'], '', '', false)}</div>`;
+  $$('[data-cfg-conf]', corpo).forEach(b => { b.onclick = () => { CFG.sub = b.dataset.cfgConf; cfgIr(); }; });
+  $$('[data-cfg-desc]', corpo).forEach(b => { b.onclick = async () => {
+    const k = b.dataset.cfgDesc, nome = k === 'google' ? 'Google Agenda' : 'Meta';
+    if (!await Dlg.confirmar({ titulo: `Desconectar ${nome}`, texto: k === 'google' ? 'O Calendário Geral deixa de ler as agendas do Google até reconectar. Nenhum evento é apagado no Google.' : 'Instagram e Tráfego Pago deixam de sincronizar até reconectar. Os dados já guardados não são apagados.', confirmar: 'Desconectar', perigo: true })) return;
+    try { await post(k === 'google' ? '/integrations/google/disconnect' : '/integrations/meta/disconnect', {}); toast(nome + ' desconectado'); cfgIr(); } catch (e) { toast(e.message, 'warn'); }
+  }; });
+}
+const cfgDriveHtml = () => '<section class="card"><div class="db-tit"><h2>Google Drive</h2><span class="badge mute">Não implementada</span></div><p>O EVO MKT não tem conexão com contas do Google Drive: nada é sincronizado nem lido do Drive. Nas publicações, o material pode ser registrado como <b>link</b> de um arquivo do Drive (o arquivo continua no Drive de quem o criou).</p><p class="kpi-note">Se a conexão for desenvolvida, usará o menor escopo necessário e tratará erros de permissão e de cota.</p></section>';
+
+/* ---- Segurança ---- */
+async function cfgAutenticacao(corpo) {
+  const modo = await api('/auth/mode').then(m => m.modo).catch(() => '');
+  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Autenticação e sessões</h2></div>
+    <div class="setting-row"><div><b>Forma de entrada</b><small>${modo === 'codigo' ? 'Só com o código do acesso.' : 'Código e senha.'} Altere em Usuários e Permissões › Usuários.</small></div><span class="badge ok">Ativa</span></div>
+    <div class="setting-row"><div><b>Senha obrigatória no primeiro acesso</b><small>Quem entra com a senha temporária é obrigado a trocá-la.</small></div><span class="badge ok">Ativa</span></div>
+    <div class="setting-row"><div><b>Limite de tentativas de login</b><small>Muitas tentativas erradas bloqueiam o acesso por 15 minutos e geram aviso por e-mail ao Administrador, quando o e-mail estiver configurado no servidor.</small></div><span class="badge ok">Ativo</span></div>
+    <div class="setting-row"><div><b>Sessões</b><small>Expiram sozinhas após algumas horas. A lista de sessões ativas por pessoa não existe nesta versão.</small></div><span class="badge mute">Sem gestão individual</span></div>
+    <div class="setting-row"><div><b>Verificação em duas etapas (2FA)</b><small>Não implementada.</small></div><span class="badge mute">Indisponível</span></div>
+    <div class="setting-row"><div><b>Bloqueio por inatividade</b><small>Preferência deste aparelho, em Geral › Preferências.</small></div><span class="badge ${String(pref('autoLockMinutes', '0')) === '0' ? 'mute' : 'ok'}">${String(pref('autoLockMinutes', '0')) === '0' ? 'Desativado' : pref('autoLockMinutes', '0') + ' min'}</span></div></section>`;
+}
+async function cfgLogs(corpo) {
+  const log = await api('/admin/audit?limit=300');
+  const tipos = [['', 'Todos os registros'], ['acesso', 'Acessos'], ['alteracao', 'Alterações']];
+  const ehAcesso = l => /^(login|logout|senha|recuper|acesso)/i.test(String(l.acao));
+  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Logs de acesso e alterações</h2><small>${log.length} registros mais recentes</small></div><p class="kpi-note">Quem fez o quê e quando. Senhas, chaves e tokens nunca são gravados nestes registros.</p>
+    <div class="cfg-filtros"><label class="fb-campo"><span>Tipo</span><select class="control" id="lgTipo">${tipos.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label><label class="fb-campo"><span>Buscar</span><input class="control" id="lgBusca" type="search" placeholder="Pessoa, ação ou registro"></label><span class="kpi-note" id="lgCont"></span></div>
+    <div class="tablewrap"><table class="datatable"><thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Registro</th></tr></thead><tbody id="lgCorpo"></tbody></table></div></section>`;
+  const norm = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const desenha = () => {
+    const t = $('#lgTipo').value, b = norm($('#lgBusca').value);
+    const r = log.filter(l => (!t || (t === 'acesso') === ehAcesso(l)) && (!b || norm([l.ator, l.acao, l.modulo, l.registro].join(' ')).includes(b)));
+    $('#lgCorpo').innerHTML = r.length ? r.slice(0, 150).map(l => `<tr><td>${esc(fmtDateTime(l.quando))}</td><td>${esc(l.ator)}</td><td>${esc(l.acao)}</td><td>${esc([l.modulo, l.registro].filter(Boolean).join(' '))}</td></tr>`).join('') : '<tr><td colspan="4"><div class="empty compact">Nenhum registro com estes filtros.</div></td></tr>';
+    $('#lgCont').textContent = `${r.length} registro(s)${r.length > 150 ? ' (mostrando 150)' : ''}`;
+  };
+  $('#lgTipo').onchange = desenha; $('#lgBusca').oninput = desenha; desenha();
+}
+
+/* ---- Dados do Sistema ---- */
+const cfgBytes = n => n >= 1073741824 ? (n / 1073741824).toFixed(2).replace('.', ',') + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+async function cfgInformacoes(corpo) {
+  const s = await api('/admin/sistema');
+  const lin = (r, v) => `<div class="setting-row"><div><b>${r}</b></div><span class="pr-val">${esc(v)}</span></div>`;
+  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Informações gerais</h2></div><p class="kpi-note">Lidas agora do servidor; nada aqui é fixo.</p>
+    ${lin('Versão do sistema', s.versao)}${lin('Ambiente', s.ambiente)}${lin('Servidor (Node)', s.node)}${lin('Fuso da escola', s.fuso)}${lin('Banco de dados', `${fmtN(s.banco.tabelas)} tabelas · ${cfgBytes(s.banco.bytes)}`)}${lin('Registros do sistema', fmtN(s.registros))}${lin('Arquivos anexados', `${fmtN(s.arquivos.total)} arquivo(s) · ${cfgBytes(s.arquivos.bytes)}`)}${lin('Migrações aplicadas', `${fmtN(s.migracoes.aplicadas)}${s.migracoes.ultima ? ' · última: ' + s.migracoes.ultima : ''}`)}${lin('Último backup', s.ultimoBackup ? `${fmtDateTime(s.ultimoBackup.criadoEm)} · ${s.ultimoBackup.nome}` : 'Nenhum backup registrado')}</section>`;
+}
+async function cfgDiagnostico(corpo) {
+  corpo.innerHTML = '<div id="cfgDg"></div><div id="cfgPr"></div>';
+  if (cfgAdm()) await cfgPartes($('#cfgDg'), cfgAuditoria, [0]);
+  await cfgProntidao($('#cfgPr'));
+}
+async function cfgManutencao(corpo) {
+  corpo.innerHTML = `<section class="card"><div class="db-tit"><h2>Manutenção</h2></div><p class="kpi-note">Nada é executado sozinho. Cada ação pede confirmação e só mexe no que está descrito.</p>
+    <div class="setting-row"><div><b>Verificar integridade dos dados</b><small>Somente leitura: confere vínculos, materiais e contadores sem alterar nada.</small></div><button type="button" class="btn soft" id="mtInt">Verificar agora</button></div>
+    <div class="setting-row"><div><b>Backup dos dados</b><small>Criação e restauração ficam em Segurança › Backups.</small></div><button type="button" class="btn soft" id="mtBk">Abrir Backups</button></div>
+    <div class="setting-row"><div><b>Limpar o cache do aplicativo neste aparelho</b><small>Apaga só os arquivos guardados pelo navegador (telas e scripts). Seus dados e preferências não são tocados; a página recarrega.</small></div><button type="button" class="btn soft" id="mtCache">Limpar cache</button></div></section><div id="mtRes"></div>`;
+  $('#mtInt').onclick = async () => { $('#mtInt').disabled = true; try { await cfgPartes($('#mtRes'), cfgAuditoria, [0]); toast('Verificação concluída'); } catch (e) { toast(e.message, 'warn'); } $('#mtInt').disabled = false; };
+  $('#mtBk').onclick = () => { CFG.sec = 'seguranca'; CFG.aba = 'backups'; cfgIr(); };
+  $('#mtCache').onclick = async () => {
+    if (!await Dlg.confirmar({ titulo: 'Limpar o cache', texto: 'Os arquivos guardados pelo navegador serão apagados e a página recarregada. Nenhum dado do sistema é alterado.', confirmar: 'Limpar cache' })) return;
+    try { if ('caches' in window) for (const k of await caches.keys()) await caches.delete(k); toast('Cache limpo'); setTimeout(() => location.reload(), 600); } catch (e) { toast(e.message, 'warn'); }
+  };
+  if (!cfgAdm()) $('#mtInt').closest('.setting-row').remove();
 }
