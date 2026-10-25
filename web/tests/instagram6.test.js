@@ -17,6 +17,8 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   await G.post('/data?module=conteudos', { titulo: 'Rascunho com data', status: 'RASCUNHO', perfil: '@evolucaopb', formato: 'Feed', publicacaoEm: dia(3) + 'T14:30' });
   const r = await G.get(`/instagram/ranking?de=${dia(-29)}&ate=${hojeDia}`);
   t('API do ranking traz as 3 publicações da Meta com métricas', r.rows.length === 3 && r.rows[0].engajamento !== undefined && r.rows.every(x => 'curtidas' in x && 'visualizacoes' in x && x.perfil), r.rows.length);
+  const mm = await G.get(`/instagram/mensal?de=${dia(-29)}&ate=${hojeDia}`);
+  t('API mensal traz os meses com posts e reels contados e o ano', mm.mensal.length >= 1 && mm.mensal.reduce((a, x) => a + (x.posts || 0) + (x.reels || 0), 0) === 3 && mm.anual.length >= 1 && Array.isArray(mm.contas), JSON.stringify(mm.mensal).slice(0, 300));
   t('API do ranking recusa perfil inválido', (await G.req('GET', `/instagram/ranking?de=${dia(-29)}&ate=${hojeDia}&perfil=@x`)).status === 400);
   const b = await U.abrir(); const p = await U.pagina(b, 'NAT-3301', G.nova);
   const dir = process.env.CAPTURAS; const foto = async n => { if (dir) { fs.mkdirSync(dir, { recursive: true }); await p.screenshot({ path: `${dir}/${n}.png`, fullPage: true }); } };
@@ -36,10 +38,13 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   for (const m of ['semana', 'dia', 'lista']) { await p.click(`[data-modo="${m}"]`); await p.waitForTimeout(300); t('Calendário: visão ' + m + ' abre sem erro', (await p.$$('#igcalCorpo')).length === 1); if (m === 'lista') { t('Calendário: lista traz miniatura, horário e status', (await p.$$('.igcal-lista .igcal-item')).length >= 4 && (await p.$$('.igcal-lista .badge')).length >= 4); await foto('instagram-calendario-lista'); } }
   t('Calendário do Instagram não traz o calendário escolar', !/feriado|prova bimestral/i.test(await p.innerText('#igcalCorpo')), ((await p.innerText('#content')).match(/.{0,60}(Calendário escolar|Feriado).{0,60}/i) || [])[0]);
   await U.ir(p, 'igdesempenho', 900); await foto('instagram-desempenho');
-  t('Desempenho carrega', (await p.$$('[data-dim]')).length >= 1);
+  t('Desempenho carrega e traz cada postagem com seus dados', (await p.$$('[data-dim]')).length >= 1 && (await p.$$('.ig-card')).length === 3 && /visualizações/i.test(await p.innerText('.ig-card')) && /engajamento/i.test(await p.innerText('.ig-card')));
   await U.ir(p, 'igranking', 900);
   t('Ranking carrega com as publicações, imagens e classificação', (await p.$$('.igr-tab tbody tr')).length === 3 && (await p.$$('.igr-podio')).length === 3 && (await p.$$('.igr-tab img')).length === 3);
   t('Ranking: 1º por interações é a publicação do Reels', /Reels da feira/.test(await p.innerText('.igr-tab tbody tr')));
+  t('Ranking traz as informações mensais da conta (mês e ano) com histórico e seguidores manuais', /informações mensais da conta/i.test(await p.innerText('#content')) && (await p.$$('.igr-mensal tbody tr')).length >= 1 && (await p.$('#igrHist')) !== null && (await p.$('#igrSegManual')) !== null);
+  await p.click('[data-igr-visao="ano"]'); await p.waitForTimeout(400);
+  t('informações mensais: visão por ano', /Ano/.test(await p.innerText('.igr-mensal thead')) && (await p.$$('.igr-mensal tbody tr')).length >= 1);
   await p.selectOption('#igrOrdem', 'alcance'); await p.waitForTimeout(400);
   t('Ranking reclassifica por alcance e por visualizações', /Reels da feira/.test(await p.innerText('.igr-tab tbody tr')) && (await p.$$eval('#igrOrdem option', e => e.map(x => x.value))).includes('visualizacoes'));
   await foto('instagram-ranking');
