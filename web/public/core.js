@@ -150,7 +150,7 @@ const ROTULOS = {
   configuracoes: 'Configurações',
 };
 const DESCRICOES = {
-  hoje: 'Decisões do Marketing: publicações, calendário, Instagram e tráfego em um só lugar.',
+  hoje: 'Visão geral do marketing do Colégio Evolução: Instagram, Tráfego Pago, agenda escolar e integrações, somente consulta.',
   calendario: 'Eventos e atividades escolares do Colégio Evolução, lidos do Google Agenda.',
   igvisao: 'Desempenho orgânico dos perfis do Instagram.', igconteudos: 'Rascunhos, agendadas e já postadas no Instagram, com publicar agora e agendar.',
   igplan: 'Pauta do mês, ideias, campanhas editoriais e modelos.', igcalendario: 'Publicações programadas e já postadas no Instagram, com status, horário e perfil.', igranking: 'As melhores publicações do período, por alcance, interações, engajamento e visualizações.', igdesempenho: 'O que funcionou, por perfil, segmento, formato, tema e horário.',

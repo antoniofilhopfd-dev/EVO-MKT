@@ -16,15 +16,15 @@ const br = iso => iso.split('-').reverse().join('/');
   // 1-5. períodos diferentes em cada aba
   await trocar('igvisao', () => p.click('[data-fbp="7"]'));
   await trocar('trafego', () => p.click('[data-fbp="mes"]'));
-  await trocar('hoje', () => p.selectOption('#fbP', '90'));
+  await trocar('hoje', () => p.click('[data-fbp="ano"]'));
   await trocar('igdesempenho', () => p.selectOption('#fbP', 'm:' + hoje.slice(0, 7)));
   await trocar('igranking', () => p.selectOption('#fbP', '365'));
   await trocar('tfdesempenho', () => p.click('[data-fbp="mes_ant"]'));
   await trocar('tfrelatorios', () => p.click('[data-fbp="ano"]'));
-  t('cada aba guarda o próprio período (chaves separadas no navegador)', (await per('filtros.instagram.visao')) === '7' && (await per('filtros.trafego.visao')) === 'mes' && (await per('filtros.dashboard')) === '90' && (await per('filtros.instagram.desempenho')) === 'm:' + hoje.slice(0, 7) && (await per('filtros.instagram.ranking')) === '365' && (await per('filtros.trafego.desempenho')) === 'mes_ant' && (await per('filtros.trafego.relatorios')) === 'ano', await p.evaluate(() => Object.keys(localStorage).filter(k => k.includes('filtros'))));
+  t('cada aba guarda o próprio período (chaves separadas no navegador)', (await per('filtros.instagram.visao')) === '7' && (await per('filtros.trafego.visao')) === 'mes' && (await per('filtros.dashboard')) === 'ano' && (await per('filtros.instagram.desempenho')) === 'm:' + hoje.slice(0, 7) && (await per('filtros.instagram.ranking')) === '365' && (await per('filtros.trafego.desempenho')) === 'mes_ant' && (await per('filtros.trafego.relatorios')) === 'ano', await p.evaluate(() => Object.keys(localStorage).filter(k => k.includes('filtros'))));
   await U.ir(p, 'igvisao', 500); t('Instagram › Visão Geral continua em Últimos 7 dias depois de ir ao Tráfego e ao Dashboard', (await ativoRapido()).join() === '7');
   await U.ir(p, 'trafego', 500); t('Tráfego Pago › Visão Geral continua em Este mês', (await ativoRapido()).join() === 'mes');
-  await U.ir(p, 'hoje', 500); t('Dashboard continua em Últimos 90 dias', (await p.$eval('#fbP', e => e.value)) === '90');
+  await U.ir(p, 'hoje', 500); t('Dashboard continua em Este ano', (await ativoRapido()).join() === 'ano');
   await U.ir(p, 'tfdesempenho', 500); const c1 = (await ativoRapido()).join();
   await U.ir(p, 'tfrelatorios', 500); const c2 = (await ativoRapido()).join();
   t('Desempenho e Relatórios têm períodos diferentes', c1 === 'mes_ant' && c2 === 'ano', [c1, c2]);

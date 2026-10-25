@@ -330,3 +330,18 @@ a.btn,a.btn:hover{text-decoration:none}
 @media(max-width:1100px){.tf-rel-grade{grid-template-columns:minmax(0,1fr)}.tf-kpis8{grid-template-columns:repeat(2,minmax(0,1fr))}.tf-det{grid-template-columns:minmax(0,1fr)}}
 .tf-visao .db-tit,#tfDes .db-tit,.tf-rel-grade .db-tit{flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;text-align:left}.tf-rel-menu .db-tit{flex-direction:column;align-items:flex-start;gap:2px}
 .tf-seg-lista{list-style:none;margin:12px 0 8px;padding:0;display:grid;gap:8px}.tf-seg-lista li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;border-bottom:1px solid var(--line);padding-bottom:8px}.tf-seg-lista li small{grid-column:1/-1;color:var(--ink-3)}
+
+/* Dashboard principal (marketing escolar): faixa do período, 6 indicadores, duas colunas, eventos e integrações. */
+.db-faixa{display:flex;gap:6px 16px;align-items:baseline;flex-wrap:wrap;margin:0 0 12px}.db-faixa b{font-size:16px}.db-faixa span{color:var(--ink-3);font-size:14px}
+.kpis6{grid-template-columns:repeat(6,minmax(0,1fr))}.db-kpi strong{font-size:22px;overflow-wrap:anywhere}
+.db2{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(280px,1fr);gap:16px;align-items:start}.db2-main,.db2-lado{display:grid;gap:16px;min-width:0}.db2 .card{margin:0;min-width:0}
+.db2 .db-tit{flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;text-align:left}
+.db-eventos{list-style:none;margin:0;padding:0;display:grid;gap:8px}.db-ev{display:flex;gap:10px;align-items:center;width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:6px 0;text-align:left;font:inherit;cursor:pointer;color:inherit}
+.db-ev-dia{display:grid;place-items:center;width:46px;height:46px;border-radius:10px;background:#EAF0FF;color:#063996;font-size:10px;font-weight:800;flex:none}.db-ev-dia b{font-size:17px;line-height:1}.db-ev-cor{width:8px;height:8px;border-radius:50%;flex:none}.db-ev-txt{display:grid;min-width:0}.db-ev-txt small{color:var(--ink-3)}
+.db-recentes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.db-rec{display:grid;gap:3px;min-width:0}.db-rec b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.db-rec small{color:var(--ink-3)}.db-rec-img{display:block;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:#EEF0F5}.db-rec-img img{width:100%;height:100%;object-fit:cover;display:block}.db-rec-img .db-sem-img{display:grid;place-items:center;height:100%}
+.db-camp{list-style:none;margin:0;padding:0;display:grid;gap:10px}.db-camp li{display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}.db-camp-img{width:56px;height:56px;border-radius:10px;overflow:hidden;background:#EEF0F5;flex:none;display:grid;place-items:center}.db-camp-img img{width:100%;height:100%;object-fit:cover}.db-camp small{display:block;color:var(--ink-3)}
+.db-int{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:10px}.db-int li{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}.db-int-nome{display:grid;min-width:0}.db-int-nome small{color:var(--ink-3)}
+@media(max-width:1300px){.kpis6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1100px){.db2{grid-template-columns:minmax(0,1fr)}.db-recentes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.kpis6{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.db2 .db-tit h2{flex:1 1 130px;font-size:16px!important}.db2 .db-tit .btn{padding:6px 12px;font-size:13px;white-space:nowrap}

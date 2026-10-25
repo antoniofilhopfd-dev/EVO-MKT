@@ -25,7 +25,7 @@ const Filtros = (() => {
   const PADRAO = { p: '30', de: '', ate: '', perfil: '', segmento: '', formato: '', campanha: '' };
   const CAMPOS = Object.keys(PADRAO);
   /** Padrões próprios de cada aba (a lista de Publicações mostra os últimos 12 meses). */
-  const PADRAO_P = { 'instagram.conteudos': '365', 'trafego.visao': 'semana', 'trafego.desempenho': 'semana', 'trafego.relatorios': 'semana' };
+  const PADRAO_P = { 'instagram.conteudos': '365', 'trafego.visao': 'semana', 'trafego.desempenho': 'semana', 'trafego.relatorios': 'semana', 'dashboard': 'semana' };
   const padraoDe = chave => ({ ...PADRAO, p: PADRAO_P[chave] || PADRAO.p });
   const memoria = {};
   const ouvintes = [];
@@ -97,7 +97,7 @@ const Filtros = (() => {
 
 /** Filtros que cada aba oferece. A barra só mostra os que funcionam na aba; o perfil do Instagram fica no cabeçalho. */
 const FILTROS_PAGINA = {
-  hoje: { aplica: ['periodo', 'perfil', 'segmento', 'formato', 'campanha'] },
+  hoje: { aplica: ['periodo', 'perfil'] },
   calendario: { aplica: [] },
   igvisao: { aplica: ['periodo', 'formato'] },
   igconteudos: { aplica: ['periodo', 'formato'] },
@@ -133,7 +133,7 @@ async function montarFiltros() {
   const periodoTrafego = () => `<div class="fb-rapidos tf-periodos" role="group" aria-label="Período">${PERIODOS_TRAFEGO.map(([v, l]) => `<button type="button" class="pill ${f.p === v ? 'on' : ''}" data-fbp="${v}" aria-pressed="${f.p === v}">${l}</button>`).join('')}<button type="button" class="pill ${f.p === 'x' ? 'on' : ''}" id="fbPers" aria-pressed="${f.p === 'x'}">${f.p === 'x' ? esc(rotP) : 'Personalizado'}</button>${!PERIODOS_TRAFEGO.some(x => x[0] === f.p) && f.p !== 'x' ? `<span class="kpi-note">${esc(rotP)}</span>` : ''}</div>`;
   const n = Filtros.ativos(), aberto = window.innerWidth >= 860;
   box.innerHTML = `<details class="fb-det" ${aberto ? 'open' : ''}><summary>Filtros${n ? ` · ${n} ativo(s)` : ''} ${tem('periodo') ? `<small>${esc(Filtros.descricao())}</small>` : ''}</summary><div class="fb-linha">
-    ${tem('periodo') ? (pagina === 'igvisao' ? periodoVisao() : (pagina === 'trafego' || pagina.startsWith('tf')) ? periodoTrafego() : periodoLista()) : ''}
+    ${tem('periodo') ? (pagina === 'igvisao' ? periodoVisao() : (pagina === 'trafego' || pagina === 'hoje' || pagina.startsWith('tf')) ? periodoTrafego() : periodoLista()) : ''}
     ${tem('perfil') && !ig ? sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA) : ''}${tem('segmento') ? sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA) : ''}
     ${tem('formato') ? sel('fbFmt', 'formato', 'Formato', [['', 'Todos os formatos'], ...FORMATO_LISTA.map(x => [x, x])]) : ''}
     ${tem('campanha') ? sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])]) : ''}
