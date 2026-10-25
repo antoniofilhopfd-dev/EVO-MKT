@@ -112,3 +112,12 @@ function delta(v, { bomSubir = true } = {}) {
   const sobe = v.tipo === 'subiu', bom = sobe === bomSubir;
   return `<i class="kd ${bom ? 'up' : 'down'}">${sobe ? '▲' : '▼'} ${Math.abs(v.percentual).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% vs. período anterior</i>`;
 }
+
+/** A data é a da coleta, nunca a hora de abertura da tela. */
+function avisoAtualizacao(o, limiteHoras = 48) {
+  const raw = o?.atualizadoEm;
+  const ms = raw ? Date.parse(raw) : NaN;
+  const antiga = Number.isFinite(ms) && Date.now() - ms > limiteHoras * 3600000;
+  const texto = !Number.isFinite(ms) ? 'Sem sincronização confirmada' : `Dados coletados em ${fmtDateTime(raw)}${antiga ? ' · atualização pendente' : ''}`;
+  return `<p class="foco-chip" role="status">${esc(texto)} · ${esc(o?.periodo || 'período não informado')}${!Number.isFinite(ms) || antiga ? ' · Confira a conexão em Configurações.' : ''}${o?.aviso ? ' · ' + esc(o.aviso) : ''}</p>`;
+}

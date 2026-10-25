@@ -204,13 +204,18 @@ export async function igSync(months = 2): Promise<number> {
   let n = 0, ultimo: any = null, falhas = 0;
   for (const c of cs) {
     try { n += await igSyncConta(c.ig, c.usuario, months, cs.length > 1); } catch (e: any) {
-      if ((await setting('meta_token_invalido')) === '1') throw e;
+      if ((await setting('meta_token_invalido')) === '1') {
+        await setSetting('ig_sync_warning', 'Acesso à Meta expirado ou revogado. Reconecte o Instagram em Configurações.');
+        throw e;
+      }
       falhas++; ultimo = e;
       await intLog('instagram', 'erro', `@${c.usuario}: ${e.message}`);
     }
   }
+  const aviso = !cs.length ? 'Nenhum perfil disponível para sincronizar.' : falhas ? `Sincronização incompleta: ${falhas} de ${cs.length} perfil(is) falharam. Confira Configurações › Instagram.` : '';
+  await setSetting('ig_sync_warning', aviso);
   if (cs.length && falhas === cs.length) throw ultimo;
-  await setSetting('ig_last_sync', now());
+  if (cs.length && !falhas) await setSetting('ig_last_sync', now());
   return n;
 }
 async function igSyncConta(ig: string, usuario: string, months: number, varias: boolean): Promise<number> {
@@ -295,7 +300,6 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
     else await insertRow('instagram', row, 'integracao:instagram');
     n++;
   }
-  await setSetting('ig_last_sync', now());
   await intLog('instagram', 'ok', `Métricas sincronizadas (${n} período(s)); seguidores: ${profile.followers_count ?? '?'}`);
   return n;
 }

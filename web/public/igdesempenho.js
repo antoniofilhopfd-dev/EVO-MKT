@@ -6,7 +6,7 @@ PAGINAS.igdesempenho = async function () {
   const [d, imp] = await Promise.all([api(`/instagram/desempenho?dim=${IGD.dim}&` + Filtros.query()), api('/instagram/impulsionados?' + Filtros.query()).catch(() => ({ rows: [] }))]);
   const minimo = d.minimo;
   const melhor = d.rows.filter(r => r.publicacoes >= minimo).sort((a, b) => b.mediaInteracoes - a.mediaInteracoes)[0];
-  $('#content').innerHTML = `${abasInstagramAcoes()}
+  $('#content').innerHTML = `${abasInstagramAcoes()}${avisoAtualizacao(d.origem)}
     <div class="pills" role="tablist" aria-label="Analisar por">${IGD_DIMS.map(([k, l]) => `<button type="button" role="tab" class="pill ${IGD.dim === k ? 'on' : ''}" data-dim="${k}" aria-selected="${IGD.dim === k}">${l}</button>`).join('')}</div>
     <section class="card"><div class="db-tit"><h2>Desempenho por ${esc(IGD_DIMS.find(x => x[0] === IGD.dim)[1].toLowerCase())}</h2>${origem(d.origem)}<small>${esc(Filtros.descricao())}</small></div>
       ${d.aviso ? `<p class="foco-chip">${esc(d.aviso)}</p>` : ''}

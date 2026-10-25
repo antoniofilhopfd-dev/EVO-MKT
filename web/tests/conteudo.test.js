@@ -55,6 +55,16 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   t('falha da plataforma aparece como FALHA NA PUBLICAÇÃO, com o motivo', (await est(f.id)).estado === 'FALHA NA PUBLICAÇÃO' && (await est(f.id)).erro === 'Mídia recusada');
   const g = await mk({ titulo: 'Em processamento', status: 'EM PRODUÇÃO' }); sql(`INSERT INTO ig_publish(conteudo_id,status,container_id,media_id,erro,quando) VALUES('${g.id}','PROCESSANDO','c','','','x')`);
   t('enviado e ainda processando = ENVIADO À PLATAFORMA', (await est(g.id)).estado === 'ENVIADO À PLATAFORMA');
+  const foco = encodeURIComponent(`${a.id},${b.id}`);
+  const p1 = await G.get(`/content/list?ids=${foco}&tamanho=1`);
+  const p2 = await G.get(`/content/list?ids=${foco}&tamanho=1&pagina=2`);
+  t('paginação no banco: total, páginas e sem repetir registros', p1.total === 2 && p1.paginas === 2 && p1.rows.length === 1 && p2.rows.length === 1 && p1.rows[0].id !== p2.rows[0].id, { p1, p2 });
+  const filtro = await G.get(`/content/list?ids=${foco}&status=IDEIA&busca=Reels`);
+  t('busca e status valem antes da paginação', filtro.total === 1 && filtro.rows[0].id === a.id, filtro);
+  const vazio = await G.get('/content/list?ids=');
+  t('foco vazio não expõe toda a coleção', vazio.total === 0 && vazio.rows.length === 0, vazio);
+  t('tamanho acima do limite é recusado', (await G.req('GET', '/content/list?tamanho=101')).status === 400);
+  t('lista paginada exige sessão', (await fetch(U.B + '/content/list')).status === 401);
   t('rotas de conteúdo exigem sessão', (await fetch(U.B + '/content/states')).status === 401);
   fim();
 })().catch(e => { console.error(e); process.exit(1); });

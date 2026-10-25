@@ -1,3 +1,5 @@
+import { lerFiltros } from '../filtros';
+import { rotuloSegmento } from '../segmentos';
 import { Ctx } from '../ctx';
 import { q, q1, run } from '../db';
 import { requireInternal } from '../auth';
@@ -38,6 +40,38 @@ const sair = (r: Row) => ({ id: r.id, materiais: materiaisDe(r) });
 export async function conteudoRoute(c: Ctx) {
   const { path, method } = c;
   const u = await requireInternal(c);
+  if (path === '/content/list' && method === 'GET') {
+    const f = lerFiltros(c);
+    const inteiro = (k: string, padrao: number, max: number) => {
+      const v = c.qs(k);
+      if (!v) return padrao;
+      if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > max) fail(400, 'Paginação inválida.');
+      return Number(v);
+    };
+    const tamanho = inteiro('tamanho', 30, 100), solicitada = inteiro('pagina', 1, 1000000);
+    const where = ["r.modulo='conteudos'"], args: unknown[] = [];
+    const campo = (k: string) => `COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.data,'$.${k}')),'')`;
+    const igual = (k: string, v: string) => { if (v) { where.push(`${campo(k)}=?`); args.push(v); } };
+    if (f.perfil) { where.push(`${campo('perfil')} IN (?, 'Ambos')`); args.push(f.perfil); }
+    if (f.segmento) { where.push(`${campo('segmento')} IN (?, 'Todos')`); args.push(rotuloSegmento(f.segmento)); }
+    igual('formato', f.formato); igual('campanhaId', f.campanha);
+    igual('status', c.qs('status')); igual('responsavel', c.qs('responsavel'));
+    const busca = c.qs('busca').trim().toLowerCase().slice(0, 300);
+    if (busca) { where.push(`LOCATE(?, LOWER(CONCAT(${campo('titulo')},' ',${campo('legenda')},' ',${campo('hashtags')})))>0`); args.push(busca); }
+    // Foco do Dashboard: IDs validados e parametrizados, sem carregar toda a coleção.
+    if (c.url.searchParams.has('ids')) {
+      const ids = c.qs('ids').split(',').filter(Boolean);
+      if (ids.length > 5000 || ids.some(id => !/^[A-Za-z0-9._-]{1,64}$/.test(id))) fail(400, 'Foco inválido.');
+      where.push(ids.length ? `r.id IN (${ids.map(() => '?').join(',')})` : '1=0'); args.push(...ids);
+    }
+    const sqlWhere = where.join(' AND ');
+    const total = Number((await q1(`SELECT COUNT(*) n FROM records r WHERE ${sqlWhere}`, args))?.n || 0);
+    const paginas = Math.max(1, Math.ceil(total / tamanho)), pagina = Math.min(solicitada, paginas);
+    const dados = await q(`SELECT r.data,p.status ig_status,p.media_id,p.erro FROM records r LEFT JOIN ig_publish p ON p.conteudo_id=r.id WHERE ${sqlWhere} ORDER BY ${campo('publicacaoEm')} DESC,r.id DESC LIMIT ${tamanho} OFFSET ${(pagina - 1) * tamanho}`, args);
+    const rows = dados.map(x => JSON.parse(x.data));
+    const estados = dados.map((x, i) => ({ id: rows[i].id, estado: estadoPublicacao(rows[i], { status: x.ig_status, media_id: x.media_id }), erro: x.ig_status === 'ERRO' ? x.erro : '', pendencias: pendencias(rows[i]) }));
+    return json({ rows, estados, total, pagina, paginas, tamanho });
+  }
   if (path === '/content/states') {
     const igs = new Map((await q('SELECT conteudo_id,status,media_id,erro FROM ig_publish')).map((x: Row) => [String(x.conteudo_id), x]));
     return json({
