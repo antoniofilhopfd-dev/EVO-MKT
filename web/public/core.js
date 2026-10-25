@@ -178,15 +178,19 @@ function montarSubtabs() {
   const box = $('#subtabs'); if (!box) return; const a = areaOf(state.page);
   if (!a || a.pages.length < 2) { box.innerHTML = ''; box.hidden = true; return; }
   box.hidden = false; box.setAttribute('aria-label', 'Seções de ' + a.label);
-  const perfilAtual = typeof Filtros !== 'undefined' ? Filtros.get().perfil : '';
-  const perfis = [['','Todos os perfis'],['@evolucaopb','@evolucaopb'],['@geracaoevolucao','@geracaoevolucao']];
-  box.innerHTML = '<div class="subtabs-links">'+a.pages.map(p => `<button class="subtab ${p === state.page ? 'active' : ''}" data-sub="${p}" ${p === state.page ? 'aria-current="page"' : ''}>${esc(ROTULOS[p])}</button>`).join('')+'</div>'+(a.k === 'instagramarea' ? `<label class="ig-perfil-proprio"><span>Perfil do Instagram</span><select class="control" id="igPerfilPrincipal" aria-label="Selecionar perfil do Instagram">${perfis.map(([v,n])=>`<option value="${v}" ${perfilAtual===v?'selected':''}>${n}</option>`).join('')}</select></label>` : '');
-  $('[data-sub]', box).forEach(b => { b.onclick = () => go(b.dataset.sub); });
-  const seletorPerfil = $('#igPerfilPrincipal',box);
-  if(seletorPerfil) seletorPerfil.onchange = () => Filtros.set({perfil:seletorPerfil.value});
+  box.innerHTML = a.pages.map(p => `<button class="subtab ${p === state.page ? 'active' : ''}" data-sub="${p}" ${p === state.page ? 'aria-current="page"' : ''}>${esc(ROTULOS[p])}</button>`).join('');
+  $$('[data-sub]', box).forEach(b => { b.onclick = () => go(b.dataset.sub); });
   setPref('areaLast.' + a.k, state.page);
 }
-function updateHeader() { montarSubtabs(); const a = areaOf(state.page); setTitle(a && a.pages.length > 1 ? `${a.label} · ${ROTULOS[state.page]}` : ROTULOS[state.page] || 'EVO MKT', DESCRICOES[state.page] || ''); }
+function montarPerfilCabecalho() {
+  const area = document.getElementById('headerIgProfile');
+  if (!area || typeof Filtros === 'undefined') return;
+  const perfis = [['','Todos os perfis'],['@evolucaopb','@evolucaopb'],['@geracaoevolucao','@geracaoevolucao']];
+  const atual = Filtros.get().perfil;
+  area.innerHTML = '<label for="igPerfilCabecalho" class="ig-header-label">Perfil</label><select class="control" id="igPerfilCabecalho" aria-label="Selecionar perfil do Instagram">'+perfis.map(([v,l])=>`<option value="${v}" ${atual===v?'selected':''}>${l}</option>`).join('')+'</select>';
+  document.getElementById('igPerfilCabecalho').onchange=e=>Filtros.set({perfil:e.target.value});
+}
+function updateHeader() { montarPerfilCabecalho(); montarSubtabs(); const a = areaOf(state.page); setTitle(a && a.pages.length > 1 ? `${a.label} · ${ROTULOS[state.page]}` : ROTULOS[state.page] || 'EVO MKT', DESCRICOES[state.page] || ''); }
 
 async function go(page) {
   document.querySelectorAll('.tp-lateral').forEach(x => x.remove());
