@@ -62,7 +62,7 @@ PAGINAS.tfrelatorios = async function () {
   // pré-visualização: a mesma página do relatório, montada por trafego-relatorio.js dentro de um shadow DOM (estilo isolado do app)
   const sombra = $('#tfrPrevia').attachShadow({ mode: 'open' });
   const optRel = { status: TF_REL.status, segmento: TF_REL.segmento, campanha: TF_REL.campanha, semanal: TF_REL.semanal && semanalOk, tp: f.p };
-  sombra.innerHTML = `<link rel="stylesheet" href="/relatorio-trafego.css?v=20261025-rp3"><div class="previa-pg">${TfRelatorio.html(d, optRel, TfRelatorio.obsPadrao())}</div>`;
+  sombra.innerHTML = `<link rel="stylesheet" href="/relatorio-trafego.css?v=20261025-rp4"><div class="previa-pg">${TfRelatorio.html(d, optRel, TfRelatorio.obsPadrao())}</div>`;
   sombra.querySelectorAll('td.foto img').forEach(img => { img.onerror = () => img.replaceWith(Object.assign(document.createElement('span'), { textContent: 'Imagem indisponível' })); });
   // Baixar PDF: pede o arquivo ao servidor e o salva direto (sem impressão); erros aparecem na tela
   $('#tfrPdf').onclick = async () => {

@@ -69,3 +69,6 @@ tfoot .tot td{background:#F1F4FA;border-top:2px solid var(--navy)}
 .cab .logo{height:auto;max-height:44px;max-width:150px;width:auto;object-fit:contain}
 .vazio{padding:20px;text-align:center;color:#5E6678;font-size:12px}
 @media(max-width:700px){.graf2{grid-template-columns:1fr}}
+/* tabelas do relatório: cabeçalhos podem quebrar em duas linhas e nada passa da borda (nem na prévia nem na tela cheia) */
+.sec table{table-layout:auto;width:100%}.sec th{white-space:normal;line-height:1.15;word-break:normal}.sec td{white-space:normal}.sec.det td.foto{width:46px}.sec.det td.l{min-width:70px;max-width:120px}
+.sec.det table,.sec.det th,.sec.det td{font-size:9px}.sec.det th{padding:5px 2px}.sec.det td{padding:4px 2px}.tw{overflow-x:visible}

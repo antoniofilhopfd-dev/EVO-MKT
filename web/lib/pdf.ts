@@ -202,7 +202,7 @@ export function tabela(doc: Doc, y: number, colunas: Coluna[], linhas: (string |
   const m = PAGINA.m, alt = opt.alturaLinha ?? 18, somaW = colunas.reduce((s, c) => s + c.w, 0), esc = (PAGINA.w - m * 2) / somaW, ws = colunas.map((c) => c.w * esc);
   const cab = (yy: number) => {
     doc.rect(m, yy, PAGINA.w - m * 2, 17).fill(COR.azul);
-    let x = m; colunas.forEach((c, i) => { doc.font('Helvetica-Bold').fontSize(7.2).fillColor('#fff').text(limpa(c.t), x + 3, yy + 5, { width: ws[i] - 6, align: c.al ?? 'left', lineBreak: false, ellipsis: true }); x += ws[i]; });
+    let x = m; colunas.forEach((c, i) => { doc.font('Helvetica-Bold').fontSize(c.t.length > 11 ? 6.4 : 7.2).fillColor('#fff').text(limpa(c.t), x + 2, yy + 5, { width: ws[i] - 4, align: c.al ?? 'left', lineBreak: false }); x += ws[i]; });
     return yy + 17;
   };
   y = garanteEspaco(doc, y, 17 + alt * 2); y = cab(y);
