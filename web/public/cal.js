@@ -66,7 +66,7 @@ const calEncurta = i => (i.fim && (CalMotor.dataDe(i.fim) - CalMotor.dataDe(i.da
 
 function calAbrir(it) {
   if (it.origem === 'pub') return editarPublicacao(it.id);
-  if (it.origem === 'camp') { window.IG_ABRIR_CAMPANHA = it.id; return go('igplan'); }
+  if (it.origem === 'camp') { window.IG_ABRIR_CAMPANHA = it.id; return go('igconteudos'); }
   if (it.origem === 'esc') return escAbrir(it);
   if (it.origem === 'dc') return dcAbrir(it);
   if (it.origem === 'gl') return calLeituraDetalhe(it);

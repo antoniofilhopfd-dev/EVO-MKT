@@ -4,7 +4,17 @@
 const SEG_LISTA = [['', 'Todos os segmentos'], ['INFANTIL', 'Educação Infantil'], ['FUND1', 'Ensino Fundamental – Anos Iniciais'], ['FUND2', 'Ensino Fundamental – Anos Finais'], ['MEDIO', 'Ensino Médio'], ['ADMIN', 'Administrativo'], ['DIRECAO', 'Direção']];
 const PERFIL_LISTA = [['', 'Todos os perfis'], ['@evolucaopb', '@evolucaopb'], ['@geracaoevolucao', '@geracaoevolucao']];
 const FORMATO_LISTA = ['Feed', 'Stories', 'Reels', 'Carrossel', 'Vídeo', 'Foto', 'Outro'];
-const PERIODOS = [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana anterior'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano'], ['prox7', 'Próximos 7 dias'], ['prox30', 'Próximos 30 dias'], ['x', 'Personalizado…']];
+/** Os últimos 12 meses, um por um (Outubro de 2026, Setembro de 2026…), para olhar mês a mês. */
+function PERIODOS_MESES() {
+  const h = hojeBR(); let y = +h.slice(0, 4), m = +h.slice(5, 7); const out = [];
+  for (let i = 0; i < 12; i++) {
+    const nome = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, 1, 12)));
+    out.push([`m:${y}-${String(m).padStart(2, '0')}`, nome.charAt(0).toUpperCase() + nome.slice(1)]);
+    m--; if (m === 0) { m = 12; y--; }
+  }
+  return out;
+}
+const PERIODOS = [['hoje', 'Hoje'], ['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['365', 'Últimos 12 meses'], ['semana', 'Esta semana'], ['semana_ant', 'Semana anterior'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano'], ['prox7', 'Próximos 7 dias'], ['prox30', 'Próximos 30 dias'], ...PERIODOS_MESES(), ['x', 'Personalizado…']];
 
 const Filtros = (() => {
   const PADRAO = { p: '30', de: '', ate: '', perfil: '', segmento: '', formato: '', campanha: '' };
@@ -20,18 +30,21 @@ const Filtros = (() => {
     if (p === 'hoje') return [h, h];
     if (p === 'semana') { const d = new Date(h + 'T12:00:00Z').getUTCDay(); return [somaDias(h, -d), h]; }
     if (p === 'semana_ant') { const d = new Date(h + 'T12:00:00Z').getUTCDay(); return [somaDias(h, -d - 7), somaDias(h, -d - 1)]; }
+    if (/^m:\d{4}-\d{2}$/.test(p)) { const ym = p.slice(2), fim = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).toISOString().slice(0, 10); return [ym + '-01', fim > h ? h : fim]; }
     if (p === 'mes') return [h.slice(0, 8) + '01', h];
     if (p === 'ano') return [h.slice(0, 4) + '-01-01', h];
     if (p === 'mes_ant') { const ult = somaDias(h.slice(0, 8) + '01', -1); return [ult.slice(0, 8) + '01', ult]; }
     const n = Number(p) || 30; return [somaDias(h, -(n - 1)), h];
   }
-  const calc = () => { const [de, ate] = intervalo(est.p, est.de, est.ate); return { ...est, de, ate }; };
+  /** No Instagram não existem filtros de segmento e campanha editorial: nunca entram na consulta nem na lista. */
+  const noInstagram = () => typeof state !== 'undefined' && String(state.page || '').startsWith('ig');
+  const calc = () => { const [de, ate] = intervalo(est.p, est.de, est.ate); return { ...est, de, ate, ...(noInstagram() ? { segmento: '', campanha: '' } : {}) }; };
   const salvar = () => setPref('filtros', { p: est.p, de: est.de, ate: est.ate, perfil: est.perfil, segmento: est.segmento, formato: est.formato, campanha: est.campanha });
   const disparar = () => { salvar(); ouvintes.forEach(f => f(calc())); };
 
   const api_ = {
     get: calc,
-    ativos: () => ['perfil', 'segmento', 'formato', 'campanha'].filter(k => est[k]).length + (est.p !== PADRAO.p ? 1 : 0),
+    ativos: () => { const f = calc(); return ['perfil', 'segmento', 'formato', 'campanha'].filter(k => f[k]).length + (est.p !== PADRAO.p ? 1 : 0); },
     /** Parâmetros para a consulta ao servidor. `campos` limita aos filtros que a tela aceita. */
     query(campos = ['periodo', 'perfil', 'segmento', 'formato', 'campanha']) {
       const f = calc(), q = new URLSearchParams();
@@ -79,9 +92,9 @@ async function montarFiltros() {
   const n = Filtros.ativos(), aberto = window.innerWidth >= 860;
   box.innerHTML = `<details class="fb-det" ${aberto ? 'open' : ''}><summary>Filtros${n ? ` · ${n} ativo(s)` : ''} <small>${esc(dis('periodo') ? 'período próprio da tela' : Filtros.descricao())}</small></summary><div class="fb-linha">
     <label class="fb-campo ${dis('periodo') ? 'fb-off' : ''}"${dica('periodo')}><span>Período</span><select class="control" id="fbP" ${dis('periodo') ? 'disabled' : ''} aria-label="Período">${PERIODOS.map(([v, l]) => `<option value="${v}" ${f.p === v ? 'selected' : ''}>${v === 'x' && f.p === 'x' ? esc(rotP) : esc(l)}</option>`).join('')}</select></label>
-    ${!state.page.startsWith('ig') ? sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA) : ''}${sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA)}
+    ${!state.page.startsWith('ig') ? sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA) : ''}${!state.page.startsWith('ig') ? sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA) : ''}
     ${sel('fbFmt', 'formato', 'Formato', [['', 'Todos os formatos'], ...FORMATO_LISTA.map(x => [x, x])])}
-    ${sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])])}
+    ${!state.page.startsWith('ig') ? sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])]) : ''}
     <button type="button" class="btn soft fb-limpar" id="fbLimpar" ${Filtros.ativos() ? '' : 'disabled'}>Limpar filtros</button>
   </div>
   <div class="fb-info" id="fbInfo">${state.page.startsWith('ig') ? `<span class="fb-perfil-atual">Perfil: <b>${esc((PERFIL_LISTA.find(x=>x[0]===f.perfil)||PERFIL_LISTA[0])[1])}</b></span> · ` : ''}<b>${dis('periodo') ? 'Período: navegação própria desta tela' : 'Período: ' + esc(Filtros.descricao())}</b>${f.p !== 'x' && !dis('periodo') ? ' · fuso America/Fortaleza' : ''}${semEfeito.length ? ` · <span class="fb-aviso">Sem efeito aqui: ${semEfeito.map(k => ({ perfil: 'perfil', segmento: 'segmento', formato: 'formato', campanha: 'campanha editorial' }[k])).join(', ')} (${esc(cfg.motivo[semEfeito[0]] || '')})</span>` : ''}</div></details>`;

@@ -52,9 +52,9 @@ const igcalAbrir = i => (i.origem === 'meta' ? `<a class="igcal-item igcal-meta"
 const igcalFecha = i => (i.origem === 'meta' ? '</a>' : '</button>');
 const igcalPerfilCurto = p => (p ? '@' + p.replace(/^@/, '').slice(0, 10) : '');
 
-/** Item compacto (mês e semana): miniatura pequena, horário, título e perfil. */
+/** Item compacto (mês e semana): miniatura, horário em destaque, título em até duas linhas e perfil. A cor mostra o status. */
 function igcalChip(i) {
-  return `${igcalAbrir(i)} title="${attr(`${i.rotulo} · ${i.perfil} · ${i.titulo}`)}">${i.mini ? `<img src="${attr(i.mini)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<i aria-hidden="true">◇</i>'}<span><b>${esc(i.hora || '')}</b> ${esc(i.titulo)}<small>${esc(igcalPerfilCurto(i.perfil))} · ${esc(i.rotulo)}</small></span>${igcalFecha(i)}`;
+  return `${igcalAbrir(i)} title="${attr(`${i.hora || 'sem horário'} · ${i.rotulo} · ${i.perfil} · ${i.titulo}`)}">${i.mini ? `<img src="${attr(i.mini)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<i aria-hidden="true">◇</i>'}<span class="igcal-cx"><time class="igcal-hora">${esc(i.hora || '—:—')}</time><span class="igcal-tit">${esc(i.titulo)}</span>${Filtros.get().perfil ? '' : `<small>${esc(igcalPerfilCurto(i.perfil))}</small>`}</span>${igcalFecha(i)}`;
 }
 /** Item em linha (dia e lista): miniatura maior, horário, título, perfil, formato e status. */
 function igcalLinha(i, comData) {
