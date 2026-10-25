@@ -140,3 +140,10 @@ main{background:#f5f7fc}
 .pill.on{box-shadow:0 2px 6px rgba(0,39,95,.12)}
 .empty-rich{border-radius:12px;max-width:100%}
 @media(max-width:760px){#content{padding-top:14px}.subtabs{padding:8px 12px!important;overflow-x:auto;flex-wrap:nowrap!important}.subtab{white-space:nowrap}.filtros-barra{padding:10px 12px!important}.card{padding:15px!important}}
+
+/* Seleção de perfil independente do restante dos filtros, como no Instagram anterior. */
+.subtabs:has(.ig-perfil-proprio){display:flex!important;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.subtabs-links{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ig-perfil-proprio{display:flex;gap:10px;align-items:center;margin-left:auto;color:var(--ink-2);font-weight:650;font-size:12px}
+.ig-perfil-proprio select{min-width:184px;max-width:230px;background:#fff;border:1px solid #cbd6e6;border-radius:8px;color:#063996;font-weight:700}
+@media(max-width:760px){.subtabs:has(.ig-perfil-proprio){align-items:stretch}.subtabs-links{overflow-x:auto;flex-wrap:nowrap;max-width:100%}.ig-perfil-proprio{margin:0;width:100%;justify-content:space-between}.ig-perfil-proprio select{flex:1;max-width:none}}

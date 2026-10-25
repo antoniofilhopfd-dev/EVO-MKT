@@ -78,7 +78,7 @@ async function montarFiltros() {
   const n = Filtros.ativos(), aberto = window.innerWidth >= 860;
   box.innerHTML = `<details class="fb-det" ${aberto ? 'open' : ''}><summary>Filtros${n ? ` · ${n} ativo(s)` : ''} <small>${esc(dis('periodo') ? 'período próprio da tela' : Filtros.descricao())}</small></summary><div class="fb-linha">
     <label class="fb-campo ${dis('periodo') ? 'fb-off' : ''}"${dica('periodo')}><span>Período</span><select class="control" id="fbP" ${dis('periodo') ? 'disabled' : ''} aria-label="Período">${PERIODOS.map(([v, l]) => `<option value="${v}" ${f.p === v ? 'selected' : ''}>${v === 'x' && f.p === 'x' ? esc(rotP) : esc(l)}</option>`).join('')}</select></label>
-    ${sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA)}${sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA)}
+    ${!state.page.startsWith('ig') ? sel('fbPerfil', 'perfil', 'Perfil do Instagram', PERFIL_LISTA) : ''}${sel('fbSeg', 'segmento', 'Segmento', SEG_LISTA)}
     ${sel('fbFmt', 'formato', 'Formato', [['', 'Todos os formatos'], ...FORMATO_LISTA.map(x => [x, x])])}
     ${sel('fbCamp', 'campanha', 'Campanha editorial', [['', 'Todas as campanhas'], ...camps.map(c => [c.id, c.titulo || c.id])])}
     <button type="button" class="btn soft fb-limpar" id="fbLimpar" ${Filtros.ativos() ? '' : 'disabled'}>Limpar filtros</button>
