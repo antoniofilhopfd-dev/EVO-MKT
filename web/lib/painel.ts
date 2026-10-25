@@ -12,7 +12,7 @@ export const formatoDoPost = (tipo: unknown): string => {
   const t = strv(tipo).toUpperCase();
   return t === 'REELS' ? 'Reels' : t === 'STORY' ? 'Stories' : t === 'CAROUSEL_ALBUM' ? 'Carrossel' : t === 'VIDEO' ? 'Vídeo' : 'Feed';
 };
-const semArroba = (s: string) => s.replace(/^@/, '').toLowerCase();
+const semArroba = (s: string) => s.replace(/^@/, '').replace(/[._]/g, '').toLowerCase();
 
 export async function contasDoPerfil(perfil: string): Promise<MetaConta[]> {
   const todas = await contasMonitoradas().catch(() => []);
