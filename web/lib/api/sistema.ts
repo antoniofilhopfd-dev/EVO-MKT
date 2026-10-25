@@ -8,7 +8,10 @@ import { setting } from '../settings';
 import { env, fail, Row, strv } from '../util';
 import { EVO_VERSION } from '../records';
 import { json } from './handlers';
+import { validarLogo, lerImagem, LOGO } from '../logo';
+import { now } from '../util';
 
+const validarLogoSemRegras = (b: Buffer) => { try { return lerImagem(b); } catch { return null; } };
 /** Apoio de Configurações: e-mail das pessoas, relatório da migração, arquivos sem vínculo e IA (rascunho). */
 const usados = async () => (await q("SELECT data FROM records WHERE modulo IN ('conteudos','ideias','calendario','campanhas','templates','configuracoes')")).map((r) => String(r.data)).join('\n');
 
@@ -21,6 +24,12 @@ export async function sistemaRoute(c: Ctx): Promise<Response> {
     await audit(String(u.codigo), 'ia-variacoes');
     return json({ variacoes, rascunho: true });
   }
+  if (path === '/public/logo') {
+    // Pública (aparece até na tela de entrada): a logo enviada pelo Administrador ou, sem envio, a logo original do sistema.
+    const f = await q1("SELECT mime,conteudo FROM arquivos WHERE caminho='CONFIG/logo-colegio'");
+    if (!f) return new Response(null, { status: 302, headers: { Location: '/img/logo-colegio.png', 'Cache-Control': 'no-cache' } });
+    return new Response(new Uint8Array(f.conteudo as Buffer), { headers: { 'Content-Type': String(f.mime), 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' } });
+  }
   const u = await requireAdmin(c);
   if (path === '/admin/users/email' && method === 'POST') {
     const b = await c.body();
@@ -29,6 +38,38 @@ export async function sistemaRoute(c: Ctx): Promise<Response> {
     if (!(await q1('SELECT 1 FROM users WHERE codigo=?', [cod]))) fail(404, 'Ficha não encontrada.');
     await run('UPDATE users SET email=? WHERE codigo=?', [email, cod]);
     await audit(String(u.codigo), 'email-usuario:' + cod);
+    return json({ ok: true });
+  }
+  if (path === '/admin/logo') {
+    await requireAdmin(c);
+    if (method === 'GET') {
+      const f = await q1("SELECT mime,tamanho,criado_em,conteudo FROM arquivos WHERE caminho='CONFIG/logo-colegio'");
+      const ant = await q1("SELECT criado_em FROM arquivos WHERE caminho='CONFIG/logo-colegio.anterior'");
+      let dim = null; if (f) { const i = validarLogoSemRegras(f.conteudo as Buffer); dim = i; }
+      return json({ personalizada: !!f, atualizadoEm: f ? strv(f.criado_em) : '', bytes: f ? Number(f.tamanho) : 0, largura: dim?.largura ?? 0, altura: dim?.altura ?? 0, temAnterior: !!ant, regras: LOGO });
+    }
+    if (method !== 'POST') return fail(405, 'Método não permitido.');
+    const a = await requireAdmin(c), b = await c.body();
+    if (b.confirmar !== true) fail(400, 'Confirme a substituição da logo.');
+    const m = /^data:(image\/(?:png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(strv(b.dados));
+    if (!m) fail(400, 'Envie a logo em PNG ou JPEG.');
+    const buf = Buffer.from(m![2], 'base64'), info = validarLogo(buf);
+    if (info.mime !== m![1]) fail(400, 'O conteúdo do arquivo não corresponde ao formato informado.');
+    // guarda a logo que estava em uso (se houver uma enviada antes) para poder voltar
+    await run("INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) SELECT 'CONFIG/logo-colegio.anterior',mime,tamanho,conteudo,criado_em FROM arquivos WHERE caminho='CONFIG/logo-colegio' ON DUPLICATE KEY UPDATE mime=VALUES(mime),tamanho=VALUES(tamanho),conteudo=VALUES(conteudo),criado_em=VALUES(criado_em)");
+    await run("INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES('CONFIG/logo-colegio',?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime),tamanho=VALUES(tamanho),conteudo=VALUES(conteudo),criado_em=VALUES(criado_em)", [info.mime, buf.length, buf, now()]);
+    await audit(String(a.codigo), 'logo-trocada', 'configuracoes', `${info.largura}x${info.altura}`);
+    return json({ ok: true, largura: info.largura, altura: info.altura });
+  }
+  if (path === '/admin/logo/restaurar') {
+    const a = await requireAdmin(c);
+    if (method !== 'POST') return fail(405, 'Método não permitido.');
+    if ((await c.body()).confirmar !== true) fail(400, 'Confirme a restauração da logo original.');
+    const f = await q1("SELECT 1 x FROM arquivos WHERE caminho='CONFIG/logo-colegio'");
+    if (!f) fail(409, 'O sistema já usa a logo original.');
+    await run("INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) SELECT 'CONFIG/logo-colegio.anterior',mime,tamanho,conteudo,criado_em FROM arquivos WHERE caminho='CONFIG/logo-colegio' ON DUPLICATE KEY UPDATE mime=VALUES(mime),tamanho=VALUES(tamanho),conteudo=VALUES(conteudo),criado_em=VALUES(criado_em)");
+    await run("DELETE FROM arquivos WHERE caminho='CONFIG/logo-colegio'");
+    await audit(String(a.codigo), 'logo-original-restaurada', 'configuracoes', '');
     return json({ ok: true });
   }
   if (path === '/admin/sistema') {
@@ -51,7 +92,7 @@ export async function sistemaRoute(c: Ctx): Promise<Response> {
   }
   if (path === '/admin/arquivos-sem-vinculo') {
     const base = await usados();
-    const rows = (await q('SELECT caminho,tamanho,criado_em FROM arquivos ORDER BY criado_em DESC')).filter((r) => !base.includes(String(r.caminho)));
+    const rows = (await q("SELECT caminho,tamanho,criado_em FROM arquivos WHERE caminho NOT LIKE 'CONFIG/%' ORDER BY criado_em DESC")).filter((r) => !base.includes(String(r.caminho)));
     return json({ total: rows.length, bytes: rows.reduce((s, r) => s + Number(r.tamanho ?? 0), 0), rows: rows.slice(0, 500).map((r) => ({ caminho: r.caminho, tamanho: Number(r.tamanho), criadoEm: r.criado_em })) });
   }
   if (path === '/admin/arquivos-sem-vinculo/excluir' && method === 'POST') {
@@ -60,6 +101,7 @@ export async function sistemaRoute(c: Ctx): Promise<Response> {
     const alvos = (Array.isArray(b.caminhos) ? b.caminhos : []).map(String).slice(0, 500);
     if (!alvos.length) fail(400, 'Escolha ao menos um arquivo.');
     const base = await usados();
+    if (alvos.some((p) => p.startsWith('CONFIG/'))) fail(400, 'Arquivos de configuração (como a logo) não são excluídos por aqui.');
     const livres = alvos.filter((p) => !base.includes(p));
     if (livres.length !== alvos.length) fail(409, 'Algum arquivo passou a ser usado por uma publicação. Atualize a lista.');
     const backup = await makeBackup('antesexcluirarquivos', { completo: true }); // ponto de volta antes de apagar

@@ -265,9 +265,38 @@ async function cfgEscola(corpo) {
 }
 async function cfgAparencia(corpo) {
   const cores = [['Azul institucional', '#063996'], ['Laranja', '#FF7800'], ['Azul escuro', '#00275F'], ['Azul claro', '#00A1F3'], ['Amarelo', '#FAB900'], ['Roxo', '#793A8C'], ['Branco', '#FFFFFF']];
-  corpo.innerHTML = `<div class="cfg-duas"><section class="card"><div class="db-tit"><h2>Logo e identidade visual</h2></div><div class="cfg-logo"><img src="/img/logo-colegio.png" alt="Logo do Colégio Evolução"></div>
-    <p class="kpi-note">Logo atual do sistema, usada no menu, nos relatórios e nos PDFs. A troca da logo ainda não está disponível nesta tela: ela exige validar formato, dimensões e tamanho e confirmar a substituição, e não foi implementada nesta entrega.</p><button type="button" class="btn soft" disabled>Alterar logo (indisponível)</button></section>
+  const info = cfgAdm() ? await api('/admin/logo').catch(() => null) : null;
+  const regras = info?.regras || { maxBytes: 1000000, larguraMin: 300, larguraMax: 4000, alturaMin: 60, alturaMax: 2000, proporcaoMin: 1.5, proporcaoMax: 8 };
+  corpo.innerHTML = `<div class="cfg-duas"><section class="card"><div class="db-tit"><h2>Logo e identidade visual</h2>${info ? cfgBadge(info.personalizada, 'Logo enviada', 'Logo original') : ''}</div>
+    <div class="cfg-logo"><img id="logoAtual" src="/api/public/logo?v=${Date.now()}" alt="Logo do Colégio Evolução"></div>
+    <p class="kpi-note">Usada na tela de entrada, nos relatórios em PDF, na impressão e nas páginas públicas. ${info?.personalizada ? `Enviada em ${esc(fmtDateTime(info.atualizadoEm))} · ${info.largura}×${info.altura} px · ${cfgBytes(info.bytes)}.` : 'Hoje é a logo original do sistema.'} O menu lateral continua com a versão branca do símbolo.</p>
+    ${info ? `<p class="kpi-note">Formato PNG ou JPEG, até ${cfgBytes(regras.maxBytes)}, largura de ${regras.larguraMin} a ${regras.larguraMax} px, altura de ${regras.alturaMin} a ${regras.alturaMax} px, horizontal (largura de 1,5 a 8 vezes a altura). Recomendado: PNG com fundo transparente.</p>
+    <div class="cfg-logo-acoes"><label class="btn soft" for="logoArq">Escolher nova logo…</label><input type="file" id="logoArq" accept="image/png,image/jpeg" hidden>${info.personalizada ? '<button type="button" class="btn soft" id="logoOrig">Voltar à logo original</button>' : ''}</div>
+    <div id="logoPrevia"></div>` : '<p class="kpi-note">Somente o Administrador troca a logo.</p>'}</section>
     <section class="card"><div class="db-tit"><h2>Cores do sistema</h2></div><p class="kpi-note">Paleta institucional fixa: as cores não são editáveis.</p><ul class="cfg-cores">${cores.map(([n, h]) => `<li><i style="background:${h}"></i><span>${n}</span><code>${h}</code></li>`).join('')}</ul></section></div>`;
+  if (!info) return;
+  const lerArquivo = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(new Error('Não foi possível ler o arquivo.')); r.readAsDataURL(f); });
+  const dimensoes = url => new Promise((ok, no) => { const im = new Image(); im.onload = () => ok([im.naturalWidth, im.naturalHeight]); im.onerror = () => no(new Error('O arquivo não é uma imagem válida.')); im.src = url; });
+  $('#logoArq').onchange = async e => {
+    const f = e.target.files[0], box = $('#logoPrevia'); if (!f) return;
+    box.innerHTML = '';
+    const erro = m => { box.innerHTML = `<div class="foco-chip" role="alert">${esc(m)}</div>`; e.target.value = ''; };
+    if (!/^image\/(png|jpeg)$/.test(f.type)) return erro('Formato não aceito. Envie a logo em PNG ou JPEG.');
+    if (f.size > regras.maxBytes) return erro(`A logo tem ${cfgBytes(f.size)}; o máximo é ${cfgBytes(regras.maxBytes)}.`);
+    let url, w, h;
+    try { url = await lerArquivo(f); [w, h] = await dimensoes(url); } catch (er) { return erro(er.message); }
+    if (w < regras.larguraMin || w > regras.larguraMax || h < regras.alturaMin || h > regras.alturaMax) return erro(`Dimensões ${w}×${h} px fora do aceito (largura ${regras.larguraMin}–${regras.larguraMax} px, altura ${regras.alturaMin}–${regras.alturaMax} px).`);
+    const p = w / h; if (p < regras.proporcaoMin || p > regras.proporcaoMax) return erro('A logo deve ser horizontal (largura entre 1,5 e 8 vezes a altura), como a logo atual.');
+    box.innerHTML = `<div class="cfg-logo-nova"><div><small>Nova logo (${w}×${h} px · ${cfgBytes(f.size)})</small><div class="cfg-logo"><img src="${attr(url)}" alt="Prévia da nova logo"></div></div><button type="button" class="btn" id="logoUsar">Usar esta logo</button></div>`;
+    $('#logoUsar').onclick = async () => {
+      if (!await Dlg.confirmar({ titulo: 'Substituir a logo', texto: 'A logo atual será substituída na tela de entrada, nos relatórios e na impressão. A anterior fica guardada e você pode voltar à original quando quiser.', confirmar: 'Substituir a logo' })) return;
+      try { await post('/admin/logo', { dados: url, confirmar: true }); toast('Logo atualizada'); cfgIr(); } catch (er) { toast(er.message, 'warn'); }
+    };
+  };
+  const orig = $('#logoOrig'); if (orig) orig.onclick = async () => {
+    if (!await Dlg.confirmar({ titulo: 'Voltar à logo original', texto: 'A logo enviada deixa de ser usada e a logo original do sistema volta. A enviada fica guardada.', confirmar: 'Voltar à original' })) return;
+    try { await post('/admin/logo/restaurar', { confirmar: true }); toast('Logo original restaurada'); cfgIr(); } catch (er) { toast(er.message, 'warn'); }
+  };
 }
 async function cfgPreferencias(corpo) {
   corpo.innerHTML = '<div id="cfgP"></div><div id="cfgIAbox"></div>';
