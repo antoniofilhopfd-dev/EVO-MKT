@@ -13,22 +13,27 @@ const varTxt=v=>!v||v.tipo==='sem'?'sem base':v.tipo==='novo'?'novo':v.tipo==='e
 function kpis(d){return `<div class="kpis m">${KPIS.map(([l,k,f])=>`<div><small>${l}</small><b>${f(d.atual[k])}</b><small>${varTxt(d.variacoes[k])} vs. anterior</small></div>`).join('')}</div>`}
 function passo(max){const c=[1,2,5,10,20,25,50,100,200,250,500,1000,2000,5000,10000];return c.find(x=>max/x<=6)||20000}
 function grafico(g){
-  const W=760,H=260,L=52,R=16,T=40,B=30,n=g.dias.length;if(!n||!g.series.length)return '<div class="vazio">Sem investimento por dia neste período.</div>';
-  const max=Math.max(1,...g.total),st=passo(max),top=Math.ceil(max/st)*st,bw=Math.min(40,(W-L-R)/n*.7);
-  const x=i=>L+(i+.5)*(W-L-R)/n,y=v=>T+(H-T-B)*(1-v/top);
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Investimento diário por campanha">`;
-  for(let v=0;v<=top;v+=st)s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#DDD" stroke-dasharray="2 3"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="#444">${v}</text>`;
-  const passoX=Math.max(1,Math.ceil(n/12));
-  g.dias.forEach((d,i)=>{if(i%passoX===0)s+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle" font-size="10" fill="#444">${DM(d)}</text>`;let base=0;g.series.forEach((se,k)=>{const v=se.valores[i]||0;if(v){s+=`<rect x="${x(i)-bw/2}" y="${y(base+v)}" width="${bw}" height="${Math.max(0,y(base)-y(base+v))}" fill="${CORES[k%CORES.length]}"><title>${esc(d)} · ${esc(se.nome)}: ${MONEY(v)}</title></rect>`;base+=v}})});
-  const leg=g.series.map((se,k)=>`<tspan fill="${CORES[k%CORES.length]}">■</tspan> ${esc(se.codigo||se.nome)}  `).join('');
-  return s+`<text x="${L}" y="16" font-size="11" fill="#222">${leg}</text></svg>`;
+  const W=760,H=270,L=52,R=16,T=48,B=30,n=g.dias.length;
+  if(!n||!g.series.length)return '<div class="vazio">Sem investimento por dia neste período.</div>';
+  const series=[...g.series.map((s,i)=>({...s,cor:['#063996','#00A1F3','#FF7800','#793A8C'][i%4]})),{nome:'Total',valores:g.total,cor:'#00275F',total:true}];
+  const max=Math.max(1,...series.flatMap(s=>s.valores)),st=passo(max),top=Math.ceil(max/st)*st;
+  const x=i=>L+(n===1?(W-L-R)/2:i*(W-L-R)/(n-1)),y=v=>T+(H-T-B)*(1-v/top);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Investimento diário por campanha, total tracejado">`;
+  for(let v=0;v<=top;v+=st)svg+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#DDD"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="#444">${v}</text>`;
+  const step=Math.max(1,Math.ceil(n/9));g.dias.forEach((d,i)=>{if(i%step===0||i===n-1)svg+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle" font-size="10" fill="#444">${DM(d)}</text>`});
+  series.forEach((s,j)=>{
+    const pts=s.valores.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+    svg+=`<polyline points="${pts}" fill="none" stroke="${s.cor}" stroke-width="${s.total?2.5:1.8}" ${s.total?'stroke-dasharray="6 4"':''}/>`;
+    s.valores.forEach((v,i)=>{if(i%Math.max(1,Math.ceil(n/40))&&i!==n-1)return;svg+=s.total?`<rect x="${x(i)-2.5}" y="${y(v)-2.5}" width="5" height="5" fill="${s.cor}"/>`:`<circle cx="${x(i)}" cy="${y(v)}" r="2" fill="${s.cor}"/>`});
+  });
+  return `<div class="tf-rel-legenda">${series.map(s=>`<span><svg width="22" height="10" aria-hidden="true"><line x1="0" y1="5" x2="22" y2="5" stroke="${s.cor}" stroke-width="2" ${s.total?'stroke-dasharray="5 3"':''}/></svg> ${esc(s.codigo||s.nome)}</span>`).join('')}</div>`+svg+'</svg>';
 }
 function tabelaCamp(d){
   const t=d.atual;
   return `<table><thead><tr><th>Campanha</th><th>Invest. (R$)</th><th>Impress.</th><th>Alcance</th><th>Cliques</th><th>CTR</th><th>CPC (R$)</th><th>Conversas</th><th>Custo/Conv. (R$)</th></tr></thead><tbody>${d.campanhas.map(c=>`<tr><td class="l">${esc(c.nome)}</td><td>${MONEY(c.investimento)}</td><td>${N0(c.impressoes)}</td><td>${N0(c.alcance)}</td><td>${N0(c.cliques)}</td><td>${PCT(c.ctr)}</td><td>${MONEY(c.cpc)}</td><td>${N0(c.conversas)}</td><td>${MONEY(c.custoConversa)}</td></tr>`).join('')||'<tr><td colspan="9" class="vazio">Nenhuma campanha com veiculação neste período.</td></tr>'}<tr class="tot"><td class="l">TOTAL</td><td>${MONEY(t.investimento)}</td><td>${N0(t.impressoes)}</td><td>${N0(t.alcance)}</td><td>${N0(t.cliques)}</td><td>${PCT(t.ctr)}</td><td>${MONEY(t.cpc)}</td><td>${N0(t.conversas)}</td><td>${MONEY(t.custoConversa)}</td></tr></tbody></table>`;
 }
 function tabelaAnuncios(d){
-  return `<table><thead><tr><th>Foto</th><th>Anúncio</th><th>Campanha</th><th>Status</th><th>Custo (R$)</th><th>Impress.</th><th>Cliques</th><th>CTR</th><th>Conv.</th><th>Custo/Conv.</th></tr></thead><tbody>${d.anuncios.map(a=>`<tr><td class="foto">${a.miniatura?`<img alt="" referrerpolicy="no-referrer" src="${esc(a.miniatura)}">`:''}</td><td class="l">${esc(a.nome)}</td><td>${esc(a.codigo||a.campanha)}</td><td>${esc(a.statusRotulo)}</td><td>${MONEY(a.investimento)}</td><td>${N0(a.impressoes)}</td><td>${N0(a.cliques)}</td><td>${PCT(a.ctr)}</td><td>${N0(a.conversas)}</td><td>${MONEY(a.custoConversa)}</td></tr>`).join('')||'<tr><td colspan="10" class="vazio">Nenhum anúncio com veiculação neste período.</td></tr>'}</tbody></table>`;
+  return `<table><thead><tr><th>Foto</th><th>Anúncio</th><th>Campanha</th><th>Status</th><th>Custo (R$)</th><th>Impress.</th><th>Cliques</th><th>CTR</th><th>Conv.</th><th>Custo/Conv.</th></tr></thead><tbody>${d.anuncios.map(a=>`<tr><td class="foto">${a.miniatura?`<img alt="" referrerpolicy="no-referrer" src="${esc(a.imagem||a.miniatura)}">`:'<span>Sem imagem</span>'}</td><td class="l">${esc(a.nome)}</td><td>${esc(a.codigo||a.campanha)}</td><td>${esc(a.statusRotulo)}</td><td>${MONEY(a.investimento)}</td><td>${N0(a.impressoes)}</td><td>${N0(a.cliques)}</td><td>${PCT(a.ctr)}</td><td>${N0(a.conversas)}</td><td>${MONEY(a.custoConversa)}</td></tr>`).join('')||'<tr><td colspan="10" class="vazio">Nenhum anúncio com veiculação neste período.</td></tr>'}</tbody></table>`;
 }
 function html(d,sub,obs){
   const p=d.periodo,ant=d.anterior,agora=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
@@ -52,7 +57,7 @@ async function carregar(){
     ultimo=d;desenhar();
   }catch(e){$('#rel').innerHTML=`<div class="msg">${esc(e.message)}</div>`}
 }
-function desenhar(){if(ultimo)$('#rel').innerHTML=html(ultimo,$('#sub').value,$('#obs').value.trim())}
+function desenhar(){if(!ultimo)return;$('#rel').innerHTML=html(ultimo,$('#sub').value,$('#obs').value.trim());document.querySelectorAll('#rel td.foto img').forEach(img=>{img.onerror=()=>img.replaceWith(Object.assign(document.createElement('span'),{textContent:'Imagem indisponível'}))})}
 {
   const q=new URLSearchParams(location.search),hoje=hojeBR();
   $('#de').value=/^\d{4}-\d\d-\d\d$/.test(q.get('de')||'')?q.get('de'):soma(hoje,-29);$('#ate').value=/^\d{4}-\d\d-\d\d$/.test(q.get('ate')||'')?q.get('ate'):hoje;

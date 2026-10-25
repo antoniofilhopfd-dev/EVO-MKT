@@ -9,7 +9,7 @@ import { adsPermitido } from './metaads';
  * e devolve indicadores recalculados a partir dos valores absolutos. Nada aqui cria, edita, ativa, pausa ou muda orçamento.
  * Leads, visitas, matrículas e funil comercial NÃO aparecem: pertencem ao EVO CRM.
  */
-export const MAX_DIAS = 93;
+export const MAX_DIAS = 400;
 const TTL_MS = 5 * 60 * 1000;
 const CONVERSA_PRINCIPAL = 'onsite_conversion.messaging_conversation_started_7d';
 const CONVERSA_ALTERNATIVA = 'messaging_conversation_started_7d';
@@ -131,12 +131,12 @@ async function insights(conta: string, nivel: 'campaign' | 'ad' | 'account', de:
   return { linhas, truncado };
 }
 
-async function anunciosDetalhe(conta: string, ids: string[]): Promise<Map<string, Row>> {
+async function anunciosDetalhe(conta: string, ids: string[], campanhas = false): Promise<Map<string, Row>> {
   const mapa = new Map<string, Row>();
-  const campos = 'id,effective_status,creative.thumbnail_width(300).thumbnail_height(380){thumbnail_url}';
+  const campos = campanhas ? 'id,effective_status' : 'id,effective_status,creative.thumbnail_width(300).thumbnail_height(380){thumbnail_url,image_url}';
   try {
     for (let i = 0; i < ids.length; i += 40) {
-      const r = await metaGet(`/act_${conta}/ads`, { fields: campos, filtering: JSON.stringify([{ field: 'id', operator: 'IN', value: ids.slice(i, i + 40) }]), limit: 100 });
+      const r = await metaGet(`/act_${conta}/${campanhas ? 'campaigns' : 'ads'}`, { fields: campos, filtering: JSON.stringify([{ field: 'id', operator: 'IN', value: ids.slice(i, i + 40) }]), limit: 100 });
       for (const a of (r.data ?? []) as Row[]) mapa.set(String(a.id), a);
     }
   } catch { /* sem foto/estado: o painel sai assim mesmo, com aviso */ }
@@ -168,12 +168,14 @@ export async function resumoTrafego(de: string, ate: string, tipo = '', forcar =
   if (!camp.linhas.length) avisos.push('A Meta não devolveu campanhas com veiculação neste período.');
   const detalhe = await anunciosDetalhe(conta, [...new Set(anunc.linhas.map((l) => String(l.ad_id ?? '')).filter(Boolean))]);
   if (anunc.linhas.length && !detalhe.size) avisos.push('Não foi possível ler as miniaturas e o status dos anúncios agora.');
-  const linhaCamp = (l: Row) => { const t = totais([l], num(l.reach)); return { id: String(l.campaign_id ?? ''), nome: String(l.campaign_name ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), ...t }; };
+  const detalheCamp = await anunciosDetalhe(conta, [...new Set(camp.linhas.map(l => String(l.campaign_id ?? '')).filter(Boolean))], true);
+  if (camp.linhas.length && detalheCamp.size < new Set(camp.linhas.map(l => String(l.campaign_id))).size) avisos.push('O status de algumas campanhas não está disponível; elas aparecem em Todos ou Status indisponível.');
+  const linhaCamp = (l: Row) => { const status = String(detalheCamp.get(String(l.campaign_id))?.effective_status ?? ''); const t = totais([l], num(l.reach)); return { id: String(l.campaign_id ?? ''), nome: String(l.campaign_name ?? ''), status, statusRotulo: rotuloStatus(status), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), ...t }; };
   const campanhas = camp.linhas.map(linhaCamp).filter((c) => c.investimento > 0 || c.impressoes > 0).sort((a, b) => b.investimento - a.investimento);
   const anuncios = anunc.linhas.map((l) => {
     const d = detalhe.get(String(l.ad_id)) ?? {};
     const t = totais([l], num(l.reach));
-    return { id: String(l.ad_id ?? ''), nome: String(l.ad_name ?? ''), campanha: String(l.campaign_name ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), status: String(d.effective_status ?? ''), statusRotulo: rotuloStatus(d.effective_status), miniatura: urlDeImagemMeta(d.creative?.thumbnail_url), ...t };
+    return { id: String(l.ad_id ?? ''), nome: String(l.ad_name ?? ''), campanha: String(l.campaign_name ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), status: String(d.effective_status ?? ''), statusRotulo: rotuloStatus(d.effective_status), miniatura: urlDeImagemMeta(d.creative?.thumbnail_url) || urlDeImagemMeta(d.creative?.image_url), imagem: urlDeImagemMeta(d.creative?.image_url) || urlDeImagemMeta(d.creative?.thumbnail_url), ...t };
   }).filter((a) => a.investimento > 0 || a.impressoes > 0).sort((a, b) => b.investimento - a.investimento);
   const pausadosComGasto = anuncios.filter((a) => /PAUSED/.test(a.status)).length;
   if (pausadosComGasto) avisos.push(`${pausadosComGasto} anúncio(s) estão pausados hoje, mas tiveram gasto no período.`);
@@ -208,4 +210,18 @@ export async function resumoDaUltimaSincronizacao(de: string, ate: string): Prom
   const r = await q1('SELECT COALESCE(SUM(gasto),0) g,COALESCE(SUM(impressoes),0) i,COALESCE(SUM(cliques),0) c,COALESCE(SUM(conversas),0) v,COUNT(*) n FROM ads_diario WHERE dia>=? AND dia<=?', [de, ate]);
   if (!r || !Number(r.n)) return null;
   return totais([{ spend: r.g, impressions: r.i, clicks: r.c, conversas: r.v }], null);
+}
+
+/** O status é o efetivo ATUAL informado pela Meta, e não o status histórico no período. */
+export const FILTROS_STATUS: Record<string, string> = { todos: 'Todos', ativos: 'Ativos', pausados: 'Pausados', analise: 'Em análise', problemas: 'Com problemas ou reprovados', arquivados: 'Arquivados ou excluídos', desconhecidos: 'Status indisponível' };
+export function validarFiltroStatus(status: string, nivel: string): void {
+  if (!Object.hasOwn(FILTROS_STATUS, status) || !['campanhas', 'anuncios'].includes(nivel)) fail(400, 'Filtro de status ou nível inválido.');
+}
+export function filtrarTabelaTrafego(d: Row, status = 'todos', nivel = 'campanhas'): Row {
+  validarFiltroStatus(status, nivel);
+  const cabe = (s: string) => status === 'todos' || (status === 'ativos' ? s === 'ACTIVE' : status === 'pausados' ? ['PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED'].includes(s) : status === 'analise' ? ['PENDING_REVIEW', 'IN_PROCESS', 'PREAPPROVED'].includes(s) : status === 'problemas' ? ['WITH_ISSUES', 'DISAPPROVED', 'PENDING_BILLING_INFO'].includes(s) : status === 'arquivados' ? ['ARCHIVED', 'DELETED'].includes(s) : !s);
+  const rows = (d[nivel] as Row[]).filter(r => cabe(String(r.status || '')));
+  // Alcance não é aditivo: a conta não informa alcance deduplicado para este recorte.
+  const total = status === 'todos' ? d.atual : totais(rows, null);
+  return { ...d, [nivel]: rows, tabela: { nivel, status, rotulo: FILTROS_STATUS[status], total }, avisos: [...(d.avisos || []), ...(status === 'todos' ? [] : ['Filtro pelo status atual na Meta. Os valores representam a veiculação no período escolhido; itens sem veiculação não aparecem. O alcance total deste recorte não é somado.'])] };
 }
