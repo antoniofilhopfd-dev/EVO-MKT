@@ -171,3 +171,9 @@ main{background:#f5f7fc}
 .igr-pos{font-size:20px;color:var(--brand,#06379a)}.igr-img img,.igr-img .db-sem-img{width:84px;height:84px;border-radius:12px;object-fit:cover;display:grid;place-items:center;background:#eef2fb;font-size:11px}
 .igr-ord{display:inline-flex;align-items:center;gap:8px;font-weight:600}.igr-tab td.num,.igr-tab th.num{text-align:right}.igr-sel{background:#f2f6ff;font-weight:700}
 .igr-tab .rk-thumb img{width:44px;height:44px;border-radius:8px;object-fit:cover}
+/* Instagram › Desempenho: cartão de cada postagem */
+.ig-card{display:flex;flex-direction:column;background:#fff;border:1px solid var(--line,#e3e7ef);border-radius:16px;overflow:hidden}
+.ig-thumb{display:grid;place-items:center;aspect-ratio:1/1;background:#eef2fb;color:var(--ink-3);text-decoration:none;font-size:12px}.ig-thumb img{width:100%;height:100%;object-fit:cover}
+.ig-body{padding:10px 12px;display:flex;flex-direction:column;gap:6px}.ig-meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;flex-wrap:wrap}.ig-meta span{color:var(--ink-3)}
+.ig-body p{margin:0;font-size:13px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ig-body dl{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px;margin:0}.ig-body dl div{display:flex;justify-content:space-between;gap:6px;font-size:12px;border-bottom:1px solid var(--line,#e3e7ef);padding:2px 0}.ig-body dt{color:var(--ink-3)}.ig-body dd{margin:0}

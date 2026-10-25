@@ -36,7 +36,7 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   for (const m of ['semana', 'dia', 'lista']) { await p.click(`[data-modo="${m}"]`); await p.waitForTimeout(300); t('Calendário: visão ' + m + ' abre sem erro', (await p.$$('#igcalCorpo')).length === 1); if (m === 'lista') { t('Calendário: lista traz miniatura, horário e status', (await p.$$('.igcal-lista .igcal-item')).length >= 4 && (await p.$$('.igcal-lista .badge')).length >= 4); await foto('instagram-calendario-lista'); } }
   t('Calendário do Instagram não traz o calendário escolar', !/feriado|prova bimestral/i.test(await p.innerText('#igcalCorpo')), ((await p.innerText('#content')).match(/.{0,60}(Calendário escolar|Feriado).{0,60}/i) || [])[0]);
   await U.ir(p, 'igdesempenho', 900); await foto('instagram-desempenho');
-  t('Desempenho carrega', (await p.$$('[data-dim]')).length >= 1);
+  t('Desempenho carrega e traz cada postagem com seus dados', (await p.$$('[data-dim]')).length >= 1 && (await p.$$('.ig-card')).length === 3 && /visualizações/i.test(await p.innerText('.ig-card')) && /engajamento/i.test(await p.innerText('.ig-card')));
   await U.ir(p, 'igranking', 900);
   t('Ranking carrega com as publicações, imagens e classificação', (await p.$$('.igr-tab tbody tr')).length === 3 && (await p.$$('.igr-podio')).length === 3 && (await p.$$('.igr-tab img')).length === 3);
   t('Ranking: 1º por interações é a publicação do Reels', /Reels da feira/.test(await p.innerText('.igr-tab tbody tr')));
