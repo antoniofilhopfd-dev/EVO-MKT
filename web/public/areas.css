@@ -119,3 +119,24 @@ ins{background:#D7F2E1;text-decoration:none;border-radius:3px}del{background:#FA
 .tf-visao{display:grid;gap:16px;min-width:0}.tf-visao>.card,.tf-vis-graficos>.card{margin:0;min-width:0}.tf-vis-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px;align-items:center;padding:24px}.tf-vis-hero>div:first-child{display:grid;gap:5px}.tf-vis-hero strong{font-size:clamp(32px,4vw,52px);line-height:1.1;letter-spacing:-1px;overflow-wrap:anywhere}.tf-vis-hero small{color:var(--ink-3)}.tf-vis-contexto{display:grid;gap:8px;border-left:1px solid var(--line);padding-left:24px}.tf-vis-contexto span{font-size:14px}.tf-vis-kpis{margin:0}.tf-vis-graficos{display:grid;grid-template-columns:minmax(0,3fr) minmax(260px,1.2fr);gap:16px;align-items:start}.tf-vis-graficos .ch-nome small{overflow-wrap:anywhere}.tf-vis-alertas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}.tf-vis-alerta{display:flex;gap:10px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:10px;min-width:0}.tf-vis-alerta.problema{border-left:3px solid #FF7800}.tf-vis-alerta p{font-size:13px;color:var(--ink-3);line-height:1.5;margin:5px 0 0;overflow-wrap:anywhere}.tf-visao .db-tit{flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}.tf-visao .tablewrap{max-width:100%}.tf-visao .tf-foto{width:56px;min-height:68px}.tf-visao .tf-foto img{width:50px;height:64px}
 @media(max-width:1100px){.tf-vis-graficos{grid-template-columns:minmax(0,1fr)}.tf-vis-graficos .ch-barras{margin:0}}@media(max-width:700px){.tf-vis-hero{grid-template-columns:minmax(0,1fr);gap:16px;padding:18px}.tf-vis-contexto{border-left:0;border-top:1px solid var(--line);padding:14px 0 0}.tf-vis-alertas{grid-template-columns:minmax(0,1fr)}.tf-visao .db-tit .btn{width:100%}}
 .tf-vis-hero .kd{color:var(--ink-3)}
+
+/* Revisão visual 2026-10-25: resgata densidade e hierarquia do EVO MKT anterior sem módulos legados. */
+main{background:#f5f7fc}
+#content{padding-top:22px;padding-bottom:32px}
+.subtabs{background:#fff!important;border-bottom:1px solid #e2e8f2!important;gap:6px!important;padding:10px 20px!important;position:relative!important;top:auto!important}
+.subtab{min-height:40px!important;border-radius:9px!important;border:1px solid transparent!important;padding:9px 17px!important;font-size:13px!important;font-weight:700!important;transition:background .15s,border-color .15s}
+.subtab.active{color:#fff!important;background:#063996!important;border-color:#063996!important;box-shadow:0 2px 6px rgba(0,39,95,.12)!important}
+.subtab:not(.active):hover{color:#063996!important;background:#eaf0fb!important}
+.filtros-barra{position:relative!important;background:#fff!important;border-bottom:1px solid #e4e9f3!important;padding:14px 22px 13px!important}
+.filtros-barra .fb-campo{min-width:130px}
+.card{border:1px solid #e3e9f3!important;border-radius:12px!important;padding:20px!important;box-shadow:0 2px 12px rgba(0,39,95,.04)!important}
+.db-tit{margin-bottom:16px!important;align-items:center!important}
+.db-tit h2{font-size:17px!important;line-height:1.35}
+.kpi{border:1px solid #e6eaf1!important;border-radius:10px!important;background:#fff!important;padding:16px!important;min-width:0}
+.kpi strong{letter-spacing:-.025em}
+.ig-grade{gap:16px}
+.ig-post{border:1px solid #e4e9f3;border-radius:12px;overflow:hidden;background:#fff}
+.pills{gap:7px!important}.pill{font-size:13px!important;border-radius:9px!important}
+.pill.on{box-shadow:0 2px 6px rgba(0,39,95,.12)}
+.empty-rich{border-radius:12px;max-width:100%}
+@media(max-width:760px){#content{padding-top:14px}.subtabs{padding:8px 12px!important;overflow-x:auto;flex-wrap:nowrap!important}.subtab{white-space:nowrap}.filtros-barra{padding:10px 12px!important}.card{padding:15px!important}}
