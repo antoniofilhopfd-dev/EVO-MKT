@@ -212,7 +212,7 @@ export async function igSync(months = 2): Promise<number> {
       await intLog('instagram', 'erro', `@${c.usuario}: ${e.message}`);
     }
   }
-  const aviso = !cs.length ? 'Nenhum perfil disponível para sincronizar.' : falhas ? `Sincronização incompleta: ${falhas} de ${cs.length} perfil(is) falharam. Confira Configurações › Instagram.` : '';
+  const aviso = !cs.length ? 'Nenhum perfil disponível para sincronizar.' : falhas ? `Sincronização incompleta: ${falhas} de ${cs.length} perfil(is) falharam. Confira Configurações › Instagram.${ultimo?.message ? ` Último erro: ${String(ultimo.message).replace(/\s+/g, ' ').slice(0, 220)}` : ''}` : '';
   await setSetting('ig_sync_warning', aviso);
   if (cs.length && falhas === cs.length) throw ultimo;
   if (cs.length && !falhas) await setSetting('ig_last_sync', now());
