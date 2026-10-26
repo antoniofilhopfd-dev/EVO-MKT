@@ -66,7 +66,7 @@ const { t, fim } = U.contador();
   const b = await U.abrir(); const p = await U.pagina(b, 'NAT-3301', G.nova); let dialogos = 0; p.removeAllListeners('dialog'); p.on('dialog', d => { dialogos++; d.dismiss(); });
   for (const pg of ['hoje', 'calendario', 'igvisao', 'igconteudos', 'igplan', 'igdesempenho']) { await U.ir(p, pg, 500); await p.evaluate(() => document.querySelectorAll('.admin-overlay').forEach(e => e.remove())); }
   await U.ir(p, 'igplan'); await p.click('[data-aba="ideias"]'); await p.waitForTimeout(800); await p.click('[data-aba="campanhas"]').catch(() => {}); await p.waitForTimeout(800);
-  await U.ir(p, 'igconteudos'); await p.click('[data-pub]'); await p.waitForSelector('#estForm', { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(500);
+  await U.ir(p, 'igconteudos'); await p.click('[data-ac="editar"]').catch(() => {}); await p.waitForSelector('#igpub', { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(500);
   t('HTML dentro dos textos nunca executa (Dashboard, Calendário, Instagram e Estúdio)', (await p.evaluate(() => window.__xss)) === undefined && dialogos === 0, [dialogos, p.errs]);
   t('e aparece como texto, não como elemento', (await p.$$eval('img[src="x"]', e => e.length)) === 0);
   await b.close();

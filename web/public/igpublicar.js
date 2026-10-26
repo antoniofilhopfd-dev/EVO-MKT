@@ -11,13 +11,14 @@ const igpubPerfilRotulo = usuario => { const u = String(usuario || '').replace(/
 /** modo: 'agora' | 'agendar'. `existente`: publicação já criada (rascunho) para continuar. */
 function escolherNovaPublicacao(opc = {}) {
   const dlg = dialogo(`<h3>Nova publicação</h3><p class="kpi-note">Como você quer publicar?</p><div class="igp-escolha"><button type="button" class="igp-op" data-modo="agendar"><b>Agendar</b><span>Escolha o dia e a hora; o sistema publica sozinho.</span></button><button type="button" class="igp-op" data-modo="agora"><b>Publicar agora</b><span>Envia para o Instagram em seguida.</span></button></div><div class="dlg-acoes"><button type="button" class="btn" data-close>Fechar</button></div>`);
-  $$('[data-modo]', dlg.el).forEach(b => b.onclick = () => { const modo = b.dataset.modo; dlg.close(); abrirPublicacao(modo, null, { dia: opc.data }); });
+  $$('[data-modo]', dlg.el).forEach(b => b.onclick = () => { const modo = b.dataset.modo; dlg.close(); abrirPublicacao(modo, null, { dia: opc.data, dados: opc.dados }); });
 }
 async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
   const contas = (await api('/instagram/contas')).contas || [];
   if (!contas.length) { toast('Conecte o Instagram em Configurações antes de publicar.', 'warn'); return; }
   const amanha = somaDias(hojeBR(), 1);
-  const est = { modo, conta: 0, collab: false, formato: existente?.formato || 'Reels', arquivos: [], legenda: existente?.legenda || '', dia: existente?.publicacaoEm ? existente.publicacaoEm.slice(0, 10) : opc.dia || amanha, hora: existente?.publicacaoEm ? existente.publicacaoEm.slice(11, 16) : '09:00', id: existente?.id || '', previa: 0 };
+  const est = { modo, conta: 0, collab: false, formato: existente?.formato || (IGPUB_FORMATOS.some(f => f[0] === opc.dados?.formato) ? opc.dados.formato : 'Reels'), arquivos: [], legenda: existente?.legenda ?? opc.dados?.legenda ?? '', dia: existente?.publicacaoEm ? existente.publicacaoEm.slice(0, 10) : opc.dia || amanha, hora: existente?.publicacaoEm ? existente.publicacaoEm.slice(11, 16) : '09:00', id: existente?.id || '', previa: 0 };
+  const perfilBase = existente?.perfil || opc.dados?.perfil; if (perfilBase && !existente?.contaInstagram) { const i = contas.findIndex(c => igpubPerfilRotulo(c.usuario) === perfilBase); if (i >= 0) est.conta = i; }
   if (existente?.contaInstagram) { const i = contas.findIndex(c => c.ig === existente.contaInstagram); if (i >= 0) est.conta = i; }
   const dlg = dialogo('<div id="igpub"></div>', { larga: true });
   const raiz = $('#igpub', dlg.el);
@@ -25,7 +26,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
   const aceita = () => (est.formato === 'Reels' ? '.mp4,.mov' : '.jpg,.jpeg,.mp4,.mov');
   const maxItens = () => (est.formato === 'Carrossel' ? 10 : 1);
   const ehVideo = a => /\.(mp4|mov)$/i.test(a.name);
-  const urls = est.arquivos.map(a => URL.createObjectURL(a));
+  const salvos = (existente?.materiais || []).filter(m => !m.substituido && m.papel === 'final').length;
 
   const previaMidia = () => {
     const a = est.arquivos[0]; if (!a) return '<div class="igp-vazio">Sua mídia aparece aqui</div>';
@@ -50,7 +51,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
       ${outra ? `<label class="check-row"><input type="checkbox" id="igpCollab" ${est.collab ? 'checked' : ''} ${est.formato === 'Stories' ? 'disabled' : ''}> Convidar @${esc(String(outra.usuario).replace(/^@/, ''))} como colaborador (Collab)</label><p class="kpi-note">O Instagram envia um convite ao outro perfil e ele precisa aceitar; a publicação não sai sozinha nos dois perfis.</p>` : ''}
       <h4>2. Formato</h4><div class="igp-formatos">${IGPUB_FORMATOS.map(([k, n, d]) => `<label class="igp-formato ${est.formato === k ? 'on' : ''}"><input type="radio" name="igpFmt" value="${k}" ${est.formato === k ? 'checked' : ''}><b>${n}</b><small>${d}</small></label>`).join('')}</div>
       <h4>3. Mídia</h4><div class="igp-midia"><label class="igp-upload"><input type="file" id="igpArq" accept="${aceita()}" ${maxItens() > 1 ? 'multiple' : ''}><b>Clique para enviar ${maxItens() > 1 ? 'as fotos' : est.formato === 'Reels' ? 'o vídeo' : 'a mídia'}</b><small>${est.formato === 'Reels' ? 'MP4 ou MOV' : 'JPG, MP4 ou MOV'} · até ${maxItens()} item(ns) · máx. 15 MB cada</small></label>
-        <div class="igp-lista">${est.arquivos.map((a, i) => `<span class="igp-item">${esc(a.name)} <button type="button" data-rm="${i}" aria-label="Remover">✕</button></span>`).join('') || '<small class="kpi-note">Nenhum arquivo escolhido.</small>'}</div></div>
+        <div class="igp-lista">${salvos && !est.arquivos.length ? `<small class="kpi-note">${salvos} arquivo(s) já enviado(s). Envie outro só se quiser trocar.</small>` : ''}${est.arquivos.map((a, i) => `<span class="igp-item">${esc(a.name)} <button type="button" data-rm="${i}" aria-label="Remover">✕</button></span>`).join('') || '<small class="kpi-note">Nenhum arquivo escolhido.</small>'}</div></div>
       <h4>4. Legenda</h4><textarea id="igpLeg" class="control" rows="5" maxlength="2200" placeholder="Escreva a legenda e as hashtags…">${esc(est.legenda)}</textarea><div class="igp-cont"><span id="igpN">${est.legenda.length}</span>/2.200</div>
       ${modo === 'agendar' ? `<h4>5. Data e horário</h4><div class="igp-quando"><label>Dia<input type="date" id="igpDia" class="control" min="${hojeBR()}" value="${est.dia}"></label><label>Horário<input type="time" id="igpHora" class="control" value="${est.hora}"></label><small class="kpi-note">Horário de Fortaleza.</small></div>` : ''}
       <div class="igp-erro" id="igpErro" role="alert" hidden></div>
@@ -95,7 +96,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
     try {
       const primeira = est.legenda.trim().split('\n')[0].slice(0, 60);
       const dados = { titulo: primeira || 'Publicação sem título', legenda: est.legenda, perfil: igpubPerfilRotulo(c.usuario), formato: est.formato, canal: 'Instagram', contaInstagram: c.ig, colaboradores: est.collab && outra ? String(outra.usuario).replace(/^@/, '') : '', publicarInstagram: 'SIM', publicacaoEm: modo === 'agendar' ? `${est.dia}T${est.hora}` : '' };
-      let r = est.id ? await put(`/data?module=conteudos&id=${encodeURIComponent(est.id)}`, dados) : await post('/data?module=conteudos', { ...dados, status: 'RASCUNHO' });
+      let r = est.id ? await put(`/data?module=conteudos&id=${encodeURIComponent(est.id)}`, dados) : await post('/data?module=conteudos', { ...Object.fromEntries(Object.entries(opc.dados || {}).filter(([k]) => /^origem/.test(k))), ...dados, status: 'RASCUNHO' });
       est.id = r.id;
       if (est.arquivos.length) {
         const fd = new FormData(); fd.append('id', r.id); fd.append('papel', 'final'); est.arquivos.forEach(a => fd.append('files', a));
