@@ -28,20 +28,42 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
   const ehVideo = a => /\.(mp4|mov)$/i.test(a.name);
   const salvos = (existente?.materiais || []).filter(m => !m.substituido && m.papel === 'final').length;
 
-  const previaMidia = () => {
-    const a = est.arquivos[0]; if (!a) return '<div class="igp-vazio">Sua mídia aparece aqui</div>';
-    const u = URL.createObjectURL(a);
-    return ehVideo(a) ? `<video src="${attr(u)}" muted playsinline></video>` : `<img src="${attr(u)}" alt="">`;
+  /* Mídia da prévia: o arquivo escolhido agora ou, ao editar, a arte final já salva. A proporção real vem do próprio arquivo. */
+  const salva = (existente?.materiais || []).find(m => !m.substituido && m.papel === 'final' && m.tipo === 'arquivo');
+  const fonte = () => {
+    const a = est.arquivos[0];
+    if (a) { if (est.fonteDe !== a) { if (est.fonteUrl) URL.revokeObjectURL(est.fonteUrl); est.fonteUrl = URL.createObjectURL(a); est.fonteDe = a; est.dim = null; } return { url: est.fonteUrl, video: ehVideo(a) }; }
+    if (salva) return { url: urlMaterial(salva), video: /\.(mp4|mov)$/i.test(salva.caminho || salva.nome || '') };
+    return null;
   };
+  const medir = () => {
+    const f = fonte(); if (!f || est.dimDe === f.url) return; est.dimDe = f.url;
+    const ok = (w, h) => { if (est.dimDe !== f.url || !w || !h) return; est.dim = { w, h }; const pv = $('#igpPrev', raiz); if (pv) { pv.innerHTML = previa(); ligaPrevia(); } };
+    if (f.video) { const v = document.createElement('video'); v.preload = 'metadata'; v.onloadedmetadata = () => ok(v.videoWidth, v.videoHeight); v.src = f.url; }
+    else { const i = new Image(); i.onload = () => ok(i.naturalWidth, i.naturalHeight); i.src = f.url; }
+  };
+  const previaMidia = () => {
+    const f = fonte(); if (!f) return '<div class="igp-vazio">Sua mídia aparece aqui</div>';
+    return f.video ? `<video src="${attr(f.url)}" muted playsinline preload="metadata"></video>` : `<img src="${attr(f.url)}" alt="">`;
+  };
+  const cortaLeg = (t, n) => { const x = String(t || ''); return x.length > n ? `${esc(x.slice(0, n).trimEnd())}… <em class="igp-mais">mais</em>` : esc(x); };
   const previa = () => {
-    const c = contas[est.previa] || contas[0], u = '@' + String(c.usuario).replace(/^@/, '');
-    const legenda = esc(est.legenda || 'Sua legenda aparece aqui…').slice(0, 220);
-    const f = est.formato;
+    const c = contas[est.previa] || contas[0], u = String(c.usuario).replace(/^@/, '');
+    const f = est.formato, r = est.dim ? est.dim.w / est.dim.h : null;
     const abas = est.collab && contas.length > 1 ? `<div class="igp-abas">${contas.map((x, i) => `<button type="button" class="${est.previa === i ? 'on' : ''}" data-prev="${i}">No perfil de @${esc(String(x.usuario).replace(/^@/, ''))}</button>`).join('')}</div>` : '';
-    const quadro = f === 'Reels' || f === 'Stories'
-      ? `<div class="igp-tela igp-vertical">${previaMidia()}<div class="igp-sobre"><b>${f === 'Stories' ? 'Stories' : 'Reels'}</b><div class="igp-rodape"><b>${esc(u)}</b><span>${legenda}</span></div></div></div>`
-      : `<div class="igp-post"><div class="igp-cab"><i></i><b>${esc(u)}</b></div><div class="igp-quadrado">${previaMidia()}${f === 'Carrossel' && est.arquivos.length ? `<em>1/${est.arquivos.length}</em>` : ''}</div><div class="igp-leg"><b>${esc(u)}</b> ${legenda}</div></div>`;
-    return `<h3>Pré-visualização</h3><p class="kpi-note">Veja como a publicação deve ficar no Instagram.</p>${abas}${quadro}`;
+    let quadro, aviso = '';
+    if (f === 'Reels' || f === 'Stories') {
+      if (r && Math.abs(r - 9 / 16) > 0.04) aviso = `O arquivo não é vertical 9:16; o Instagram vai cortar as laterais ou as bordas (a prévia mostra o recorte).`;
+      const sobre = f === 'Stories'
+        ? `<div class="igp-sobre igp-st"><div class="igp-barra"><i></i></div><div class="igp-stu"><span class="igp-av"></span><b>${esc(u)}</b><small>agora</small></div></div>`
+        : `<div class="igp-sobre igp-rl"><div class="igp-lado"><span>♡</span><span>◌</span><span>➤</span></div><div class="igp-rodape"><div class="igp-stu"><span class="igp-av"></span><b>${esc(u)}</b></div><span>${cortaLeg(est.legenda || 'Sua legenda aparece aqui…', 70)}</span></div></div>`;
+      quadro = `<div class="igp-tela">${previaMidia()}${sobre}</div>`;
+    } else {
+      const lim = r ? Math.min(1.91, Math.max(0.8, r)) : 1;
+      if (r && (r > 1.92 || r < 0.79)) aviso = r > 1.92 ? 'Fotos muito largas são cortadas para 1,91:1 no Feed.' : 'Fotos muito altas são cortadas para 4:5 no Feed.';
+      quadro = `<div class="igp-post"><div class="igp-cab"><span class="igp-av"></span><b>${esc(u)}</b><span class="igp-pts">•••</span></div><div class="igp-quadrado" style="aspect-ratio:${lim.toFixed(4)}">${previaMidia()}${f === 'Carrossel' && est.arquivos.length ? `<em>1/${est.arquivos.length}</em>` : ''}</div><div class="igp-icones"><span>♡</span><span>◌</span><span>➤</span><span class="igp-sv">▢</span></div><div class="igp-leg"><b>${esc(u)}</b> ${cortaLeg(est.legenda || 'Sua legenda aparece aqui…', 125)}</div></div>`;
+    }
+    return `<h3>Pré-visualização</h3><p class="kpi-note">Veja como a publicação deve ficar no Instagram.</p>${abas}${quadro}${aviso ? `<p class="igp-aviso">${esc(aviso)}</p>` : ''}`;
   };
   const desenha = () => {
     const c = contas[est.conta], outra = contas.find((_, i) => i !== est.conta);
@@ -57,7 +79,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
       <div class="igp-erro" id="igpErro" role="alert" hidden></div>
       <div class="igp-acoes"><button type="button" class="btn soft" id="igpRasc">Salvar rascunho</button><button type="button" class="btn" id="igpGo">${modo === 'agora' ? 'Publicar agora' : 'Agendar'}</button></div>
     </div><aside class="igp-prev" id="igpPrev">${previa()}</aside></div>`;
-    liga();
+    liga(); medir();
   };
   const liga = () => {
     $$('[name=igpConta]', raiz).forEach(r => { r.onchange = () => { est.conta = +r.value; est.previa = est.conta; est.collab = false; desenha(); }; });
