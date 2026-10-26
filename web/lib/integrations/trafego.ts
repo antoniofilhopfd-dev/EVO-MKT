@@ -65,6 +65,15 @@ export function variacao(atual: number | null, anterior: number | null): { tipo:
   return { tipo: p > 0 ? 'subiu' : 'caiu', percentual: p };
 }
 
+/** Textos do criativo vindos da Meta: só texto simples, com limite de tamanho (a tela os mostra escapados). */
+const texto = (v: unknown, max: number) => String(v ?? '').replace(/[\u0000-\u001F\u007F]+/g, ' ').trim().slice(0, max);
+const CTA: Record<string, string> = { LEARN_MORE: 'Saiba mais', SIGN_UP: 'Cadastre-se', CONTACT_US: 'Fale conosco', MESSAGE_PAGE: 'Enviar mensagem', WHATSAPP_MESSAGE: 'Enviar mensagem no WhatsApp', BOOK_TRAVEL: 'Reservar', APPLY_NOW: 'Inscreva-se', GET_QUOTE: 'Solicitar orçamento', CALL_NOW: 'Ligar agora', SHOP_NOW: 'Comprar', NO_BUTTON: 'Sem botão' };
+const rotuloCta = (v: unknown) => { const t = String(v ?? ''); return t ? CTA[t] ?? t.toLowerCase().replace(/_/g, ' ') : ''; };
+const FORMATO_CRIATIVO: Record<string, string> = { VIDEO: 'Vídeo', PHOTO: 'Imagem', SHARE: 'Link', STATUS: 'Publicação', INVALID: '' };
+const rotuloFormato = (v: unknown) => { const t = String(v ?? ''); return t ? FORMATO_CRIATIVO[t] ?? t.toLowerCase() : ''; };
+/** Link da publicação só se for HTTPS do Instagram ou do Facebook. */
+const linkSocial = (v: unknown) => { try { const p = new URL(String(v ?? '')); const h = p.hostname.toLowerCase(); return p.protocol === 'https:' && !p.username && !p.password && (h === 'instagram.com' || h.endsWith('.instagram.com') || h === 'facebook.com' || h.endsWith('.facebook.com')) && p.href.length <= 600 ? p.href : ''; } catch { return ''; } };
+
 /** Só imagens servidas pela Meta/Instagram, por HTTPS, sem credenciais na URL nem porta estranha. */
 export function urlDeImagemMeta(u: unknown): string {
   try {
@@ -128,7 +137,7 @@ async function insights(conta: string, nivel: 'campaign' | 'adset' | 'ad' | 'acc
 
 async function anunciosDetalhe(conta: string, ids: string[], tipo: 'ads' | 'campaigns' | 'adsets' = 'ads'): Promise<Map<string, Row>> {
   const mapa = new Map<string, Row>();
-  const campos = tipo !== 'ads' ? 'id,effective_status' : 'id,effective_status,creative.thumbnail_width(300).thumbnail_height(380){id,thumbnail_url,image_url}';
+  const campos = tipo !== 'ads' ? 'id,effective_status' : 'id,effective_status,creative.thumbnail_width(300).thumbnail_height(380){id,thumbnail_url,image_url,title,body,call_to_action_type,object_type,instagram_permalink_url}';
   try {
     for (let i = 0; i < ids.length; i += 40) {
       const r = await metaGet(`/act_${conta}/${tipo}`, { fields: campos, filtering: JSON.stringify([{ field: 'id', operator: 'IN', value: ids.slice(i, i + 40) }]), limit: 100 });
@@ -175,7 +184,7 @@ export async function resumoTrafego(de: string, ate: string, tipo = '', forcar =
   const anuncios = anunc.linhas.map((l) => {
     const d = detalhe.get(String(l.ad_id)) ?? {};
     const t = totais([l], num(l.reach));
-    return { id: String(l.ad_id ?? ''), nome: String(l.ad_name ?? ''), conjunto: String(l.adset_name ?? ''), conjuntoId: String(l.adset_id ?? ''), campanhaId: String(l.campaign_id ?? ''), criativoId: String(d.creative?.id ?? ''), campanha: String(l.campaign_name ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), status: String(d.effective_status ?? ''), statusRotulo: rotuloStatus(d.effective_status), miniatura: urlDeImagemMeta(d.creative?.thumbnail_url) || urlDeImagemMeta(d.creative?.image_url), imagem: urlDeImagemMeta(d.creative?.image_url) || urlDeImagemMeta(d.creative?.thumbnail_url), ...t };
+    return { id: String(l.ad_id ?? ''), nome: String(l.ad_name ?? ''), conjunto: String(l.adset_name ?? ''), conjuntoId: String(l.adset_id ?? ''), campanhaId: String(l.campaign_id ?? ''), criativoId: String(d.creative?.id ?? ''), titulo: texto(d.creative?.title, 160), texto: texto(d.creative?.body, 600), cta: rotuloCta(d.creative?.call_to_action_type), formatoCriativo: rotuloFormato(d.creative?.object_type), linkPublicacao: linkSocial(d.creative?.instagram_permalink_url), campanha: String(l.campaign_name ?? ''), codigo: codigoCampanha(l.campaign_name), segmento: segmentoDoNome(l.campaign_name), status: String(d.effective_status ?? ''), statusRotulo: rotuloStatus(d.effective_status), miniatura: urlDeImagemMeta(d.creative?.thumbnail_url) || urlDeImagemMeta(d.creative?.image_url), imagem: urlDeImagemMeta(d.creative?.image_url) || urlDeImagemMeta(d.creative?.thumbnail_url), ...t };
   }).filter((a) => a.investimento > 0 || a.impressoes > 0).sort((a, b) => b.investimento - a.investimento);
   const pausadosComGasto = anuncios.filter((a) => /PAUSED/.test(a.status)).length;
   if (pausadosComGasto) avisos.push(`${pausadosComGasto} anúncio(s) estão pausados hoje, mas tiveram gasto no período.`);
