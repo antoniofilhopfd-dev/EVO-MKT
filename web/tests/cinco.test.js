@@ -66,7 +66,7 @@ const { t, fim } = U.contador();
   // criar ao clicar
   const alvo = dia(6); await p.click(`.cm-num[data-novo="${alvo}"]`).catch(async () => { await p.click(`.cm-dia[data-date="${alvo}"]`); });
   await p.waitForSelector('.cal-escolha'); t('clicar em um dia oferece criar publicação, compromisso, evento escolar ou data', (await p.$$('.cal-escolha [data-n]')).length === 4);
-  await p.click('[data-n="pub"]'); await p.waitForSelector('#estForm'); t('criar publicação a partir do dia já vem com a data preenchida', (await p.inputValue('#fQuando')).startsWith(alvo), await p.inputValue('#fQuando'));
+  await p.click('[data-n="pub"]'); await p.click('[data-modo="agendar"]'); await p.waitForSelector('#igpDia'); t('criar publicação a partir do dia já vem com a data preenchida', (await p.inputValue('#igpDia')) === alvo, await p.inputValue('#igpDia'));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   // reagendar arrastando
   const o = await p.$(`.cm-item[data-uid^="pub:"]:has-text("Aula aberta")`); const dest = await p.$(`.cm-dia[data-date="${dia(3)}"]`);

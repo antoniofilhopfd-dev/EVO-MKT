@@ -88,8 +88,18 @@ const { t, fim } = U.contador();
   await p.selectOption('#tfVModo', 'mes'); await p.waitForTimeout(200);
   t('agrupar por mês mantém o mesmo total do período', (await totalTab()) === t0);
   t('há investimento e resultado por segmento e a tabela de campanhas ao final', (await p.$('#tfRoscaSeg svg')) !== null && /Total \(\d+ campanha/.test(await p.innerText('#tfVisCampanhas')));
+  // ---- anúncios em destaque na Visão Geral ----
+  t('Visão Geral: “Anúncios em destaque” com os anúncios (foto ou “Sem imagem”), campanha e resultados', (await p.$$('.tf-anuncio')).length === 3 && /Anúncios em destaque/.test(await p.innerText('#tfVisAnuncios')) && /Custo\/conversa/.test(await p.innerText('#tfVisAnuncios')) && /Ver todos os anúncios \(3\)/.test(await p.innerText('#tfVisAnuncios')));
+  await p.locator('.tf-anuncio', { hasText: 'Vídeo depoimento' }).locator('[data-tf-anuncio]').click(); await p.waitForSelector('.tf-det', { timeout: 5000 });
+  const det = await p.innerText('body');
+  t('detalhe do anúncio: título, texto, botão, formato e link da publicação (da Meta, sem inventar)', /Título do anúncio:\s*Matrículas abertas/.test(det) && /Texto do anúncio:\s*Conheça a escola/.test(det) && /Botão:\s*Saiba mais/.test(det) && (await p.$$('.tf-det ~ p a[href^="https://www.instagram.com/"], .admin-box a[href^="https://www.instagram.com/"]')).length >= 1);
+  t('detalhe do anúncio: posição dentro da campanha (participação no investimento e comparação com a média)', /Dentro da campanha/.test(det) && /% do investimento da campanha/.test(det) && /que a média da campanha|igual à média|sem base/.test(det));
+  await p.evaluate(() => document.querySelector('[data-close]')?.click()); await p.waitForTimeout(300);
+  await p.click('#tfVerAnuncios'); await p.waitForSelector('[data-tf-nivel].on', { timeout: 8000 }); await p.waitForTimeout(500);
+  t('“Ver todos os anúncios” abre o Desempenho já em Anúncios', (await p.$eval('[data-tf-nivel].on', e => e.textContent)) === 'Anúncios');
+  await U.ir(p, 'trafego', 900);
   // ---- Desempenho ----
-  await U.ir(p, 'tfdesempenho', 900); txt = await U.textoConteudo(p);
+  await U.ir(p, 'tfdesempenho', 900); await p.click('[data-tf-nivel="campanhas"]'); await p.waitForTimeout(300); txt = await U.textoConteudo(p);
   t('Desempenho: campanha → conjunto → anúncio na mesma aba', JSON.stringify(await p.$$eval('[data-tf-nivel]', e => e.map(x => x.textContent))) === JSON.stringify(['Campanhas', 'Conjuntos', 'Anúncios']) && /Total \(\d+\)/.test(txt));
   await p.click('[data-tf-abre]'); await p.waitForTimeout(400);
   t('clicar numa campanha abre os conjuntos dela (filtro, sem nova aba)', (await p.$eval('[data-tf-nivel].on', e => e.textContent)) === 'Conjuntos' && /Todas as campanhas/.test(await p.innerText('.tf-migalha')));
