@@ -7,7 +7,6 @@ PAGINAS.igplan = async function () {
   const abas = [['pauta', 'Pauta do mês'], ['ideias', 'Ideias'], ['campanhas', 'Campanhas editoriais'], ['modelos', 'Modelos e hashtags']];
   $('#content').innerHTML = `${abasInstagramAcoes()}<div class="pills" role="tablist" aria-label="Planejamento">${abas.map(([k, l]) => `<button type="button" role="tab" class="pill ${IGP.aba === k ? 'on' : ''}" data-aba="${k}" aria-selected="${IGP.aba === k}">${l}</button>`).join('')}</div><div id="igpCorpo"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   $$('[data-aba]').forEach(b => { b.onclick = () => { IGP.aba = b.dataset.aba; setPref('igpAba', IGP.aba); go('igplan'); }; });
-  ligaNova();
   await ({ pauta: igpPauta, ideias: igpIdeias, campanhas: igpCampanhas, modelos: igpModelos }[IGP.aba] || igpPauta)();
   if (window.IG_ABRIR_CAMPANHA) { const id = window.IG_ABRIR_CAMPANHA; window.IG_ABRIR_CAMPANHA = null; if (IGP.aba !== 'campanhas') { IGP.aba = 'campanhas'; return go('igplan'); } const r = ((await getRows('campanhas')).rows || []).find(x => x.id === id); if (r) igpCampanhaForm(r); }
 };

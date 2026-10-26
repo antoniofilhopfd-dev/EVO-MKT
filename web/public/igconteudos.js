@@ -1,12 +1,9 @@
-/* Instagram › Conteúdos: da ideia à publicação, com revisão e aprovação internas (sem Portal e sem link externo).
-   Fluxo: Ideia → Rascunho → Em produção → Em revisão → Aprovado → Agendado → Publicado. */
-const IG_ETAPAS = ['IDEIA', 'RASCUNHO', 'EM PRODUÇÃO', 'EM REVISÃO', 'APROVADO', 'AGENDADO', 'PUBLICADO'];
+/* Instagram › Publicações: lista, filtros e ações (editar, publicar agora, agendar, duplicar, excluir). Criar e editar usam o formulário de igpublicar.js. */
 /* Auxiliares que antes ficavam no Dashboard. */
 const ESTADO_ROTULO = { IDEIA: 'Ideia', RASCUNHO: 'Rascunho', 'EM PRODUÇÃO': 'Em produção', 'EM REVISÃO': 'Em revisão', APROVADO: 'Aprovado', AGENDADO: 'Agendado', PUBLICADO: 'Publicado', ARQUIVADO: 'Arquivado' };
 const estadoClasse = s => ({ APROVADO: 'ok', AGENDADO: 'info', PUBLICADO: 'ok', 'EM REVISÃO': 'warn', ARQUIVADO: 'mute' }[s] || '');
 function abrirRegistros(ids, titulo) { window.IG_FOCO = { ids, titulo }; go('igconteudos'); }
 const IG_ESTADO_ROTULO = { ...ESTADO_ROTULO };
-const IG_PAPEIS = { referencia: 'Referência', producao: 'Arquivo em produção', final: 'Arquivo final', miniatura: 'Miniatura' };
 const SEG_NOMES = SEG_LISTA.filter(s => s[0]).map(s => s[1]).concat(['Todos']);
 const IGC = { rows: [], estados: new Map(), busca: '', status: '', resp: '', vista: pref('igVista', 'lista'), meta: [] };
 
@@ -16,9 +13,6 @@ const materiaisAtivosDe = (r, papel) => (r.materiais || []).filter(m => !m.subst
 const urlMaterial = m => (m.tipo === 'arquivo' ? `${API}/file?path=${encodeURIComponent(m.caminho)}` : m.url);
 const ehImagem = m => m.tipo === 'arquivo' && /\.(jpe?g|png|gif|webp)$/i.test(m.caminho || m.nome || '');
 
-/** Botão "Nova publicação" presente nas quatro abas do Instagram. */
-const botaoNova = () => '<button type="button" class="btn" data-nova>+ Nova publicação</button>';
-function ligaNova(raiz = document) { $$('[data-nova]', raiz).forEach(b => { b.onclick = () => novaPublicacao(); }); }
 /** O botão "+ Nova publicação" do cabeçalho vale para todo o Instagram; as abas não repetem o botão. */
 function abasInstagramAcoes() { return ''; }
 
