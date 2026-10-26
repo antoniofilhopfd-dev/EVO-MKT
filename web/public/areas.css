@@ -365,3 +365,5 @@ a.btn,a.btn:hover{text-decoration:none}
 /* Tráfego › Relatórios: formulário de geração (período, recorte semanal, filtros, Baixar PDF). */
 .tfr-per{display:flex;gap:12px 16px;flex-wrap:wrap;align-items:flex-end}.tfr-per .fb-campo input{width:132px}.tfr-filtros{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}.tfr-filtros .fb-campo select{min-width:190px}.tfr-form .cm-erro{margin:6px 0 0;min-height:0}
 .tfr-form .db-tit,.tf-rel-previa .db-tit{align-items:flex-start;text-align:left}.tfr-form .db-tit h2,.tf-rel-previa .db-tit h2{text-align:left}
+/* Semana/Dia: os eventos de "dia todo" ficam dentro da coluna do próprio dia (antes o texto comprido invadia as colunas vizinhas). */
+.cg-allday{grid-template-columns:minmax(0,1fr);min-width:0;overflow:hidden}.cg-h-allday>div,.cg-h-topo>div,.cg-col{min-width:0}.cg-allday .cg-ev{min-width:0;max-width:100%;overflow:hidden}.cg-allday .cg-ev span{min-width:0;flex:1 1 auto}
