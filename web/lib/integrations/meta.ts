@@ -1,4 +1,4 @@
-import { q, q1, run } from '../db';
+import { getPool, q, q1, run } from '../db';
 import { audit, getRow, insertRow, listRows, saveRow, updateRow } from '../records';
 import { intLog, setSetting, setting } from '../settings';
 import { notifyMail } from '../mail';
@@ -414,8 +414,17 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   await intLog('instagram', 'ok', `Publicado: ${id} → ${link}`);
   return { status: 'PUBLICADO', link };
 }
-/** Publica o que está programado e vencido (usado pelo cron). */
+/** Publica o que está programado e vencido. Roda pelo cron da hospedagem E por um relógio dentro do servidor; um bloqueio no banco
+ *  garante que só uma execução por vez publica (nunca duas vezes o mesmo post, mesmo com vários processos). */
 export async function igPublishDue(): Promise<number> {
+  const conn = await getPool().getConnection();
+  try {
+    const [r] = (await conn.query("SELECT GET_LOCK('evo_ig_publish', 0) AS l")) as any;
+    if (!Number(r?.[0]?.l)) return 0; // outra execução está publicando agora
+    try { return await igPublishDueSemBloqueio(); } finally { await conn.query("SELECT RELEASE_LOCK('evo_ig_publish')").catch(() => {}); }
+  } finally { conn.release(); }
+}
+async function igPublishDueSemBloqueio(): Promise<number> {
   await setSetting('ig_last_publish_run', now());
   if (!(await metaConnected())) return 0;
   let n = 0;

@@ -13,4 +13,14 @@ export async function register() {
   } catch (e) {
     console.error('[startup] falha ao aplicar migrações:', e);
   }
+  // Publicação agendada do Instagram também por um relógio interno (a cada 5 min): o cron da hospedagem pode falhar
+  // ("fork failed") e o post agendado não pode depender só dele. O bloqueio no banco evita publicar em duplicidade.
+  if (process.env.IG_AUTO_PUBLISH_INTERNO !== '0') {
+    const rodar = async () => {
+      try { const { igPublishDue } = await import('./lib/integrations/meta'); const n = await igPublishDue(); if (n) console.log(`[agendador] ${n} post(s) publicado(s)`); }
+      catch (e: any) { console.error('[agendador] falha:', String(e?.message ?? e).replace(/access_token=[^&\s"]+/g, 'access_token=***')); }
+    };
+    setTimeout(rodar, 60_000).unref();
+    setInterval(rodar, 5 * 60_000).unref();
+  }
 }
