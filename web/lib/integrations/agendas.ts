@@ -23,6 +23,8 @@ export const corDosGrupos = (gs: string[]) => (gs.length === 1 ? GRUPOS.find((g)
 const tz = () => env('TIMEZONE', 'America/Fortaleza');
 const pad = (n: number) => String(n).padStart(2, '0');
 const escreve = (papel: string) => ['owner', 'writer'].includes(papel);
+/** A agenda do Marketing pode se chamar "Marketing", "AGENDA MKT" etc. */
+export const ehAgendaMarketing = (nome: string) => /marketing|(^|[^a-z0-9])mkt([^a-z0-9]|$)/i.test(nome);
 
 export class ErroAgenda extends Error {
   constructor(public http: number, message: string, public codigo = '') { super(message); }
@@ -110,7 +112,7 @@ export async function agendaAdicionar(id: string, ator: string): Promise<Agenda>
     try { item = (await chamar('POST', '/calendar/v3/users/me/calendarList', { id: cal }, 'A agenda')) as Row; } catch { throw new ErroAgenda(404, 'Não encontrei essa agenda. Confira o ID e se ela foi compartilhada com a conta Google conectada.', 'google_404'); }
   }
   const nome = nomeDe(item), papel = String(item.accessRole ?? 'reader');
-  const editavel = /^marketing/i.test(nome) && escreve(papel) ? 1 : 0;
+  const editavel = ehAgendaMarketing(nome) && escreve(papel) ? 1 : 0;
   await run('INSERT INTO google_agendas(calendar_id,nome,grupo,papel,editavel,ativa,status,erro,ultima_sync,criado_em) VALUES(?,?,?,?,?,?,?,?,?,?)', [cal, nome.slice(0, 160), grupoPeloNome(nome), papel, editavel, 1, 'SINCRONIZADA', '', now(), now()]);
   await intLog('google', 'ok', `Agenda cadastrada: ${nome} (${papel}) por ${ator}`);
   return agendaDe(cal);

@@ -34,6 +34,12 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   t('não dá para liberar edição de agenda que o Google só deixa ler', (await G.post('/agendas/atualizar', { id: 'cal_mat', editavel: true })).http === 409);
   t('sem login: 401', (await fetch(U.B + '/agenda/eventos?de=2026-10-01&ate=2026-10-31', { headers: { 'X-EVO': '1' } })).status === 401);
 
+  // migração 031: agenda "AGENDA MKT" (escrita no Google) vira editável; a só de leitura e as de outros nomes continuam como estão
+  sql("INSERT INTO google_agendas(calendar_id,nome,grupo,papel,editavel,ativa,status,erro,ultima_sync,criado_em) VALUES ('t_mkt','AGENDA MKT','GERAL','owner',0,1,'SINCRONIZADA','','x','x'),('t_mktr','MKT leitura','GERAL','reader',0,1,'SINCRONIZADA','','x','x'),('t_outra','Educação Infantil','INFANTIL','writer',0,1,'SINCRONIZADA','','x','x');");
+  sql(fs.readFileSync(require('path').join(__dirname, '../db/migrations/031_agenda_mkt_editavel.sql'), 'utf8'));
+  const mg = Object.fromEntries(sql("SELECT calendar_id,editavel FROM google_agendas WHERE calendar_id LIKE 't!_%' ESCAPE '!';").trim().split('\n').map(l => l.split('\t')));
+  t('migração 031: “AGENDA MKT” com escrita vira editável; leitura e outros nomes não', mg.t_mkt === '1' && mg.t_mktr === '0' && mg.t_outra === '0', mg);
+  sql("DELETE FROM google_agendas WHERE calendar_id LIKE 't!_%' ESCAPE '!';");
   // ---- leitura: todas as páginas, falhas parciais, fuso ----
   const muitos = []; for (let i = 0; i < 300; i++) muitos.push({ id: 'p' + i, summary: 'Aula ' + i, status: 'confirmed', start: { dateTime: `${dia(-3)}T${String(7 + (i % 10)).padStart(2, '0')}:00:00-03:00` }, end: { dateTime: `${dia(-3)}T${String(8 + (i % 10)).padStart(2, '0')}:00:00-03:00` } });
   muitos.push({ id: 'proj1', summary: 'Projeto Leitura – 2º ano', status: 'confirmed', location: 'Biblioteca', description: 'Leitura coletiva', start: { dateTime: `${dia(3)}T08:00:00-03:00` }, end: { dateTime: `${dia(3)}T09:00:00-03:00` }, attendees: [{ email: 'prof@colegio.test', displayName: 'Professora' }] });
