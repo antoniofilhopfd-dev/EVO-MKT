@@ -107,7 +107,7 @@ PAGINAS.calendario = async function () {
         <span class="cg-modos" role="group" aria-label="Visão">${[['mes', 'Mês'], ['semana', 'Semana'], ['dia', 'Dia']].map(([k, n]) => `<button type="button" class="btn ${CG.modo === k ? '' : 'soft'}" data-modo="${k}" aria-pressed="${CG.modo === k}">${n}</button>`).join('')}</span>
         <details class="cg-segs"><summary class="btn soft">${todos ? 'Todos os segmentos' : `${CG.segs.size} segmento(s)`} ▾</summary><div>${CG_GRUPOS.map(([k, n, c]) => `<label><input type="checkbox" data-seg="${k}" ${CG.segs.has(k) ? 'checked' : ''}><i style="background:${c}"></i>${n}</label>`).join('')}<button type="button" class="btn soft" data-seg-todos>Marcar todos</button></div></details>
         <input type="search" class="control cg-busca" id="cgBusca" placeholder="Buscar eventos, locais, responsáveis…" aria-label="Buscar eventos escolares" value="${attr(CG.busca)}">
-        <button type="button" class="btn" id="cgNovo" ${dados.pode ? '' : 'disabled title="Nenhuma agenda liberada para edição. Só a agenda do Marketing aceita novos eventos."'}>+ Novo evento</button>
+        <button type="button" class="btn" id="cgNovo" ${dados.pode ? '' : 'disabled title="Nenhuma agenda liberada para edição. O Administrador liga “Editar no EVO MKT” na agenda do Marketing em Configurações › Integrações › Google Agenda › Agendas Google."'}>+ Novo evento</button>
       </div>
       ${dados.avisos.length ? `<div class="cg-avisos" role="alert">${dados.avisos.map(a => `<p><b>${esc(a.agenda || 'Google')}:</b> ${esc(a.mensagem)}</p>`).join('')}<small>Os eventos desta agenda podem estar incompletos até o problema ser resolvido.</small></div>` : ''}
       ${cgLegenda()}
