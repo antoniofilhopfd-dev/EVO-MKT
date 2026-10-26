@@ -32,11 +32,6 @@ const { t, fim } = U.contador();
     await foto('nova-previa-' + nome.replace(' ', '-'));
   }
   t('a legenda longa é cortada com “mais”', await p.$('.igp-leg .igp-mais') !== null);
-  await p.evaluate(() => document.querySelector('[name=igpFmt][value="Stories"]').click()); await p.waitForSelector('.igp-tela');
-  await p.setInputFiles('#igpArq', { name: 'story.jpg', mimeType: 'image/jpeg', buffer: await imagem(1600, 900, { r: 214, g: 51, b: 108 }) });
-  await p.waitForSelector('.igp-aviso', { timeout: 5000 }).catch(() => {});
-  const q = await p.evaluate(() => { const r = document.querySelector('.igp-tela').getBoundingClientRect(); return r.width / r.height; });
-  t('Stories fica 9:16 e avisa quando o arquivo é horizontal', Math.abs(q - 9 / 16) < 0.03 && await p.$('.igp-aviso') !== null, q);
-  await foto('nova-previa-stories');
+  t('o formato Stories não é mais oferecido', await p.$('[name=igpFmt][value="Stories"]') === null && (await p.$$('[name=igpFmt]')).length === 3);
   fim();
 })().catch(e => { console.error(e); process.exit(1); });

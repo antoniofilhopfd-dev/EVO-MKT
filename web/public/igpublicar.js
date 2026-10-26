@@ -4,7 +4,6 @@ const IGPUB_FORMATOS = [
   ['Reels', 'Reels', 'Vídeo vertical, MP4 ou MOV', 'video'],
   ['Feed', 'Post individual', 'Uma foto (JPG) ou um vídeo', 'um'],
   ['Carrossel', 'Carrossel de fotos', 'De 2 a 10 itens', 'multi'],
-  ['Stories', 'Stories', 'Pontual: não entra na pauta nem no calendário', 'story'],
 ];
 const igpubPerfilRotulo = usuario => { const u = String(usuario || '').replace(/^@/, ''), s = u.replace(/[._]/g, '').toLowerCase(); return s === 'geracaoevolucao' ? '@geracaoevolucao' : '@' + u; };
 
@@ -52,11 +51,9 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
     const f = est.formato, r = est.dim ? est.dim.w / est.dim.h : null;
     const abas = est.collab && contas.length > 1 ? `<div class="igp-abas">${contas.map((x, i) => `<button type="button" class="${est.previa === i ? 'on' : ''}" data-prev="${i}">No perfil de @${esc(String(x.usuario).replace(/^@/, ''))}</button>`).join('')}</div>` : '';
     let quadro, aviso = '';
-    if (f === 'Reels' || f === 'Stories') {
+    if (f === 'Reels') {
       if (r && Math.abs(r - 9 / 16) > 0.04) aviso = `O arquivo não é vertical 9:16; o Instagram vai cortar as laterais ou as bordas (a prévia mostra o recorte).`;
-      const sobre = f === 'Stories'
-        ? `<div class="igp-sobre igp-st"><div class="igp-barra"><i></i></div><div class="igp-stu"><span class="igp-av"></span><b>${esc(u)}</b><small>agora</small></div></div>`
-        : `<div class="igp-sobre igp-rl"><div class="igp-lado"><span>♡</span><span>◌</span><span>➤</span></div><div class="igp-rodape"><div class="igp-stu"><span class="igp-av"></span><b>${esc(u)}</b></div><span>${cortaLeg(est.legenda || 'Sua legenda aparece aqui…', 70)}</span></div></div>`;
+      const sobre = `<div class="igp-sobre igp-rl"><div class="igp-lado"><span>♡</span><span>◌</span><span>➤</span></div><div class="igp-rodape"><div class="igp-stu"><span class="igp-av"></span><b>${esc(u)}</b></div><span>${cortaLeg(est.legenda || 'Sua legenda aparece aqui…', 70)}</span></div></div>`;
       quadro = `<div class="igp-tela">${previaMidia()}${sobre}</div>`;
     } else {
       const lim = r ? Math.min(1.91, Math.max(0.8, r)) : 1;
@@ -70,7 +67,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
     raiz.innerHTML = `<div class="igp"><div class="igp-form">
       <div class="igp-topo"><div><h2>${modo === 'agora' ? 'Publicar agora' : 'Agendar publicação'}</h2><p class="kpi-note">${modo === 'agora' ? 'Crie e publique seu conteúdo no Instagram.' : 'Escolha o dia e o horário; o sistema publica sozinho.'}</p></div><button type="button" class="btn soft" data-close aria-label="Fechar">✕</button></div>
       <h4>1. Perfil</h4><div class="igp-perfis">${contas.map((x, i) => `<label class="igp-perfil ${est.conta === i ? 'on' : ''}"><input type="radio" name="igpConta" value="${i}" ${est.conta === i ? 'checked' : ''}><b>${esc(x.pagina || x.usuario)}</b><small>@${esc(String(x.usuario).replace(/^@/, ''))}</small></label>`).join('')}</div>
-      ${outra ? `<label class="check-row"><input type="checkbox" id="igpCollab" ${est.collab ? 'checked' : ''} ${est.formato === 'Stories' ? 'disabled' : ''}> Convidar @${esc(String(outra.usuario).replace(/^@/, ''))} como colaborador (Collab)</label><p class="kpi-note">O Instagram envia um convite ao outro perfil e ele precisa aceitar; a publicação não sai sozinha nos dois perfis.</p>` : ''}
+      ${outra ? `<label class="check-row"><input type="checkbox" id="igpCollab" ${est.collab ? 'checked' : ''}> Convidar @${esc(String(outra.usuario).replace(/^@/, ''))} como colaborador (Collab)</label><p class="kpi-note">O Instagram envia um convite ao outro perfil e ele precisa aceitar; a publicação não sai sozinha nos dois perfis.</p>` : ''}
       <h4>2. Formato</h4><div class="igp-formatos">${IGPUB_FORMATOS.map(([k, n, d]) => `<label class="igp-formato ${est.formato === k ? 'on' : ''}"><input type="radio" name="igpFmt" value="${k}" ${est.formato === k ? 'checked' : ''}><b>${n}</b><small>${d}</small></label>`).join('')}</div>
       <h4>3. Mídia</h4><div class="igp-midia"><label class="igp-upload"><input type="file" id="igpArq" accept="${aceita()}" ${maxItens() > 1 ? 'multiple' : ''}><b>Clique para enviar ${maxItens() > 1 ? 'as fotos' : est.formato === 'Reels' ? 'o vídeo' : 'a mídia'}</b><small>${est.formato === 'Reels' ? 'MP4 ou MOV' : 'JPG, MP4 ou MOV'} · até ${maxItens()} item(ns) · máx. 15 MB cada</small></label>
         <div class="igp-lista">${salvos && !est.arquivos.length ? `<small class="kpi-note">${salvos} arquivo(s) já enviado(s). Envie outro só se quiser trocar.</small>` : ''}${est.arquivos.map((a, i) => `<span class="igp-item">${esc(a.name)} <button type="button" data-rm="${i}" aria-label="Remover">✕</button></span>`).join('') || '<small class="kpi-note">Nenhum arquivo escolhido.</small>'}</div></div>
@@ -83,7 +80,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
   };
   const liga = () => {
     $$('[name=igpConta]', raiz).forEach(r => { r.onchange = () => { est.conta = +r.value; est.previa = est.conta; est.collab = false; desenha(); }; });
-    $$('[name=igpFmt]', raiz).forEach(r => { r.onchange = () => { est.formato = r.value; if (est.formato === 'Stories') est.collab = false; est.arquivos = est.arquivos.slice(0, maxItens()); desenha(); }; });
+    $$('[name=igpFmt]', raiz).forEach(r => { r.onchange = () => { est.formato = r.value; est.arquivos = est.arquivos.slice(0, maxItens()); desenha(); }; });
     const co = $('#igpCollab', raiz); if (co) co.onchange = () => { est.collab = co.checked; est.previa = est.conta; $('#igpPrev', raiz).innerHTML = previa(); ligaPrevia(); };
     $('#igpArq', raiz).onchange = e => {
       const novos = [...e.target.files], ok = [];
