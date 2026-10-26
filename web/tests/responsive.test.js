@@ -14,7 +14,7 @@ const { t, fim } = U.contador();
       if (o.bw > 2) { ruins.push(pg + ':' + o.bw); await p.screenshot({ path: `/tmp/resp_${vp.width}_${pg}.png` }); }
     }
     // o Estúdio em diálogo também cabe
-    await U.ir(p, 'igconteudos', 300); await p.click('#newBtn'); await p.waitForSelector('#estForm'); await p.waitForTimeout(300);
+    await U.ir(p, 'igconteudos', 300); await p.evaluate(() => novaPublicacao({ dados: {} })); await p.waitForSelector('#estForm'); await p.waitForTimeout(300);
     const e = await p.evaluate(() => ({ bw: document.documentElement.scrollWidth - document.documentElement.clientWidth, box: document.querySelector('.est-box').scrollWidth - document.querySelector('.est-box').clientWidth }));
     if (e.bw > 2 || e.box > 2) ruins.push('estudio:' + JSON.stringify(e));
     t(`${nome}: sem estouro horizontal em ${PAGINAS.length} telas e no Estúdio`, ruins.length === 0, ruins);

@@ -118,7 +118,8 @@ PAGINAS.igconteudos = async function () {
 };
 
 /* ================= Estúdio: editor da publicação ================= */
-function novaPublicacao(opc = {}) { return abrirEstudio(null, opc); }
+/* Botão "+ Nova publicação": fluxo simples (Agendar / Publicar agora). O estúdio antigo fica só para editar e para pautas/ideias já preenchidas. */
+function novaPublicacao(opc = {}) { return opc.dados ? abrirEstudio(null, opc) : escolherNovaPublicacao(opc); }
 async function editarPublicacao(id) {
   let r;
   try { r = (await api(`/data?module=conteudos&id=${encodeURIComponent(id)}`)); } catch { /* cai para a lista */ }

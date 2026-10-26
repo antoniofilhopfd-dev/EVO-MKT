@@ -10,7 +10,7 @@ const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP////////////////////
   const p = await U.pagina(b, 'NAT-3301', a.nova);
   await U.ir(p, 'igconteudos');
   // ---- criar ----
-  await p.click('#newBtn');
+  await p.evaluate(() => novaPublicacao({ dados: {} })); // o botão do cabeçalho agora abre o fluxo novo; o Estúdio segue para pautas e edição
   await p.waitForSelector('#estForm');
   t('abre o Estúdio em um diálogo interno', await p.$('.est-box') !== null);
   await p.fill('#fTitulo', 'Matrículas abertas');

@@ -9,6 +9,10 @@ const IGPUB_FORMATOS = [
 const igpubPerfilRotulo = usuario => { const u = String(usuario || '').replace(/^@/, ''), s = u.replace(/[._]/g, '').toLowerCase(); return s === 'geracaoevolucao' ? '@geracaoevolucao' : '@' + u; };
 
 /** modo: 'agora' | 'agendar'. `existente`: publicação já criada (rascunho) para continuar. */
+function escolherNovaPublicacao(opc = {}) {
+  const dlg = dialogo(`<h3>Nova publicação</h3><p class="kpi-note">Como você quer publicar?</p><div class="igp-escolha"><button type="button" class="igp-op" data-modo="agendar"><b>Agendar</b><span>Escolha o dia e a hora; o sistema publica sozinho.</span></button><button type="button" class="igp-op" data-modo="agora"><b>Publicar agora</b><span>Envia para o Instagram em seguida.</span></button></div><div class="dlg-acoes"><button type="button" class="btn" data-close>Fechar</button></div>`);
+  $$('[data-modo]', dlg.el).forEach(b => b.onclick = () => { const modo = b.dataset.modo; dlg.close(); abrirPublicacao(modo, null, { dia: opc.data }); });
+}
 async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
   const contas = (await api('/instagram/contas')).contas || [];
   if (!contas.length) { toast('Conecte o Instagram em Configurações antes de publicar.', 'warn'); return; }
