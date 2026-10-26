@@ -3,7 +3,7 @@
 const IGPUB_FORMATOS = [
   ['Reels', 'Reels', 'Vídeo vertical, MP4 ou MOV', 'video'],
   ['Feed', 'Post individual', 'Uma foto (JPG) ou um vídeo', 'um'],
-  ['Carrossel', 'Carrossel de fotos', 'De 2 a 10 itens', 'multi'],
+  ['Carrossel', 'Carrossel de fotos', 'De 2 a 20 itens', 'multi'],
 ];
 const igpubPerfilRotulo = usuario => { const u = String(usuario || '').replace(/^@/, ''), s = u.replace(/[._]/g, '').toLowerCase(); return s === 'geracaoevolucao' ? '@geracaoevolucao' : '@' + u; };
 
@@ -23,7 +23,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
   const raiz = $('#igpub', dlg.el);
   const fmt = () => IGPUB_FORMATOS.find(f => f[0] === est.formato);
   const aceita = () => (est.formato === 'Reels' ? '.mp4,.mov' : '.jpg,.jpeg,.mp4,.mov');
-  const maxItens = () => (est.formato === 'Carrossel' ? 10 : 1);
+  const maxItens = () => (est.formato === 'Carrossel' ? 20 : 1);
   const ehVideo = a => /\.(mp4|mov)$/i.test(a.name);
   const salvos = (existente?.materiais || []).filter(m => !m.substituido && m.papel === 'final').length;
 
@@ -107,7 +107,7 @@ async function abrirPublicacao(modo = 'agora', existente = null, opc = {}) {
     const c = contas[est.conta], outra = contas.find((_, i) => i !== est.conta), publicar = acao === 'publicar';
     if (publicar && !est.legenda.trim()) return erro('Escreva a legenda.');
     if (publicar && !est.arquivos.length && !est.id) return erro('Envie a mídia.');
-    if (publicar && est.formato === 'Carrossel' && est.arquivos.length < 2 && !est.id) return erro('O carrossel precisa de 2 a 10 itens.');
+    if (publicar && est.formato === 'Carrossel' && est.arquivos.length < 2 && !est.id) return erro('O carrossel precisa de 2 a 20 itens.');
     if (publicar && est.formato === 'Reels' && est.arquivos.length && !est.arquivos.every(ehVideo)) return erro('O Reels precisa ser um vídeo (MP4 ou MOV).');
     if (publicar && modo === 'agendar' && (!est.dia || !est.hora || `${est.dia}T${est.hora}` <= `${hojeBR()}T${new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' }).format(new Date())}`)) return erro('Escolha um dia e um horário no futuro.');
     const botoes = $$('#igpRasc, #igpGo', raiz); botoes.forEach(b => { b.disabled = true; });
