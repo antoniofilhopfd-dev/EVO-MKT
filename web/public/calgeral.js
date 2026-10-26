@@ -62,10 +62,23 @@ function cgHoras(itens, dias) {
     const cols = []; // atribui colunas para eventos que se sobrepõem
     evs.forEach(e => { const ini = cgHoraMin(e.horaInicio), fim = Math.max(cgHoraMin(e.horaFim), ini + 30); let c = cols.findIndex(f => f <= ini); if (c < 0) { c = cols.length; cols.push(0); } cols[c] = fim; e._c = c; e._n = 0; });
     evs.forEach(e => { const ini = cgHoraMin(e.horaInicio), fim = Math.max(cgHoraMin(e.horaFim), ini + 30); e._n = Math.max(...evs.filter(o => cgHoraMin(o.horaInicio) < fim && Math.max(cgHoraMin(o.horaFim), cgHoraMin(o.horaInicio) + 30) > ini).map(o => o._c)) + 1; });
-    return `<div class="cg-col ${d === hoje ? 'hoje' : ''}" data-dia="${d}" style="height:${(H1 - H0) * PX}px">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cg-linha" style="top:${i * PX}px" ${CG.dados?.pode ? `data-novo="${d}" data-hora="${String(H0 + i).padStart(2, '0')}:00"` : ''}></div>`).join('')}${evs.map(e => {
+    return `<div class="cg-col ${d === hoje ? 'hoje' : ''}" data-dia="${d}" style="height:${(H1 - H0) * PX}px">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cg-linha" style="top:${i * PX}px" ${CG.dados?.pode ? `data-novo="${d}" data-hora="${String(H0 + i).padStart(2, '0')}:00"` : ''}></div>`).join('')}${(() => {
+    const bloco = e => {
       const ini = Math.max(cgHoraMin(e.horaInicio), H0 * 60), fim = Math.min(Math.max(cgHoraMin(e.horaFim), cgHoraMin(e.horaInicio) + 30), H1 * 60), top = (ini - H0 * 60) / 60 * PX, alt = Math.max(24, (fim - ini) / 60 * PX - 2), larg = 100 / e._n;
-      return `<button type="button" class="cg-bloco" data-ev="${attr(e.id)}" style="--c:${e.cor};background:${cgFundo(e.cor)};top:${top}px;height:${alt}px;left:${e._c * larg}%;width:calc(${larg}% - 3px)" title="${attr(`${e.titulo} · ${cgHora(e)}`)}"><b>${esc(e.horaInicio)} – ${esc(e.horaFim)}</b><span>${esc(e.titulo)}</span>${e.local ? `<small>${esc(e.local)}</small>` : ''}</button>`;
-    }).join('')}</div>`;
+      return `<button type="button" class="cg-bloco ${e._n >= 3 ? 'apert' : e._n === 2 ? 'dois' : ''}" data-ev="${attr(e.id)}" style="--c:${e.cor};background:${cgFundo(e.cor)};top:${top}px;height:${alt}px;left:${e._c * larg}%;width:calc(${larg}% - 3px)" title="${attr(`${e.titulo} · ${cgHora(e)}`)}"><b>${esc(e.horaInicio)} – ${esc(e.horaFim)}</b><span>${esc(e.titulo)}</span>${e.local ? `<small>${esc(e.local)}</small>` : ''}</button>`;
+    };
+    // na Semana, três ou mais eventos ao mesmo tempo viram UM bloco "N eventos" (a coluna é estreita); clicar abre o Dia, onde cada evento tem a largura toda
+    const grupos = []; let cur = null;
+    evs.forEach(e => { const ini = cgHoraMin(e.horaInicio), fim = Math.max(cgHoraMin(e.horaFim), ini + 30); if (cur && ini < cur.fim) { cur.itens.push(e); cur.fim = Math.max(cur.fim, fim); } else { cur = { ini, fim, itens: [e] }; grupos.push(cur); } });
+    return grupos.map(g => {
+      if (dias.length > 1 && g.itens.some(e => e._n >= 3)) {
+        const ini = Math.max(g.ini, H0 * 60), fim = Math.min(g.fim, H1 * 60), top = (ini - H0 * 60) / 60 * PX, alt = Math.max(36, (fim - ini) / 60 * PX - 2), cor = g.itens[0].cor;
+        const horaMin = g.itens.map(e => e.horaInicio).sort()[0], horaMax = g.itens.map(e => e.horaFim).sort().pop();
+        return `<button type="button" class="cg-bloco cg-grupo" data-grupo="${d}" style="--c:${cor};background:${cgFundo(cor)};top:${top}px;height:${alt}px;left:0;width:calc(100% - 3px)" title="${attr(g.itens.map(e => `${e.horaInicio} ${e.titulo}`).join('\n'))}"><b>${g.itens.length} eventos</b><span>${esc(g.itens.map(e => e.titulo).join(' · '))}</span><small>${esc(horaMin)} – ${esc(horaMax)} · abrir o dia</small></button>`;
+      }
+      return g.itens.map(bloco).join('');
+    }).join('');
+  })()}</div>`;
   }).join('');
   const horas = Array.from({ length: H1 - H0 }, (_, i) => `<div style="height:${PX}px"><small>${String(H0 + i).padStart(2, '0')}:00</small></div>`).join('');
   const n = dias.length;
@@ -109,6 +122,7 @@ PAGINAS.calendario = async function () {
     const todos = $('[data-seg-todos]'); if (todos) todos.onclick = () => { CG_GRUPOS.forEach(g => CG.segs.add(g[0])); desenha(); };
     $('#cgBusca').oninput = debounce(e => { CG.busca = e.target.value; desenha(); const i = $('#cgBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250);
     $('#cgNovo').onclick = () => cgForm(null, { dia: CG.sel }, recarrega);
+    $$('[data-grupo]').forEach(b => { b.onclick = () => { const d = b.dataset.grupo; CG.sel = d; CG.ref = d; CG.modo = 'dia'; setPref('cgModo', 'dia'); recarrega(); }; });
     $$('[data-abre]').forEach(b => { b.onclick = () => { const d = b.dataset.abre, mini = !!b.closest('.cg-mini'); CG.sel = d; CG.ref = d; if (!mini && CG.modo === 'mes') { CG.modo = 'dia'; setPref('cgModo', 'dia'); } recarrega(); }; });
     $$('[data-novo]').forEach(b => { b.onclick = e => { e.stopPropagation(); cgForm(null, { dia: b.dataset.novo, hora: b.dataset.hora || '' }, recarrega); }; });
     $$('[data-ev]').forEach(b => { b.onclick = e => { e.stopPropagation(); const ev = (CG.dados?.itens || []).find(x => x.id === b.dataset.ev); if (ev) cgDetalhes(ev, recarrega); }; });
