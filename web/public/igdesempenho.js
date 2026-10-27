@@ -83,7 +83,7 @@ function igdComparativosLiga(g) {
   });
 }
 /** Tabela ordenável de todas as publicações do período, com miniatura. “Não disponível” quando a Meta não atribui o dado (nunca zero). */
-const IGD_COLS = [['alcance', 'Alcance'], ['visualizacoes', 'Visualizações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['compartilhamentos', 'Compartilh.'], ['salvos', 'Salvamentos'], ['engajamento', 'Engajamento'], ['seguidoresNovos', 'Novos seguidores']];
+const IGD_COLS = [['alcance', 'Alcance'], ['visualizacoes', 'Visualizações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['compartilhamentos', 'Compartilh.'], ['salvos', 'Salvamentos'], ['engajamento', 'Engajamento'], ['seguidoresNovos', 'Novos seguidores'], ['visitasPerfil', 'Visitas ao perfil'], ['interacoes', 'Interações']];
 function igdTabela(posts) {
   const rows = [...(posts.rows || [])].sort((a, b) => {
     const k = IGD.ordem, va = k === 'quando' ? String(a.quando) : (a[k] ?? -1), vb = k === 'quando' ? String(b.quando) : (b[k] ?? -1);
@@ -93,7 +93,7 @@ function igdTabela(posts) {
   const celula = (p, k) => {
     const v = p[k];
     if (k === 'seguidoresNovos') return v === null || v === undefined ? '<span class="igd-nd" title="A Meta não atribui seguidores a esta publicação">Não disponível</span>' : '+' + fmtN(v);
-    if (k === 'engajamento') return v === null ? '—' : String(v).replace('.', ',') + '%';
+    if (k === 'engajamento') return v === null || v === undefined ? '—' : String(v).replace('.', ',') + '%';
     return igdN(v);
   };
   const cab = (k, n) => `<th class="num"><button type="button" class="igd-ord ${IGD.ordem === k ? 'on' : ''}" data-igd-ord="${k}" aria-label="Ordenar por ${attr(n)}">${n}${IGD.ordem === k ? (IGD.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;
