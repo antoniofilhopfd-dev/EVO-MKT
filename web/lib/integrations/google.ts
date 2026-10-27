@@ -73,7 +73,8 @@ export async function gApiStatus(method: string, path: string, body: any = null)
 }
 
 // ---------- Agenda ----------
-export const GCAL_MODULES = ['calendario', 'conteudos'];
+/* Só os compromissos vão para o Google. As publicações do Instagram não entram mais na agenda (têm calendário próprio em Instagram). */
+export const GCAL_MODULES = ['calendario'];
 async function gCalendarId(): Promise<string> {
   const id = await setting('g_calendar_id');
   if (!id) throw new Error('Escolha a agenda do Google em Administração → Integrações (o sistema não cria agenda sozinho).');

@@ -103,9 +103,9 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/integrations/google/agendas-leitura',{m:'POST',ck:G,b:{ids:[]}});
  r=await call('/integrations/google/calendars',{ck:G});t('lista as agendas da conta',r.s===200&&r.j.rows.some(a=>a.id==='cal1'),r);
  r=await call('/integrations/google/calendar/choose',{m:'POST',ck:G,b:{id:'cal1'}});t('escolhe uma agenda existente',r.s===200,r);
- r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: envia itens do EVO ao Google (compromisso e publicação)',r.s===200&&r.j.para_google>=2,r);
+ r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('Agenda: envia só os compromissos do EVO ao Google (publicações ficam de fora)',r.s===200&&r.j.para_google>=1,r);
  let s2=await mock('/__state');const evs=Object.values(s2.events);
- t('eventos criados com módulo/ID de origem e horário',evs.some(e=>e.summary==='Reunião de pauta'&&e.extendedProperties.private.evoModule==='calendario'&&e.start.dateTime)&&evs.some(e=>e.summary==='[Publicação] Reel da feira'&&e.extendedProperties.private.evoModule==='conteudos'));
+ t('compromisso criado com módulo/ID de origem e horário; nenhuma publicação enviada ao Google',evs.some(e=>e.summary==='Reunião de pauta'&&e.extendedProperties.private.evoModule==='calendario'&&e.start.dateTime)&&!evs.some(e=>/^\[Publicação\]/.test(e.summary||'')&&e.extendedProperties&&e.extendedProperties.private.evoModule==='conteudos'));
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});t('sincronizar de novo não duplica',r.j.para_google===0&&r.j.do_google===0&&r.j.criados===0,r.j);
  const cal=(await rows('calendario')).find(c=>c.titulo==='Reunião de pauta');
  await put('calendario',cal.id,{titulo:'Reunião de pauta (nova sala)'});r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});
@@ -133,7 +133,7 @@ const cron=a=>execFileSync('php',[DIR+'/cron_integracoes.php',a],{encoding:'utf8
  r=await call('/integrations/google/calendar/limpar-importados',{m:'POST',ck:G,b:{}});s2=await mock('/__state');t('limpar importados remove do sistema sem apagar no Google',r.s===200&&r.j.removidos>=1&&!(await rows('calendario')).some(c=>c.origem==='GOOGLE_AGENDA')&&Object.values(s2.events).some(e=>e.summary==='Visita da inspetora'),r);
  const tar=(await rows('conteudos')).find(c=>c.titulo==='Reel da feira');await call('/data?module=conteudos&id='+tar.id,{m:'DELETE',ck:G});
  r=await call('/integrations/google/calendar/sync',{m:'POST',ck:G,b:{}});s2=await mock('/__state');
- t('item excluído no EVO remove o evento do Google',r.j.removidos===1&&Object.values(s2.events).find(e=>e.summary==='[Publicação] Reel da feira').status==='cancelled',r.j);
+ t('excluir uma publicação não mexe no Google (publicações não vão para a agenda)',r.j.removidos===0&&!Object.values(s2.events).some(e=>e.summary==='[Publicação] Reel da feira'),r.j);
  // ---------- cron geral, log e desconexão ----------
  const o2=cron('sincronizar');t('cron sincronizar roda Instagram + Google Agenda sem erro',/instagram-metricas/.test(o2)&&/google-agenda/.test(o2)&&!/ERRO/.test(o2),o2);
  r=await call('/integrations/log',{ck:G});t('log das integrações registra as operações',r.s===200&&r.j.length>5&&r.j.some(l=>l.servico==='instagram')&&r.j.some(l=>l.servico==='google'));
