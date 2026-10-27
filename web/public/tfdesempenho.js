@@ -4,7 +4,7 @@
 const TF_DES = { nivel: 'campanhas', busca: '', status: 'todos', segmento: '', campanha: '', conjunto: '', ordem: 'investimento', dir: -1, pagina: 1, comparar: [] };
 const TF_POR_PAGINA = 15;
 const TF_NIVEIS = [['campanhas', 'Campanhas'], ['conjuntos', 'Conjuntos'], ['anuncios', 'Anúncios']];
-const TF_COLUNAS = [['investimento', 'Investimento'], ['impressoes', 'Impressões'], ['alcance', 'Alcance'], ['cliques', 'Cliques'], ['ctr', 'CTR'], ['cpc', 'CPC'], ['conversas', 'Conversas'], ['custoConversa', 'Custo/conversa']];
+const TF_COLUNAS = [['investimento', 'Investimento'], ['impressoes', 'Impressões'], ['alcance', 'Alcance'], ['cliques', 'Cliques'], ['ctr', 'CTR'], ['cpc', 'CPC'], ['conversas', 'Conversas'], ['custoConversa', 'Custo/conversa'], ['frequencia', 'Frequência'], ['cpm', 'CPM'], ['cliquesLink', 'Cliques no link'], ['ctrLink', 'CTR do link'], ['cpcLink', 'CPC do link']];
 
 function tfDesLinhas(d) {
   const r = tfFiltrar(d, TF_DES), base = r[TF_DES.nivel];
