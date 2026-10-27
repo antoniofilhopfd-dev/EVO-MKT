@@ -8,7 +8,6 @@
  * Requer migração 032 aplicada e DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME configurados.
  */
 import fs from 'node:fs/promises';
-import mysql from 'mysql2/promise';
 const args=process.argv.slice(2);
 const file=args.find(a=>!a.startsWith('--'));
 const aplicar=args.includes('--apply');
@@ -18,7 +17,6 @@ if (!file || (aplicar && args.includes('--dry-run'))) {
 }
 const data=JSON.parse(await fs.readFile(file,'utf8'));
 if (!data || !data.conteudo || !Array.isArray(data.abas)) throw Error('Manifesto inválido.');
-const normalizar=v=>typeof v==='string' && ['-','x','X','n/a','N/A'].includes(v.trim())?null:v;
 const contaDe=(arquivo,aba)=>{
   const s=(arquivo+' '+aba).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   if (/geracao|\bger\b/.test(s)) return '@geracao.evolucao';
@@ -40,7 +38,7 @@ for (const [arquivo,abas] of Object.entries(data.conteudo)) for (const [aba,linh
   if (!Array.isArray(linhas)) throw Error('Aba inválida: '+aba);
   for (const l of linhas) {
     if (!Number.isInteger(l.row) || l.row < 1 || !l.cells || typeof l.cells!=='object') throw Error('Linha inválida: '+arquivo+'/'+aba);
-    const cells=Object.fromEntries(Object.entries(l.cells).map(([k,v])=>[k,normalizar(v)]));
+    const cells=l.cells; // Preserva inclusive os marcadores '-' e 'x' exatamente como vieram do Excel.
     // Guardar a data como célula original, sem supor se o Excel usou texto ou serial.
     lista.push([arquivo,aba,l.row,contaDe(arquivo,aba),categoriaDe(aba),null,null,JSON.stringify(cells),new Date().toISOString()]);
   }
@@ -51,6 +49,7 @@ if (chaves.size!==total) throw Error('Duplicidade de origem no próprio manifest
 console.log(JSON.stringify({abas:data.abas.length,linhas:total,modo:aplicar?'GRAVAÇÃO':'SIMULAÇÃO',contas:[...new Set(lista.map(r=>r[3]))]},null,2));
 if(!aplicar){console.log('Nenhum dado gravado. Para importar use --apply após backup e migração 032.');process.exit(0);}
 for(const k of ['DB_USER','DB_NAME']) if(!process.env[k]) throw Error('Falta configurar '+k);
+const { default: mysql } = await import('mysql2/promise');
 const connection=await mysql.createConnection({host:process.env.DB_HOST||'localhost',port:Number(process.env.DB_PORT||3306),user:process.env.DB_USER,password:process.env.DB_PASSWORD||'',database:process.env.DB_NAME,charset:'utf8mb4'});
 try{
   await connection.beginTransaction();
