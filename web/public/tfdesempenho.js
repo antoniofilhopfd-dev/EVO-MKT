@@ -20,13 +20,21 @@ function tfDesLinhas(d) {
   return { linhas, filtrado: r.filtrado };
 }
 const tfDesRotuloNivel = n => ({ campanhas: 'campanha', conjuntos: 'conjunto', anuncios: 'anúncio' })[n];
-function tfDesCsv(d, linhas) {
+function tfDesAlcance(d, linhas, filtrado) {
+  // O alcance único da conta vale para o conjunto completo, independentemente do nível exibido.
+  // Um único item pode usar o alcance próprio; recortes com múltiplos itens exigem consulta deduplicada à Meta.
+  if (!linhas.length) return null;
+  if (linhas.length === 1) return linhas[0].alcance ?? null;
+  if (!filtrado && linhas.length === (d[TF_DES.nivel] || []).length) return d.atual.alcance ?? null;
+  return null;
+}
+function tfDesCsv(d, linhas, alcanceTotal) {
   const n = TF_DES.nivel, cel = v => { let t = String(v === null || v === undefined ? '' : v); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
   const br = v => v === null || v === undefined ? '' : String(Number(v.toFixed ? v.toFixed(2) : v)).replace('.', ',');
   const cab = [tfDesRotuloNivel(n)[0].toUpperCase() + tfDesRotuloNivel(n).slice(1), ...(n !== 'campanhas' ? ['Campanha'] : []), ...(n === 'anuncios' ? ['Conjunto'] : []), 'Segmento', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR (%)', 'CPC', 'Conversas iniciadas', 'Custo por conversa'];
   const rows = linhas.map(r => [r.nome, ...(n !== 'campanhas' ? [r.campanha] : []), ...(n === 'anuncios' ? [r.conjunto] : []), tfSegRotulo(r.segmento), r.statusRotulo || '', br(r.investimento), r.impressoes, r.alcance === null ? '' : r.alcance, r.cliques, br(r.ctr), br(r.cpc), r.conversas, br(r.custoConversa)]);
-  const t = tfTotais(linhas, null);
-  rows.push(['TOTAL', ...(n !== 'campanhas' ? [''] : []), ...(n === 'anuncios' ? [''] : []), '', '', br(t.investimento), t.impressoes, '', t.cliques, br(t.ctr), br(t.cpc), t.conversas, br(t.custoConversa)]);
+  const t = tfTotais(linhas, alcanceTotal);
+  rows.push(['TOTAL', ...(n !== 'campanhas' ? [''] : []), ...(n === 'anuncios' ? [''] : []), '', '', br(t.investimento), t.impressoes, t.alcance === null ? '' : t.alcance, t.cliques, br(t.ctr), br(t.cpc), t.conversas, br(t.custoConversa)]);
   const url = URL.createObjectURL(new Blob(['﻿' + [cab, ...rows].map(l => l.map(cel).join(';')).join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' }));
   const a = document.createElement('a'); a.href = url; a.download = `evo-mkt-trafego-${n}-${d.periodo.de}-${d.periodo.ate}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -63,7 +71,7 @@ PAGINAS.tfdesempenho = async function () {
     const paginas = Math.max(1, Math.ceil(linhas.length / TF_POR_PAGINA));
     if (TF_DES.pagina > paginas) TF_DES.pagina = paginas;
     const vis = linhas.slice((TF_DES.pagina - 1) * TF_POR_PAGINA, TF_DES.pagina * TF_POR_PAGINA);
-    const t = tfTotais(linhas, filtrado || n !== 'campanhas' ? null : d.atual.alcance);
+    const t = tfTotais(linhas, tfDesAlcance(d, linhas, filtrado));
     const segs = [...new Set(d.campanhas.map(c => c.segmento || 'SEM'))];
     const opc = (v, l, atual) => `<option value="${attr(v)}" ${String(atual) === String(v) ? 'selected' : ''}>${esc(l)}</option>`;
     const camp = d.campanhas.find(c => c.id === TF_DES.campanha), conj = d.conjuntos.find(c => c.id === TF_DES.conjunto);
@@ -82,7 +90,7 @@ PAGINAS.tfdesempenho = async function () {
       <section class="card"><div class="db-tit"><h2>${TF_NIVEIS.find(x => x[0] === n)[1]}</h2><small>${linhas.length} resultado(s)${filtrado ? ' com os filtros escolhidos' : ''} · status é o atual na Meta</small>
         <div class="tf-acoes">${TF_DES.comparar.length >= 2 ? `<button type="button" class="btn" id="tfdCmp">Comparar selecionados (${TF_DES.comparar.length})</button>` : '<small class="kpi-note">Marque 2 a 4 linhas para comparar</small>'}<button type="button" class="btn soft" id="tfdCsv" ${linhas.length ? '' : 'disabled'}>Exportar CSV</button></div></div>
         ${linhas.length ? `<div class="tablewrap"><table class="datatable tf-tab"><thead><tr><th></th>${n === 'anuncios' ? '<th>Foto</th>' : ''}${th('nome', TF_NIVEIS.find(x => x[0] === n)[1].slice(0, -1) === 'Campanha' ? 'Campanha' : n === 'conjuntos' ? 'Conjunto' : 'Anúncio', false)}${th('status', 'Status', false)}${TF_COLUNAS.map(([k, l]) => th(k, l)).join('')}</tr></thead><tbody>${vis.map(linhaHtml).join('')}</tbody><tfoot><tr><th colspan="${n === 'anuncios' ? 4 : 3}">Total (${linhas.length})</th><th class="num">${money(t.investimento)}</th><th class="num">${fmtN(t.impressoes)}</th><th class="num">${t.alcance === null ? '—' : fmtN(t.alcance)}</th><th class="num">${fmtN(t.cliques)}</th><th class="num">${tfPct(t.ctr)}</th><th class="num">${tfMoney(t.cpc)}</th><th class="num">${fmtN(t.conversas)}</th><th class="num">${tfMoney(t.custoConversa)}</th></tr></tfoot></table></div>
-        <div class="tf-pag"><small class="kpi-note">${(TF_DES.pagina - 1) * TF_POR_PAGINA + 1}–${Math.min(linhas.length, TF_DES.pagina * TF_POR_PAGINA)} de ${linhas.length} · o alcance é único por consulta e não é somado entre linhas${t.alcance === null ? ' (por isso aparece “—” no total)' : ''}</small><span><button type="button" class="btn soft" data-tf-pg="-1" ${TF_DES.pagina <= 1 ? 'disabled' : ''}>Anterior</button> Página ${TF_DES.pagina} de ${paginas} <button type="button" class="btn soft" data-tf-pg="1" ${TF_DES.pagina >= paginas ? 'disabled' : ''}>Próxima</button></span></div>`
+        <div class="tf-pag"><small class="kpi-note">${(TF_DES.pagina - 1) * TF_POR_PAGINA + 1}–${Math.min(linhas.length, TF_DES.pagina * TF_POR_PAGINA)} de ${linhas.length} · o alcance é único por consulta e não é somado entre linhas${t.alcance === null ? ' (a Meta precisa informar o alcance único deste recorte)' : ''}</small><span><button type="button" class="btn soft" data-tf-pg="-1" ${TF_DES.pagina <= 1 ? 'disabled' : ''}>Anterior</button> Página ${TF_DES.pagina} de ${paginas} <button type="button" class="btn soft" data-tf-pg="1" ${TF_DES.pagina >= paginas ? 'disabled' : ''}>Próxima</button></span></div>`
         : `<div class="empty-rich"><strong>${d[n].length ? 'Nenhum resultado com estes filtros' : `Nenhum ${tfDesRotuloNivel(n)} com veiculação neste período`}</strong><p>${d[n].length ? 'Mude ou limpe os filtros para ver mais.' : 'A Meta não devolveu veiculação para este nível no período. Escolha outro período.'}</p></div>`}</section>`;
     tfLigarFotos(raiz);
     const re = (alt = {}) => { if (alt.nivel && alt.nivel !== TF_DES.nivel) TF_DES.comparar = []; Object.assign(TF_DES, alt); TF_DES.pagina = alt.pagina ?? 1; desenhar(); };
@@ -99,7 +107,7 @@ PAGINAS.tfdesempenho = async function () {
     raiz.querySelectorAll('[data-tf-abre]').forEach(b => { b.onclick = () => { const id = b.dataset.tfAbre; if (n === 'campanhas') re({ campanha: id, conjunto: '', nivel: 'conjuntos' }); else if (n === 'conjuntos') { const c = d.conjuntos.find(x => x.id === id); re({ campanha: c ? c.campanhaId : TF_DES.campanha, conjunto: id, nivel: 'anuncios' }); } else tfDesDetalhe(d, id); }; });
     raiz.querySelectorAll('[data-tf-cmp]').forEach(c => { c.onchange = () => { const id = c.dataset.tfCmp, i = TF_DES.comparar.indexOf(id); if (i >= 0) TF_DES.comparar.splice(i, 1); else if (TF_DES.comparar.length >= 4) { c.checked = false; toast('Compare até 4 linhas por vez.', 'warn'); return; } else TF_DES.comparar.push(id); desenhar(); }; });
     const cmp = $('#tfdCmp'); if (cmp) cmp.onclick = () => tfDesComparar(d);
-    $('#tfdCsv').onclick = () => tfDesCsv(d, linhas);
+    $('#tfdCsv').onclick = () => tfDesCsv(d, linhas, t.alcance);
   };
   desenhar();
 };
