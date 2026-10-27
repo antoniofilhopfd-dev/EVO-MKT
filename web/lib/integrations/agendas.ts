@@ -186,7 +186,7 @@ export async function eventosAgendas(de: string, ate: string): Promise<{ itens: 
       let tok = '', paginas = 0;
       do {
         const j = await chamar('GET', `/calendar/v3/calendars/${encodeURIComponent(a.calendar_id)}/events?` + qsOf({ maxResults: 250, singleEvents: 'true', orderBy: 'startTime', showDeleted: 'false', timeZone: tz(), timeMin: rfc3339(de, '00:00'), timeMax: rfc3339(soma(ate, 1), '00:00'), ...(tok ? { pageToken: tok } : {}) }), null, 'A agenda');
-        for (const ev of (j.items ?? []) as Row[]) if (ev.status !== 'cancelled' && ev.start) meus.push(normalizar(ev, a));
+        for (const ev of (j.items ?? []) as Row[]) if (ev.status !== 'cancelled' && ev.start && !/^\s*\[Publica[cç][aã]o\]/i.test(String(ev.summary ?? ''))) meus.push(normalizar(ev, a)); // publicações antigas enviadas ao Google ficam fora do Calendário Geral
         tok = String(j.nextPageToken ?? '');
       } while (tok && ++paginas < 40);
       if (tok) meusAvisos.push({ agenda: a.nome, mensagem: 'Há eventos demais nesta janela; mostrando os primeiros. Reduza o período.' });
