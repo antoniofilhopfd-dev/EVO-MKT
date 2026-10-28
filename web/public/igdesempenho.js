@@ -10,7 +10,7 @@ PAGINAS.igdesempenho = async function () {
   const minimo = d.minimo;
   const melhor = d.rows.filter(r => r.publicacoes >= minimo).sort((a, b) => b.mediaInteracoes - a.mediaInteracoes)[0];
   $('#content').innerHTML = `${abasInstagramAcoes()}
-    <section class="card"><div class="db-tit"><h2>Histórico das planilhas</h2><small>Registros separados das métricas oficiais da Meta</small></div><button type="button" class="btn soft" id="igdHistoricoBtn">Consultar histórico importado</button> <button type="button" class="btn soft" id="igdImportarBtn">Importar planilhas (administrador)</button><input type="file" id="igdImportarArquivo" accept=".json,application/json" hidden><div id="igdImportarEstado" class="kpi-note"></div><div id="igdHistoricoConteudo"></div></section>
+    <section class="card"><div class="db-tit"><h2>Histórico das planilhas</h2><small>Registros separados das métricas oficiais da Meta</small></div><button type="button" class="btn soft" id="igdHistoricoBtn">Consultar histórico importado</button> <button type="button" class="btn soft" id="igdImportarBtn">Importar planilhas (administrador)</button><input type="file" id="igdImportarArquivo" accept=".json,application/json" hidden><div id="igdImportarEstado" class="kpi-note"></div><div id="igdHistoricoConteudo"></div></section>\n    <section class="card"><div class="db-tit"><h2>Seguidores por mês — histórico</h2><small>Última contagem registrada, sem estimativas</small></div><button type="button" class="btn soft" id="igdMensaisBtn">Consultar totais mensais</button><div id="igdMensaisResultado"></div></section>
     ${igdComparativos(geral)}
     ${igdMesAMes(posts)}
     ${igdTabela(posts)}
@@ -27,6 +27,18 @@ PAGINAS.igdesempenho = async function () {
     </section>`;
   $$('[data-igd-ord]').forEach(h => { h.onclick = () => { const k = h.dataset.igdOrd; IGD.dir = IGD.ordem === k && IGD.dir === 'desc' ? 'asc' : 'desc'; IGD.ordem = k; Filtros.localSet({ ordem: IGD.ordem, dir: IGD.dir }); PAGINAS.igdesempenho(); }; });
   $('#igdHistoricoBtn')?.addEventListener('click', () => igdAbrirHistorico(1));
+  $('#igdMensaisBtn')?.addEventListener('click', async () => {
+    const el=$('#igdMensaisResultado');if(!el)return;
+    el.textContent='Consultando histórico...';
+    try {
+      const d=await api('/instagram/seguidores-mensais');
+      const r=d.rows||[];
+      el.innerHTML=r.length ? '<p class="kpi-note">'+esc(d.observacao||'')+'</p><div class="tablewrap"><table class="datatable"><thead><tr><th>Mês</th><th>Perfil</th><th class="num">Seguidores</th><th>Data do registro</th><th>Origem</th></tr></thead><tbody>'+
+        r.map(x=>'<tr><td>'+esc(x.mes)+'</td><td>'+esc(x.conta)+'</td><td class="num">'+(x.aproximado?'≈ ':'')+fmtN(x.seguidores)+'</td><td>'+esc(x.data)+'</td><td>'+esc(x.fonte)+'</td></tr>').join('')+'</tbody></table></div>' :
+        '<p class="kpi-note">Não há totais mensais importados com ano e data comprovados. Faça a importação histórica primeiro.</p>';
+    }catch(e){el.textContent='Consulta indisponível: '+(e.message||e);}
+  });
+
   $('#igdImportarBtn')?.addEventListener('click', () => $('#igdImportarArquivo')?.click());
   $('#igdImportarArquivo')?.addEventListener('change', async e => {
     const input=e.target, status=$('#igdImportarEstado'), file=input.files?.[0];
