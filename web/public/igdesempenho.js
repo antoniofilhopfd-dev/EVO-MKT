@@ -10,6 +10,7 @@ PAGINAS.igdesempenho = async function () {
   const minimo = d.minimo;
   const melhor = d.rows.filter(r => r.publicacoes >= minimo).sort((a, b) => b.mediaInteracoes - a.mediaInteracoes)[0];
   $('#content').innerHTML = `${abasInstagramAcoes()}
+    <section class="card"><div class="db-tit"><h2>Histórico das planilhas</h2><small>Registros separados das métricas oficiais da Meta</small></div><button type="button" class="btn soft" id="igdHistoricoBtn">Consultar histórico importado</button><div id="igdHistoricoConteudo"></div></section>
     ${igdComparativos(geral)}
     ${igdMesAMes(posts)}
     ${igdTabela(posts)}
@@ -25,6 +26,7 @@ PAGINAS.igdesempenho = async function () {
       <div class="est-linha"><button type="button" class="btn soft" id="vincBtn">Vincular um anúncio a uma publicação</button><small class="kpi-note">A comparação só existe quando uma pessoa confirma o vínculo; o sistema nunca adivinha qual anúncio impulsionou qual publicação.</small></div>
     </section>`;
   $$('[data-igd-ord]').forEach(h => { h.onclick = () => { const k = h.dataset.igdOrd; IGD.dir = IGD.ordem === k && IGD.dir === 'desc' ? 'asc' : 'desc'; IGD.ordem = k; Filtros.localSet({ ordem: IGD.ordem, dir: IGD.dir }); PAGINAS.igdesempenho(); }; });
+  $('#igdHistoricoBtn')?.addEventListener('click', () => igdAbrirHistorico(1));
   igdComparativosLiga(geral);
   igdMesAMesLiga(posts);
   const mais = $('#igdMais'); if (mais) mais.onclick = () => { IGD.todas = true; PAGINAS.igdesempenho(); };
@@ -67,6 +69,24 @@ function igdMesAMesLiga(posts) {
 }
 
 /** Comparativos com o período anterior, gráficos e comparação das contas. */
+async function igdAbrirHistorico(pagina = 1) {
+  const alvo = $('#igdHistoricoConteudo');
+  if (!alvo) return;
+  alvo.textContent = 'Carregando histórico...';
+  try {
+    const dados = await api('/instagram/historico-planilhas?pagina=' + pagina + '&limite=20');
+    const rows = dados.rows || [];
+    alvo.innerHTML = '<p class="kpi-note">' + fmtN(dados.total) + ' linhas históricas (incluindo possíveis cabeçalhos), não somadas à Meta.</p>' +
+      (rows.length ? '<div class="tablewrap"><table class="datatable"><thead><tr><th>Arquivo / Aba</th><th>Linha</th><th>Conteúdo original</th></tr></thead><tbody>' +
+      rows.map(r => '<tr><td>' + esc(r.arquivo) + '<br><small>' + esc(r.aba) + '</small></td><td>' + fmtN(r.linha) + '</td><td>' +
+      Object.entries(r.celulas || {}).slice(0,8).map(([k,v]) => esc(k) + ': ' + esc(v == null ? '—' : typeof v === 'object' ? JSON.stringify(v) : v)).join(' · ') + '</td></tr>').join('') +
+      '</tbody></table></div>' : '<div class="empty compact">Nenhum registro histórico disponível.</div>') +
+      '<div class="actions"><button class="btn soft" id="igdHistAnterior" ' + (pagina <= 1 ? 'disabled' : '') + '>Anterior</button> Página ' + pagina +
+      ' <button class="btn soft" id="igdHistProximo" ' + (pagina*20 >= dados.total ? 'disabled' : '') + '>Próxima</button></div>';
+    $('#igdHistAnterior')?.addEventListener('click', () => igdAbrirHistorico(pagina-1));
+    $('#igdHistProximo')?.addEventListener('click', () => igdAbrirHistorico(pagina+1));
+  } catch (e) { alvo.textContent = 'Histórico indisponível. Confira a migração 032 e a importação no banco. ' + (e.message || ''); }
+}
 function igdComparativos(g) {
   const a = g.atual, ant = g.anterior;
   const kpi = (rot, k) => `<div class="kpi"><small>${rot}</small><strong>${igvN(a[k])}</strong>${a[k] === null ? '<i class="kd flat">a Meta não informou</i>' : delta(varPct(a[k], ant[k]))}</div>`;
@@ -83,7 +103,7 @@ function igdComparativosLiga(g) {
   });
 }
 /** Tabela ordenável de todas as publicações do período, com miniatura. “Não disponível” quando a Meta não atribui o dado (nunca zero). */
-const IGD_COLS = [['alcance', 'Alcance'], ['visualizacoes', 'Visualizações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['compartilhamentos', 'Compartilh.'], ['salvos', 'Salvamentos'], ['engajamento', 'Engajamento'], ['seguidoresNovos', 'Novos seguidores']];
+const IGD_COLS = [['alcance', 'Alcance'], ['visualizacoes', 'Visualizações'], ['curtidas', 'Curtidas'], ['comentarios', 'Comentários'], ['compartilhamentos', 'Compartilh.'], ['salvos', 'Salvamentos'], ['engajamento', 'Engajamento'], ['seguidoresNovos', 'Novos seguidores'], ['visitasPerfil', 'Visitas ao perfil'], ['interacoes', 'Interações']];
 function igdTabela(posts) {
   const rows = [...(posts.rows || [])].sort((a, b) => {
     const k = IGD.ordem, va = k === 'quando' ? String(a.quando) : (a[k] ?? -1), vb = k === 'quando' ? String(b.quando) : (b[k] ?? -1);
@@ -93,7 +113,7 @@ function igdTabela(posts) {
   const celula = (p, k) => {
     const v = p[k];
     if (k === 'seguidoresNovos') return v === null || v === undefined ? '<span class="igd-nd" title="A Meta não atribui seguidores a esta publicação">Não disponível</span>' : '+' + fmtN(v);
-    if (k === 'engajamento') return v === null ? '—' : String(v).replace('.', ',') + '%';
+    if (k === 'engajamento') return v === null || v === undefined ? '—' : String(v).replace('.', ',') + '%';
     return igdN(v);
   };
   const cab = (k, n) => `<th class="num"><button type="button" class="igd-ord ${IGD.ordem === k ? 'on' : ''}" data-igd-ord="${k}" aria-label="Ordenar por ${attr(n)}">${n}${IGD.ordem === k ? (IGD.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;

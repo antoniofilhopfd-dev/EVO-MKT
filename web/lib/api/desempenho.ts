@@ -44,6 +44,25 @@ export async function desempenhoRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   if (c.path !== '/instagram/vinculo' && c.method !== 'GET') fail(405, 'Método não permitido.');
   const f = lerFiltros(c);
+  if (c.path === '/instagram/historico-planilhas') {
+    const arquivo = c.url.searchParams.get('arquivo') || '';
+    const aba = c.url.searchParams.get('aba') || '';
+    const conta = c.url.searchParams.get('conta') || '';
+    const pagina = Math.max(1, Math.min(10000, Number(c.url.searchParams.get('pagina')) || 1));
+    const limite = Math.max(1, Math.min(100, Number(c.url.searchParams.get('limite')) || 30));
+    const filtros: string[] = [];
+    const parametros: unknown[] = [];
+    if (arquivo) { filtros.push('arquivo = ?'); parametros.push(arquivo); }
+    if (aba) { filtros.push('aba = ?'); parametros.push(aba); }
+    if (conta) { filtros.push('conta = ?'); parametros.push(conta); }
+    const where = filtros.length ? ' WHERE ' + filtros.join(' AND ') : '';
+    const count = await q1<{ total: number }>('SELECT COUNT(*) AS total FROM instagram_historico_planilhas' + where, parametros);
+    const rows = await q('SELECT arquivo,aba,linha_origem,conta,categoria,data_referencia,identificador,valores_json FROM instagram_historico_planilhas' + where + ' ORDER BY arquivo,aba,linha_origem LIMIT ? OFFSET ?', [...parametros, limite, (pagina - 1) * limite]);
+    return json({ total: Number(count?.total || 0), pagina, limite,
+      rows: rows.map(r => ({arquivo:r.arquivo,aba:r.aba,linha:r.linha_origem,conta:r.conta,categoria:r.categoria,data:r.data_referencia,celulas:JSON.parse(String(r.valores_json || '{}'))})),
+      aviso: 'Histórico documental não somado aos resultados oficiais da Meta. Pode conter cabeçalhos e registros coincidentes.',
+      origem: { fonte: 'Planilhas históricas importadas', natureza: 'dados originais, separados da API Meta' } });
+  }
   if (c.path === '/instagram/ranking') {
     /** Todas as publicações do Instagram (sincronizadas com a Meta) do período e perfil escolhidos, com as métricas de cada uma. */
     const o = await organico(f);
