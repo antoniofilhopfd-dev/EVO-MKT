@@ -58,11 +58,29 @@ export async function historicoMensalSeguidores(c:Ctx):Promise<Response>{
     pontos.push({mes:data.slice(0,7),data,seguidores:total.n,aproximado:total.aproximado,fonte:'Planilha histórica',aba,linha,conta});
   }
   const meta=await q<Row>("SELECT s.conta,s.dia,s.seguidores FROM ig_seguidores s INNER JOIN (SELECT conta,SUBSTRING(dia,1,7) mes,MAX(dia) dia FROM ig_seguidores GROUP BY conta,SUBSTRING(dia,1,7)) fim ON fim.conta=s.conta AND fim.dia=s.dia");
-  // Mapeamento do ID Meta é feito pela configuração, não pelo nome exibido no Instagram.
-  const integracoes=await q<Row>("SELECT k,v FROM integration_settings WHERE k IN ('ig_user_id','ig_user_id_geracao')");
-  const idPrincipal=strv(integracoes.find(x=>x.k==='ig_user_id')?.v);
+  // Associar cada ID Meta ao perfil verdadeiro configurado; nunca supor que o primeiro é Evolução.
+  const integracoes=await q<Row>("SELECT k,v FROM integration_settings WHERE k IN ('meta_contas','ig_user_id','ig_username')");
+  const cfg=(k:string)=>strv(integracoes.find(x=>x.k===k)?.v);
+  const porId=new Map<string,string>();
+  const reconhecer=(u:string):string|null=>{
+    const name=u.trim().replace(/^@/,'').toLowerCase();
+    if(name==='evolucaopb')return '@evolucaopb';
+    if(name==='geracao.evolucao')return '@geracao.evolucao';
+    return null;
+  };
+  try {
+    const todas:unknown=JSON.parse(cfg('meta_contas')||'[]');
+    if(Array.isArray(todas))for(const v of todas){
+      if(!v||typeof v!=='object')continue;
+      const item=v as Record<string,unknown>;
+      const perfil=reconhecer(strv(item.usuario));
+      if(perfil&&strv(item.ig))porId.set(strv(item.ig),perfil);
+    }
+  }catch{/* configuração sem contas adicionais */}
+  const principal=reconhecer(cfg('ig_username'));
+  if(principal&&cfg('ig_user_id'))porId.set(cfg('ig_user_id'),principal);
   for(const r of meta){
-    const conta=strv(r.conta)===idPrincipal?'@evolucaopb':null;
+    const conta=porId.get(strv(r.conta))||null;
     if(!conta)continue; // IDs adicionais não devem ser atribuídos por suposição.
     const data=strv(r.dia),n=Number(r.seguidores);
     if(!/^20\d\d-\d\d-\d\d$/.test(data)||!Number.isFinite(n))continue;
@@ -71,8 +89,7 @@ export async function historicoMensalSeguidores(c:Ctx):Promise<Response>{
   const melhor=new Map<string,Ponto>();
   for(const p of pontos){
     const k=p.conta+'|'+p.mes,ant=melhor.get(k);
-    if(!ant || (p.fonte==='Meta API'&&ant.fonte!=='Meta API') ||
-      (p.fonte===ant.fonte && (p.data>ant.data ||(p.data===ant.data&&!p.aproximado&&ant.aproximado))))
+    if(!ant || p.data>ant.data || (p.data===ant.data && ((p.fonte==='Meta API'&&ant.fonte!=='Meta API') || (!p.aproximado&&ant.aproximado))))
       melhor.set(k,p);
   }
   const rows=[...melhor.values()].sort((a,b)=>a.mes.localeCompare(b.mes)||a.conta.localeCompare(b.conta));
