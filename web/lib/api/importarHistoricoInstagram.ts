@@ -40,7 +40,7 @@ export async function importarHistoricoInstagram(c: Ctx): Promise<Response> {
  try{
    await db.beginTransaction();
    const [tables]=await db.query("SHOW TABLES LIKE 'instagram_historico_planilhas'");
-   if(!(tables as unknown[]).length) return fail(409,'Migração 032 ainda não aplicada.');
+   if(!(tables as unknown[]).length) { await db.rollback(); return fail(409,'Migração 032 ainda não aplicada.'); }
    let inseridas=0,existentes=0;
    for(const row of values){
      const [result]=await db.execute('INSERT IGNORE INTO instagram_historico_planilhas (arquivo,aba,linha_origem,conta,categoria,data_referencia,identificador,valores_json,atualizado_em) VALUES (?,?,?,?,?,?,?,?,?)',row);
