@@ -7,7 +7,7 @@ import { notifyMail } from '../mail';
 import { adsSync } from '../integrations/metaads';
 import { resumoOperacional } from '../insights';
 import { intLog, setting } from '../settings';
-import { igPublishDue, igSync, metaConnected, metaRefreshIfNeeded } from '../integrations/meta';
+import { igPublishDue, igSync, igSyncSeguidores, metaConnected, metaRefreshIfNeeded } from '../integrations/meta';
 import { gCalendarSync, gConnected } from '../integrations/google';
 import { json } from './handlers';
 
@@ -33,6 +33,12 @@ async function integracoes(what: string): Promise<Row> {
   const step = async (name: string, fn: () => Promise<unknown>) => {
     try { out[name] = await fn(); } catch (e: any) { out[name] = 'ERRO: ' + e.message; await intLog('cron', 'erro', `${name}: ${e.message}`); }
   };
+  if (what === 'seguidores') {
+    if (!(await metaConnected())) return { 'instagram-seguidores': 'Instagram não conectado' };
+    await step('instagram-token', async () => { await metaRefreshIfNeeded(); return 'ok'; });
+    await step('instagram-seguidores', () => igSyncSeguidores());
+    return out;
+  }
   if (what === 'publicar' || what === 'tudo') await step('instagram-publicar', async () => ({ publicados: await igPublishDue() }));
   if (what === 'sincronizar' || what === 'tudo') {
     if (await metaConnected()) {
