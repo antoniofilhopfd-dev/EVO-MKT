@@ -44,7 +44,7 @@ const { t, fim } = U.contador();
   const b = await U.abrir();
   for (const [nome, vp] of [['desktop', { width: 1440, height: 900 }], ['tablet', { width: 820, height: 1180 }]]) {
     const p = await U.pagina(b, 'NAT-3301', G.nova, vp);
-    t(`${nome}: menu com exatamente as cinco áreas`, (await p.$$eval('#nav .navitem .navlabel', e => e.map(x => x.innerText.trim()))).join('|') === 'Dashboard|Calendário|Instagram|Tráfego Pago|Configurações');
+    t(`${nome}: menu com as cinco áreas do marketing mais Uso de Imagem`, (await p.$$eval('#nav .navitem .navlabel', e => e.map(x => x.innerText.trim()))).join('|') === 'Dashboard|Calendário|Instagram|Tráfego Pago|Uso de Imagem|Configurações');
     await U.ir(p, 'configuracoes', 900);
     t(`${nome}: tela inicial com cinco cartões`, (await p.$$eval('.cfg-cartao h2', e => e.map(x => x.textContent))).join('|') === 'Geral|Usuários e Permissões|Integrações|Segurança|Dados do Sistema');
     await foto(p, `configuracoes-inicio-${nome}`);
