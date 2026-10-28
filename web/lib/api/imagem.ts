@@ -6,6 +6,8 @@ import { fail, lower, now, Row, strv } from '../util';
 import { lerXlsx } from '../xlsxLeitura';
 import { json } from './handlers';
 import { imagemSolicRoute } from './imagemSolic';
+import { atualizarVencimentos } from '../imagemDados';
+import { lerConfig } from '../imagemConfig';
 
 /**
  * Uso de Imagem. Etapa 1: alunos (cadastro, importação sem apagar nada e busca) e painel.
@@ -50,15 +52,16 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   const ator = String(u.nome ?? u.codigo ?? '');
 
+  await atualizarVencimentos();
   const outra = await imagemSolicRoute(c, u);
   if (outra) return outra;
 
   if (path === '/imagem/alunos' && method === 'GET') {
-    const busca = lower(c.qs('busca')).trim(), seg = c.qs('segmento'), turma = c.qs('turma'), inativos = c.qs('inativos') === '1';
+    const busca = lower(c.qs('busca')).trim(), seg = c.qs('segmento'), turma = c.qs('turma'), inativos = c.qs('inativos') === '1', situ = c.qs('situacao').toUpperCase().replace(/[^A-Z_]/g, '');
     const like = `%${busca}%`;
     const rows = await q(
-      `SELECT a.*, (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao FROM ui_alunos a WHERE (a.ativo=1 OR ?=1) AND (?='' OR a.segmento=?) AND (?='' OR a.turma=?) AND (?='' OR LOWER(a.nome) LIKE ? OR a.matricula LIKE ?) ORDER BY a.nome LIMIT 1000`,
-      [inativos ? 1 : 0, seg, seg, turma, turma, busca, like, like],
+      `SELECT a.*, (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao FROM ui_alunos a WHERE (a.ativo=1 OR ?=1) AND (?='' OR a.segmento=?) AND (?='' OR a.turma=?) AND (?='' OR LOWER(a.nome) LIKE ? OR a.matricula LIKE ?) HAVING (?='' OR (?='SEM' AND situacao IS NULL) OR situacao=?) ORDER BY a.nome LIMIT 1000`,
+      [inativos ? 1 : 0, seg, seg, turma, turma, busca, like, like, situ, situ, situ],
     );
     const turmas = (await q('SELECT DISTINCT turma FROM ui_alunos WHERE ativo=1 AND turma<>\'\' ORDER BY turma')).map((r) => r.turma);
     const total = (await q1('SELECT COUNT(*) n FROM ui_alunos WHERE ativo=1'))?.n ?? 0;
@@ -141,12 +144,15 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
     const porSit: Record<string, number> = {};
     for (const r of await q("SELECT status, COUNT(*) n FROM (SELECT aluno_id, SUBSTRING_INDEX(GROUP_CONCAT(status ORDER BY id DESC), ',', 1) status FROM ui_solicitacoes WHERE status<>'CANCELADO' GROUP BY aluno_id) t GROUP BY status")) porSit[r.status] = Number(r.n);
     const cont = (...st: string[]) => st.reduce((a, k) => a + (porSit[k] ?? 0), 0);
+    const cfg = await lerConfig(), limite = new Date(Date.now() + cfg.avisoVencimentoDias * 86400_000).toISOString().slice(0, 10), hoje = new Date().toISOString().slice(0, 10);
+    const naoUsar = await q(`SELECT a.id, a.nome, a.turma, t.status, t.protocolo, t.vence_em FROM ui_alunos a JOIN ui_solicitacoes t ON t.id=(SELECT MAX(s.id) FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO') WHERE a.ativo=1 AND t.status IN ('NAO_AUTORIZADO','VENCIDO','REVOGADO') ORDER BY a.nome LIMIT 40`);
+    const vencemLogo = await q(`SELECT a.id, a.nome, a.turma, t.protocolo, t.vence_em FROM ui_alunos a JOIN ui_solicitacoes t ON t.id=(SELECT MAX(s.id) FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO') WHERE a.ativo=1 AND t.status='AUTORIZADO' AND t.vence_em<>'' AND t.vence_em<=? AND t.vence_em>=? ORDER BY t.vence_em LIMIT 40`, [limite, hoje]);
     const recentes = await q('SELECT e.quando, e.ator, e.acao, e.detalhe, a.nome aluno FROM ui_eventos e LEFT JOIN ui_alunos a ON a.id=e.aluno_id ORDER BY e.id DESC LIMIT 8');
     return json({
       totalAlunos: ativos,
       autorizados: cont('AUTORIZADO'), pendentes: cont('AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'), naoAutorizados: cont('NAO_AUTORIZADO'), vencidos: cont('VENCIDO'), revogados: cont('REVOGADO'), comSolicitacao: Object.values(porSit).reduce((a, n) => a + n, 0),
       segmentos: Object.entries(SEGMENTOS).map(([k, nome]) => ({ k, nome, n: Number(porSeg.find((r) => r.segmento === k)?.n ?? 0) })).concat([{ k: '', nome: 'Sem segmento', n: Number(porSeg.find((r) => !r.segmento)?.n ?? 0) }]),
-      recentes,
+      recentes, naoUsar, vencemLogo, avisoDias: cfg.avisoVencimentoDias,
     });
   }
 

@@ -1,7 +1,8 @@
 /* Uso de Imagem › Painel e Alunos. O Marketing escolhe MANUALMENTE quem precisa de autorização; nada é selecionado sozinho.
    Dados de alunos ficam só nesta área interna e nunca vão para URLs públicas. */
-const UI = { sel: new Map(), busca: '', segmento: '', turma: '', inativos: false };
+const UI = { sel: new Map(), busca: '', segmento: '', turma: '', situacao: '', inativos: false };
 const UI_ACOES = { 'aluno-criado': 'Aluno cadastrado', 'aluno-editado': 'Cadastro atualizado', 'aluno-inativado': 'Aluno inativado', 'aluno-reativado': 'Aluno reativado', importacao: 'Lista importada', 'solicitacoes-criadas': 'Solicitações criadas' };
+const UI_SITU = [['', 'Todas as situações'], ['SEM', 'Sem solicitação'], ['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['AGUARDANDO_ENVIO', 'Aguardando envio'], ['ENVIADO', 'Enviado'], ['ABERTO', 'Aberto'], ['AGUARDANDO_ASSINATURA', 'Aguardando assinatura'], ['AGUARDANDO_VALIDACAO', 'Aguardando validação'], ['VENCIDO', 'Vencido'], ['REVOGADO', 'Revogado']];
 
 PAGINAS.uipainel = async function () {
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
@@ -9,11 +10,14 @@ PAGINAS.uipainel = async function () {
   const cartao = (rot, v, cls, nota) => `<div class="db-cartao ui-cartao ${cls || ''}"><small>${rot}</small><strong>${fmtN(v)}</strong>${nota ? `<span class="kpi-note">${nota}</span>` : ''}</div>`;
   const maior = Math.max(1, ...d.segmentos.map(s => s.n));
   $('#content').innerHTML = `<div class="ig-barra"><button type="button" class="btn" id="uiIrAlunos">Selecionar alunos</button><span class="kpi-note">O Marketing escolhe, na lista, quem precisa de autorização de uso de imagem.</span></div>
-    <div class="db-cartoes">${cartao('Alunos ativos', d.totalAlunos)}${cartao('Autorizados', d.autorizados, 'ok')}${cartao('Pendentes', d.pendentes, d.pendentes ? 'alerta' : '')}${cartao('Não autorizados', d.naoAutorizados, d.naoAutorizados ? 'alerta' : '')}</div>
+    <div class="db-cartoes ui-seis">${cartao('Alunos ativos', d.totalAlunos)}${cartao('Autorizados', d.autorizados, 'ok')}${cartao('Pendentes', d.pendentes, d.pendentes ? 'alerta' : '')}${cartao('Não autorizados', d.naoAutorizados, d.naoAutorizados ? 'alerta' : '')}${cartao('Vencidos', d.vencidos, d.vencidos ? 'alerta' : '')}${cartao('Revogados', d.revogados, d.revogados ? 'alerta' : '')}</div>
+    ${d.naoUsar.length ? `<section class="card ui-atencao"><div class="db-tit"><h2>Não usar a imagem destes alunos</h2></div><p class="kpi-note">Recusado, vencido ou revogado: não publicar fotos nem vídeos.</p><ul class="ui-nao">${d.naoUsar.map(a => `<li><button type="button" class="ui-lk" data-ficha="${a.id}"><b>${esc(a.nome)}</b> <small>${esc(a.turma || '')}</small></button>${uiBadge(a.status)}</li>`).join('')}</ul></section>` : ''}
+    ${d.vencemLogo.length ? `<section class="card"><div class="db-tit"><h2>Vencem nos próximos ${d.avisoDias} dias</h2></div><ul class="ui-nao">${d.vencemLogo.map(a => `<li><button type="button" class="ui-lk" data-ficha="${a.id}"><b>${esc(a.nome)}</b> <small>${esc(a.turma || '')}</small></button><span class="badge warn">vence em ${esc(fmtDate(a.vence_em))}</span></li>`).join('')}</ul></section>` : ''}
     <div class="db-duas"><section class="card"><div class="db-tit"><h2>Alunos por segmento</h2></div>${d.totalAlunos ? `<ul class="ui-seg">${d.segmentos.filter(s => s.n || s.k).map(s => `<li><span>${esc(s.nome)}</span><div class="ui-barra"><i style="width:${Math.round(s.n / maior * 100)}%"></i></div><b>${fmtN(s.n)}</b></li>`).join('')}</ul>` : '<p class="kpi-note">Nenhum aluno cadastrado ainda. Importe a lista em Alunos.</p>'}</section>
     <section class="card"><div class="db-tit"><h2>Atividade recente</h2></div>${d.recentes.length ? `<ul class="ui-rec">${d.recentes.map(r => `<li><b>${esc(UI_ACOES[r.acao] || r.acao)}</b><span>${esc(r.aluno || r.detalhe || '')}</span><small>${esc(fmtDateTime(r.quando))} · ${esc(r.ator)}</small></li>`).join('')}</ul>` : '<p class="kpi-note">Nada por aqui ainda.</p>'}</section></div>
     `;
   $('#uiIrAlunos').onclick = () => go('uialunos');
+  $$('[data-ficha]').forEach(b => { b.onclick = () => uiFicha(+b.dataset.ficha); });
 };
 
 /* ---- leitura de listas (CSV colado/enviado ou planilha .xlsx) ---- */
@@ -45,7 +49,7 @@ function uiLinhasParaAlunos(linhas) {
 }
 
 PAGINAS.uialunos = async function () {
-  $('#content').innerHTML = `<div class="ig-barra"><input id="uiBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(UI.busca)}"><select id="uiSeg" class="control" aria-label="Segmento"></select><select id="uiTurma" class="control" aria-label="Turma"></select>
+  $('#content').innerHTML = `<div class="ig-barra"><input id="uiBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(UI.busca)}"><select id="uiSeg" class="control" aria-label="Segmento"></select><select id="uiTurma" class="control" aria-label="Turma"></select><select id="uiSit" class="control" aria-label="Situação da autorização">${UI_SITU.map(([k, t]) => `<option value="${k}" ${UI.situacao === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
     <label class="check-row ui-inat"><input type="checkbox" id="uiInat" ${UI.inativos ? 'checked' : ''}> Mostrar inativos</label><span class="cm-esp"></span><button type="button" class="btn soft" id="uiImp">Importar lista</button><button type="button" class="btn" id="uiNovo">+ Novo aluno</button></div>
     <div class="ui-selbar" id="uiSelBar" hidden></div><div id="uiLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   let dados = null, atraso = 0;
@@ -56,7 +60,7 @@ PAGINAS.uialunos = async function () {
     const cr = $('#uiCriar'); if (cr) cr.onclick = () => uiCriarSolic(UI.sel);
   };
   const carrega = async () => {
-    const qs = new URLSearchParams({ busca: UI.busca, segmento: UI.segmento, turma: UI.turma, inativos: UI.inativos ? '1' : '' });
+    const qs = new URLSearchParams({ busca: UI.busca, segmento: UI.segmento, turma: UI.turma, situacao: UI.situacao, inativos: UI.inativos ? '1' : '' });
     dados = await api('/imagem/alunos?' + qs);
     $('#uiSeg').innerHTML = `<option value="">Todos os segmentos</option>${dados.segmentos.map(s => `<option value="${s.k}" ${UI.segmento === s.k ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}`;
     $('#uiTurma').innerHTML = `<option value="">Todas as turmas</option>${dados.turmas.map(t => `<option value="${attr(t)}" ${UI.turma === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}`;
@@ -65,15 +69,17 @@ PAGINAS.uialunos = async function () {
   const desenha = () => {
     barra();
     const rows = dados.rows, todosMarcados = rows.length && rows.every(r => UI.sel.has(r.id));
-    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 1.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th>Aluno</th><th>Matrícula</th><th>Turma</th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td>${uiBadge(r.situacao)}</td><td class="acoes-cel"><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
-      : `<div class="empty-rich"><strong>${dados.total || UI.busca || UI.segmento || UI.turma ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}</strong><p>${dados.total || UI.busca || UI.segmento || UI.turma ? 'Mude a busca ou os filtros.' : 'Importe a lista (CSV ou planilha .xlsx) ou cadastre um aluno por vez.'}</p></div>`;
+    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 1.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th>Aluno</th><th>Matrícula</th><th>Turma</th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td>${uiBadge(r.situacao)}</td><td class="acoes-cel"><button type="button" class="btn soft" data-fi="${r.id}">Ficha</button><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
+      : `<div class="empty-rich"><strong>${dados.total || UI.busca || UI.segmento || UI.turma || UI.situacao ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}</strong><p>${dados.total || UI.busca || UI.segmento || UI.turma || UI.situacao ? 'Mude a busca ou os filtros.' : 'Importe a lista (CSV ou planilha .xlsx) ou cadastre um aluno por vez.'}</p></div>`;
     $$('[data-sel]').forEach(c => { c.onchange = () => { const r = dados.rows.find(x => x.id === +c.dataset.sel); if (c.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); barra(); const t = $('#uiTodos'); if (t) t.checked = dados.rows.length && dados.rows.every(x => UI.sel.has(x.id)); }; });
     const t = $('#uiTodos'); if (t) t.onchange = () => { dados.rows.filter(r => r.ativo).forEach(r => { if (t.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); }); desenha(); };
+    $$('[data-fi]').forEach(b => { b.onclick = () => uiFicha(+b.dataset.fi); });
     $$('[data-ed]').forEach(b => { b.onclick = () => uiAlunoForm(dados.rows.find(x => x.id === +b.dataset.ed), carrega, dados.segmentos); });
   };
   $('#uiBusca').oninput = e => { clearTimeout(atraso); atraso = setTimeout(() => { UI.busca = e.target.value; carrega(); }, 250); };
   $('#uiSeg').onchange = e => { UI.segmento = e.target.value; carrega(); };
   $('#uiTurma').onchange = e => { UI.turma = e.target.value; carrega(); };
+  $('#uiSit').onchange = e => { UI.situacao = e.target.value; carrega(); };
   $('#uiInat').onchange = e => { UI.inativos = e.target.checked; carrega(); };
   $('#uiNovo').onclick = () => uiAlunoForm(null, carrega, null);
   $('#uiImp').onclick = () => uiImportar(carrega);

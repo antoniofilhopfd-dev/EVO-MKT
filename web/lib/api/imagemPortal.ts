@@ -2,9 +2,10 @@ import { Ctx } from '../ctx';
 import { rateCheck, rateFail } from '../auth';
 import { sha256 } from '../crypto';
 import { q1, run } from '../db';
-import { eventoSolic, ENCERRADAS, lerArquivoSolic, salvarArquivoSolic, sha, solicCompleta, termoPdfDe } from '../imagemDados';
+import { atualizarVencimentos, eventoSolic, ENCERRADAS, lerArquivoSolic, salvarArquivoSolic, sha, solicCompleta, termoPdfDe } from '../imagemDados';
 import { termosPdf } from '../imagemPdf';
 import { examinarPdfAssinado, PARENTESCOS, validarAssinaturaDesenhada } from '../imagemPortal';
+import { calcVence, lerConfig } from '../imagemConfig';
 import { fail, now, Row, strv } from '../util';
 import { json } from './handlers';
 
@@ -38,11 +39,19 @@ async function acesso(c: Ctx, b: Row): Promise<{ ac: Row; s: Row }> {
   return { ac, s };
 }
 
+/** Termo substituído por uma versão mais nova do modelo, ou com prazo que já terminou: não se responde mais por este link. */
+async function termoAindaValeParaResponder(s: Row): Promise<void> {
+  if (['AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'].includes(s.status)) return; // quem já escolheu autorizar termina o que começou
+  const m = await q1('SELECT versao FROM ui_modelos WHERE id=?', [s.modelo_id]);
+  if ((await lerConfig()).bloquearVersaoAntiga && m && Number(m.versao) > Number(s.modelo_versao)) fail(409, 'Este termo foi substituído por uma versão mais nova. Peça ao colégio um novo link.');
+  if (s.periodo_tipo === 'ATE_DATA' && /^\d{4}-\d{2}-\d{2}$/.test(String(s.periodo_valor)) && String(s.periodo_valor) < now().slice(0, 10)) fail(409, 'O prazo deste termo já terminou. Peça ao colégio um novo termo.');
+}
+
 const visao = (s: Row, ac: Row) => ({
   protocolo: s.protocolo, aluno: s.aluno, turma: s.turma, modelo: s.modelo_nome, versao: s.modelo_versao, texto: s.termo_texto, hash: String(s.termo_hash).slice(0, 16),
   status: s.status, decisao: s.decisao, modalidade: s.modalidade, responsavel: s.resp_confirmado || s.responsavel_nome, parentesco: s.parentesco,
   encerrada: ENCERRADAS.includes(s.status), decididaEm: s.decisao_em ? dataBR(s.decisao_em) : '', expiraEm: dataBR(String(ac.expira_em)), parentescos: PARENTESCOS,
-  recusaDoArquivo: s.status === 'AGUARDANDO_ASSINATURA' && s.validado_por ? s.validacao_obs || 'O arquivo enviado não foi aceito. Assine de novo e envie outro.' : '',
+  venceEm: s.vence_em || '', recusaDoArquivo: s.status === 'AGUARDANDO_ASSINATURA' && s.validado_por ? s.validacao_obs || 'O arquivo enviado não foi aceito. Assine de novo e envie outro.' : '',
   podeBaixarFinal: ['AUTORIZADO', 'NAO_AUTORIZADO'].includes(s.status) && !!s.final_hash,
 });
 
@@ -72,6 +81,8 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
 
   const b = await c.body();
   const { ac, s } = await acesso(c, b);
+  s.status = (await q1('SELECT status FROM ui_solicitacoes WHERE id=?', [s.id]))?.status ?? s.status;
+  if (s.status === 'AUTORIZADO') { await atualizarVencimentos(); s.status = (await q1('SELECT status FROM ui_solicitacoes WHERE id=?', [s.id]))?.status ?? s.status; }
 
   if (path === '/public/imagem/abrir') {
     if (['AGUARDANDO_ENVIO', 'ENVIADO'].includes(s.status)) {
@@ -79,11 +90,14 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
       await eventoSolic(Number(s.id), 'responsável', 'aberto', '');
       s.status = 'ABERTO';
     }
-    return json(visao(s, ac), 200, cab);
+    let bloqueio = '';
+    try { if (!ENCERRADAS.includes(s.status)) await termoAindaValeParaResponder(s); } catch (e) { bloqueio = (e as Error).message; }
+    return json({ ...visao(s, ac), bloqueio }, 200, cab);
   }
 
   if (path === '/public/imagem/decidir') {
     if (!['AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA'].includes(s.status)) fail(409, ENCERRADAS.includes(s.status) ? 'Esta solicitação já foi respondida.' : 'Esta solicitação já está em validação e não pode ser alterada.');
+    await termoAindaValeParaResponder(s);
     const decisao = strv(b.decisao), nome = strv(b.responsavel_nome).replace(/\s+/g, ' ').trim(), parentesco = strv(b.parentesco);
     if (!['AUTORIZO', 'NAO_AUTORIZO'].includes(decisao)) fail(400, 'Escolha AUTORIZO ou NÃO AUTORIZO.');
     if (nome.length < 5 || !nome.includes(' ') || nome.length > 160) fail(400, 'Digite o nome completo do responsável legal.');
@@ -111,7 +125,7 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
     const pdf = await termosPdf([termoPdfDe(s, { tipo: 'DESENHADA', nome: s.resp_confirmado, parentesco: s.parentesco, em: dataBR(em), png: v.png })]);
     await salvarArquivoSolic(Number(s.id), 'assinatura', `assinatura_${s.protocolo}.png`, v.png, 'image/png', `sha256=${v.hash.slice(0, 16)}`, c.ip);
     await salvarArquivoSolic(Number(s.id), 'final', `termo-assinado_${s.protocolo}.pdf`, pdf, 'application/pdf', 'termo com assinatura manuscrita desenhada', c.ip);
-    await run("UPDATE ui_solicitacoes SET status='AUTORIZADO',modalidade='DESENHADA',decisao_em=?,ip_decisao=?,ua_decisao=?,final_hash=?,atualizado_em=? WHERE id=?", [em, c.ip, ua(c), sha(pdf), em, s.id]);
+    await run("UPDATE ui_solicitacoes SET status='AUTORIZADO',modalidade='DESENHADA',decisao_em=?,vence_em=?,ip_decisao=?,ua_decisao=?,final_hash=?,atualizado_em=? WHERE id=?", [em, calcVence(String(s.periodo_tipo), String(s.periodo_valor), em), c.ip, ua(c), sha(pdf), em, s.id]);
     await eventoSolic(Number(s.id), 'responsável', 'autorizado', `assinatura desenhada; ${s.resp_confirmado} (${s.parentesco})`);
     return json({ ok: true, status: 'AUTORIZADO', protocolo: s.protocolo }, 200, cab);
   }

@@ -9,6 +9,8 @@ import { fail, now, Row, strv } from '../util';
 import { randHex, sha256 } from '../crypto';
 import { publicUrl } from '../integrations/http';
 import { ENCERRADAS, lerArquivoSolic, solicCompleta } from '../imagemDados';
+import { imagemGestaoRoute } from './imagemGestao';
+import { calcVence, lerConfig, mensagemCom } from '../imagemConfig';
 import { json } from './handlers';
 
 /** Uso de Imagem, etapa 2: modelos (só o Administrador edita), prévia, solicitações em lote e PDF do termo. */
@@ -27,6 +29,9 @@ const novoProtocolo = (id: number) => `UI-${now().slice(0, 4)}-${String(id).padS
 export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null> {
   const { path, method } = c;
   const ator = String(u.nome ?? u.codigo ?? '');
+
+  const gestao = await imagemGestaoRoute(c, u);
+  if (gestao) return gestao;
 
   if (path === '/imagem/modelos' && method === 'GET') {
     const rows = await q('SELECT * FROM ui_modelos ORDER BY ativo DESC, nome');
@@ -125,11 +130,13 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
   }
 
   if (path === '/imagem/solicitacoes/cancelar' && method === 'POST') {
-    const id = Number((await c.body()).id) || 0;
+    const b = await c.body(), id = Number(b.id) || 0, motivo = limpa(b.motivo, 400);
     const s = await q1('SELECT status FROM ui_solicitacoes WHERE id=?', [id]) ?? fail(404, 'Solicitação não encontrada.');
-    if (s.status !== 'AGUARDANDO_ENVIO') fail(409, 'Só dá para cancelar uma solicitação que ainda não foi enviada.');
-    await run("UPDATE ui_solicitacoes SET status='CANCELADO',atualizado_em=? WHERE id=?", [now(), id]);
-    await evento(id, ator, 'cancelada', '');
+    if (!['AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA'].includes(s.status)) fail(409, 'Só dá para cancelar uma solicitação que ainda não foi respondida. Para uma autorização em vigor, use Revogar.');
+    if (s.status !== 'AGUARDANDO_ENVIO' && motivo.length < 5) fail(400, 'Explique o motivo do cancelamento (o link já foi enviado).');
+    await run("UPDATE ui_solicitacoes SET status='CANCELADO',cancelado_motivo=?,atualizado_em=? WHERE id=?", [motivo, now(), id]);
+    await run('UPDATE ui_acessos SET ativo=0 WHERE solicitacao_id=?', [id]);
+    await evento(id, ator, 'cancelada', motivo);
     await audit(ator, 'imagem-solicitacao-cancelada', 'ui_solicitacoes', String(id));
     return json({ ok: true });
   }
@@ -154,7 +161,10 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
     const b = await c.body(), id = Number(b.id) || 0;
     const s = await solicCompleta(id) ?? fail(404, 'Solicitação não encontrada.');
     if (ENCERRADAS.includes(s.status)) fail(409, 'Esta solicitação já está encerrada; não há mais o que enviar.');
-    const dias = Math.min(60, Math.max(1, Number(b.dias) || 15));
+    const cfg = await lerConfig();
+    const mod = await q1('SELECT versao FROM ui_modelos WHERE id=?', [s.modelo_id]);
+    if (cfg.bloquearVersaoAntiga && mod && Number(mod.versao) > Number(s.modelo_versao) && !['AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'].includes(s.status)) fail(409, `O modelo foi alterado depois desta solicitação (v${s.modelo_versao} para v${mod.versao}). Cancele esta solicitação e crie outra com a versão atual.`);
+    const dias = Math.min(60, Math.max(1, Number(b.dias) || cfg.linkDias));
     const token = randHex(24), codigo = String(Math.floor(100000 + (Number.parseInt(randHex(4), 16) / 0x100000000) * 900000));
     const expira = now(new Date(Date.now() + dias * 86400_000));
     await run('UPDATE ui_acessos SET ativo=0 WHERE solicitacao_id=?', [id]);
@@ -162,8 +172,8 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
     await evento(id, ator, 'link-gerado', `válido por ${dias} dia(s)`);
     await audit(ator, 'imagem-link-gerado', 'ui_solicitacoes', String(id));
     const link = `${publicUrl(c.url.origin)}/autorizar.html#${token}`;
-    const mensagem = `Olá! O Colégio Evolução pede a sua autorização (ou a sua recusa) para o uso de imagem de ${s.aluno}. Leia e responda com calma por este link seguro: ${link}\n\nO código de acesso será informado por outro meio. O link vale até ${expira.slice(8, 10)}/${expira.slice(5, 7)}/${expira.slice(0, 4)}.`;
-    return json({ ok: true, link, codigo, expiraEm: expira, mensagem, telefone: s.responsavel_tel, email: s.responsavel_email });
+    const mensagem = mensagemCom(cfg.mensagemEnvio, { aluno: s.aluno, link, validade: `${expira.slice(8, 10)}/${expira.slice(5, 7)}/${expira.slice(0, 4)}`, protocolo: s.protocolo });
+    return json({ ok: true, link, codigo, expiraEm: expira, mensagem, telefone: s.responsavel_tel, email: s.responsavel_email, canais: cfg.canais });
   }
 
   /** O envio é feito por uma pessoa (WhatsApp, e-mail, bilhete). O sistema só registra que foi enviado, quando a equipe confirma. */
@@ -198,15 +208,16 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
 
   /** Validação manual do PDF do GOV.BR: a pessoa confere em https://validar.iti.gov.br e registra aqui o resultado. Só então vira Autorizado. */
   if (path === '/imagem/solicitacoes/validar' && method === 'POST') {
+    if ((await lerConfig()).quemValida === 'admin') await requireAdmin(c);
     const b = await c.body(), id = Number(b.id) || 0, resultado = strv(b.resultado);
-    const s = await q1('SELECT status FROM ui_solicitacoes WHERE id=?', [id]) ?? fail(404, 'Solicitação não encontrada.');
+    const s = await q1('SELECT status,periodo_tipo,periodo_valor FROM ui_solicitacoes WHERE id=?', [id]) ?? fail(404, 'Solicitação não encontrada.');
     if (s.status !== 'AGUARDANDO_VALIDACAO') fail(409, 'Esta solicitação não está aguardando validação.');
     if (!['VALIDO', 'INVALIDO'].includes(resultado)) fail(400, 'Informe o resultado da validação.');
     const obs = limpa(b.obs, 400);
     if (resultado === 'VALIDO') {
       if (b.conferido_no_validar !== true) fail(400, 'Confirme que a assinatura foi conferida em validar.iti.gov.br e que o documento corresponde ao termo.');
       const f = await lerArquivoSolic(id, 'govbr');
-      await run("UPDATE ui_solicitacoes SET status='AUTORIZADO',validado_por=?,validado_em=?,validacao_obs=?,final_hash=?,atualizado_em=? WHERE id=?", [ator, now(), obs, f?.sha256 ?? '', now(), id]);
+      await run("UPDATE ui_solicitacoes SET status='AUTORIZADO',validado_por=?,validado_em=?,validacao_obs=?,final_hash=?,vence_em=?,atualizado_em=? WHERE id=?", [ator, now(), obs, f?.sha256 ?? '', calcVence(String(s.periodo_tipo), String(s.periodo_valor), now()), now(), id]);
       await evento(id, ator, 'validado', `assinatura GOV.BR conferida manualmente${obs ? ': ' + obs : ''}`);
     } else {
       if (obs.length < 5) fail(400, 'Explique o motivo (o responsável verá a mensagem).');

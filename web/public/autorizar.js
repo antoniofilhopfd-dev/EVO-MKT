@@ -7,7 +7,7 @@
   const S = { codigo: '', v: null, decisao: '', passo: '' };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const chamar = async (rota, corpo) => {
-    const r = await fetch(API + rota, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-EVO': '1' }, body: JSON.stringify({ token, codigo: S.codigo, ...corpo }), cache: 'no-store' });
+    let r; try { r = await fetch(API + rota, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-EVO': '1' }, body: JSON.stringify({ token, codigo: S.codigo, ...corpo }), cache: 'no-store' }); } catch { throw new Error('Sem conexão com a internet. Confira o sinal e tente de novo: o que você já respondeu não foi perdido.'); }
     if (r.headers.get('content-type')?.includes('application/pdf')) return r;
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { const e = new Error(j.error || j.message || 'Não foi possível concluir. Tente de novo.'); e.status = r.status; throw e; }
@@ -39,9 +39,12 @@
   function proximo() {
     const v = S.v;
     if (v.status === 'AUTORIZADO' || v.status === 'NAO_AUTORIZADO') return telaFim();
+    if (v.status === 'REVOGADO') return tela(`<h1>Autorização revogada</h1><p>Esta autorização (${esc(v.protocolo)}) foi revogada. O colégio não deve mais usar a imagem do aluno conforme este termo.</p>`);
+    if (v.status === 'VENCIDO') return tela(`<h1>Autorização vencida</h1><p>O prazo desta autorização (${esc(v.protocolo)}) terminou. Se o colégio precisar de uma nova, enviará outro termo.</p>`);
     if (v.encerrada) return tela(`<h1>Solicitação encerrada</h1><p>Esta solicitação (${esc(v.protocolo)}) foi encerrada pelo colégio. Em caso de dúvida, fale com a secretaria.</p>`);
     if (v.status === 'AGUARDANDO_VALIDACAO') return telaFim();
     if (v.status === 'AGUARDANDO_ASSINATURA' && v.decisao === 'AUTORIZO') return telaAssinatura();
+    if (v.bloqueio) return tela(`<h1>Termo indisponível</h1><p class="aut-aviso">${esc(v.bloqueio)}</p>`);
     telaTermo();
   }
 
@@ -125,7 +128,7 @@
       <li><b>Abra o assinador oficial do GOV.BR</b> em outra aba e assine o PDF com a sua conta (prata ou ouro).<br><a class="aut-btn aut-sec" href="https://assinador.iti.br/" target="_blank" rel="noopener noreferrer">Abrir assinador.iti.br</a></li>
       <li><b>Baixe o arquivo assinado</b> do próprio assinador. Não use “Imprimir em PDF”: isso apaga a assinatura.</li>
       <li><b>Envie aqui o PDF assinado.</b></li></ol>
-      <p class="aut-aviso"><b>Cuidado:</b> o colégio nunca pede a sua senha do GOV.BR. Não a digite aqui nem a informe a ninguém.</p>
+      <p class="aut-aviso"><b>Cuidado:</b> o colégio nunca pede a sua senha do GOV.BR. Não a digite aqui nem a informe a ninguém.</p><p class="aut-sub">Não tem conta GOV.BR prata ou ouro, ou está sem internet boa? Volte e assine escrevendo na tela, ou procure a secretaria do colégio.</p>
       <form id="fGov" class="aut-card" novalidate><label for="arq">PDF assinado (até 5 MB)</label><input id="arq" class="aut-in" type="file" accept="application/pdf,.pdf">
       <p class="aut-erro" id="eG" role="alert" hidden></p><div class="aut-acoes"><button class="aut-btn aut-sec" id="bV" type="button">Voltar</button><button class="aut-btn" type="submit">Enviar PDF assinado</button></div></form>
       <p class="aut-sub">Depois do envio, a equipe do colégio confere a assinatura. A autorização só vale depois dessa conferência.</p>`);

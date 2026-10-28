@@ -147,7 +147,7 @@ const ROTULOS = {
   hoje: 'Dashboard', calendario: 'Calendário',
   igvisao: 'Visão geral', igconteudos: 'Publicações', igplan: 'Planejamento', igcalendario: 'Calendário', igdesempenho: 'Desempenho', igranking: 'Ranking',
   trafego: 'Visão Geral', tfdesempenho: 'Desempenho', tfrelatorios: 'Relatórios',
-  uipainel: 'Painel', uialunos: 'Alunos', uimodelos: 'Modelos', uisolic: 'Solicitações',
+  uipainel: 'Painel', uialunos: 'Alunos', uimodelos: 'Modelos', uisolic: 'Solicitações', uirelat: 'Relatórios', uiconfig: 'Ajustes',
   configuracoes: 'Configurações',
 };
 const DESCRICOES = {
@@ -156,7 +156,7 @@ const DESCRICOES = {
   igvisao: 'Desempenho orgânico dos perfis do Instagram.', igconteudos: 'Rascunhos, agendadas e já postadas no Instagram, com publicar agora e agendar.',
   igplan: 'Pauta do mês, ideias, campanhas editoriais e modelos.', igcalendario: 'Publicações programadas e já postadas no Instagram, com status, horário e perfil.', igranking: 'As melhores publicações do período, por alcance, interações, engajamento e visualizações.', igdesempenho: 'O que funcionou, por perfil, segmento, formato, tema e horário.',
   trafego: 'Anúncios da Meta: somente consulta. Criar e editar anúncios continua no Gerenciador de Anúncios da Meta.', tfdesempenho: 'Campanhas, conjuntos e anúncios, com fotos dos criativos e filtros.', tfrelatorios: 'Relatórios por período, com pré-visualização antes de imprimir ou salvar em PDF.',
-  uipainel: 'Autorizações de uso de imagem dos alunos: visão geral e atividade recente.', uialunos: 'Alunos do colégio: importação, busca e seleção manual de quem precisa de autorização.', uimodelos: 'Modelos do termo de autorização de uso de imagem, com prévia e versão.', uisolic: 'Solicitações de autorização por aluno, com situação e PDF do termo.',
+  uipainel: 'Autorizações de uso de imagem dos alunos: visão geral e atividade recente.', uialunos: 'Alunos do colégio: importação, busca e seleção manual de quem precisa de autorização.', uimodelos: 'Modelos do termo de autorização de uso de imagem, com prévia e versão.', uisolic: 'Solicitações de autorização por aluno, com situação e PDF do termo.', uirelat: 'Relatórios de uso de imagem por segmento, turma, período e situação, em tela, PDF e Excel.', uiconfig: 'Ajustes do módulo: prazos, lembretes, mensagens, retenção e permissões.',
   configuracoes: 'Acessos, integrações, backup, auditoria e prontidão do sistema.',
 };
 const AREAS = [
@@ -164,7 +164,7 @@ const AREAS = [
   { k: 'calendario', label: 'Calendário', icon: '▤', pages: ['calendario'] },
   { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igcalendario', 'igdesempenho', 'igranking'] },
   { k: 'trafego', label: 'Tráfego Pago', icon: '↗', pages: ['trafego', 'tfdesempenho', 'tfrelatorios'] },
-  { k: 'imagem', label: 'Uso de Imagem', icon: '▣', pages: ['uipainel', 'uialunos', 'uimodelos', 'uisolic'] },
+  { k: 'imagem', label: 'Uso de Imagem', icon: '▣', pages: ['uipainel', 'uialunos', 'uimodelos', 'uisolic', 'uirelat', 'uiconfig'] },
   { k: 'configuracoes', label: 'Configurações', icon: '⚙', pages: ['configuracoes'] },
 ];
 const areaOf = p => AREAS.find(a => a.pages.includes(p));

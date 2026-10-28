@@ -93,23 +93,27 @@ async function uiCriarSolic(selecionados) {
 
 const UISOL = { busca: '', status: '', sel: new Set() };
 PAGINAS.uisolic = async function () {
-  $('#content').innerHTML = `<div class="ig-barra"><input id="usBusca" class="control" type="search" placeholder="Buscar por aluno, matrícula ou protocolo" aria-label="Buscar solicitação" value="${attr(UISOL.busca)}"><select id="usSt" class="control" aria-label="Situação"><option value="">Todas as situações</option>${Object.entries(UI_STATUS).map(([k, [t]]) => `<option value="${k}" ${UISOL.status === k ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="cm-esp"></span><button type="button" class="btn" id="usLote" disabled>Baixar PDF dos marcados</button></div><div id="usLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
+  $('#content').innerHTML = `<div class="ig-barra"><input id="usBusca" class="control" type="search" placeholder="Buscar por aluno, matrícula ou protocolo" aria-label="Buscar solicitação" value="${attr(UISOL.busca)}"><select id="usSt" class="control" aria-label="Situação"><option value="">Todas as situações</option>${Object.entries(UI_STATUS).map(([k, [t]]) => `<option value="${k}" ${UISOL.status === k ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="cm-esp"></span><button type="button" class="btn soft" id="usLemb" disabled>Preparar lembretes</button><button type="button" class="btn" id="usLote" disabled>Baixar PDF dos marcados</button></div><div class="ui-chips" id="usChips"></div><div id="usLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   let rows = [], atraso = 0;
-  const lote = () => { const b = $('#usLote'); b.disabled = !UISOL.sel.size; b.textContent = UISOL.sel.size ? `Baixar PDF dos ${UISOL.sel.size} marcados` : 'Baixar PDF dos marcados'; };
+  const lote = () => { $('#usLemb').disabled = !UISOL.sel.size; const b = $('#usLote'); b.disabled = !UISOL.sel.size; b.textContent = UISOL.sel.size ? `Baixar PDF dos ${UISOL.sel.size} marcados` : 'Baixar PDF dos marcados'; };
   const carrega = async () => {
     rows = (await api('/imagem/solicitacoes?' + new URLSearchParams({ busca: UISOL.busca, status: UISOL.status }))).rows;
-    $('#usLista').innerHTML = rows.length ? `<div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"></th><th>Protocolo</th><th>Aluno</th><th>Turma</th><th>Modelo</th><th>Situação</th><th>Criada em</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td class="ui-ck"><input type="checkbox" data-m="${r.id}" aria-label="Marcar ${attr(r.protocolo)}" ${UISOL.sel.has(r.id) ? 'checked' : ''}></td><td>${esc(r.protocolo)}</td><td class="titlecell"><b>${esc(r.aluno)}</b><br><small>${esc(r.matricula)}</small></td><td>${esc(r.turma || '—')}</td><td>${esc(r.modelo)} <small>v${r.versao}</small></td><td>${uiBadge(r.status)}</td><td>${esc(fmtDateTime(r.criadoEm))}</td><td class="acoes-cel">${['CANCELADO', 'AUTORIZADO', 'NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO', 'ERRO'].includes(r.status) ? '' : `<button type="button" class="btn" data-link="${r.id}">Link de envio</button>`}${r.status === 'AGUARDANDO_VALIDACAO' ? `<button type="button" class="btn" data-det="${r.id}">Validar</button>` : `<button type="button" class="btn soft" data-det="${r.id}">Detalhes</button>`}<button type="button" class="btn soft" data-pdf="${r.id}">PDF</button>${r.status === 'AGUARDANDO_ENVIO' ? `<button type="button" class="btn soft" data-cx="${r.id}">Cancelar</button>` : ''}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">O sistema não envia nada sozinho: gere o link, copie a mensagem e envie por WhatsApp ou e-mail. O código de acesso deve ir por outro meio. O PDF serve para impressão e assinatura presencial.</p>`
+    const cont = (await api('/imagem/relatorio')).resumo.porStatus;
+    $('#usChips').innerHTML = [['', 'Todas', Object.values(cont).reduce((a, n) => a + n, 0)], ...Object.entries(UI_STATUS).map(([k, [t]]) => [k, t, cont[k] || 0]).filter(x => x[2])].map(([k, t, n]) => `<button type="button" class="ui-chip ${UISOL.status === k ? 'on' : ''}" data-chip="${k}">${esc(t)} <b>${n}</b></button>`).join('');
+    $$('[data-chip]').forEach(b => { b.onclick = () => { UISOL.status = b.dataset.chip; $('#usSt').value = UISOL.status; carrega(); }; });
+    $('#usLista').innerHTML = rows.length ? `<div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"></th><th>Protocolo</th><th>Aluno</th><th>Turma</th><th>Modelo</th><th>Situação</th><th>Criada em</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td class="ui-ck"><input type="checkbox" data-m="${r.id}" aria-label="Marcar ${attr(r.protocolo)}" ${UISOL.sel.has(r.id) ? 'checked' : ''}></td><td>${esc(r.protocolo)}</td><td class="titlecell"><b>${esc(r.aluno)}</b><br><small>${esc(r.matricula)}</small></td><td>${esc(r.turma || '—')}</td><td>${esc(r.modelo)} <small>v${r.versao}</small></td><td>${uiBadge(r.status)}</td><td>${esc(fmtDateTime(r.criadoEm))}</td><td class="acoes-cel">${['CANCELADO', 'AUTORIZADO', 'NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO', 'ERRO'].includes(r.status) ? '' : `<button type="button" class="btn" data-link="${r.id}">Link de envio</button>`}${r.status === 'AGUARDANDO_VALIDACAO' ? `<button type="button" class="btn" data-det="${r.id}">Validar</button>` : `<button type="button" class="btn soft" data-det="${r.id}">Detalhes</button>`}<button type="button" class="btn soft" data-pdf="${r.id}">PDF</button>${['AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA'].includes(r.status) ? `<button type="button" class="btn soft" data-cx="${r.id}">Cancelar</button>` : ''}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">O sistema não envia nada sozinho: gere o link, copie a mensagem e envie por WhatsApp ou e-mail. O código de acesso deve ir por outro meio. O PDF serve para impressão e assinatura presencial.</p>`
       : '<div class="empty-rich"><strong>Nenhuma solicitação</strong><p>Marque os alunos em Alunos e use “Criar solicitações”.</p></div>';
     $$('[data-m]').forEach(c => { c.onchange = () => { const id = +c.dataset.m; if (c.checked) UISOL.sel.add(id); else UISOL.sel.delete(id); lote(); }; });
     $$('[data-pdf]').forEach(b => { b.onclick = () => uiBaixarPdf([+b.dataset.pdf]); });
     $$('[data-link]').forEach(b => { b.onclick = () => uiLink(rows.find(x => x.id === +b.dataset.link), carrega); });
     $$('[data-det]').forEach(b => { b.onclick = () => uiDetalhe(+b.dataset.det, carrega); });
-    $$('[data-cx]').forEach(b => { b.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Cancelar solicitação', texto: 'A solicitação ainda não foi enviada. Ela fica registrada como cancelada (nada é apagado).', confirmar: 'Cancelar solicitação', perigo: true })) return; try { await post('/imagem/solicitacoes/cancelar', { id: +b.dataset.cx }); carrega(); } catch (e) { toast(e.message, 'bad'); } }; });
+    $$('[data-cx]').forEach(b => { b.onclick = () => uiCancelar(rows.find(x => x.id === +b.dataset.cx), carrega); });
     lote();
   };
   $('#usBusca').oninput = e => { clearTimeout(atraso); atraso = setTimeout(() => { UISOL.busca = e.target.value; carrega(); }, 250); };
   $('#usSt').onchange = e => { UISOL.status = e.target.value; carrega(); };
   $('#usLote').onclick = () => uiBaixarPdf([...UISOL.sel]);
+  $('#usLemb').onclick = () => uiLembretes([...UISOL.sel], carrega);
   await carrega();
 };
 
@@ -133,7 +137,7 @@ async function uiLink(r, recarrega) {
   d.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) recarrega(); });
 }
 
-const UI_ACAO = { criada: 'Solicitação criada', 'link-gerado': 'Link gerado', enviado: 'Marcada como enviada', aberto: 'Link aberto pelo responsável', 'autorizo-escolhido': 'Responsável escolheu autorizar', autorizado: 'Autorizado', 'nao-autorizado': 'Não autorizado', 'govbr-enviado': 'PDF GOV.BR enviado', validado: 'Assinatura GOV.BR validada', 'arquivo-recusado': 'PDF GOV.BR recusado', cancelada: 'Cancelada', 'pdf-baixado': 'PDF baixado', 'arquivo-baixado': 'Arquivo baixado' };
+const UI_ACAO = { vencido: 'Vencido (prazo terminou)', revogado: 'Autorização revogada', lembrete: 'Lembrete preparado', criada: 'Solicitação criada', 'link-gerado': 'Link gerado', enviado: 'Marcada como enviada', aberto: 'Link aberto pelo responsável', 'autorizo-escolhido': 'Responsável escolheu autorizar', autorizado: 'Autorizado', 'nao-autorizado': 'Não autorizado', 'govbr-enviado': 'PDF GOV.BR enviado', validado: 'Assinatura GOV.BR validada', 'arquivo-recusado': 'PDF GOV.BR recusado', cancelada: 'Cancelada', 'pdf-baixado': 'PDF baixado', 'arquivo-baixado': 'Arquivo baixado' };
 const UI_ARQ = { govbr: 'PDF assinado no GOV.BR', final: 'Documento final', assinatura: 'Imagem da assinatura desenhada' };
 async function uiDetalhe(id, recarrega) {
   let d; try { d = await api('/imagem/solicitacoes/detalhe?id=' + id); } catch (e) { return toast(e.message, 'bad'); }
@@ -145,11 +149,98 @@ async function uiDetalhe(id, recarrega) {
       <label class="ui-campo">Observação<input class="control" id="vObs" maxlength="400" placeholder="Ex.: assinatura válida, titular confere"></label><label class="check-row"><input type="checkbox" id="vOk"> Conferi a assinatura em validar.iti.gov.br e o documento corresponde ao termo.</label>
       <div class="igp-erro" id="vE" role="alert" hidden></div><div class="actions"><button type="button" class="btn" id="vSim">Assinatura válida: autorizar</button><button type="button" class="btn danger-soft" id="vNao">Recusar arquivo</button></div></section>` : ''}
     <h4>Histórico</h4><ul class="ui-hist">${d.eventos.map(e => `<li><b>${esc(UI_ACAO[e.acao] || e.acao)}</b> <small>${esc(fmtDateTime(e.quando))} · ${esc(e.ator)}${e.detalhe ? ' · ' + esc(e.detalhe) : ''}</small></li>`).join('')}</ul>
-    <div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn" data-close>Fechar</button></div>`, { larga: true });
+    <div class="actions dlg-acoes">${s.status === 'AUTORIZADO' ? '<button type="button" class="btn danger-soft" id="dRev">Revogar autorização</button>' : ''}<span class="cm-esp"></span><button type="button" class="btn" data-close>Fechar</button></div>`, { larga: true });
   dlg.el.firstElementChild.classList.add('ui-box');
+  const rvb = $('#dRev', dlg.el); if (rvb) rvb.onclick = () => { dlg.close(); uiRevogar({ id, protocolo: s.protocolo }, recarrega); };
   const enviar = async resultado => {
     const e = $('#vE', dlg.el); e.hidden = true;
     try { await post('/imagem/solicitacoes/validar', { id, resultado, obs: $('#vObs', dlg.el).value, conferido_no_validar: $('#vOk', dlg.el).checked }); toast(resultado === 'VALIDO' ? 'Autorizado' : 'Arquivo recusado; o responsável será avisado ao abrir o link'); dlg.close(); recarrega(); } catch (x) { e.textContent = x.message; e.hidden = false; }
   };
   const si = $('#vSim', dlg.el); if (si) { si.onclick = () => enviar('VALIDO'); $('#vNao', dlg.el).onclick = () => enviar('INVALIDO'); }
 }
+
+/* ---- cancelar (com motivo quando o link já foi enviado) ---- */
+function uiCancelar(r, recarrega) {
+  const exige = r.status !== 'AGUARDANDO_ENVIO';
+  const d = dialogo(`<form id="cxF" novalidate><h3>Cancelar solicitação ${esc(r.protocolo)}</h3><p class="kpi-note">${exige ? 'O link já foi enviado: ele deixa de funcionar. ' : ''}A solicitação fica registrada como cancelada; nada é apagado.</p>
+    <label class="ui-campo">Motivo${exige ? '' : ' (opcional)'}<input class="control" id="cxM" maxlength="400"></label><div class="igp-erro" id="cxE" role="alert" hidden></div>
+    <div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn soft" data-close>Voltar</button><button type="submit" class="btn danger">Cancelar solicitação</button></div></form>`);
+  $('#cxF', d.el).onsubmit = async ev => { ev.preventDefault(); try { await post('/imagem/solicitacoes/cancelar', { id: r.id, motivo: $('#cxM', d.el).value }); toast('Solicitação cancelada'); d.close(); recarrega(); } catch (e) { const x = $('#cxE', d.el); x.textContent = e.message; x.hidden = false; } };
+}
+
+/* ---- lembretes moderados: o sistema prepara o texto; quem envia é uma pessoa ---- */
+async function uiLembretes(ids, recarrega) {
+  let r; try { r = await post('/imagem/solicitacoes/lembrete', { ids }); } catch (e) { return toast(e.message, 'bad'); }
+  const d = dialogo(`<h3>Lembretes</h3><p class="kpi-note">O EVO MKT não envia nada sozinho. Copie cada mensagem e envie por WhatsApp ou e-mail. Há um intervalo mínimo e um máximo de ${r.max} lembrete(s) por solicitação.</p>
+    ${r.lembretes.length ? `<ul class="ui-lemb">${r.lembretes.map(l => `<li><b>${esc(l.aluno)}</b> <small>lembrete ${l.numero} de ${r.max} · ${esc(l.protocolo)}</small><div class="ui-copia"><textarea class="control" rows="3" readonly>${esc(l.mensagem)}</textarea></div><div class="actions"><button type="button" class="btn soft" data-cp="${l.id}">Copiar mensagem</button>${l.telefone ? `<a class="btn soft" target="_blank" rel="noopener noreferrer" href="https://wa.me/${String(l.telefone).length <= 11 ? '55' : ''}${esc(l.telefone)}?text=${encodeURIComponent(l.mensagem)}">WhatsApp</a>` : ''}${l.email ? `<a class="btn soft" href="mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent('Lembrete: autorização de uso de imagem')}&body=${encodeURIComponent(l.mensagem)}">E-mail</a>` : ''}</div></li>`).join('')}</ul>` : '<p class="kpi-note">Nenhum lembrete foi preparado.</p>'}
+    ${r.ignoradas.length ? `<h4>Não preparados</h4><ul class="ui-erros">${r.ignoradas.map(x => `<li><b>${esc(x.aluno)}</b>: ${esc(x.motivo)}</li>`).join('')}</ul>` : ''}
+    <div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn" data-close>Fechar</button></div>`, { larga: true });
+  d.el.firstElementChild.classList.add('ui-box');
+  $$('[data-cp]', d.el).forEach(b => { b.onclick = () => uiCopiar(r.lembretes.find(x => x.id === +b.dataset.cp).mensagem, 'Mensagem copiada'); });
+  d.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) recarrega(); });
+}
+
+/* ---- revogar uma autorização em vigor ---- */
+function uiRevogar(s, aoFim) {
+  const d = dialogo(`<form id="rvF" novalidate><h3>Revogar autorização ${esc(s.protocolo)}</h3><p class="kpi-note">A autorização passa a <b>Revogada</b> e o aluno entra na lista de “não usar a imagem”. As provas (documento, assinatura, histórico) continuam guardadas.</p>
+    <label class="ui-campo">Quem pediu e por quê<input class="control" id="rvM" maxlength="400" placeholder="Ex.: mãe pediu por telefone em 20/11"></label><div class="igp-erro" id="rvE" role="alert" hidden></div>
+    <div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn soft" data-close>Voltar</button><button type="submit" class="btn danger">Revogar autorização</button></div></form>`);
+  $('#rvF', d.el).onsubmit = async ev => { ev.preventDefault(); try { await post('/imagem/solicitacoes/revogar', { id: s.id, motivo: $('#rvM', d.el).value }); toast('Autorização revogada'); d.close(); aoFim(); } catch (e) { const x = $('#rvE', d.el); x.textContent = e.message; x.hidden = false; } };
+}
+
+/* ---- ficha do aluno ---- */
+async function uiFicha(id) {
+  let f; try { f = await api('/imagem/alunos/ficha?id=' + id); } catch (e) { return toast(e.message, 'bad'); }
+  const a = f.aluno, atual = f.solicitacoes.find(s => s.status !== 'CANCELADO');
+  const d = dialogo(`<h3>${esc(a.nome)}</h3><p class="kpi-note">Matrícula ${esc(a.matricula)} · ${esc(a.turma || 'sem turma')}${a.ativo ? '' : ' · inativo'}</p>
+    <p>Situação atual: ${uiBadge(atual ? atual.status : '')} ${atual && ['NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO'].includes(atual.status) ? '<b class="ui-ruim">Não usar a imagem deste aluno.</b>' : ''}</p>
+    ${f.solicitacoes.length ? f.solicitacoes.map(s => `<section class="card ui-ficha"><div class="db-tit"><h2>${esc(s.protocolo)}</h2>${uiBadge(s.status)}</div>
+      <dl class="dc-dl"><dt>Modelo</dt><dd>${esc(s.modelo)} (v${s.versao})</dd><dt>Responsável</dt><dd>${esc(s.responsavel || '—')}${s.parentesco ? ' (' + esc(s.parentesco) + ')' : ''}</dd><dt>Decisão</dt><dd>${s.decisao === 'AUTORIZO' ? 'Autoriza' : s.decisao === 'NAO_AUTORIZO' ? 'Não autoriza' : '—'}${s.decisaoEm ? ' em ' + esc(fmtDateTime(s.decisaoEm)) : ''}</dd><dt>Assinatura</dt><dd>${s.modalidade === 'GOVBR' ? 'GOV.BR' : s.modalidade === 'DESENHADA' ? 'Desenhada na tela' : '—'}${s.validadoPor ? ' · validada por ' + esc(s.validadoPor) : ''}</dd><dt>Prazo</dt><dd>${s.venceEm ? 'até ' + esc(fmtDate(s.venceEm)) : 'indeterminado'}</dd>${s.status === 'REVOGADO' ? `<dt>Revogação</dt><dd>${esc(fmtDateTime(s.revogadoEm))} · ${esc(s.revogadoPor)} — ${esc(s.revogadoMotivo)}</dd>` : ''}<dt>Hash do termo</dt><dd><small>${esc(s.termoHash)}</small></dd></dl>
+      ${s.arquivos.length ? `<ul class="ui-arqs">${s.arquivos.map(x => `<li><a href="${API}/imagem/solicitacoes/arquivo?id=${s.id}&tipo=${x.tipo}" download>${esc(UI_ARQ[x.tipo] || x.tipo)}</a> <small>SHA-256 ${esc(x.sha256.slice(0, 12))}…</small></li>`).join('')}</ul>` : ''}
+      <details><summary>Histórico (${s.eventos.length})</summary><ul class="ui-hist">${s.eventos.map(e => `<li><b>${esc(UI_ACAO[e.acao] || e.acao)}</b> <small>${esc(fmtDateTime(e.quando))} · ${esc(e.ator)}${e.detalhe ? ' · ' + esc(e.detalhe) : ''}</small></li>`).join('')}</ul></details>
+      ${s.status === 'AUTORIZADO' ? `<div class="actions"><button type="button" class="btn danger-soft" data-rv="${s.id}">Revogar autorização</button></div>` : ''}</section>`).join('') : '<p class="kpi-note">Este aluno ainda não tem solicitações.</p>'}
+    <div class="actions dlg-acoes"><a class="btn soft" href="${API}/imagem/alunos/ficha.pdf?id=${id}" download>Exportar ficha (PDF)</a><span class="cm-esp"></span><button type="button" class="btn" data-close>Fechar</button></div>`, { larga: true });
+  d.el.firstElementChild.classList.add('ui-box');
+  $$('[data-rv]', d.el).forEach(b => { b.onclick = () => { d.close(); uiRevogar(f.solicitacoes.find(x => x.id === +b.dataset.rv), () => uiFicha(id)); }; });
+}
+
+/* ---- relatórios ---- */
+const UIREL = { segmento: '', turma: '', status: '', de: '', ate: '' };
+PAGINAS.uirelat = async function () {
+  const qs = () => new URLSearchParams(Object.entries(UIREL).filter(([, v]) => v)).toString();
+  const al = await api('/imagem/alunos'), md = await api('/imagem/modelos');
+  $('#content').innerHTML = `<div class="ig-barra"><select id="rSeg" class="control" aria-label="Segmento"><option value="">Todos os segmentos</option>${al.segmentos.map(s => `<option value="${s.k}" ${UIREL.segmento === s.k ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select><select id="rTur" class="control" aria-label="Turma"><option value="">Todas as turmas</option>${al.turmas.map(t => `<option ${UIREL.turma === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select><select id="rSt" class="control" aria-label="Situação"><option value="">Todas as situações</option>${Object.entries(UI_STATUS).map(([k, [t]]) => `<option value="${k}" ${UIREL.status === k ? 'selected' : ''}>${t}</option>`).join('')}</select><label class="ui-campo ui-dt">De<input type="date" id="rDe" class="control" value="${attr(UIREL.de)}"></label><label class="ui-campo ui-dt">Até<input type="date" id="rAte" class="control" value="${attr(UIREL.ate)}"></label><span class="cm-esp"></span><a class="btn soft" id="rXls" download>Baixar Excel</a><a class="btn" id="rPdf" download>Baixar PDF</a></div><div id="rCorpo"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
+  void md;
+  const carrega = async () => {
+    const d = await api('/imagem/relatorio?' + qs());
+    $('#rXls').href = `${API}/imagem/relatorio.xlsx?${qs()}`; $('#rPdf').href = `${API}/imagem/relatorio.pdf?${qs()}`;
+    const n = k => d.resumo.porStatus[k] || 0, pend = ['AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'].reduce((a, k) => a + n(k), 0);
+    const tabela = (m, tit) => `<section class="card"><div class="db-tit"><h2>${tit}</h2></div><div class="tablewrap"><table class="datatable"><thead><tr><th>${tit === 'Por segmento' ? 'Segmento' : 'Turma'}</th><th>Autorizado</th><th>Não autoriz.</th><th>Pendente</th><th>Vencido/Revog.</th></tr></thead><tbody>${Object.entries(m).map(([k, v]) => `<tr><td>${esc(tit === 'Por segmento' ? ({ INFANTIL: 'Educação Infantil', FUND1: 'Anos Iniciais', FUND2: 'Anos Finais', MEDIO: 'Ensino Médio', '': 'Sem segmento' }[k] ?? k) : k)}</td><td>${v.AUTORIZADO || 0}</td><td>${v.NAO_AUTORIZADO || 0}</td><td>${['AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'].reduce((a, s) => a + (v[s] || 0), 0)}</td><td>${(v.VENCIDO || 0) + (v.REVOGADO || 0)}</td></tr>`).join('')}</tbody></table></div></section>`;
+    $('#rCorpo').innerHTML = `<div class="db-cartoes"><div class="db-cartao ui-cartao"><small>Solicitações</small><strong>${d.resumo.total}</strong></div><div class="db-cartao ui-cartao"><small>Alunos</small><strong>${d.resumo.alunos}</strong></div><div class="db-cartao ui-cartao ok"><small>Autorizadas</small><strong>${n('AUTORIZADO')}</strong></div><div class="db-cartao ui-cartao"><small>Pendentes</small><strong>${pend}</strong></div></div>
+      <div class="ui-rel2">${tabela(d.porSegmento, 'Por segmento')}${tabela(d.porTurma, 'Por turma')}</div>
+      <section class="card"><div class="db-tit"><h2>Solicitações</h2></div>${d.linhas.length ? `<div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th>Aluno</th><th>Turma</th><th>Modelo</th><th>Situação</th><th>Solicitada</th><th>Vence</th></tr></thead><tbody>${d.linhas.map(r => `<tr><td class="titlecell"><b>${esc(r.aluno)}</b></td><td>${esc(r.turma || '—')}</td><td>${esc(r.modelo)} <small>v${r.versao}</small></td><td>${uiBadge(r.status)}</td><td>${esc(fmtDate(String(r.criadoEm).slice(0, 10)))}</td><td>${r.venceEm ? esc(fmtDate(r.venceEm)) : '—'}</td></tr>`).join('')}</tbody></table></div>${d.truncado ? '<p class="kpi-note">Mostrando as 500 primeiras linhas. O PDF e o Excel trazem tudo.</p>' : ''}` : '<div class="empty-rich"><strong>Nada neste recorte</strong><p>Mude os filtros.</p></div>'}</section>`;
+  };
+  const liga = (id, k) => { $(id).onchange = e => { UIREL[k] = e.target.value; carrega(); }; };
+  liga('#rSeg', 'segmento'); liga('#rTur', 'turma'); liga('#rSt', 'status'); liga('#rDe', 'de'); liga('#rAte', 'ate');
+  await carrega();
+};
+
+/* ---- ajustes do módulo (só o Administrador altera) ---- */
+PAGINAS.uiconfig = async function () {
+  $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
+  const { config: c, podeEditar, retencao } = await api('/imagem/config');
+  const dis = podeEditar ? '' : 'disabled';
+  const num = (id, rot, v, min, max, ajuda) => `<label class="ui-campo">${rot}<input type="number" class="control" id="${id}" min="${min}" max="${max}" value="${v}" ${dis}>${ajuda ? `<small class="kpi-note">${ajuda}</small>` : ''}</label>`;
+  $('#content').innerHTML = `<p class="kpi-note">${podeEditar ? 'Você é Administrador: pode alterar estes ajustes.' : 'Só o Administrador altera estes ajustes. Você pode consultá-los.'}</p>
+    <form id="cfF" class="ui-cfg" novalidate><section class="card"><div class="db-tit"><h2>Prazos e lembretes</h2></div>${num('cLink', 'Validade do link (dias)', c.linkDias, 1, 60, 'Depois disso o link expira e é preciso gerar outro.')}${num('cInt', 'Intervalo mínimo entre lembretes (dias)', c.lembreteIntervaloDias, 1, 30)}${num('cMax', 'Máximo de lembretes por solicitação', c.lembreteMax, 0, 10, 'Evita insistir demais com a mesma família.')}${num('cVenc', 'Avisar vencimentos com antecedência de (dias)', c.avisoVencimentoDias, 1, 365, 'Aparece no Painel.')}</section>
+    <section class="card"><div class="db-tit"><h2>Retenção e documentos substituídos</h2></div>${num('cRet', 'Guardar registros encerrados por (anos)', c.retencaoAnos, 1, 30, `Hoje há ${retencao.elegiveisParaRevisao} registro(s) encerrado(s) além desse prazo, elegíveis para revisão. O sistema <b>não apaga nada sozinho</b>: a exclusão é decisão humana, com backup.`)}<label class="check-row"><input type="checkbox" id="cBloq" ${c.bloquearVersaoAntiga ? 'checked' : ''} ${dis}> Bloquear respostas a termos de versão antiga</label><small class="kpi-note">Se o modelo mudar, solicitações ainda não respondidas deixam de valer e precisam ser recriadas.</small></section>
+    <section class="card"><div class="db-tit"><h2>Permissões e canais</h2></div><label class="ui-campo">Quem pode validar assinaturas do GOV.BR<select class="control" id="cVal" ${dis}><option value="equipe" ${c.quemValida === 'equipe' ? 'selected' : ''}>Toda a equipe de Marketing</option><option value="admin" ${c.quemValida === 'admin' ? 'selected' : ''}>Só o Administrador</option></select></label><label class="ui-campo">Quem pode revogar autorizações<select class="control" id="cRev" ${dis}><option value="equipe" ${c.quemRevoga === 'equipe' ? 'selected' : ''}>Toda a equipe de Marketing</option><option value="admin" ${c.quemRevoga === 'admin' ? 'selected' : ''}>Só o Administrador</option></select></label>
+      <fieldset class="ui-campo"><legend>Atalhos de envio oferecidos</legend><label class="check-row"><input type="checkbox" name="cCan" value="whatsapp" ${c.canais.includes('whatsapp') ? 'checked' : ''} ${dis}> WhatsApp (abre o aplicativo; você envia)</label><label class="check-row"><input type="checkbox" name="cCan" value="email" ${c.canais.includes('email') ? 'checked' : ''} ${dis}> E-mail (abre o seu programa de e-mail; você envia)</label></fieldset></section>
+    <section class="card"><div class="db-tit"><h2>Mensagens</h2></div><label class="ui-campo">Mensagem de envio<textarea class="control" id="cME" rows="5" ${dis}>${esc(c.mensagemEnvio)}</textarea><small class="kpi-note">Marcadores: {aluno} {link} {validade} {protocolo}. O {link} é obrigatório.</small></label><label class="ui-campo">Mensagem de lembrete<textarea class="control" id="cML" rows="4" ${dis}>${esc(c.mensagemLembrete)}</textarea><small class="kpi-note">Marcadores: {aluno} {protocolo}.</small></label></section>
+    <div class="igp-erro" id="cfE" role="alert" hidden></div>${podeEditar ? '<div class="actions"><button type="submit" class="btn">Salvar ajustes</button></div>' : ''}</form>`;
+  const f = $('#cfF'); if (!podeEditar) return;
+  f.onsubmit = async ev => {
+    ev.preventDefault(); const e = $('#cfE'); e.hidden = true;
+    try { await post('/imagem/config', { linkDias: +$('#cLink').value, lembreteIntervaloDias: +$('#cInt').value, lembreteMax: +$('#cMax').value, avisoVencimentoDias: +$('#cVenc').value, retencaoAnos: +$('#cRet').value, bloquearVersaoAntiga: $('#cBloq').checked, quemValida: $('#cVal').value, quemRevoga: $('#cRev').value, canais: $$('[name=cCan]:checked').map(x => x.value), mensagemEnvio: $('#cME').value, mensagemLembrete: $('#cML').value }); toast('Ajustes salvos'); } catch (x) { e.textContent = x.message; e.hidden = false; }
+  };
+};

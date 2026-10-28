@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { q1, run } from './db';
+import { q, q1, run } from './db';
 import { RegistroPdf, TermoPdf } from './imagemPdf';
 import { now, Row } from './util';
 
@@ -36,4 +36,15 @@ export async function lerArquivoSolic(solicId: number, tipo: string): Promise<{ 
   const f = await q1('SELECT mime, conteudo FROM arquivos WHERE caminho=?', [a.caminho]);
   if (!f) return null;
   return { buf: Buffer.from(f.conteudo), nome: a.nome, mime: f.mime, sha256: a.sha256 };
+}
+
+/** Marca como VENCIDO o que passou do prazo do termo (o dia do vencimento ainda vale). Chamado ao abrir o módulo e o portal. */
+export async function atualizarVencimentos(): Promise<number> {
+  const hoje = now().slice(0, 10);
+  const venc = await q("SELECT id FROM ui_solicitacoes WHERE status='AUTORIZADO' AND vence_em<>'' AND vence_em<?", [hoje]);
+  for (const r of venc) {
+    await run("UPDATE ui_solicitacoes SET status='VENCIDO',atualizado_em=? WHERE id=? AND status='AUTORIZADO'", [now(), r.id]);
+    await eventoSolic(Number(r.id), 'sistema', 'vencido', 'prazo do termo terminou');
+  }
+  return venc.length;
 }
