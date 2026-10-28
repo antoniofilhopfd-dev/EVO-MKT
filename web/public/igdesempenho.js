@@ -10,7 +10,7 @@ PAGINAS.igdesempenho = async function () {
   const minimo = d.minimo;
   const melhor = d.rows.filter(r => r.publicacoes >= minimo).sort((a, b) => b.mediaInteracoes - a.mediaInteracoes)[0];
   $('#content').innerHTML = `${abasInstagramAcoes()}
-    <section class="card"><div class="db-tit"><h2>Histórico das planilhas</h2><small>Registros separados das métricas oficiais da Meta</small></div><button type="button" class="btn soft" id="igdHistoricoBtn">Consultar histórico importado</button><div id="igdHistoricoConteudo"></div></section>
+    <section class="card"><div class="db-tit"><h2>Histórico das planilhas</h2><small>Registros separados das métricas oficiais da Meta</small></div><button type="button" class="btn soft" id="igdHistoricoBtn">Consultar histórico importado</button> <button type="button" class="btn soft" id="igdImportarBtn">Importar planilhas (administrador)</button><input type="file" id="igdImportarArquivo" accept=".json,application/json" hidden><div id="igdImportarEstado" class="kpi-note"></div><div id="igdHistoricoConteudo"></div></section>
     ${igdComparativos(geral)}
     ${igdMesAMes(posts)}
     ${igdTabela(posts)}
@@ -27,6 +27,34 @@ PAGINAS.igdesempenho = async function () {
     </section>`;
   $$('[data-igd-ord]').forEach(h => { h.onclick = () => { const k = h.dataset.igdOrd; IGD.dir = IGD.ordem === k && IGD.dir === 'desc' ? 'asc' : 'desc'; IGD.ordem = k; Filtros.localSet({ ordem: IGD.ordem, dir: IGD.dir }); PAGINAS.igdesempenho(); }; });
   $('#igdHistoricoBtn')?.addEventListener('click', () => igdAbrirHistorico(1));
+  $('#igdImportarBtn')?.addEventListener('click', () => $('#igdImportarArquivo')?.click());
+  $('#igdImportarArquivo')?.addEventListener('change', async e => {
+    const input=e.target, status=$('#igdImportarEstado'), file=input.files?.[0];
+    if(!file || !status) return;
+    try {
+      if(file.size>15000000) throw Error('Arquivo maior que 15 MB.');
+      const data=JSON.parse(await file.text());
+      if(!Array.isArray(data.abas) || !data.conteudo || typeof data.conteudo!=='object') throw Error('Manifesto inválido.');
+      const linhas=[];
+      for(const [arquivo,abas] of Object.entries(data.conteudo)) for(const [aba,registros] of Object.entries(abas)){
+        if(!Array.isArray(registros)) throw Error('Aba inválida: '+aba);
+        for(const r of registros) linhas.push({arquivo,aba,row:r.row,cells:r.cells});
+      }
+      if(!linhas.length) throw Error('Nenhuma linha encontrada.');
+      if(!window.confirm('Importar '+linhas.length+' linhas históricas? Um backup será criado primeiro. Dados oficiais da Meta não serão substituídos.')) return;
+      status.textContent='Criando backup de segurança...';
+      await api('/instagram/importar-historico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'backup'})});
+      let inseridas=0,existentes=0;
+      for(let i=0;i<linhas.length;i+=100){
+        const lote=await api('/instagram/importar-historico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'lote',linhas:linhas.slice(i,i+100)})});
+        inseridas+=lote.inseridas; existentes+=lote.existentes;
+        status.textContent='Importando '+Math.min(i+100,linhas.length)+' de '+linhas.length+' linhas...';
+      }
+      status.textContent='Importação concluída: '+inseridas+' novas, '+existentes+' já existentes.';
+      igdAbrirHistorico(1);
+    } catch(err){status.textContent='Importação não concluída: '+(err.message||err);}
+    finally{input.value='';}
+  });
   igdComparativosLiga(geral);
   igdMesAMesLiga(posts);
   const mais = $('#igdMais'); if (mais) mais.onclick = () => { IGD.todas = true; PAGINAS.igdesempenho(); };
