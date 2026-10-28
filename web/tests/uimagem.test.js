@@ -62,6 +62,51 @@ const xlsx = linhas => {
   const painel = await G.get('/imagem/painel');
   t('painel: total de alunos ativos, segmentos e atividade recente', painel.totalAlunos === 4 && painel.segmentos.find(s => s.k === 'FUND1').n === 1 && painel.recentes.length > 0 && painel.autorizados === 0, painel);
 
+  // ---------- etapa 2: modelos, prévia, solicitações em lote e PDF ----------
+  const ids = {}; for (const a of (await G.get('/imagem/alunos')).rows) ids[a.matricula] = a.id;
+  let md = await G.get('/imagem/modelos');
+  const padrao = md.rows.find(m => /padrão/i.test(m.nome));
+  t('existe o modelo padrão de exemplo (v1) e o Administrador pode editar', padrao && padrao.versao === 1 && md.podeEditar === true && md.canais.length >= 5, md.rows.map(m => m.nome));
+  t('a Equipe vê os modelos, mas não pode editar', (await E.get('/imagem/modelos')).podeEditar === false && (await E.req('POST', '/imagem/modelos', { nome: 'x' })).status === 403);
+  const base = { nome: 'Modelo da Feira (teste)', tipo: 'EVENTO', finalidade: 'Divulgar a Feira Cultural nas redes do colégio.', canais: ['Instagram', 'Site'], local_uso: 'Feira Cultural', periodo_tipo: 'MESES', periodo_valor: '12', observacoes: '', corpo: padrao.corpo };
+  t('modelo sem canal, sem finalidade ou sem {{aluno}} é recusado (400)', (await G.req('POST', '/imagem/modelos', { ...base, canais: [] })).status === 400 && (await G.req('POST', '/imagem/modelos', { ...base, finalidade: '' })).status === 400 && (await G.req('POST', '/imagem/modelos', { ...base, corpo: 'Texto sem o aluno, mas com mais de quarenta caracteres no total aqui.' })).status === 400);
+  r = await G.post('/imagem/modelos', base);
+  const modeloId = r.id; t('Administrador cria um modelo de evento', r.ok && modeloId, r);
+  t('nome de modelo repetido é recusado (409)', (await G.req('POST', '/imagem/modelos', base)).status === 409);
+  let pv = await G.post('/imagem/previa', { modelo_id: modeloId, aluno_id: ids['T-1001'], responsavel: 'Maria Responsável Teste' });
+  t('prévia: dados do aluno, responsável, finalidade, canais e prazo preenchidos', /Ana Fictícia de Souza/.test(pv.texto) && /Maria Responsável Teste/.test(pv.texto) && /Feira Cultural/.test(pv.texto) && /Instagram, Site/.test(pv.texto) && /12 meses/.test(pv.texto) && /AUTORIZO/.test(pv.texto) && !/\{\{/.test(pv.texto), pv.texto);
+  t('prévia de rascunho (sem salvar) e hash estável', (await G.post('/imagem/previa', { modelo: base })).texto.includes('Nome do Aluno (exemplo)') && pv.hash === (await G.post('/imagem/previa', { modelo_id: modeloId, aluno_id: ids['T-1001'], responsavel: 'Maria Responsável Teste' })).hash);
+  r = await G.post('/imagem/modelos', { ...base, id: modeloId, nome: 'Modelo da Feira (teste) renomeado' });
+  t('mudar só o nome não cria nova versão', r.ok && r.novaVersao === false);
+  r = await G.post('/imagem/solicitacoes/criar', { modelo_id: modeloId, alunos: [{ id: ids['T-1002'], responsavel: 'Pai do Bruno', email: 'pai@exemplo.com', telefone: '(83) 99999-0001' }, { id: ids['T-1004'] }] });
+  t('cria uma solicitação por aluno marcado, cada uma com protocolo próprio', r.criadas.length === 2 && new Set(r.criadas.map(x => x.protocolo)).size === 2 && /^UI-\d{4}-\d{6}$/.test(r.criadas[0].protocolo) && r.ignoradas.length === 0, r);
+  const sol = (await G.get('/imagem/solicitacoes')).rows;
+  const sBruno = sol.find(x => x.matricula === 'T-1002');
+  t('a solicitação nasce “aguardando envio”, ligada ao modelo e à versão', sBruno.status === 'AGUARDANDO_ENVIO' && sBruno.versao === 1 && /Feira/.test(sBruno.modelo) && sBruno.responsavel === 'Pai do Bruno', sBruno);
+  r = await G.post('/imagem/solicitacoes/criar', { modelo_id: modeloId, alunos: [{ id: ids['T-1002'] }, { id: ids['T-1001'], email: 'invalido' }, { id: hugo.id }, { id: ids['T-1003'], telefone: '123' }] });
+  t('duplicada, e-mail inválido, aluno inativo e telefone inválido são recusados um a um', r.criadas.length === 0 && r.ignoradas.length === 4 && /Já existe/.test(r.ignoradas[0].motivo) && /E-mail/.test(r.ignoradas[1].motivo) && /inativo/.test(r.ignoradas[2].motivo) && /Telefone/.test(r.ignoradas[3].motivo), r.ignoradas);
+  t('sem alunos marcados: 400', (await G.req('POST', '/imagem/solicitacoes/criar', { modelo_id: modeloId, alunos: [] })).status === 400);
+  await G.post('/imagem/modelos', { ...base, id: modeloId, nome: 'Modelo da Feira (teste) renomeado', corpo: base.corpo + '\n\nParágrafo novo desta versão do modelo.' });
+  const novaV = (await G.get('/imagem/modelos')).rows.find(m => m.id === modeloId);
+  const depois = (await G.get('/imagem/solicitacoes')).rows.find(x => x.matricula === 'T-1002');
+  t('editar o texto cria a versão 2, mas a solicitação antiga continua na versão 1 (congelada)', novaV.versao === 2 && depois.versao === 1);
+  const pdf1 = await fetch(U.B + '/imagem/solicitacoes/pdf?ids=' + sBruno.id, { headers: G.H }), b1 = Buffer.from(await pdf1.arrayBuffer());
+  const pdf2 = Buffer.from(await (await fetch(U.B + '/imagem/solicitacoes/pdf?ids=' + sBruno.id, { headers: G.H })).arrayBuffer());
+  if (process.env.CAPTURAS) { fs.mkdirSync(process.env.CAPTURAS, { recursive: true }); fs.writeFileSync(process.env.CAPTURAS + '/termo-exemplo.pdf', b1); }
+  t('PDF individual: 200, application/pdf, anexo com o protocolo no nome e arquivo válido', pdf1.status === 200 && /application\/pdf/.test(pdf1.headers.get('content-type')) && /UI-\d{4}-\d{6}\.pdf/.test(pdf1.headers.get('content-disposition')) && b1.subarray(0, 5).toString() === '%PDF-', pdf1.headers.get('content-disposition'));
+  t('baixar o PDF de novo gera exatamente o mesmo arquivo (conteúdo congelado)', b1.equals(pdf2) && b1.length > 1500);
+  const pdfL = Buffer.from(await (await fetch(U.B + '/imagem/solicitacoes/pdf?ids=' + sol.map(x => x.id).join(','), { headers: G.H })).arrayBuffer());
+  t('PDF em lote: uma página por aluno', (pdfL.toString('latin1').match(/\/Type \/Page(?!s)/g) || []).length === sol.length, sol.length);
+  t('PDF sem login (401) e sem ids (400)', (await fetch(U.B + '/imagem/solicitacoes/pdf?ids=1')).status === 401 && (await G.req('GET', '/imagem/solicitacoes/pdf')).status === 400);
+  t('lista de alunos mostra a situação da solicitação', (await G.get('/imagem/alunos?busca=T-1002')).rows[0].situacao === 'AGUARDANDO_ENVIO');
+  let pn = await G.get('/imagem/painel');
+  t('painel conta as solicitações pendentes', pn.pendentes === 2 && pn.autorizados === 0 && pn.comSolicitacao === 2, pn);
+  r = await G.post('/imagem/solicitacoes/cancelar', { id: sBruno.id });
+  t('cancelar uma solicitação não enviada a mantém registrada como cancelada', r.ok && (await G.get('/imagem/solicitacoes?status=CANCELADO')).rows.length === 1 && (await G.req('POST', '/imagem/solicitacoes/cancelar', { id: sBruno.id })).status === 409);
+  r = await G.post('/imagem/solicitacoes/criar', { modelo_id: modeloId, alunos: [{ id: ids['T-1002'] }] });
+  t('depois de cancelada, dá para criar outra para o mesmo aluno', r.criadas.length === 1);
+  t('busca de solicitações por aluno e por protocolo', (await G.get('/imagem/solicitacoes?busca=davi')).rows.length === 1 && (await G.get('/imagem/solicitacoes?busca=' + sBruno.protocolo)).rows.length === 1);
+
   // ---- telas reais ----
   const dir = process.env.CAPTURAS; if (dir) fs.mkdirSync(dir, { recursive: true });
   const b = await U.abrir();
@@ -87,6 +132,22 @@ const xlsx = linhas => {
     await foto('importar-previa');
     await p.click('#uiOk'); await p.waitForTimeout(900);
     t(`${nome}: depois de importar, a lista cresce com os 2 novos e a seleção anterior continua`, (await p.$$('.ui-tab tbody tr')).length === (nome === 'desktop' ? 6 : 8) && (await p.$$('[data-sel]:checked')).length === 2);
+    if (nome === 'desktop') {
+      await p.click('#uiCriar'); await p.waitForSelector('#sfM'); await p.waitForSelector('#sfPrev .ui-doc');
+      t(`${nome}: criar solicitações mostra os alunos marcados e a prévia do termo`, /Ana Fictícia de Souza/.test(await p.innerText('#sfPrev')) && (await p.$$('.ui-sf-item')).length === 2);
+      await p.fill('[data-r]', 'Responsável Exemplo'); await foto('solicitacoes-criar');
+      await p.click('#uiSF button[type=submit]'); await p.waitForSelector('#usLista .ui-tab');
+      t(`${nome}: depois de criar, abre a lista de solicitações com os novos pedidos`, /Solicitações/.test(await p.innerText('#subtabs')) && (await p.$$('#usLista .ui-tab tbody tr')).length === 5);
+      await foto('solicitacoes');
+      const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-pdf]')]);
+      t(`${nome}: o botão PDF baixa o termo`, /\.pdf$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+    } else { await U.ir(p, 'uisolic', 600); await p.waitForSelector('#usLista .ui-tab'); await foto('solicitacoes'); }
+    await U.ir(p, 'uimodelos', 600); await p.waitForSelector('.ui-modelo');
+    t(`${nome}: Modelos mostra o aviso de texto de exemplo e o modelo padrão`, /revisão jurídica/.test(await p.innerText('#content')) && /Modelo padrão/.test(await p.innerText('#content')));
+    await foto('modelos');
+    await p.click('[data-ed]'); await p.waitForSelector('#mfPrev .ui-doc'); await foto('modelo-editar');
+    t(`${nome}: o formulário do modelo mostra a prévia ao vivo`, /AUTORIZO/.test(await p.innerText('#mfPrev')));
+    await p.evaluate(() => document.querySelectorAll('.admin-overlay').forEach(o => o.remove()));
     t(`${nome}: sem estouro horizontal`, await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth <= 2));
     t(`${nome}: sem erros de script`, p.errs.length === 0, p.errs);
   }

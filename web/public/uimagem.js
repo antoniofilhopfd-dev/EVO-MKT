@@ -1,7 +1,7 @@
 /* Uso de Imagem › Painel e Alunos. O Marketing escolhe MANUALMENTE quem precisa de autorização; nada é selecionado sozinho.
    Dados de alunos ficam só nesta área interna e nunca vão para URLs públicas. */
 const UI = { sel: new Map(), busca: '', segmento: '', turma: '', inativos: false };
-const UI_ACOES = { 'aluno-criado': 'Aluno cadastrado', 'aluno-editado': 'Cadastro atualizado', 'aluno-inativado': 'Aluno inativado', 'aluno-reativado': 'Aluno reativado', importacao: 'Lista importada' };
+const UI_ACOES = { 'aluno-criado': 'Aluno cadastrado', 'aluno-editado': 'Cadastro atualizado', 'aluno-inativado': 'Aluno inativado', 'aluno-reativado': 'Aluno reativado', importacao: 'Lista importada', 'solicitacoes-criadas': 'Solicitações criadas' };
 
 PAGINAS.uipainel = async function () {
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
@@ -12,7 +12,7 @@ PAGINAS.uipainel = async function () {
     <div class="db-cartoes">${cartao('Alunos ativos', d.totalAlunos)}${cartao('Autorizados', d.autorizados, 'ok')}${cartao('Pendentes', d.pendentes, d.pendentes ? 'alerta' : '')}${cartao('Não autorizados', d.naoAutorizados, d.naoAutorizados ? 'alerta' : '')}</div>
     <div class="db-duas"><section class="card"><div class="db-tit"><h2>Alunos por segmento</h2></div>${d.totalAlunos ? `<ul class="ui-seg">${d.segmentos.filter(s => s.n || s.k).map(s => `<li><span>${esc(s.nome)}</span><div class="ui-barra"><i style="width:${Math.round(s.n / maior * 100)}%"></i></div><b>${fmtN(s.n)}</b></li>`).join('')}</ul>` : '<p class="kpi-note">Nenhum aluno cadastrado ainda. Importe a lista em Alunos.</p>'}</section>
     <section class="card"><div class="db-tit"><h2>Atividade recente</h2></div>${d.recentes.length ? `<ul class="ui-rec">${d.recentes.map(r => `<li><b>${esc(UI_ACOES[r.acao] || r.acao)}</b><span>${esc(r.aluno || r.detalhe || '')}</span><small>${esc(fmtDateTime(r.quando))} · ${esc(r.ator)}</small></li>`).join('')}</ul>` : '<p class="kpi-note">Nada por aqui ainda.</p>'}</section></div>
-    <p class="kpi-note">Situação das autorizações (autorizados, pendentes, não autorizados e vencidos) aparece aqui quando as solicitações forem criadas.</p>`;
+    `;
   $('#uiIrAlunos').onclick = () => go('uialunos');
 };
 
@@ -51,8 +51,9 @@ PAGINAS.uialunos = async function () {
   let dados = null, atraso = 0;
   const barra = () => {
     const b = $('#uiSelBar'), n = UI.sel.size; b.hidden = !n;
-    b.innerHTML = n ? `<b>${n} aluno(s) selecionado(s)</b><span class="kpi-note">A escolha é manual: só quem você marcar entra na solicitação.</span><span class="cm-esp"></span><button type="button" class="btn soft" id="uiLimpaSel">Limpar seleção</button>` : '';
+    b.innerHTML = n ? `<b>${n} aluno(s) selecionado(s)</b><span class="kpi-note">A escolha é manual: só quem você marcar entra na solicitação.</span><span class="cm-esp"></span><button type="button" class="btn soft" id="uiLimpaSel">Limpar seleção</button><button type="button" class="btn" id="uiCriar">Criar solicitações</button>` : '';
     const l = $('#uiLimpaSel'); if (l) l.onclick = () => { UI.sel.clear(); desenha(); };
+    const cr = $('#uiCriar'); if (cr) cr.onclick = () => uiCriarSolic(UI.sel);
   };
   const carrega = async () => {
     const qs = new URLSearchParams({ busca: UI.busca, segmento: UI.segmento, turma: UI.turma, inativos: UI.inativos ? '1' : '' });
@@ -64,7 +65,7 @@ PAGINAS.uialunos = async function () {
   const desenha = () => {
     barra();
     const rows = dados.rows, todosMarcados = rows.length && rows.every(r => UI.sel.has(r.id));
-    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 1.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th>Aluno</th><th>Matrícula</th><th>Turma</th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td><span class="badge">Sem solicitação</span></td><td class="acoes-cel"><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
+    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 1.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th>Aluno</th><th>Matrícula</th><th>Turma</th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td>${uiBadge(r.situacao)}</td><td class="acoes-cel"><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
       : `<div class="empty-rich"><strong>${dados.total || UI.busca || UI.segmento || UI.turma ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}</strong><p>${dados.total || UI.busca || UI.segmento || UI.turma ? 'Mude a busca ou os filtros.' : 'Importe a lista (CSV ou planilha .xlsx) ou cadastre um aluno por vez.'}</p></div>`;
     $$('[data-sel]').forEach(c => { c.onchange = () => { const r = dados.rows.find(x => x.id === +c.dataset.sel); if (c.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); barra(); const t = $('#uiTodos'); if (t) t.checked = dados.rows.length && dados.rows.every(x => UI.sel.has(x.id)); }; });
     const t = $('#uiTodos'); if (t) t.onchange = () => { dados.rows.filter(r => r.ativo).forEach(r => { if (t.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); }); desenha(); };
@@ -121,7 +122,7 @@ function uiImportar(aoFim) {
     const f = e.target.files[0]; if (!f) return; erro('');
     try {
       if (/\.xlsx$/i.test(f.name)) {
-        if (f.size > 10 * 1048576) return erro('A planilha passa de 10 MB.');
+        if (f.size > 1400000) return erro('A planilha passa de 1,4 MB. Salve como .csv e tente de novo.');
         const bytes = new Uint8Array(await f.arrayBuffer()); let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
         alunos = uiLinhasParaAlunos((await post('/imagem/alunos/ler-planilha', { base64: btoa(bin) })).linhas);
       } else alunos = uiLinhasParaAlunos(uiLerCsv(await f.text()));

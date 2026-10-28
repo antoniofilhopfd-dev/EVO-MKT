@@ -35,6 +35,9 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   ads_acoes: { cols: ['id', 'quando', 'quem', 'nivel', 'objeto_id', 'nome', 'acao', 'antes', 'depois', 'resultado', 'erro'], restore: 'replace', opt: true },
   ui_alunos: { cols: ['id', 'matricula', 'nome', 'turma', 'segmento', 'ativo', 'criado_em', 'atualizado_em'], restore: 'replace', opt: true },
   ui_eventos: { cols: ['id', 'quando', 'ator', 'acao', 'aluno_id', 'detalhe'], restore: 'replace', opt: true },
+  ui_modelos: { cols: ['id', 'nome', 'tipo', 'finalidade', 'canais', 'local_uso', 'periodo_tipo', 'periodo_valor', 'observacoes', 'corpo', 'versao', 'ativo', 'criado_em', 'atualizado_em', 'atualizado_por'], restore: 'replace', opt: true },
+  ui_solicitacoes: { cols: ['id', 'protocolo', 'aluno_id', 'modelo_id', 'modelo_nome', 'modelo_versao', 'termo_texto', 'termo_hash', 'pdf_hash', 'periodo_tipo', 'periodo_valor', 'responsavel_nome', 'responsavel_email', 'responsavel_tel', 'status', 'lote', 'criado_por', 'criado_em', 'atualizado_em'], restore: 'replace', opt: true },
+  ui_solic_eventos: { cols: ['id', 'solicitacao_id', 'quando', 'ator', 'acao', 'detalhe'], restore: 'replace', opt: true },
   user_prefs: { cols: ['codigo', 'chave', 'valor', 'atualizado'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };

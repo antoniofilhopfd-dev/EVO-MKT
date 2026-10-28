@@ -5,6 +5,7 @@ import { audit } from '../records';
 import { fail, lower, now, Row, strv } from '../util';
 import { lerXlsx } from '../xlsxLeitura';
 import { json } from './handlers';
+import { imagemSolicRoute } from './imagemSolic';
 
 /**
  * Uso de Imagem. Etapa 1: alunos (cadastro, importação sem apagar nada e busca) e painel.
@@ -26,7 +27,7 @@ export function segmentoDe(txt: string): string {
 }
 
 const limpa = (v: unknown, n: number) => strv(v).replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
-const alunoPublico = (r: Row) => ({ id: r.id, matricula: r.matricula, nome: r.nome, turma: r.turma, segmento: r.segmento, segmentoNome: SEGMENTOS[r.segmento] ?? 'Sem segmento', ativo: !!Number(r.ativo), atualizadoEm: r.atualizado_em });
+const alunoPublico = (r: Row) => ({ id: r.id, matricula: r.matricula, nome: r.nome, turma: r.turma, segmento: r.segmento, segmentoNome: SEGMENTOS[r.segmento] ?? 'Sem segmento', ativo: !!Number(r.ativo), atualizadoEm: r.atualizado_em, situacao: r.situacao ?? '' });
 
 async function evento(ator: string, acao: string, alunoId: number | null, detalhe: string) {
   await run('INSERT INTO ui_eventos(quando,ator,acao,aluno_id,detalhe) VALUES(?,?,?,?,?)', [now(), ator, acao, alunoId, detalhe.slice(0, 400)]);
@@ -49,11 +50,14 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   const ator = String(u.nome ?? u.codigo ?? '');
 
+  const outra = await imagemSolicRoute(c, u);
+  if (outra) return outra;
+
   if (path === '/imagem/alunos' && method === 'GET') {
     const busca = lower(c.qs('busca')).trim(), seg = c.qs('segmento'), turma = c.qs('turma'), inativos = c.qs('inativos') === '1';
     const like = `%${busca}%`;
     const rows = await q(
-      `SELECT * FROM ui_alunos WHERE (ativo=1 OR ?=1) AND (?='' OR segmento=?) AND (?='' OR turma=?) AND (?='' OR LOWER(nome) LIKE ? OR matricula LIKE ?) ORDER BY nome LIMIT 1000`,
+      `SELECT a.*, (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao FROM ui_alunos a WHERE (a.ativo=1 OR ?=1) AND (?='' OR a.segmento=?) AND (?='' OR a.turma=?) AND (?='' OR LOWER(a.nome) LIKE ? OR a.matricula LIKE ?) ORDER BY a.nome LIMIT 1000`,
       [inativos ? 1 : 0, seg, seg, turma, turma, busca, like, like],
     );
     const turmas = (await q('SELECT DISTINCT turma FROM ui_alunos WHERE ativo=1 AND turma<>\'\' ORDER BY turma')).map((r) => r.turma);
@@ -96,7 +100,7 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
   if (path === '/imagem/alunos/ler-planilha' && method === 'POST') {
     const b = await c.body();
     const dados = strv(b.base64);
-    if (!dados || dados.length > 14_000_000) fail(400, 'Envie uma planilha de até 10 MB.');
+    if (!dados || dados.length > 1_900_000) fail(400, 'Envie uma planilha de até 1,4 MB (ou salve como .csv).');
     try { return json({ linhas: lerXlsx(Buffer.from(dados, 'base64')) }); } catch (e) { fail(400, (e as Error).message); }
   }
 
@@ -134,11 +138,13 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
   if (path === '/imagem/painel' && method === 'GET') {
     const ativos = Number((await q1('SELECT COUNT(*) n FROM ui_alunos WHERE ativo=1'))?.n ?? 0);
     const porSeg = await q('SELECT segmento, COUNT(*) n FROM ui_alunos WHERE ativo=1 GROUP BY segmento');
+    const porSit: Record<string, number> = {};
+    for (const r of await q("SELECT status, COUNT(*) n FROM (SELECT aluno_id, SUBSTRING_INDEX(GROUP_CONCAT(status ORDER BY id DESC), ',', 1) status FROM ui_solicitacoes WHERE status<>'CANCELADO' GROUP BY aluno_id) t GROUP BY status")) porSit[r.status] = Number(r.n);
+    const cont = (...st: string[]) => st.reduce((a, k) => a + (porSit[k] ?? 0), 0);
     const recentes = await q('SELECT e.quando, e.ator, e.acao, e.detalhe, a.nome aluno FROM ui_eventos e LEFT JOIN ui_alunos a ON a.id=e.aluno_id ORDER BY e.id DESC LIMIT 8');
     return json({
       totalAlunos: ativos,
-      // As situações de autorização chegam com as solicitações (próximas etapas).
-      autorizados: 0, pendentes: 0, naoAutorizados: 0, vencidos: 0, comSolicitacao: 0,
+      autorizados: cont('AUTORIZADO'), pendentes: cont('AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'), naoAutorizados: cont('NAO_AUTORIZADO'), vencidos: cont('VENCIDO'), revogados: cont('REVOGADO'), comSolicitacao: Object.values(porSit).reduce((a, n) => a + n, 0),
       segmentos: Object.entries(SEGMENTOS).map(([k, nome]) => ({ k, nome, n: Number(porSeg.find((r) => r.segmento === k)?.n ?? 0) })).concat([{ k: '', nome: 'Sem segmento', n: Number(porSeg.find((r) => !r.segmento)?.n ?? 0) }]),
       recentes,
     });
