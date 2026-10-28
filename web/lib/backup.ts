@@ -33,6 +33,8 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   ads_anuncios: { cols: ['conta', 'anuncio_id', 'periodo', 'anuncio', 'campanha', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'conversas', 'inicio', 'moeda', 'status', 'problema', 'ativo', 'atualizado_em'], restore: 'replace', opt: true },
   ads_lancamentos: { cols: ['id', 'chave', 'quem', 'quando', 'tipo', 'referencia', 'titulo', 'objetivo', 'orcamento_dia', 'dias', 'inicio', 'fim', 'compromisso', 'moeda', 'publico', 'campanha_id', 'conjunto_id', 'anuncio_id', 'estado', 'erro', 'atualizado_em'], restore: 'replace', opt: true },
   ads_acoes: { cols: ['id', 'quando', 'quem', 'nivel', 'objeto_id', 'nome', 'acao', 'antes', 'depois', 'resultado', 'erro'], restore: 'replace', opt: true },
+  ui_alunos: { cols: ['id', 'matricula', 'nome', 'turma', 'segmento', 'ativo', 'criado_em', 'atualizado_em'], restore: 'replace', opt: true },
+  ui_eventos: { cols: ['id', 'quando', 'ator', 'acao', 'aluno_id', 'detalhe'], restore: 'replace', opt: true },
   user_prefs: { cols: ['codigo', 'chave', 'valor', 'atualizado'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };
