@@ -6,6 +6,9 @@ import { respostaPdf } from '../pdf';
 import { hashBytes, termosPdf, TermoPdf } from '../imagemPdf';
 import { CANAIS, hashTexto, montarTermo, PLACEHOLDERS, validaModelo } from '../imagemTermo';
 import { fail, now, Row, strv } from '../util';
+import { randHex, sha256 } from '../crypto';
+import { publicUrl } from '../integrations/http';
+import { ENCERRADAS, lerArquivoSolic, solicCompleta } from '../imagemDados';
 import { json } from './handlers';
 
 /** Uso de Imagem, etapa 2: modelos (só o Administrador edita), prévia, solicitações em lote e PDF do termo. */
@@ -144,6 +147,74 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
       await evento(r.id, ator, 'pdf-baixado', rows.length > 1 ? 'em lote' : '');
     }
     return respostaPdf(buf, rows.length === 1 ? `Autorizacao-Uso-de-Imagem_${rows[0].protocolo}.pdf` : `Autorizacoes-Uso-de-Imagem_${rows.length}-alunos.pdf`);
+  }
+
+  /** Gera o link único e o código de acesso. O link anterior deixa de valer. Token e código só aparecem agora: no banco ficam só os hashes. */
+  if (path === '/imagem/solicitacoes/link' && method === 'POST') {
+    const b = await c.body(), id = Number(b.id) || 0;
+    const s = await solicCompleta(id) ?? fail(404, 'Solicitação não encontrada.');
+    if (ENCERRADAS.includes(s.status)) fail(409, 'Esta solicitação já está encerrada; não há mais o que enviar.');
+    const dias = Math.min(60, Math.max(1, Number(b.dias) || 15));
+    const token = randHex(24), codigo = String(Math.floor(100000 + (Number.parseInt(randHex(4), 16) / 0x100000000) * 900000));
+    const expira = now(new Date(Date.now() + dias * 86400_000));
+    await run('UPDATE ui_acessos SET ativo=0 WHERE solicitacao_id=?', [id]);
+    await run('INSERT INTO ui_acessos(solicitacao_id,token_hash,codigo_hash,expira_em,tentativas,ativo,criado_em,criado_por) VALUES(?,?,?,?,0,1,?,?)', [id, sha256(token), sha256(`${token}:${codigo}`), expira, now(), ator]);
+    await evento(id, ator, 'link-gerado', `válido por ${dias} dia(s)`);
+    await audit(ator, 'imagem-link-gerado', 'ui_solicitacoes', String(id));
+    const link = `${publicUrl(c.url.origin)}/autorizar.html#${token}`;
+    const mensagem = `Olá! O Colégio Evolução pede a sua autorização (ou a sua recusa) para o uso de imagem de ${s.aluno}. Leia e responda com calma por este link seguro: ${link}\n\nO código de acesso será informado por outro meio. O link vale até ${expira.slice(8, 10)}/${expira.slice(5, 7)}/${expira.slice(0, 4)}.`;
+    return json({ ok: true, link, codigo, expiraEm: expira, mensagem, telefone: s.responsavel_tel, email: s.responsavel_email });
+  }
+
+  /** O envio é feito por uma pessoa (WhatsApp, e-mail, bilhete). O sistema só registra que foi enviado, quando a equipe confirma. */
+  if (path === '/imagem/solicitacoes/enviado' && method === 'POST') {
+    const b = await c.body(), id = Number(b.id) || 0, canal = ['whatsapp', 'email', 'presencial', 'outro'].includes(strv(b.canal)) ? strv(b.canal) : 'outro';
+    const s = await q1('SELECT status FROM ui_solicitacoes WHERE id=?', [id]) ?? fail(404, 'Solicitação não encontrada.');
+    if (s.status !== 'AGUARDANDO_ENVIO') fail(409, 'Esta solicitação já foi marcada como enviada.');
+    await run("UPDATE ui_solicitacoes SET status='ENVIADO',enviado_em=?,enviado_canal=?,atualizado_em=? WHERE id=?", [now(), canal, now(), id]);
+    await evento(id, ator, 'enviado', `canal: ${canal} (confirmado pela equipe)`);
+    return json({ ok: true });
+  }
+
+  if (path === '/imagem/solicitacoes/detalhe' && method === 'GET') {
+    const id = Number(c.qs('id')) || 0;
+    const s = await solicCompleta(id) ?? fail(404, 'Solicitação não encontrada.');
+    const eventos = await q('SELECT quando,ator,acao,detalhe FROM ui_solic_eventos WHERE solicitacao_id=? ORDER BY id DESC LIMIT 100', [id]);
+    const arquivos = await q('SELECT tipo,nome,sha256,tamanho,info,criado_em FROM ui_arquivos WHERE solicitacao_id=? AND ativo=1 ORDER BY id', [id]);
+    const ac = await q1('SELECT expira_em,tentativas,ativo,ultimo_acesso FROM ui_acessos WHERE solicitacao_id=? ORDER BY id DESC LIMIT 1', [id]);
+    return json({
+      solicitacao: { ...solicPublica(s), decisao: s.decisao, decisaoEm: s.decisao_em, respConfirmado: s.resp_confirmado, parentesco: s.parentesco, modalidade: s.modalidade, termoHash: s.termo_hash, validadoPor: s.validado_por, validadoEm: s.validado_em, validacaoObs: s.validacao_obs, enviadoEm: s.enviado_em, enviadoCanal: s.enviado_canal, abertoEm: s.aberto_em },
+      eventos, arquivos, acesso: ac ? { expiraEm: ac.expira_em, ativo: !!Number(ac.ativo) && String(ac.expira_em) >= now() && Number(ac.tentativas) < 5, ultimoAcesso: ac.ultimo_acesso } : null,
+    });
+  }
+
+  if (path === '/imagem/solicitacoes/arquivo' && method === 'GET') {
+    const id = Number(c.qs('id')) || 0, tipo = ['govbr', 'final', 'assinatura'].includes(c.qs('tipo')) ? c.qs('tipo') : '';
+    if (!tipo) fail(400, 'Tipo de arquivo inválido.');
+    const f = await lerArquivoSolic(id, tipo) ?? fail(404, 'Arquivo não encontrado.');
+    await evento(id, ator, 'arquivo-baixado', tipo);
+    return new Response(new Uint8Array(f.buf), { headers: { 'Content-Type': f.mime, 'Content-Disposition': `attachment; filename="${f.nome.replace(/[^A-Za-z0-9._-]/g, '_')}"`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+  }
+
+  /** Validação manual do PDF do GOV.BR: a pessoa confere em https://validar.iti.gov.br e registra aqui o resultado. Só então vira Autorizado. */
+  if (path === '/imagem/solicitacoes/validar' && method === 'POST') {
+    const b = await c.body(), id = Number(b.id) || 0, resultado = strv(b.resultado);
+    const s = await q1('SELECT status FROM ui_solicitacoes WHERE id=?', [id]) ?? fail(404, 'Solicitação não encontrada.');
+    if (s.status !== 'AGUARDANDO_VALIDACAO') fail(409, 'Esta solicitação não está aguardando validação.');
+    if (!['VALIDO', 'INVALIDO'].includes(resultado)) fail(400, 'Informe o resultado da validação.');
+    const obs = limpa(b.obs, 400);
+    if (resultado === 'VALIDO') {
+      if (b.conferido_no_validar !== true) fail(400, 'Confirme que a assinatura foi conferida em validar.iti.gov.br e que o documento corresponde ao termo.');
+      const f = await lerArquivoSolic(id, 'govbr');
+      await run("UPDATE ui_solicitacoes SET status='AUTORIZADO',validado_por=?,validado_em=?,validacao_obs=?,final_hash=?,atualizado_em=? WHERE id=?", [ator, now(), obs, f?.sha256 ?? '', now(), id]);
+      await evento(id, ator, 'validado', `assinatura GOV.BR conferida manualmente${obs ? ': ' + obs : ''}`);
+    } else {
+      if (obs.length < 5) fail(400, 'Explique o motivo (o responsável verá a mensagem).');
+      await run("UPDATE ui_solicitacoes SET status='AGUARDANDO_ASSINATURA',validado_por=?,validado_em=?,validacao_obs=?,atualizado_em=? WHERE id=?", [ator, now(), obs, now(), id]);
+      await evento(id, ator, 'arquivo-recusado', obs);
+    }
+    await audit(ator, resultado === 'VALIDO' ? 'imagem-govbr-validado' : 'imagem-govbr-recusado', 'ui_solicitacoes', String(id));
+    return json({ ok: true });
   }
 
   return null;
