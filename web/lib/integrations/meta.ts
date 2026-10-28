@@ -195,6 +195,37 @@ async function conciliarAgendados(ig: string): Promise<void> {
 }
 
 /** Sincroniza o mês atual e o anterior de TODAS as contas acompanhadas. Devolve o nº de períodos gravados. */
+/** Captura leve da contagem atual; não tenta reconstruir dias anteriores pela API. */
+export async function igSyncSeguidores(): Promise<{ atualizados: number; falhas: number; aviso: string }> {
+  if (!(await metaConnected())) throw new Error('Instagram não conectado.');
+  const contas = await contasMonitoradas();
+  if (!contas.length) throw new Error('Nenhum perfil Instagram monitorado.');
+  let atualizados = 0, falhas = 0;
+  const erros: string[] = [];
+  for (const conta of contas) {
+    try {
+      const perfil = await metaGet(`/${conta.ig}`, { fields: 'followers_count,follows_count,media_count,username' });
+      const seguidores = Number(perfil.followers_count);
+      if (!Number.isSafeInteger(seguidores) || seguidores < 0)
+        throw new Error('Meta não retornou contagem válida de seguidores.');
+      await run('INSERT INTO ig_seguidores(conta,dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),seguindo=VALUES(seguindo),midias=VALUES(midias),atualizado_em=VALUES(atualizado_em)',
+        [conta.ig, fmtDate(new Date()), seguidores,
+          Number.isSafeInteger(Number(perfil.follows_count)) ? Number(perfil.follows_count) : 0,
+          Number.isSafeInteger(Number(perfil.media_count)) ? Number(perfil.media_count) : 0, now()]);
+      atualizados++;
+    } catch (e: any) {
+      falhas++;
+      const erro = `@${conta.usuario}: ${String(e?.message || e).slice(0,180)}`;
+      erros.push(erro);
+      await intLog('instagram-seguidores', 'erro', erro);
+    }
+  }
+  const aviso = erros.join('; ');
+  if (falhas) await intLog('instagram-seguidores', 'aviso', aviso);
+  if (!atualizados) throw new Error('Nenhum perfil atualizado: ' + aviso);
+  return { atualizados, falhas, aviso };
+}
+
 export async function igSync(months = 2): Promise<number> {
   if (!(await metaConnected())) throw new Error('Instagram não conectado.');
   const principal = await setting('ig_user_id');
