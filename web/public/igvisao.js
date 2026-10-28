@@ -26,8 +26,9 @@ PAGINAS.igvisao = async function () {
   const card = (cor, rot, valor, rodape) => `<div class="kpi kpi-ig kpi-${cor}"><small>${rot}</small><strong>${valor}</strong>${rodape}</div>`;
   const nd = txt => `<i class="kd flat">${txt}</i>`;
   const ppEng = a.engajamento !== null && ant.engajamento !== null ? Math.round((a.engajamento - ant.engajamento) * 10) / 10 : null;
-  const seguidoresRodape = sg.atual === null ? nd('Sem histórico ainda') : sg.base ? `${dif(sg.atual, sg.base)}${sg.completo ? '' : `<i class="kd flat">desde ${fmtDate(sg.desde)}</i>`}` : nd('sem base de comparação');
-  const novosRodape = sg.novos === null ? nd('Não disponível') : nd(sg.completo ? 'no período' : `desde ${fmtDate(sg.desde)}`);
+  const historicoParcial = sg.completo === false;
+  const seguidoresRodape = sg.atual === null ? nd('Sem histórico ainda') : sg.base ? `${dif(sg.atual, sg.base)}${historicoParcial ? nd('histórico parcial') : ''}` : nd('sem base de comparação');
+  const novosRodape = sg.novos === null ? nd('Não disponível') : nd(historicoParcial ? 'histórico parcial' : 'no período');
   const kpis = [
     card('azul', 'Seguidores atuais', igvN(sg.atual), seguidoresRodape),
     card('verde', 'Novos seguidores', sg.novos === null ? '—' : (sg.novos > 0 ? '+' : '') + fmtN(sg.novos), novosRodape),
@@ -42,12 +43,12 @@ PAGINAS.igvisao = async function () {
     .map(([r, k]) => `<div class="kpi"><small>${r}</small><strong>${igvN(a[k])}</strong>${a[k] === null ? nd('a Meta não informou') : dif(a[k], ant[k])}</div>`).join('');
   const crescimento = sg.atual !== null && sg.base !== null && sg.base > 0
     ? ((sg.atual - sg.base) / sg.base) * 100 : null;
-  const crescimentoHtml = `<section class="card"><div class="db-tit"><h2>Crescimento de seguidores</h2><small>Comparação com a base disponível no período</small></div><div class="kpis kpis4">
+  const crescimentoHtml = `<section class="card"><div class="db-tit"><h2>Crescimento de seguidores</h2><small>Comparação com a base disponível no período${historicoParcial ? ' · histórico parcial' : ''}</small></div><div class="kpis kpis4">
     <div class="kpi"><small>Base de seguidores</small><strong>${igvN(sg.base)}</strong></div>
     <div class="kpi"><small>Seguidores atuais</small><strong>${igvN(sg.atual)}</strong></div>
     <div class="kpi"><small>Variação líquida</small><strong>${sg.atual === null || sg.base === null ? '—' : (sg.atual - sg.base > 0 ? '+' : '') + fmtN(sg.atual - sg.base)}</strong></div>
     <div class="kpi"><small>Crescimento (%)</small><strong>${crescimento === null ? '—' : igvPct(crescimento.toFixed(2))}</strong></div>
-  </div><p class="kpi-note">Variação de seguidores entre duas contagens disponíveis; não representa necessariamente seguidores atribuídos às publicações.</p></section>`;
+  </div><p class="kpi-note">Variação entre duas contagens disponíveis${historicoParcial ? ' (desde ' + esc(fmtDate(sg.desde)) + '; o histórico não cobre todo o período selecionado)' : ''}; não representa necessariamente seguidores atribuídos às publicações.</p></section>`;
   const comparacao = igvComparacao(d);
   const melhores = d.melhores.length ? d.melhores.map((p, i) => `<article class="ig-top"><b class="ig-top-pos">${i + 1}º</b>${p.miniatura ? `<img src="${attr(p.miniatura)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<div class="db-sem-img">Sem imagem</div>'}<div class="ig-top-txt"><b>${esc(p.titulo || p.legenda || '(sem legenda)')}</b><small>${esc(p.formato)} · ${esc(fmtDate(igcalQuando(p.quando).dia))}${p.perfil ? ' · @' + esc(p.perfil.replace(/^@/, '')) : ''}</small></div><dl class="ig-top-met"><div><dt>Alcance</dt><dd>${igvN(p.alcance)}</dd></div><div><dt>Interações</dt><dd>${igvN(p.interacoes)}</dd></div><div><dt>Comentários</dt><dd>${igvN(p.comentarios)}</dd></div><div><dt>Salvamentos</dt><dd>${igvN(p.salvamentos)}</dd></div></dl>${p.link ? `<a class="ig-top-link" href="${attr(p.link)}" target="_blank" rel="noopener noreferrer" aria-label="Abrir no Instagram">↗</a>` : ''}</article>`).join('') : '<div class="empty compact">Nenhuma publicação no período com os filtros escolhidos.</div>';
   const sync = d.ultimaSync ? `Última sincronização com a Meta: <b>${esc(fmtDateTime(d.ultimaSync))}</b>` : 'Ainda não houve sincronização com a Meta';
