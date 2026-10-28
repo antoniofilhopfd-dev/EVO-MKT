@@ -24,7 +24,7 @@ export async function importarHistoricoInstagram(c: Ctx): Promise<Response> {
  }
  if(b.acao!=='lote' || !Array.isArray(b.linhas) || !b.linhas.length || b.linhas.length>100)
    return fail(400,'Lote inválido (1 a 100 registros).');
- const values:unknown[][]=[];
+ const values:(string | number | null)[][]=[];
  const keys=new Set<string>();
  for(const item of b.linhas){
    if(!item || !allowed.has(item.arquivo) || typeof item.aba!=='string' || !item.aba.trim() || item.aba.length>180 || !Number.isInteger(item.row) || item.row<1 || !item.cells || typeof item.cells!=='object' || Array.isArray(item.cells))
