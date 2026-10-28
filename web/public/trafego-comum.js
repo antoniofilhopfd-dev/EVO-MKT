@@ -22,7 +22,11 @@ function tfTotais(linhas, alcance = null) {
   const n = v => Number(v) || 0;
   const investimento = linhas.reduce((s, l) => s + n(l.investimento), 0), impressoes = linhas.reduce((s, l) => s + n(l.impressoes), 0);
   const cliques = linhas.reduce((s, l) => s + n(l.cliques), 0), conversas = linhas.reduce((s, l) => s + n(l.conversas), 0);
-  return { investimento, impressoes, alcance, cliques, ctr: impressoes ? cliques / impressoes * 100 : null, cpc: cliques ? investimento / cliques : null, conversas, custoConversa: conversas ? investimento / conversas : null };
+  const comLink = linhas.length && linhas.every(l => l.cliquesLink !== null && l.cliquesLink !== undefined);
+  const cliquesLink = comLink ? linhas.reduce((s,l)=>s+n(l.cliquesLink),0) : null;
+  return { investimento, impressoes, alcance, cliques, ctr: impressoes ? cliques / impressoes * 100 : null, cpc: cliques ? investimento / cliques : null, conversas, custoConversa: conversas ? investimento / conversas : null,
+    frequencia: alcance && impressoes ? impressoes / alcance : null, cpm: impressoes ? investimento * 1000 / impressoes : null,
+    cliquesLink, ctrLink: cliquesLink !== null && impressoes ? cliquesLink * 100 / impressoes : null, cpcLink: cliquesLink ? investimento / cliquesLink : null };
 }
 
 /** Aplica status, segmento, campanha e conjunto sobre as listas devolvidas pela API. `filtrado` diz se algum filtro está ativo (então o alcance total deixa de valer). */

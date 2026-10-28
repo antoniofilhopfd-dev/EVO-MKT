@@ -30,14 +30,22 @@ export function conversasIniciadas(actions: unknown): number {
   return lista.some((a) => a.action_type === CONVERSA_PRINCIPAL) ? total(CONVERSA_PRINCIPAL) : total(CONVERSA_ALTERNATIVA);
 }
 
-export interface Totais { investimento: number; impressoes: number; alcance: number | null; cliques: number; ctr: number | null; cpc: number | null; conversas: number; custoConversa: number | null }
+export interface Totais { investimento: number; impressoes: number; alcance: number | null; cliques: number; ctr: number | null; cpc: number | null; conversas: number; custoConversa: number | null; frequencia: number | null; cpm: number | null; cliquesLink: number | null; ctrLink: number | null; cpcLink: number | null }
 /** CTR, CPC e custo por conversa SEMPRE dos valores absolutos (nunca média das médias). `alcance` vem da consulta da conta (sem repetir pessoas). */
 export function totais(linhas: Row[], alcanceConta: number | null): Totais {
   const investimento = linhas.reduce((s, l) => s + num(l.spend ?? l.investimento), 0);
   const impressoes = linhas.reduce((s, l) => s + num(l.impressions ?? l.impressoes), 0);
   const cliques = linhas.reduce((s, l) => s + num(l.clicks ?? l.cliques), 0);
   const conversas = linhas.reduce((s, l) => s + (l.actions !== undefined ? conversasIniciadas(l.actions) : num(l.conversas)), 0);
-  return { investimento, impressoes, alcance: alcanceConta, cliques, ctr: impressoes ? (cliques / impressoes) * 100 : null, cpc: cliques ? investimento / cliques : null, conversas, custoConversa: conversas ? investimento / conversas : null };
+  // Cliques no link vêm exclusivamente de inline_link_clicks, nunca de clicks (todos os cliques).
+  const comLink = linhas.filter(l => l.inline_link_clicks !== undefined && l.inline_link_clicks !== null);
+  const cliquesLink = comLink.length === linhas.length && linhas.length ? comLink.reduce((n,l)=>n+num(l.inline_link_clicks),0) : null;
+  return { investimento, impressoes, alcance: alcanceConta, cliques, ctr: impressoes ? (cliques / impressoes) * 100 : null, cpc: cliques ? investimento / cliques : null, conversas, custoConversa: conversas ? investimento / conversas : null,
+    frequencia: alcanceConta && impressoes ? impressoes / alcanceConta : null,
+    cpm: impressoes ? investimento * 1000 / impressoes : null,
+    cliquesLink, ctrLink: cliquesLink !== null && impressoes ? cliquesLink * 100 / impressoes : null,
+    cpcLink: cliquesLink ? investimento / cliquesLink : null };
+
 }
 
 export function validarPeriodo(de: string, ate: string): void {
@@ -122,7 +130,7 @@ async function contaDeAnuncios(): Promise<string> {
 }
 
 async function insights(conta: string, nivel: 'campaign' | 'adset' | 'ad' | 'account', de: string, ate: string, diario = false): Promise<{ linhas: Row[]; truncado: boolean }> {
-  const campos = nivel === 'account' ? 'spend,impressions,reach,clicks,actions' : nivel === 'campaign' ? 'campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : nivel === 'adset' ? 'adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : 'ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions';
+  const campos = nivel === 'account' ? 'spend,impressions,reach,clicks,inline_link_clicks,actions' : nivel === 'campaign' ? 'campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : nivel === 'adset' ? 'adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : 'ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions';
   const linhas: Row[] = [];
   let after = '', truncado = false;
   for (let pagina = 0; pagina < 12; pagina++) {

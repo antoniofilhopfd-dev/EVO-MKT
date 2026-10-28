@@ -73,7 +73,7 @@ export async function route(c: Ctx): Promise<Out> {
       return comentariosRoute(c);
     case path === '/ia/estado' || path === '/ia/variacoes' || ['/admin/users/email', '/admin/sistema', '/public/logo', '/admin/logo', '/admin/logo/restaurar', '/admin/migracao', '/admin/arquivos-sem-vinculo', '/admin/arquivos-sem-vinculo/excluir'].includes(path):
       return sistemaRoute(c);
-    case ['/instagram/visao', '/instagram/geral', '/instagram/ranking', '/instagram/ranking-contas', '/instagram/mensal', '/instagram/desempenho', '/instagram/impulsionados', '/instagram/vinculo'].includes(path):
+    case ['/instagram/visao', '/instagram/geral', '/instagram/ranking', '/instagram/ranking-contas', '/instagram/mensal', '/instagram/desempenho', '/instagram/impulsionados', '/instagram/vinculo', '/instagram/historico-planilhas'].includes(path):
       return desempenhoRoute(c);
     case ['/notificacoes', '/notificacoes/lida', '/timeline', '/insights', '/admin/integridade', '/datas', '/studio/hashtags', '/studio/modelos', '/team'].includes(path) || path.startsWith('/instagram/'):
       return operacaoRoute(c);

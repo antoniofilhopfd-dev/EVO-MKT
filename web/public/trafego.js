@@ -5,7 +5,7 @@ const TF_CACHE = { chave: '', dados: null, estado: null, em: 0 };
 const tfPct = v => v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
 const tfN = v => v === null || v === undefined ? '—' : fmtN(v);
 const tfMoney = v => v === null || v === undefined ? '—' : money(v);
-const TF_INDICADORES = [['investimento', 'Investimento', money, true], ['impressoes', 'Impressões', fmtN, true], ['alcance', 'Alcance', fmtN, true], ['cliques', 'Cliques', fmtN, true], ['ctr', 'CTR médio', tfPct, true], ['cpc', 'CPC médio', money, false], ['conversas', 'Conversas iniciadas', fmtN, true], ['custoConversa', 'Custo por conversa', money, false]];
+const TF_INDICADORES = [['investimento', 'Investimento', money, true], ['impressoes', 'Impressões', fmtN, true], ['alcance', 'Alcance', fmtN, true], ['cliques', 'Cliques', fmtN, true], ['ctr', 'CTR médio', tfPct, true], ['cpc', 'CPC médio', money, false], ['conversas', 'Conversas iniciadas', fmtN, true], ['custoConversa', 'Custo por conversa', money, false], ['frequencia', 'Frequência', v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 }), false], ['cpm', 'CPM', tfMoney, false], ['cliquesLink', 'Cliques no link', tfN, true], ['ctrLink', 'CTR do link', tfPct, true], ['cpcLink', 'CPC do link', tfMoney, false]];
 const TF_ICONES = { investimento: '＄', impressoes: '◉', alcance: '☺', cliques: '⌖', ctr: '%', cpc: '⚙', conversas: '✉', custoConversa: '◎' };
 
 async function tfEstado() {
