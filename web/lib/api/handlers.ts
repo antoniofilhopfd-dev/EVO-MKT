@@ -21,6 +21,7 @@ import { integrationsRoute } from './integrations';
 import { cronRoute } from './cron';
 import { operacaoRoute } from './operacao';
 import { desempenhoRoute } from './desempenho';
+import { importarHistoricoInstagram } from './importarHistoricoInstagram';
 import { sistemaRoute } from './sistema';
 import { comentariosRoute } from './comentarios';
 import { conteudoRoute } from './conteudo';
@@ -65,6 +66,8 @@ export async function route(c: Ctx): Promise<Out> {
       return lgpdRoute(c);
     case path === '/prefs':
       return prefsRoute(c);
+    case path === '/instagram/importar-historico':
+      return importarHistoricoInstagram(c);
     case path.startsWith('/dashboard/'):
       return dashboardRoute(c);
     case path.startsWith('/content/'):
