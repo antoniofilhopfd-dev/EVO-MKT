@@ -80,6 +80,10 @@ const xlsx = linhas => {
   let md = await G.get('/imagem/modelos');
   const padrao = md.rows.find(m => /padrão/i.test(m.nome));
   t('existe o modelo padrão de exemplo (v1) e o Administrador pode editar', padrao && padrao.versao === 1 && md.podeEditar === true && md.canais.length >= 5 && md.canais.includes('Tráfego pago (anúncios)'), md.rows.map(m => m.nome));
+  const trafego = md.rows.find(m => /tráfego pago/i.test(m.nome));
+  t('existe o modelo pronto de tráfego pago (anúncios), com o canal e o prazo de 12 meses', trafego && trafego.canais.includes('Tráfego pago (anúncios)') && trafego.periodo_tipo === 'MESES' && trafego.periodo_valor === '12' && /anúncios pagos/.test(trafego.corpo), trafego);
+  const pvT = await G.post('/imagem/previa', { modelo_id: trafego.id, aluno_id: ids['T-1001'], responsavel: 'Maria Responsável Teste' });
+  t('a prévia do modelo de tráfego pago cita os anúncios pagos, o canal e o prazo', /anúncios pagos \(tráfego pago\)/.test(pvT.texto) && /Tráfego pago \(anúncios\)/.test(pvT.texto) && /12 meses/.test(pvT.texto) && /Ana Fictícia/.test(pvT.texto) && !/\{\{/.test(pvT.texto), pvT.texto);
   t('a Equipe vê os modelos, mas não pode editar', (await E.get('/imagem/modelos')).podeEditar === false && (await E.req('POST', '/imagem/modelos', { nome: 'x' })).status === 403);
   const base = { nome: 'Modelo da Feira (teste)', tipo: 'EVENTO', finalidade: 'Divulgar a Feira Cultural nas redes do colégio.', canais: ['Instagram', 'Site'], local_uso: 'Feira Cultural', periodo_tipo: 'MESES', periodo_valor: '12', observacoes: '', corpo: padrao.corpo };
   t('modelo sem canal, sem finalidade ou sem {{aluno}} é recusado (400)', (await G.req('POST', '/imagem/modelos', { ...base, canais: [] })).status === 400 && (await G.req('POST', '/imagem/modelos', { ...base, finalidade: '' })).status === 400 && (await G.req('POST', '/imagem/modelos', { ...base, corpo: 'Texto sem o aluno, mas com mais de quarenta caracteres no total aqui.' })).status === 400);

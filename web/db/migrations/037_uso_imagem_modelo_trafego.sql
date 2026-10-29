@@ -1,0 +1,9 @@
+-- Modelo pronto para uso de imagem em tráfego pago (anúncios). Texto de EXEMPLO: precisa de revisão jurídica e de LGPD antes do uso real.
+INSERT IGNORE INTO ui_modelos(nome,tipo,finalidade,canais,local_uso,periodo_tipo,periodo_valor,observacoes,corpo,versao,ativo,criado_em,atualizado_em,atualizado_por) VALUES(
+ 'Modelo tráfego pago (anúncios)','EVENTO',
+ 'Uso de fotografias e vídeos do aluno em anúncios pagos (tráfego pago) do colégio, para divulgar o colégio, suas atividades e a captação de novos alunos.',
+ 'Tráfego pago (anúncios), Instagram, Facebook',
+ 'Anúncios pagos do colégio nas redes sociais e plataformas de publicidade online','MESES','12',
+ '',
+ 'Eu, {{responsavel}}, responsável legal pelo(a) aluno(a) {{aluno}}, matrícula {{matricula}}, turma {{turma}}, {{decisao}} o {{colegio}} a utilizar fotografias e vídeos em que o(a) aluno(a) apareça em anúncios pagos (tráfego pago) nas redes sociais e em plataformas de publicidade online, nas condições abaixo.\n\nFinalidade: {{finalidade}}\n\nCanais de divulgação: {{canais}}\n\nLocal ou evento: {{local}}\n\nPrazo: {{prazo}}\n\n{{observacoes}}Os anúncios pagos podem ser exibidos a pessoas que não seguem o colégio, conforme o público escolhido pelo colégio, e podem usar publicações que já existem nos perfis do colégio. O uso é gratuito e o colégio não venderá nem cederá a imagem do(a) aluno(a) a terceiros. A imagem não será usada fora da finalidade e dos canais indicados, nem de forma que exponha o(a) aluno(a) a constrangimento.\n\nO responsável pode revogar esta autorização a qualquer momento, por solicitação ao colégio. Depois da revogação, o colégio deixa de usar a imagem em novos anúncios e encerra os anúncios em veiculação em prazo razoável. Também pode optar por NÃO autorizar, sem qualquer prejuízo ao aluno. Os dados desta solicitação são tratados somente para registrar a escolha do responsável.',
+ 1,1,'2026-10-29T00:00:00-03:00','2026-10-29T00:00:00-03:00','Sistema');
