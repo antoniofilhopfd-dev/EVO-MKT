@@ -8,7 +8,8 @@ import { CANAIS, cpfMascarado, hashTexto, montarTermo, PLACEHOLDERS, validaModel
 import { fail, now, Row, strv } from '../util';
 import { randHex, sha256 } from '../crypto';
 import { publicUrl } from '../integrations/http';
-import { ENCERRADAS, lerArquivoSolic, solicCompleta } from '../imagemDados';
+import { comprovantePdf } from '../imagemPdf';
+import { dadosComprovante, ENCERRADAS, lerArquivoSolic, solicCompleta } from '../imagemDados';
 import { imagemGestaoRoute } from './imagemGestao';
 import { calcVence, lerConfig, mensagemCom } from '../imagemConfig';
 import { json } from './handlers';
@@ -196,6 +197,14 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
       solicitacao: { ...solicPublica(s), decisao: s.decisao, decisaoEm: s.decisao_em, respConfirmado: s.resp_confirmado, parentesco: s.parentesco, modalidade: s.modalidade, termoHash: s.termo_hash, cpfResponsavel: s.resp_cpf ? cpfMascarado(String(s.resp_cpf)) : '', validadoPor: s.validado_por, validadoEm: s.validado_em, validacaoObs: s.validacao_obs, enviadoEm: s.enviado_em, enviadoCanal: s.enviado_canal, abertoEm: s.aberto_em },
       eventos, arquivos, acesso: ac ? { expiraEm: ac.expira_em, ativo: !!Number(ac.ativo) && String(ac.expira_em) >= now() && Number(ac.tentativas) < 5, ultimoAcesso: ac.ultimo_acesso } : null,
     });
+  }
+
+  if (path === '/imagem/solicitacoes/comprovante' && method === 'GET') {
+    const id = Number(c.qs('id')) || 0;
+    const s = await solicCompleta(id) ?? fail(404, 'Solicitação não encontrada.');
+    const dc = await dadosComprovante(s) ?? fail(404, 'Ainda não há arquivo assinado enviado.');
+    await evento(id, ator, 'comprovante-baixado', '');
+    return new Response(new Uint8Array(await comprovantePdf(dc)), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Comprovante-Recebimento_${s.protocolo}.pdf"`, 'Cache-Control': 'no-store' } });
   }
 
   if (path === '/imagem/solicitacoes/arquivo' && method === 'GET') {

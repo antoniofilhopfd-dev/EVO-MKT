@@ -165,10 +165,11 @@
   function telaFim() {
     const v = S.v, aut = v.status === 'AUTORIZADO', nao = v.status === 'NAO_AUTORIZADO', val = v.status === 'AGUARDANDO_VALIDACAO';
     const titulo = aut ? 'Autorização registrada' : nao ? 'Recusa registrada' : 'Arquivo recebido';
-    const msg = aut ? 'Obrigado! A sua autorização foi registrada.' : nao ? 'Obrigado por responder. O colégio não usará a imagem do aluno nas condições deste termo.' : 'Recebemos o seu PDF assinado. A equipe do colégio vai conferir a assinatura; a autorização só passa a valer depois dessa conferência.';
+    const msg = aut ? 'Obrigado! A sua autorização foi registrada.' : nao ? 'Obrigado por responder. O colégio não usará a imagem do aluno nas condições deste termo.' : 'Recebemos o seu PDF assinado. A data e a hora do recebimento ficam registradas no comprovante abaixo. A equipe do colégio vai conferir a assinatura; a autorização só passa a valer depois dessa conferência.';
     tela(`<h1>${titulo}</h1><div class="aut-card aut-ok ${nao ? 'aut-nao' : ''}"><p>${msg}</p><dl class="aut-dl"><dt>Protocolo</dt><dd>${esc(v.protocolo)}</dd><dt>Aluno(a)</dt><dd>${esc(v.aluno)}</dd><dt>Situação</dt><dd>${aut ? 'Autorizado' : nao ? 'Não autorizado' : 'Aguardando validação do colégio'}</dd>${v.modalidade ? `<dt>Como foi assinado</dt><dd>${v.modalidade === 'GOVBR' ? 'GOV.BR (arquivo assinado)' : 'Assinatura desenhada na tela'}</dd>` : ''}<dt>Registrado em</dt><dd>${esc(v.decididaEm || '—')}</dd></dl>
-      ${v.podeBaixarFinal ? '<button class="aut-btn" id="bFinal" type="button">Baixar o documento</button>' : ''}</div>
+      ${v.podeBaixarFinal ? '<button class="aut-btn" id="bFinal" type="button">Baixar o documento</button>' : ''}${v.temComprovante ? '<button class="aut-btn aut-sec" id="bComp" type="button">Baixar o comprovante de recebimento</button>' : ''}</div>
       <p class="aut-sub">Você pode revogar esta autorização a qualquer momento falando com a secretaria do colégio e informando o protocolo.</p>`);
+    const bc = document.getElementById('bComp'); if (bc) bc.onclick = () => baixar('comprovante', `Comprovante-Recebimento_${v.protocolo}.pdf`).catch(e => { bc.insertAdjacentHTML('afterend', `<p class="aut-erro" role="alert">${esc(e.message)}</p>`); });
     const b = document.getElementById('bFinal'); if (b) b.onclick = () => baixar('final', `Autorizacao-Uso-de-Imagem_${v.protocolo}.pdf`).catch(e => { b.insertAdjacentHTML('afterend', `<p class="aut-erro" role="alert">${esc(e.message)}</p>`); });
   }
 

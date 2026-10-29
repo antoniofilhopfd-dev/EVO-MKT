@@ -2,8 +2,8 @@ import { Ctx } from '../ctx';
 import { rateCheck, rateFail } from '../auth';
 import { sha256 } from '../crypto';
 import { q1, run } from '../db';
-import { atualizarVencimentos, dataLonga, eventoSolic, ENCERRADAS, lerArquivoSolic, salvarArquivoSolic, sha, solicCompleta, termoPdfDe } from '../imagemDados';
-import { termosPdf } from '../imagemPdf';
+import { atualizarVencimentos, dadosComprovante, dataLonga, eventoSolic, ENCERRADAS, lerArquivoSolic, salvarArquivoSolic, sha, solicCompleta, termoPdfDe } from '../imagemDados';
+import { comprovantePdf, termosPdf } from '../imagemPdf';
 import { examinarPdfAssinado, PARENTESCOS, validarAssinaturaDesenhada } from '../imagemPortal';
 import { calcVence, lerConfig } from '../imagemConfig';
 import { cpfValido } from '../imagemTermo';
@@ -53,7 +53,7 @@ const visao = (s: Row, ac: Row) => ({
   status: s.status, decisao: s.decisao, modalidade: s.modalidade, responsavel: s.resp_confirmado || s.responsavel_nome, parentesco: s.parentesco,
   encerrada: ENCERRADAS.includes(s.status), decididaEm: s.decisao_em ? dataBR(s.decisao_em) : '', expiraEm: dataBR(String(ac.expira_em)), parentescos: PARENTESCOS,
   venceEm: s.vence_em || '', pedeCpf: !!Number(s.pede_cpf), recusaDoArquivo: s.status === 'AGUARDANDO_ASSINATURA' && s.validado_por ? s.validacao_obs || 'O arquivo enviado não foi aceito. Assine de novo e envie outro.' : '',
-  podeBaixarFinal: ['AUTORIZADO', 'NAO_AUTORIZADO'].includes(s.status) && !!s.final_hash,
+  temComprovante: ['AGUARDANDO_VALIDACAO', 'AUTORIZADO'].includes(s.status) && s.modalidade === 'GOVBR', podeBaixarFinal: ['AUTORIZADO', 'NAO_AUTORIZADO'].includes(s.status) && !!s.final_hash,
 });
 
 export async function imagemPortalRoute(c: Ctx): Promise<Response> {
@@ -107,7 +107,7 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
     if (decisao === 'AUTORIZO') {
       const cpf = strv(b.cpf).replace(/\D/g, '');
       if (Number(s.pede_cpf) && !cpfValido(cpf)) fail(400, 'Digite o CPF do responsável legal (11 números, sem erros de digitação).');
-      await run("UPDATE ui_solicitacoes SET status='AGUARDANDO_ASSINATURA',decisao='AUTORIZO',resp_confirmado=?,resp_cpf=?,parentesco=?,atualizado_em=? WHERE id=?", [nome, Number(s.pede_cpf) ? cpf : '', parentesco, now(), s.id]);
+      await run("UPDATE ui_solicitacoes SET status='AGUARDANDO_ASSINATURA',decisao='AUTORIZO',resp_confirmado=?,resp_cpf=?,parentesco=?,autorizo_em=?,atualizado_em=? WHERE id=?", [nome, Number(s.pede_cpf) ? cpf : '', parentesco, now(), now(), s.id]);
       await eventoSolic(Number(s.id), 'responsável', 'autorizo-escolhido', `${nome} (${parentesco}); falta assinar`);
       return json({ ok: true, status: 'AGUARDANDO_ASSINATURA' }, 200, cab);
     }
@@ -134,6 +134,10 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
   }
 
   if (path === '/public/imagem/pdf') {
+    if (strv(b.tipo) === 'comprovante') {
+      const dc = await dadosComprovante(s) ?? fail(404, 'Ainda não há arquivo assinado enviado.');
+      return new Response(new Uint8Array(await comprovantePdf(dc)), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Comprovante-Recebimento_${s.protocolo}.pdf"`, ...cab } });
+    }
     const tipo = strv(b.tipo) === 'final' ? 'final' : 'original';
     let buf: Buffer;
     if (tipo === 'final') { const f = (await lerArquivoSolic(Number(s.id), 'final')) ?? (s.status === 'AUTORIZADO' ? await lerArquivoSolic(Number(s.id), 'govbr') : null); if (!f) fail(404, 'Ainda não há documento final.'); buf = f.buf; }

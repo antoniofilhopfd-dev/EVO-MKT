@@ -89,3 +89,49 @@ export async function termosPdf(termos: TermoPdf[]): Promise<Buffer> {
 }
 
 export const hashBytes = (b: Buffer): string => createHash('sha256').update(b).digest('hex');
+
+export interface ComprovanteDados {
+  protocolo: string; aluno: string; turma: string; responsavel: string; cpfParcial: string; recebidoEm: string; arquivoNome: string; sha256: string; tamanho: number;
+  assinaturaDetectada: boolean; contemOriginal: boolean; situacao: string; validadoPor: string; validadoEm: string; validacaoObs: string; termoHash: string; versao: number; geradoEm: string;
+}
+
+/**
+ * Comprovante de recebimento do termo assinado no GOV.BR. O PDF assinado é guardado exatamente como foi enviado (alterá-lo quebraria a assinatura);
+ * este comprovante, separado, registra a DATA E HORA em que o arquivo voltou para o colégio, a impressão digital (SHA-256) do arquivo e a validação da equipe.
+ */
+export async function comprovantePdf(c: ComprovanteDados): Promise<Buffer> {
+  const logo = await carregarLogo();
+  const data = new Date(Date.parse(c.geradoEm) || 0);
+  const doc = new PDFDocument({ size: 'A4', margin: PAGINA.m, info: { Title: limpa('Comprovante de recebimento do termo assinado'), Author: 'Colegio Evolucao - EVO MKT', Creator: 'EVO MKT', CreationDate: data, ModDate: data } });
+  const partes: Buffer[] = [];
+  doc.on('data', (b: Buffer) => partes.push(b));
+  const fim = new Promise<void>((ok, no) => { doc.on('end', ok); doc.on('error', no); });
+  const w = PAGINA.w - PAGINA.m * 2;
+  let y = cabecalho(doc, logo, 'Colégio Evolução', [], [`Protocolo ${c.protocolo}`]) + 4;
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(COR.escuro).text('COMPROVANTE DE RECEBIMENTO DO TERMO ASSINADO', PAGINA.m, y, { width: w, align: 'center' }); y = doc.y + 4;
+  doc.font('Helvetica').fontSize(9).fillColor(COR.cinza).text('Termo de autorização para uso de imagem em campanhas de mídia paga (tráfego pago) · assinatura pelo GOV.BR', PAGINA.m, y, { width: w, align: 'center' }); y = doc.y + 14;
+  const linha = (rot: string, val: string, forte = false) => { doc.font('Helvetica').fontSize(8.5).fillColor(COR.cinza).text(limpa(rot), PAGINA.m, y, { width: 150, lineBreak: false }); doc.font(forte ? 'Helvetica-Bold' : 'Helvetica').fontSize(forte ? 11 : 9.6).fillColor(forte ? COR.escuro : '#1B2330').text(limpa(val || '-'), PAGINA.m + 155, y - (forte ? 1 : 0), { width: w - 155, lineGap: 1.5 }); y = Math.max(doc.y, y + 14) + 4; };
+  const secao = (t: string) => { y += 6; doc.font('Helvetica-Bold').fontSize(10).fillColor(COR.escuro).text(t, PAGINA.m, y); y = doc.y + 5; doc.moveTo(PAGINA.m, y - 2).lineTo(PAGINA.w - PAGINA.m, y - 2).lineWidth(0.5).strokeColor(COR.linha).stroke(); y += 4; };
+  secao('Quem');
+  linha('Aluno(a)', c.aluno); linha('Turma', c.turma); linha('Responsável legal', c.responsavel); linha('CPF (parcial)', c.cpfParcial);
+  secao('Recebimento do arquivo assinado');
+  linha('Data e hora do recebimento', c.recebidoEm, true);
+  linha('Arquivo', c.arquivoNome); linha('Tamanho', `${c.tamanho.toLocaleString('pt-BR')} bytes`);
+  linha('SHA-256 do arquivo', c.sha256);
+  linha('Assinatura digital no arquivo', c.assinaturaDetectada ? 'Detectada (a validade só é confirmada na conferência abaixo)' : 'Não detectada');
+  linha('Contém o termo original', c.contemOriginal ? 'Sim' : 'Não confirmado (arquivo reprocessado)');
+  secao('Conferência da equipe (validar.iti.gov.br)');
+  linha('Situação', c.situacao, true);
+  linha('Validado por', c.validadoPor || 'Ainda não validado'); linha('Data e hora da validação', c.validadoEm); linha('Observação', c.validacaoObs);
+  secao('Vínculo com o termo');
+  linha('Versão do termo', String(c.versao)); linha('SHA-256 do texto do termo', c.termoHash);
+  y += 10;
+  doc.font('Helvetica').fontSize(8).fillColor(COR.cinza).text(limpa(`Este comprovante registra o recebimento e a conferência do arquivo assinado, que é guardado exatamente como foi enviado, sem alterações, para não perder a assinatura digital. A data oficial da assinatura é a do carimbo do GOV.BR. Emitido em ${c.geradoEm.slice(8, 10)}/${c.geradoEm.slice(5, 7)}/${c.geradoEm.slice(0, 4)} ${c.geradoEm.slice(11, 16)}.`), PAGINA.m, y, { width: w, lineGap: 1.5 });
+  doc.page.margins.bottom = 0;
+  doc.moveTo(PAGINA.m, PAGINA.h - 70).lineTo(PAGINA.w - PAGINA.m, PAGINA.h - 70).lineWidth(1).strokeColor(COR.laranja).stroke();
+  doc.font('Helvetica').fontSize(8).fillColor(COR.escuro).text(limpa(COLEGIO.endereco), PAGINA.m, PAGINA.h - 62, { width: w, lineBreak: false }).text(limpa(COLEGIO.contato), PAGINA.m, PAGINA.h - 50, { width: w, lineBreak: false });
+  doc.rect(0, PAGINA.h - 14, PAGINA.w, 14).fill(COR.laranja);
+  doc.end();
+  await fim;
+  return Buffer.concat(partes);
+}

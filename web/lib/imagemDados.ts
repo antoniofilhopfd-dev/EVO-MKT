@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { q, q1, run } from './db';
-import { RegistroPdf, TermoPdf } from './imagemPdf';
+import { ComprovanteDados, RegistroPdf, TermoPdf } from './imagemPdf';
+import { cpfMascarado } from './imagemTermo';
 import { now, Row } from './util';
 
 /** Auxiliares compartilhados pelas rotas internas e pelo portal do responsável. */
@@ -25,7 +26,7 @@ export const termoPdfDe = (r: Row, registro?: RegistroPdf): TermoPdf => ({
   protocolo: r.protocolo, texto: r.termo_texto, hash: r.termo_hash, versao: r.modelo_versao, modelo: r.modelo_nome, aluno: r.aluno, matricula: r.matricula, turma: r.turma,
   responsavel: r.resp_confirmado || r.responsavel_nome, criadoEm: r.criado_em, registro,
   preenche: r.decisao === 'AUTORIZO' || registro?.tipo === 'DESENHADA'
-    ? { nome: r.resp_confirmado || r.responsavel_nome || undefined, cpf: r.resp_cpf || undefined, marcar: true, dataLonga: registro?.tipo === 'DESENHADA' ? registro.dataLonga : undefined }
+    ? { nome: r.resp_confirmado || r.responsavel_nome || undefined, cpf: r.resp_cpf || undefined, marcar: true, dataLonga: registro?.tipo === 'DESENHADA' ? registro.dataLonga : r.autorizo_em ? dataLonga(String(r.autorizo_em)) : undefined }
     : { nome: r.responsavel_nome || undefined },
 });
 
@@ -54,4 +55,20 @@ export async function atualizarVencimentos(): Promise<number> {
     await eventoSolic(Number(r.id), 'sistema', 'vencido', 'prazo do termo terminou');
   }
   return venc.length;
+}
+
+const STATUS_TXT: Record<string, string> = { AGUARDANDO_VALIDACAO: 'Aguardando validação da equipe', AUTORIZADO: 'Autorizado (assinatura conferida)', AGUARDANDO_ASSINATURA: 'Arquivo recusado: aguardando novo envio', REVOGADO: 'Autorização revogada', VENCIDO: 'Autorização vencida' };
+const dmyHm = (iso: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)} ${iso.slice(11, 16)}` : '');
+
+/** Dados do comprovante de recebimento do arquivo assinado no GOV.BR (ou null se ainda não houve envio). */
+export async function dadosComprovante(s: Row): Promise<ComprovanteDados | null> {
+  const a = await q1("SELECT * FROM ui_arquivos WHERE solicitacao_id=? AND tipo='govbr' AND ativo=1 ORDER BY id DESC LIMIT 1", [s.id]);
+  if (!a) return null;
+  return {
+    protocolo: String(s.protocolo), aluno: String(s.aluno), turma: String(s.turma || ''), responsavel: String(s.resp_confirmado || s.responsavel_nome || ''), cpfParcial: s.resp_cpf ? cpfMascarado(String(s.resp_cpf)) : '',
+    recebidoEm: dmyHm(String(a.criado_em)), arquivoNome: String(a.nome), sha256: String(a.sha256), tamanho: Number(a.tamanho),
+    assinaturaDetectada: /assinatura_detectada=sim/.test(String(a.info)), contemOriginal: /contem_original=sim/.test(String(a.info)),
+    situacao: STATUS_TXT[String(s.status)] ?? String(s.status), validadoPor: String(s.status === 'AUTORIZADO' || s.validado_por ? s.validado_por : ''), validadoEm: dmyHm(String(s.status === 'AUTORIZADO' || s.validado_por ? s.validado_em : '')), validacaoObs: String(s.validacao_obs || ''),
+    termoHash: String(s.termo_hash), versao: Number(s.modelo_versao), geradoEm: String(a.criado_em),
+  };
 }
