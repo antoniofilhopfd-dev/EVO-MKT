@@ -25,7 +25,7 @@ export const termoPdfDe = (r: Row, registro?: RegistroPdf): TermoPdf => ({
   protocolo: r.protocolo, texto: r.termo_texto, hash: r.termo_hash, versao: r.modelo_versao, modelo: r.modelo_nome, aluno: r.aluno, matricula: r.matricula, turma: r.turma,
   responsavel: r.resp_confirmado || r.responsavel_nome, criadoEm: r.criado_em, registro,
   preenche: r.decisao === 'AUTORIZO' || registro?.tipo === 'DESENHADA'
-    ? { nome: r.resp_confirmado || r.responsavel_nome || undefined, cpf: r.resp_cpf || undefined, marcar: true, dataLonga: registro?.tipo === 'DESENHADA' ? registro.dataLonga : undefined }
+    ? { nome: r.resp_confirmado || r.responsavel_nome || undefined, cpf: r.resp_cpf || undefined, marcar: true, dataLonga: registro?.tipo === 'DESENHADA' ? registro.dataLonga : r.autorizo_em ? dataLonga(String(r.autorizo_em)) : undefined }
     : { nome: r.responsavel_nome || undefined },
 });
 

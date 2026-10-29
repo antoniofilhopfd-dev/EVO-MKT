@@ -107,7 +107,7 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
     if (decisao === 'AUTORIZO') {
       const cpf = strv(b.cpf).replace(/\D/g, '');
       if (Number(s.pede_cpf) && !cpfValido(cpf)) fail(400, 'Digite o CPF do responsável legal (11 números, sem erros de digitação).');
-      await run("UPDATE ui_solicitacoes SET status='AGUARDANDO_ASSINATURA',decisao='AUTORIZO',resp_confirmado=?,resp_cpf=?,parentesco=?,atualizado_em=? WHERE id=?", [nome, Number(s.pede_cpf) ? cpf : '', parentesco, now(), s.id]);
+      await run("UPDATE ui_solicitacoes SET status='AGUARDANDO_ASSINATURA',decisao='AUTORIZO',resp_confirmado=?,resp_cpf=?,parentesco=?,autorizo_em=?,atualizado_em=? WHERE id=?", [nome, Number(s.pede_cpf) ? cpf : '', parentesco, now(), now(), s.id]);
       await eventoSolic(Number(s.id), 'responsável', 'autorizo-escolhido', `${nome} (${parentesco}); falta assinar`);
       return json({ ok: true, status: 'AGUARDANDO_ASSINATURA' }, 200, cab);
     }
