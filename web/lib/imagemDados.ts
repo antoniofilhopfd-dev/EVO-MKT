@@ -17,9 +17,16 @@ export const sha = (b: Buffer | string): string => createHash('sha256').update(b
 export const solicCompleta = (id: number): Promise<Row | undefined> =>
   q1('SELECT s.*, a.nome aluno, a.matricula, a.turma FROM ui_solicitacoes s JOIN ui_alunos a ON a.id=s.aluno_id WHERE s.id=?', [id]);
 
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+export const dataLonga = (iso: string): string => `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
+
+/** Monta os dados do PDF. Depois que o responsável escolhe AUTORIZO, o termo já sai com o nome, o CPF e a opção marcada; a data só quando ele assina. */
 export const termoPdfDe = (r: Row, registro?: RegistroPdf): TermoPdf => ({
   protocolo: r.protocolo, texto: r.termo_texto, hash: r.termo_hash, versao: r.modelo_versao, modelo: r.modelo_nome, aluno: r.aluno, matricula: r.matricula, turma: r.turma,
   responsavel: r.resp_confirmado || r.responsavel_nome, criadoEm: r.criado_em, registro,
+  preenche: r.decisao === 'AUTORIZO' || registro?.tipo === 'DESENHADA'
+    ? { nome: r.resp_confirmado || r.responsavel_nome || undefined, cpf: r.resp_cpf || undefined, marcar: true, dataLonga: registro?.tipo === 'DESENHADA' ? registro.dataLonga : undefined }
+    : { nome: r.responsavel_nome || undefined },
 });
 
 /** Guarda um arquivo na tabela `arquivos` e o registra na solicitação (os anteriores do mesmo tipo ficam inativos, nunca apagados). */

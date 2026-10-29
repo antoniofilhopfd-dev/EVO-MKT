@@ -38,4 +38,6 @@ async function ir(p, pg, espera = 600) {
   await p.waitForTimeout(espera);
 }
 const textoConteudo = p => p.evaluate(() => document.querySelector('#content').innerText);
-module.exports = { BASE, B, J, somaDia, dia, hoje, contador, entrar, abrir, pagina, ir, textoConteudo, cookie };
+/** Texto de modelo só para os testes (usa os marcadores de finalidade, canais, prazo etc.). O termo real do colégio é o da migração 038. */
+const CORPO_TESTE = "Eu, {{responsavel}}, responsável legal pelo(a) aluno(a) {{aluno}}, matrícula {{matricula}}, turma {{turma}}, {{decisao}} o {{colegio}} a utilizar fotografias e vídeos em que o(a) aluno(a) apareça, nas condições abaixo.\n\nFinalidade: {{finalidade}}\n\nCanais de divulgação: {{canais}}\n\nLocal ou evento: {{local}}\n\nPrazo: {{prazo}}\n\n{{observacoes}}Esta autorização é concedida de forma gratuita. O colégio não usará a imagem do(a) aluno(a) fora da finalidade e dos canais indicados, nem de forma que o exponha a constrangimento.\n\nO responsável pode revogar esta autorização a qualquer momento, por solicitação ao colégio. Também pode optar por NÃO autorizar, sem qualquer prejuízo ao aluno. Os dados desta solicitação são tratados somente para registrar a escolha do responsável.";
+module.exports = { CORPO_TESTE, BASE, B, J, somaDia, dia, hoje, contador, entrar, abrir, pagina, ir, textoConteudo, cookie };

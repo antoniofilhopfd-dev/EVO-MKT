@@ -2,10 +2,11 @@ import { Ctx } from '../ctx';
 import { rateCheck, rateFail } from '../auth';
 import { sha256 } from '../crypto';
 import { q1, run } from '../db';
-import { atualizarVencimentos, eventoSolic, ENCERRADAS, lerArquivoSolic, salvarArquivoSolic, sha, solicCompleta, termoPdfDe } from '../imagemDados';
+import { atualizarVencimentos, dataLonga, eventoSolic, ENCERRADAS, lerArquivoSolic, salvarArquivoSolic, sha, solicCompleta, termoPdfDe } from '../imagemDados';
 import { termosPdf } from '../imagemPdf';
 import { examinarPdfAssinado, PARENTESCOS, validarAssinaturaDesenhada } from '../imagemPortal';
 import { calcVence, lerConfig } from '../imagemConfig';
+import { cpfValido } from '../imagemTermo';
 import { fail, now, Row, strv } from '../util';
 import { json } from './handlers';
 
@@ -51,7 +52,7 @@ const visao = (s: Row, ac: Row) => ({
   protocolo: s.protocolo, aluno: s.aluno, turma: s.turma, modelo: s.modelo_nome, versao: s.modelo_versao, texto: s.termo_texto, hash: String(s.termo_hash).slice(0, 16),
   status: s.status, decisao: s.decisao, modalidade: s.modalidade, responsavel: s.resp_confirmado || s.responsavel_nome, parentesco: s.parentesco,
   encerrada: ENCERRADAS.includes(s.status), decididaEm: s.decisao_em ? dataBR(s.decisao_em) : '', expiraEm: dataBR(String(ac.expira_em)), parentescos: PARENTESCOS,
-  venceEm: s.vence_em || '', recusaDoArquivo: s.status === 'AGUARDANDO_ASSINATURA' && s.validado_por ? s.validacao_obs || 'O arquivo enviado não foi aceito. Assine de novo e envie outro.' : '',
+  venceEm: s.vence_em || '', pedeCpf: !!Number(s.pede_cpf), recusaDoArquivo: s.status === 'AGUARDANDO_ASSINATURA' && s.validado_por ? s.validacao_obs || 'O arquivo enviado não foi aceito. Assine de novo e envie outro.' : '',
   podeBaixarFinal: ['AUTORIZADO', 'NAO_AUTORIZADO'].includes(s.status) && !!s.final_hash,
 });
 
@@ -104,7 +105,9 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
     if (!PARENTESCOS.includes(parentesco)) fail(400, 'Informe o seu grau de responsabilidade.');
     if (b.leu_termo !== true || b.dados_corretos !== true || b.sou_responsavel !== true) fail(400, 'Marque as três confirmações: li o termo, os dados estão corretos e sou o responsável legal.');
     if (decisao === 'AUTORIZO') {
-      await run("UPDATE ui_solicitacoes SET status='AGUARDANDO_ASSINATURA',decisao='AUTORIZO',resp_confirmado=?,parentesco=?,atualizado_em=? WHERE id=?", [nome, parentesco, now(), s.id]);
+      const cpf = strv(b.cpf).replace(/\D/g, '');
+      if (Number(s.pede_cpf) && !cpfValido(cpf)) fail(400, 'Digite o CPF do responsável legal (11 números, sem erros de digitação).');
+      await run("UPDATE ui_solicitacoes SET status='AGUARDANDO_ASSINATURA',decisao='AUTORIZO',resp_confirmado=?,resp_cpf=?,parentesco=?,atualizado_em=? WHERE id=?", [nome, Number(s.pede_cpf) ? cpf : '', parentesco, now(), s.id]);
       await eventoSolic(Number(s.id), 'responsável', 'autorizo-escolhido', `${nome} (${parentesco}); falta assinar`);
       return json({ ok: true, status: 'AGUARDANDO_ASSINATURA' }, 200, cab);
     }
@@ -122,7 +125,7 @@ export async function imagemPortalRoute(c: Ctx): Promise<Response> {
     const v = await validarAssinaturaDesenhada(strv(b.assinatura));
     if (!v.ok) fail(400, v.erro);
     const em = now();
-    const pdf = await termosPdf([termoPdfDe(s, { tipo: 'DESENHADA', nome: s.resp_confirmado, parentesco: s.parentesco, em: dataBR(em), png: v.png })]);
+    const pdf = await termosPdf([termoPdfDe(s, { tipo: 'DESENHADA', nome: s.resp_confirmado, parentesco: s.parentesco, em: dataBR(em), png: v.png, dataLonga: dataLonga(em) })]);
     await salvarArquivoSolic(Number(s.id), 'assinatura', `assinatura_${s.protocolo}.png`, v.png, 'image/png', `sha256=${v.hash.slice(0, 16)}`, c.ip);
     await salvarArquivoSolic(Number(s.id), 'final', `termo-assinado_${s.protocolo}.pdf`, pdf, 'application/pdf', 'termo com assinatura manuscrita desenhada', c.ip);
     await run("UPDATE ui_solicitacoes SET status='AUTORIZADO',modalidade='DESENHADA',decisao_em=?,vence_em=?,ip_decisao=?,ua_decisao=?,final_hash=?,atualizado_em=? WHERE id=?", [em, calcVence(String(s.periodo_tipo), String(s.periodo_valor), em), c.ip, ua(c), sha(pdf), em, s.id]);

@@ -19,7 +19,8 @@
     const r = await chamar('/public/imagem/pdf', { tipo }); const b = await r.blob();
     const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
-  const doc = v => `<article class="aut-doc" tabindex="0" aria-label="Texto integral do termo"><h2>AUTORIZAÇÃO PARA USO DE IMAGEM</h2>${v.texto.split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}<small>Protocolo ${esc(v.protocolo)} · versão ${esc(v.versao)} do termo · SHA-256 do texto: ${esc(v.hash)}…</small></article>`;
+  const docLinhas = texto => String(texto).split(/\n{2,}/).map(b => b.split('\n').map(l => /^# /.test(l) ? `<h2>${esc(l.replace(/^#\s*/, ''))}</h2>` : /^## /.test(l) ? `<h3>${esc(l.replace(/^##\s*/, ''))}</h3>` : `<p>${esc(l)}</p>`).join('')).join('');
+  const doc = v => `<article class="aut-doc" tabindex="0" aria-label="Texto integral do termo">${/^# /m.test(v.texto) ? '' : '<h2>AUTORIZAÇÃO PARA USO DE IMAGEM</h2>'}${docLinhas(v.texto)}<small>Protocolo ${esc(v.protocolo)} · versão ${esc(v.versao)} do termo · SHA-256 do texto: ${esc(v.hash)}…</small></article>`;
 
   /* ---- 0. código de acesso ---- */
   function telaCodigo(msg = '') {
@@ -59,16 +60,19 @@
           <label class="aut-op"><input type="radio" name="dec" value="AUTORIZO"><span><b>AUTORIZO</b><small>Autorizo o uso da imagem do aluno nas condições do termo.</small></span></label>
           <label class="aut-op"><input type="radio" name="dec" value="NAO_AUTORIZO"><span><b>NÃO AUTORIZO</b><small>Não autorizo o uso da imagem do aluno.</small></span></label></fieldset>
         <label for="rNome">Seu nome completo (responsável legal)</label><input id="rNome" class="aut-in" autocomplete="name" maxlength="160" value="${esc(v.responsavel || '')}">
+        ${v.pedeCpf ? '<div id="cpfBox" hidden><label for="rCpf">CPF do(a) responsável legal (só números)</label><input id="rCpf" class="aut-in" inputmode="numeric" autocomplete="off" maxlength="14"><small class="aut-sub">Pedido no termo do colégio, apenas para quem autoriza. Aparece só no documento assinado.</small></div>' : ''}
         <label for="rPar">Seu grau de responsabilidade</label><select id="rPar" class="aut-in"><option value="">Escolha…</option>${v.parentescos.map(p => `<option ${v.parentesco === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
         <label class="aut-ck"><input type="checkbox" id="c1"> Li o termo inteiro e entendi a finalidade do uso da imagem.</label>
         <label class="aut-ck"><input type="checkbox" id="c2"> Os dados do aluno (${esc(v.aluno)}, ${esc(v.turma || 'turma')}) estão corretos.</label>
         <label class="aut-ck"><input type="checkbox" id="c3"> Sou o responsável legal por este aluno.</label>
         <p class="aut-erro" id="eT" role="alert" hidden></p><button class="aut-btn" type="submit">Continuar</button></form>`);
+    const alterna = () => { const b = document.getElementById('cpfBox'); if (b) b.hidden = ((document.querySelector('[name=dec]:checked') || {}).value !== 'AUTORIZO'); };
+    document.querySelectorAll('[name=dec]').forEach(r => { r.onchange = alterna; });
     document.getElementById('fTermo').onsubmit = async ev => {
       ev.preventDefault();
       const dec = (document.querySelector('[name=dec]:checked') || {}).value;
       if (!dec) return erroEm('eT', 'Escolha AUTORIZO ou NÃO AUTORIZO.');
-      const corpo = { decisao: dec, responsavel_nome: document.getElementById('rNome').value, parentesco: document.getElementById('rPar').value, leu_termo: document.getElementById('c1').checked, dados_corretos: document.getElementById('c2').checked, sou_responsavel: document.getElementById('c3').checked };
+      const corpo = { decisao: dec, cpf: (document.getElementById('rCpf') || {}).value || '', responsavel_nome: document.getElementById('rNome').value, parentesco: document.getElementById('rPar').value, leu_termo: document.getElementById('c1').checked, dados_corretos: document.getElementById('c2').checked, sou_responsavel: document.getElementById('c3').checked };
       if (dec === 'NAO_AUTORIZO' && !await confirma('Confirmar que você NÃO AUTORIZA', 'O colégio registrará a sua recusa e não usará a imagem do aluno nas condições deste termo.')) return;
       const b = ev.submitter || ev.target.querySelector('button'); b.disabled = true;
       try { const r = await chamar('/public/imagem/decidir', corpo); S.v = await chamar('/public/imagem/abrir', {}); S.v.status = r.status; proximo(); } catch (e) { erroEm('eT', e.message); b.disabled = false; }
