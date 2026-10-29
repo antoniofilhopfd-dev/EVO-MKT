@@ -62,6 +62,12 @@ const xlsx = linhas => {
   const painel = await G.get('/imagem/painel');
   t('painel: total de alunos ativos, segmentos e atividade recente', painel.totalAlunos === 4 && painel.segmentos.find(s => s.k === 'FUND1').n === 1 && painel.recentes.length > 0 && painel.autorizados === 0, painel);
 
+  // ---------- excluir alunos da lista ----------
+  const ex1 = await G.post('/imagem/alunos', { nome: 'Aluno Para Excluir', matricula: 'X-1', turma: '1º Ano', segmento: 'FUND1' }), ex2 = await G.post('/imagem/alunos', { nome: 'Aluno Para Excluir 2', matricula: 'X-2', turma: '1º Ano', segmento: 'FUND1' });
+  t('a Equipe não exclui alunos (403): só o Administrador', (await E.req('POST', '/imagem/alunos/excluir', { ids: [ex1.id] })).status === 403 && (await G.get('/imagem/alunos?busca=X-1')).rows.length === 1);
+  t('excluir sem marcar ninguém: 400', (await G.req('POST', '/imagem/alunos/excluir', { ids: [] })).status === 400);
+  r = await G.post('/imagem/alunos/excluir', { ids: [ex1.id, ex2.id] });
+  t('o Administrador exclui alunos da lista de vez, e o registro guarda só a quantidade', r.excluidos === 2 && r.mantidos.length === 0 && (await G.get('/imagem/alunos?busca=X-&inativos=1')).rows.length === 0 && (await G.get('/imagem/painel')).recentes.some(e => e.acao === 'alunos-excluidos' && !/Excluir 2/.test(e.detalhe || '')), r);
   // ---------- etapa 2: modelos, prévia, solicitações em lote e PDF ----------
   const ids = {}; for (const a of (await G.get('/imagem/alunos')).rows) ids[a.matricula] = a.id;
   let md = await G.get('/imagem/modelos');
@@ -124,6 +130,7 @@ const xlsx = linhas => {
     await p.fill('#uiBusca', ''); await p.waitForTimeout(700);
     await p.click('[data-sel]:nth-of-type(1)', { force: true }).catch(() => {}); const caixas = await p.$$('[data-sel]'); await caixas[0].check(); await caixas[2].check();
     t(`${nome}: seleção manual de 2 alunos mostra o contador e não marca os outros`, /2 aluno\(s\) selecionado/.test(await p.innerText('#uiSelBar')) && (await p.$$('[data-sel]:checked')).length === 2);
+    t(`${nome}: a barra de seleção oferece “Excluir marcados” com confirmação`, await p.$('#uiExcl') !== null && await (async () => { await p.click('#uiExcl'); await p.waitForSelector('#xlF'); const ok = /Exclusão definitiva/.test(await p.innerText('#xlF')) && /não.*é excluído/.test(await p.innerText('#xlF')); await p.evaluate(() => document.querySelectorAll('.admin-overlay').forEach(o => o.remove())); return ok; })());
     await foto('alunos-selecao');
     await p.click('#uiImp'); await p.waitForSelector('#uiTxt');
     await p.fill('#uiTxt', `nome;matrícula;turma;segmento\nIris Colada;T-4001${nome === 'desktop' ? '' : '9'};4º Ano;Anos Iniciais\nJoao Colado;T-4002${nome === 'desktop' ? '' : '9'};7º Ano;Anos Finais\nAna Fictícia de Souza;T-1001;3º Ano A;Anos Iniciais`); await p.click('#uiConferir');

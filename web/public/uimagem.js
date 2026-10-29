@@ -1,7 +1,7 @@
 /* Uso de Imagem › Painel e Alunos. O Marketing escolhe MANUALMENTE quem precisa de autorização; nada é selecionado sozinho.
    Dados de alunos ficam só nesta área interna e nunca vão para URLs públicas. */
 const UI = { sel: new Map(), busca: '', segmento: '', turma: '', situacao: '', inativos: false };
-const UI_ACOES = { 'aluno-criado': 'Aluno cadastrado', 'aluno-editado': 'Cadastro atualizado', 'aluno-inativado': 'Aluno inativado', 'aluno-reativado': 'Aluno reativado', importacao: 'Lista importada', 'solicitacoes-criadas': 'Solicitações criadas' };
+const UI_ACOES = { 'aluno-criado': 'Aluno cadastrado', 'aluno-editado': 'Cadastro atualizado', 'aluno-inativado': 'Aluno inativado', 'aluno-reativado': 'Aluno reativado', importacao: 'Lista importada', 'solicitacoes-criadas': 'Solicitações criadas', 'alunos-excluidos': 'Alunos excluídos da lista' };
 const UI_SITU = [['', 'Todas as situações'], ['SEM', 'Sem solicitação'], ['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['AGUARDANDO_ENVIO', 'Aguardando envio'], ['ENVIADO', 'Enviado'], ['ABERTO', 'Aberto'], ['AGUARDANDO_ASSINATURA', 'Aguardando assinatura'], ['AGUARDANDO_VALIDACAO', 'Aguardando validação'], ['VENCIDO', 'Vencido'], ['REVOGADO', 'Revogado']];
 
 PAGINAS.uipainel = async function () {
@@ -55,9 +55,10 @@ PAGINAS.uialunos = async function () {
   let dados = null, atraso = 0;
   const barra = () => {
     const b = $('#uiSelBar'), n = UI.sel.size; b.hidden = !n;
-    b.innerHTML = n ? `<b>${n} aluno(s) selecionado(s)</b><span class="kpi-note">A escolha é manual: só quem você marcar entra na solicitação.</span><span class="cm-esp"></span><button type="button" class="btn soft" id="uiLimpaSel">Limpar seleção</button><button type="button" class="btn" id="uiCriar">Criar solicitações</button>` : '';
+    b.innerHTML = n ? `<b>${n} aluno(s) selecionado(s)</b><span class="kpi-note">A escolha é manual: só quem você marcar entra na solicitação.</span><span class="cm-esp"></span><button type="button" class="btn soft" id="uiLimpaSel">Limpar seleção</button><button type="button" class="btn danger-soft" id="uiExcl">Excluir marcados</button><button type="button" class="btn" id="uiCriar">Criar solicitações</button>` : '';
     const l = $('#uiLimpaSel'); if (l) l.onclick = () => { UI.sel.clear(); desenha(); };
     const cr = $('#uiCriar'); if (cr) cr.onclick = () => uiCriarSolic(UI.sel);
+    const ex = $('#uiExcl'); if (ex) ex.onclick = () => uiExcluir([...UI.sel.values()], carrega);
   };
   const carrega = async () => {
     const qs = new URLSearchParams({ busca: UI.busca, segmento: UI.segmento, turma: UI.turma, situacao: UI.situacao, inativos: UI.inativos ? '1' : '' });
@@ -94,13 +95,14 @@ function uiAlunoForm(a, aoSalvar, segmentos) {
     <label class="ui-campo">Turma<input class="control" id="uiT" maxlength="60" value="${attr(a?.turma || '')}" placeholder="Ex.: 3º Ano A"></label>
     <label class="ui-campo">Segmento<select class="control" id="uiS"><option value="">Sem segmento</option>${segs.map(s => `<option value="${s.k}" ${a?.segmento === s.k ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></label>
     <div class="igp-erro" id="uiErro" role="alert" hidden></div>
-    <div class="actions dlg-acoes">${a ? `<button type="button" class="btn ${a.ativo ? 'danger-soft' : 'soft'}" id="uiAtivo">${a.ativo ? 'Inativar aluno' : 'Reativar aluno'}</button>` : ''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Cancelar</button><button type="submit" class="btn">Salvar</button></div></form>`);
+    <div class="actions dlg-acoes">${a ? `<button type="button" class="btn danger-soft" id="uiDel">Excluir da lista</button><button type="button" class="btn ${a.ativo ? 'soft' : 'soft'}" id="uiAtivo">${a.ativo ? 'Inativar aluno' : 'Reativar aluno'}</button>` : ''}<span class="cm-esp"></span><button type="button" class="btn soft" data-close>Cancelar</button><button type="submit" class="btn">Salvar</button></div></form>`);
   const erro = m => { const e = $('#uiErro', d.el); e.textContent = m; e.hidden = !m; };
   $('#uiForm', d.el).onsubmit = async ev => {
     ev.preventDefault(); erro('');
     try { await post('/imagem/alunos', { id: a?.id, nome: $('#uiN', d.el).value, matricula: $('#uiM', d.el).value, turma: $('#uiT', d.el).value, segmento: $('#uiS', d.el).value }); toast('Aluno salvo'); d.close(); aoSalvar(); }
     catch (e) { erro(e.message || 'Não foi possível salvar.'); }
   };
+  const del = $('#uiDel', d.el); if (del) del.onclick = () => { d.close(); uiExcluir([a], aoSalvar); };
   const at = $('#uiAtivo', d.el);
   if (at) at.onclick = async () => {
     if (a.ativo && !await Dlg.confirmar({ titulo: 'Inativar aluno', texto: `“${a.nome}” sai da lista de seleção. O histórico é mantido e nada é apagado.`, confirmar: 'Inativar' })) return;
@@ -139,5 +141,24 @@ function uiImportar(aoFim) {
   $('#uiOk', d.el).onclick = async () => {
     $('#uiOk', d.el).disabled = true;
     try { const r = await post('/imagem/alunos/importar', { linhas: alunos }); toast(`${r.novos} novo(s), ${r.atualizados} atualizado(s)`); d.close(); aoFim(); } catch (e) { erro(e.message); $('#uiOk', d.el).disabled = false; }
+  };
+}
+
+/* ---- excluir da lista: definitivo; quem já tem solicitação não é excluído (use Inativar) ---- */
+function uiExcluir(alunos, recarrega) {
+  if (!alunos.length) return;
+  const muitos = alunos.length > 3;
+  const d = dialogo(`<form id="xlF" novalidate><h3>Excluir ${alunos.length} aluno(s) da lista</h3><p class="ui-aviso"><b>Exclusão definitiva.</b> Quem já tem solicitação de autorização <b>não</b> é excluído (o histórico é prova): para esses, use Inativar. Se tiver dúvida, faça um backup antes em Configurações.</p>
+    <ul class="ui-erros ui-xl">${alunos.slice(0, 8).map(a => `<li>${esc(a.nome)} <small>${esc(a.turma || '')}</small></li>`).join('')}${alunos.length > 8 ? `<li>… e mais ${alunos.length - 8}</li>` : ''}</ul>
+    ${muitos ? `<label class="ui-campo">Para confirmar, digite <b>EXCLUIR</b><input class="control" id="xlC" autocomplete="off"></label>` : ''}
+    <div class="igp-erro" id="xlE" role="alert" hidden></div><div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn soft" data-close>Voltar</button><button type="submit" class="btn danger">Excluir definitivamente</button></div></form>`);
+  $('#xlF', d.el).onsubmit = async ev => {
+    ev.preventDefault(); const e = $('#xlE', d.el);
+    if (muitos && $('#xlC', d.el).value.trim().toUpperCase() !== 'EXCLUIR') { e.textContent = 'Digite EXCLUIR para confirmar.'; e.hidden = false; return; }
+    try {
+      const r = await post('/imagem/alunos/excluir', { ids: alunos.map(a => a.id) });
+      alunos.forEach(a => UI.sel.delete(a.id)); d.close();
+      toast(`${r.excluidos} aluno(s) excluído(s)` + (r.mantidos.length ? `; ${r.mantidos.length} mantido(s) por terem solicitações` : ''), r.mantidos.length ? 'warn' : undefined); recarrega();
+    } catch (x) { e.textContent = x.message; e.hidden = false; }
   };
 }
