@@ -96,20 +96,21 @@ async function uiCriarSolic(selecionados) {
 
 const UISOL = { busca: '', status: '', sel: new Set() };
 PAGINAS.uisolic = async function () {
-  $('#content').innerHTML = `<div class="ig-barra"><input id="usBusca" class="control" type="search" placeholder="Buscar por aluno, matrícula ou protocolo" aria-label="Buscar solicitação" value="${attr(UISOL.busca)}"><select id="usSt" class="control" aria-label="Situação"><option value="">Todas as situações</option>${Object.entries(UI_STATUS).map(([k, [t]]) => `<option value="${k}" ${UISOL.status === k ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="cm-esp"></span><button type="button" class="btn soft" id="usLemb" disabled>Preparar lembretes</button><button type="button" class="btn" id="usLote" disabled>Baixar PDF dos marcados</button></div><div class="ui-chips" id="usChips"></div><div id="usLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
+  $('#content').innerHTML = `<div class="ig-barra"><input id="usBusca" class="control" type="search" placeholder="Buscar por aluno, matrícula ou protocolo" aria-label="Buscar solicitação" value="${attr(UISOL.busca)}"><select id="usSt" class="control" aria-label="Situação"><option value="">Todas as situações</option>${Object.entries(UI_STATUS).map(([k, [t]]) => `<option value="${k}" ${UISOL.status === k ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="cm-esp"></span><button type="button" class="btn danger-soft" id="usExc" disabled>Excluir marcadas</button><button type="button" class="btn soft" id="usLemb" disabled>Preparar lembretes</button><button type="button" class="btn" id="usLote" disabled>Baixar PDF dos marcados</button></div><div class="ui-chips" id="usChips"></div><div id="usLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   let rows = [], atraso = 0;
-  const lote = () => { $('#usLemb').disabled = !UISOL.sel.size; const b = $('#usLote'); b.disabled = !UISOL.sel.size; b.textContent = UISOL.sel.size ? `Baixar PDF dos ${UISOL.sel.size} marcados` : 'Baixar PDF dos marcados'; };
+  const lote = () => { $('#usLemb').disabled = !UISOL.sel.size; $('#usExc').disabled = !UISOL.sel.size; const b = $('#usLote'); b.disabled = !UISOL.sel.size; b.textContent = UISOL.sel.size ? `Baixar PDF dos ${UISOL.sel.size} marcados` : 'Baixar PDF dos marcados'; };
   const carrega = async () => {
     rows = (await api('/imagem/solicitacoes?' + new URLSearchParams({ busca: UISOL.busca, status: UISOL.status }))).rows;
     const cont = (await api('/imagem/relatorio')).resumo.porStatus;
     $('#usChips').innerHTML = [['', 'Todas', Object.values(cont).reduce((a, n) => a + n, 0)], ...Object.entries(UI_STATUS).map(([k, [t]]) => [k, t, cont[k] || 0]).filter(x => x[2])].map(([k, t, n]) => `<button type="button" class="ui-chip ${UISOL.status === k ? 'on' : ''}" data-chip="${k}">${esc(t)} <b>${n}</b></button>`).join('');
     $$('[data-chip]').forEach(b => { b.onclick = () => { UISOL.status = b.dataset.chip; $('#usSt').value = UISOL.status; carrega(); }; });
-    $('#usLista').innerHTML = rows.length ? `<div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"></th><th>Protocolo</th><th>Aluno</th><th>Turma</th><th>Modelo</th><th>Situação</th><th>Criada em</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td class="ui-ck"><input type="checkbox" data-m="${r.id}" aria-label="Marcar ${attr(r.protocolo)}" ${UISOL.sel.has(r.id) ? 'checked' : ''}></td><td>${esc(r.protocolo)}</td><td class="titlecell"><b>${esc(r.aluno)}</b><br><small>${esc(r.matricula)}</small></td><td>${esc(r.turma || '—')}</td><td>${esc(r.modelo)} <small>v${r.versao}</small></td><td>${uiBadge(r.status)}</td><td>${esc(fmtDateTime(r.criadoEm))}</td><td class="acoes-cel">${['CANCELADO', 'AUTORIZADO', 'NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO', 'ERRO'].includes(r.status) ? '' : `<button type="button" class="btn" data-link="${r.id}">Link de envio</button>`}${r.status === 'AGUARDANDO_VALIDACAO' ? `<button type="button" class="btn" data-det="${r.id}">Validar</button>` : `<button type="button" class="btn soft" data-det="${r.id}">Detalhes</button>`}<button type="button" class="btn soft" data-pdf="${r.id}">PDF</button>${['AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA'].includes(r.status) ? `<button type="button" class="btn soft" data-cx="${r.id}">Cancelar</button>` : ''}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">O sistema não envia nada sozinho: gere o link, copie a mensagem e envie por WhatsApp ou e-mail. O código de acesso deve ir por outro meio. O PDF serve para impressão e assinatura presencial.</p>`
+    $('#usLista').innerHTML = rows.length ? `<div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"></th><th>Protocolo</th><th>Aluno</th><th>Turma</th><th>Modelo</th><th>Situação</th><th>Criada em</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td class="ui-ck"><input type="checkbox" data-m="${r.id}" aria-label="Marcar ${attr(r.protocolo)}" ${UISOL.sel.has(r.id) ? 'checked' : ''}></td><td>${esc(r.protocolo)}</td><td class="titlecell"><b>${esc(r.aluno)}</b><br><small>${esc(r.matricula)}</small></td><td>${esc(r.turma || '—')}</td><td>${esc(r.modelo)} <small>v${r.versao}</small></td><td>${uiBadge(r.status)}</td><td>${esc(fmtDateTime(r.criadoEm))}</td><td class="acoes-cel">${['CANCELADO', 'AUTORIZADO', 'NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO', 'ERRO'].includes(r.status) ? '' : `<button type="button" class="btn" data-link="${r.id}">Link de envio</button>`}${r.status === 'AGUARDANDO_VALIDACAO' ? `<button type="button" class="btn" data-det="${r.id}">Validar</button>` : `<button type="button" class="btn soft" data-det="${r.id}">Detalhes</button>`}<button type="button" class="btn soft" data-pdf="${r.id}">PDF</button><button type="button" class="btn danger-soft" data-ex="${r.id}">Excluir</button>${['AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA'].includes(r.status) ? `<button type="button" class="btn soft" data-cx="${r.id}">Cancelar</button>` : ''}</td></tr>`).join('')}</tbody></table></div><p class="kpi-note">O sistema não envia nada sozinho: gere o link, copie a mensagem e envie por WhatsApp ou e-mail. O código de acesso deve ir por outro meio. O PDF serve para impressão e assinatura presencial.</p>`
       : '<div class="empty-rich"><strong>Nenhuma solicitação</strong><p>Marque os alunos em Alunos e use “Criar solicitações”.</p></div>';
     $$('[data-m]').forEach(c => { c.onchange = () => { const id = +c.dataset.m; if (c.checked) UISOL.sel.add(id); else UISOL.sel.delete(id); lote(); }; });
     $$('[data-pdf]').forEach(b => { b.onclick = () => uiBaixarPdf([+b.dataset.pdf]); });
     $$('[data-link]').forEach(b => { b.onclick = () => uiLink(rows.find(x => x.id === +b.dataset.link), carrega); });
     $$('[data-det]').forEach(b => { b.onclick = () => uiDetalhe(+b.dataset.det, carrega); });
+    $$('[data-ex]').forEach(b => { b.onclick = () => uiExcluirSol(rows.filter(x => x.id === +b.dataset.ex), carrega); });
     $$('[data-cx]').forEach(b => { b.onclick = () => uiCancelar(rows.find(x => x.id === +b.dataset.cx), carrega); });
     lote();
   };
@@ -117,6 +118,7 @@ PAGINAS.uisolic = async function () {
   $('#usSt').onchange = e => { UISOL.status = e.target.value; carrega(); };
   $('#usLote').onclick = () => uiBaixarPdf([...UISOL.sel]);
   $('#usLemb').onclick = () => uiLembretes([...UISOL.sel], carrega);
+  $('#usExc').onclick = () => uiExcluirSol(rows.filter(x => UISOL.sel.has(x.id)), carrega);
   await carrega();
 };
 
@@ -247,3 +249,21 @@ PAGINAS.uiconfig = async function () {
     try { await post('/imagem/config', { linkDias: +$('#cLink').value, lembreteIntervaloDias: +$('#cInt').value, lembreteMax: +$('#cMax').value, avisoVencimentoDias: +$('#cVenc').value, retencaoAnos: +$('#cRet').value, bloquearVersaoAntiga: $('#cBloq').checked, quemValida: $('#cVal').value, quemRevoga: $('#cRev').value, canais: $$('[name=cCan]:checked').map(x => x.value), mensagemEnvio: $('#cME').value, mensagemLembrete: $('#cML').value }); toast('Ajustes salvos'); } catch (x) { e.textContent = x.message; e.hidden = false; }
   };
 };
+
+/* ---- excluir solicitações: definitivo (só Administrador) ---- */
+function uiExcluirSol(lista, recarrega) {
+  if (!lista.length) return toast('Marque as solicitações que quer excluir.', 'warn');
+  const resp = lista.filter(r => ['AUTORIZADO', 'NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO'].includes(r.status));
+  const forte = resp.length > 0 || lista.length > 3;
+  const d = dialogo(`<form id="xsF" novalidate><h3>Excluir ${lista.length} solicitação(ões)</h3><p class="ui-aviso"><b>Exclusão definitiva.</b> Some o histórico, o link, a assinatura e os PDFs guardados dessas solicitações. Se só quer deixar de usar, prefira <b>Cancelar</b> (fica registrado).</p>
+    ${resp.length ? `<p class="ui-erros"><b>${resp.length}</b> já ${resp.length === 1 ? 'foi respondida' : 'foram respondidas'} (autorizada, recusada, vencida ou revogada): a <b>prova</b> dessa resposta será perdida. Se alguma é uma autorização em vigor, o aluno volta a ficar sem autorização.</p>` : ''}
+    <ul class="ui-erros ui-xl">${lista.slice(0, 8).map(r => `<li>${esc(r.protocolo)} · ${esc(r.aluno)} ${uiBadge(r.status)}</li>`).join('')}${lista.length > 8 ? `<li>… e mais ${lista.length - 8}</li>` : ''}</ul>
+    ${forte ? '<label class="ui-campo">Para confirmar, digite <b>EXCLUIR</b><input class="control" id="xsC" autocomplete="off"></label>' : ''}
+    <div class="igp-erro" id="xsE" role="alert" hidden></div><div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn soft" data-close>Voltar</button><button type="submit" class="btn danger">Excluir definitivamente</button></div></form>`);
+  $('#xsF', d.el).onsubmit = async ev => {
+    ev.preventDefault(); const e = $('#xsE', d.el);
+    if (forte && $('#xsC', d.el).value.trim().toUpperCase() !== 'EXCLUIR') { e.textContent = 'Digite EXCLUIR para confirmar.'; e.hidden = false; return; }
+    try { const r = await post('/imagem/solicitacoes/excluir', { ids: lista.map(x => x.id) }); lista.forEach(x => UISOL.sel.delete(x.id)); d.close(); toast(`${r.excluidas} solicitação(ões) excluída(s)`); recarrega(); }
+    catch (x) { e.textContent = x.message; e.hidden = false; }
+  };
+}

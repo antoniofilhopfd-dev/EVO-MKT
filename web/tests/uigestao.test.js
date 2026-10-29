@@ -131,6 +131,16 @@ const dia = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   t('restaurar o backup devolve a autorização, a assinatura e o PDF assinado do estado do backup', rs.ok && (await st(sAut.id)) === 'AUTORIZADO' && dl.status === 200 && Buffer.from(await dl.arrayBuffer()).subarray(0, 5).toString() === '%PDF-' && (await G.get('/imagem/solicitacoes/detalhe?id=' + sAut.id)).arquivos.some(a => a.tipo === 'assinatura'), rs);
   t('depois da restauração os links, ajustes e modelos continuam funcionando', (await G.get('/imagem/config')).config.linkDias === 15 && (await G.get('/imagem/modelos')).rows.length >= 5 && (await pub('/public/imagem/abrir', { token: tokenDe(a1.k.link), codigo: a1.k.codigo })).s === 200);
 
+  // ---------- excluir solicitações ----------
+  const sx1 = await novaSol(20, M0), sx2 = await novaSol(21, M0); await autorizar(sx2);
+  { const E2 = await U.entrar(process.argv[2], 'ANT-3302', 'Ant26ab'); const rq = await E2.req('POST', '/imagem/solicitacoes/excluir', { ids: [sx1.id] }); t('a Equipe não exclui solicitações (403)', rq.status === 403 && (await st(sx1.id)) === 'AGUARDANDO_ENVIO', [rq.status, await st(sx1.id)]); }
+  t('excluir sem marcar nada: 400', (await G.req('POST', '/imagem/solicitacoes/excluir', { ids: [] })).status === 400);
+  const antesArq = Number(sql(`SELECT COUNT(*) FROM arquivos WHERE caminho LIKE 'USO-IMAGEM/${sx2.id}/%'`));
+  r = await G.post('/imagem/solicitacoes/excluir', { ids: [sx1.id, sx2.id] });
+  t('o Administrador exclui solicitações de vez e o aviso conta as já respondidas', r.excluidas === 2 && r.respondidas === 1 && antesArq >= 2, [r, antesArq]);
+  t('a exclusão leva junto histórico, link, arquivos e o PDF guardado', sql(`SELECT COUNT(*) FROM ui_solicitacoes WHERE id IN (${sx1.id},${sx2.id})`) === '0' && sql(`SELECT COUNT(*) FROM ui_solic_eventos WHERE solicitacao_id IN (${sx1.id},${sx2.id})`) === '0' && sql(`SELECT COUNT(*) FROM ui_acessos WHERE solicitacao_id IN (${sx1.id},${sx2.id})`) === '0' && sql(`SELECT COUNT(*) FROM ui_arquivos WHERE solicitacao_id IN (${sx1.id},${sx2.id})`) === '0' && sql(`SELECT COUNT(*) FROM arquivos WHERE caminho LIKE 'USO-IMAGEM/${sx2.id}/%'`) === '0');
+  t('o aluno continua cadastrado e volta a ficar “sem solicitação”', (await G.get('/imagem/alunos?busca=G-21')).rows[0].situacao === '');
+  t('o link de uma solicitação excluída deixa de funcionar (404)', (await pub('/public/imagem/abrir', { token: 'a'.repeat(48), codigo: '123456' })).s === 404);
   // ---------- telas ----------
   const dir = process.env.CAPTURAS; if (dir) fs.mkdirSync(dir, { recursive: true });
   const b = await U.abrir();
