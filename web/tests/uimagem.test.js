@@ -62,6 +62,14 @@ const xlsx = linhas => {
   const painel = await G.get('/imagem/painel');
   t('painel: total de alunos ativos, segmentos e atividade recente', painel.totalAlunos === 4 && painel.segmentos.find(s => s.k === 'FUND1').n === 1 && painel.recentes.length > 0 && painel.autorizados === 0, painel);
 
+  // ---------- ordem escolar das turmas ----------
+  const turmasT = ['3ª Série B', '1º ANO C', 'Infantil 5 B', '9º Ano A', '1º Ano A', 'Infantil 1 A', '2ª Série', '10 sem padrão', 'Infantil 2 D', '2º Ano A', '1ª Série A', '8º Ano B', 'Infantil 5 A'];
+  for (const [i, tm] of turmasT.entries()) await G.post('/imagem/alunos', { nome: `Zz Turma ${String(i).padStart(2, '0')}`, matricula: `TT-${i}`, turma: tm, segmento: '' }).catch(() => ({}));
+  const ordem = (await G.get('/imagem/alunos?busca=TT-')).rows.map(a => a.turma);
+  t('a lista segue a ordem escolar: Infantil 1 a 5, 1º ao 9º Ano, 1ª a 3ª Série (e a letra dentro de cada uma)', ordem.join('|') === ['Infantil 1 A', 'Infantil 2 D', 'Infantil 5 A', 'Infantil 5 B', '1º Ano A', '1º ANO C', '2º Ano A', '8º Ano B', '9º Ano A', '1ª Série A', '2ª Série', '3ª Série B', '10 sem padrão'].join('|'), ordem);
+  const filtroT = (await G.get('/imagem/alunos')).turmas;
+  t('o filtro de turmas também usa essa ordem', filtroT.indexOf('Infantil 1 A') < filtroT.indexOf('Infantil 5 A') && filtroT.indexOf('Infantil 5 B') < filtroT.indexOf('1º Ano A') && filtroT.indexOf('9º Ano A') < filtroT.indexOf('1ª Série A') && filtroT.indexOf('3ª Série B') < filtroT.indexOf('10 sem padrão'), filtroT);
+  for (let i = 0; i < turmasT.length; i++) { const a = (await G.get(`/imagem/alunos?busca=TT-${i}`)).rows.find(x => x.matricula === `TT-${i}`); if (a) await G.post('/imagem/alunos/excluir', { ids: [a.id] }); }
   // ---------- planilha modelo ----------
   const mod = await fetch(U.B + '/imagem/alunos/modelo.xlsx', { headers: G.H }), modB = Buffer.from(await mod.arrayBuffer());
   const modZ = require('fflate').unzipSync(new Uint8Array(modB)), modFolha = require('fflate').strFromU8(modZ['xl/worksheets/sheet1.xml']);
@@ -135,6 +143,9 @@ const xlsx = linhas => {
     t(`${nome}: painel mostra os alunos ativos e a atividade recente`, new RegExp(nome === 'desktop' ? '4' : '6').test(await p.innerText('.db-cartoes')) && /Atividade recente/.test(await p.innerText('#content')));
     await foto('painel');
     await p.click('#uiIrAlunos'); await p.waitForSelector('.ui-tab');
+    t(`${nome}: a lista abre na ordem escolar das turmas (cabeçalho Turma ativo)`, await p.$('.ui-ord.on[data-ord="turma"]') !== null && (await p.$$eval('.ui-tab tbody tr td:nth-child(4)', e => e.map(x => x.innerText.trim()))).join('|') === ((await p.$$eval('.ui-tab tbody tr td:nth-child(4)', e => e.map(x => x.innerText.trim())))).join('|'));
+    await p.click('[data-ord="nome"]');
+    t(`${nome}: clicar em Aluno ordena por nome`, await p.$('.ui-ord.on[data-ord="nome"]') !== null && await (async () => { const n = await p.$$eval('.ui-tab tbody tr td.titlecell b', e => e.map(x => x.innerText.trim())); return n.join('|') === [...n].sort((a, b) => a.localeCompare(b, 'pt-BR')).join('|'); })());
     t(`${nome}: lista de alunos com os ativos e nenhum selecionado`, (await p.$$('.ui-tab tbody tr')).length === (nome === 'desktop' ? 4 : 6) && (await p.$$('[data-sel]:checked')).length === 0);
     await p.fill('#uiBusca', 'fict'); await p.waitForTimeout(700);
     t(`${nome}: busca filtra a lista`, (await p.$$('.ui-tab tbody tr')).length === 1);

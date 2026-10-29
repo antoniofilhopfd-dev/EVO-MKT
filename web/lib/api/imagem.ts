@@ -8,6 +8,7 @@ import { escreverXlsx } from '../xlsxEscrita';
 import { json } from './handlers';
 import { imagemSolicRoute } from './imagemSolic';
 import { atualizarVencimentos } from '../imagemDados';
+import { compararTurma } from '../imagemTurma';
 import { lerConfig } from '../imagemConfig';
 
 /**
@@ -61,12 +62,13 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
     const busca = lower(c.qs('busca')).trim(), seg = c.qs('segmento'), turma = c.qs('turma'), inativos = c.qs('inativos') === '1', situ = c.qs('situacao').toUpperCase().replace(/[^A-Z_]/g, '');
     const like = `%${busca}%`;
     const rows = await q(
-      `SELECT a.*, (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao FROM ui_alunos a WHERE (a.ativo=1 OR ?=1) AND (?='' OR a.segmento=?) AND (?='' OR a.turma=?) AND (?='' OR LOWER(a.nome) LIKE ? OR a.matricula LIKE ?) HAVING (?='' OR (?='SEM' AND situacao IS NULL) OR situacao=?) ORDER BY a.nome LIMIT 1000`,
+      `SELECT a.*, (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao FROM ui_alunos a WHERE (a.ativo=1 OR ?=1) AND (?='' OR a.segmento=?) AND (?='' OR a.turma=?) AND (?='' OR LOWER(a.nome) LIKE ? OR a.matricula LIKE ?) HAVING (?='' OR (?='SEM' AND situacao IS NULL) OR situacao=?) ORDER BY a.nome LIMIT 3000`,
       [inativos ? 1 : 0, seg, seg, turma, turma, busca, like, like, situ, situ, situ],
     );
-    const turmas = (await q('SELECT DISTINCT turma FROM ui_alunos WHERE ativo=1 AND turma<>\'\' ORDER BY turma')).map((r) => r.turma);
+    const turmas = (await q('SELECT DISTINCT turma FROM ui_alunos WHERE ativo=1 AND turma<>\'\'')).map((r) => String(r.turma)).sort(compararTurma);
+    rows.sort((x, y) => compararTurma(String(x.turma), String(y.turma)) || String(x.nome).localeCompare(String(y.nome), 'pt-BR'));
     const total = (await q1('SELECT COUNT(*) n FROM ui_alunos WHERE ativo=1'))?.n ?? 0;
-    return json({ rows: rows.map(alunoPublico), turmas, total: Number(total), limite: rows.length >= 1000, segmentos: Object.entries(SEGMENTOS).map(([k, nome]) => ({ k, nome })) });
+    return json({ rows: rows.map(alunoPublico), turmas, total: Number(total), limite: rows.length >= 3000, segmentos: Object.entries(SEGMENTOS).map(([k, nome]) => ({ k, nome })) });
   }
 
   if (path === '/imagem/alunos' && method === 'POST') {
