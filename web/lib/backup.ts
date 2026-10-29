@@ -36,7 +36,7 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   ui_alunos: { cols: ['id', 'matricula', 'nome', 'turma', 'segmento', 'ativo', 'criado_em', 'atualizado_em'], restore: 'replace', opt: true },
   ui_eventos: { cols: ['id', 'quando', 'ator', 'acao', 'aluno_id', 'detalhe'], restore: 'replace', opt: true },
   ui_modelos: { cols: ['id', 'nome', 'tipo', 'finalidade', 'canais', 'local_uso', 'periodo_tipo', 'periodo_valor', 'observacoes', 'corpo', 'versao', 'ativo', 'criado_em', 'atualizado_em', 'atualizado_por'], restore: 'replace', opt: true },
-  ui_solicitacoes: { cols: ['id', 'protocolo', 'aluno_id', 'modelo_id', 'modelo_nome', 'modelo_versao', 'termo_texto', 'termo_hash', 'pdf_hash', 'periodo_tipo', 'periodo_valor', 'responsavel_nome', 'responsavel_email', 'responsavel_tel', 'status', 'lote', 'criado_por', 'criado_em', 'atualizado_em', 'enviado_em', 'enviado_canal', 'aberto_em', 'decisao', 'decisao_em', 'resp_confirmado', 'parentesco', 'modalidade', 'ip_decisao', 'ua_decisao', 'validado_por', 'validado_em', 'validacao_obs', 'final_hash', 'vence_em', 'revogado_em', 'revogado_por', 'revogado_motivo', 'lembretes', 'ultimo_lembrete', 'cancelado_motivo'], restore: 'replace', opt: true },
+  ui_solicitacoes: { cols: ['id', 'protocolo', 'aluno_id', 'modelo_id', 'modelo_nome', 'modelo_versao', 'termo_texto', 'termo_hash', 'pdf_hash', 'periodo_tipo', 'periodo_valor', 'responsavel_nome', 'responsavel_email', 'responsavel_tel', 'status', 'lote', 'criado_por', 'criado_em', 'atualizado_em', 'enviado_em', 'enviado_canal', 'aberto_em', 'decisao', 'decisao_em', 'resp_confirmado', 'parentesco', 'modalidade', 'ip_decisao', 'ua_decisao', 'validado_por', 'validado_em', 'validacao_obs', 'final_hash', 'vence_em', 'revogado_em', 'revogado_por', 'revogado_motivo', 'lembretes', 'ultimo_lembrete', 'cancelado_motivo', 'resp_cpf', 'pede_cpf'], restore: 'replace', opt: true },
   ui_solic_eventos: { cols: ['id', 'solicitacao_id', 'quando', 'ator', 'acao', 'detalhe'], restore: 'replace', opt: true },
   ui_acessos: { cols: ['id', 'solicitacao_id', 'token_hash', 'codigo_hash', 'expira_em', 'tentativas', 'ativo', 'criado_em', 'criado_por', 'ultimo_acesso'], restore: 'replace', opt: true },
   ui_arquivos: { cols: ['id', 'solicitacao_id', 'tipo', 'caminho', 'nome', 'sha256', 'tamanho', 'info', 'ativo', 'criado_em', 'ip'], restore: 'replace', opt: true },
@@ -212,7 +212,7 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
         const rows = T[t];
         if (!Array.isArray(rows) || spec.restore === 'info') continue;
         // backups anteriores à separação Administrador × Gerente não têm "admin": toda Gerente daquela época vira Administradora
-        const data = rows.map((r) => spec.cols.map((k) => (k === 'admin' && t === 'users' && r.admin === undefined ? (r.role === 'manager' ? 1 : 0) : r[k] === undefined ? (k === 'email' || (t.startsWith('ui_') && !['id', 'aluno_id', 'solicitacao_id'].includes(k)) ? '' : null) : r[k])));
+        const data = rows.map((r) => spec.cols.map((k) => (k === 'admin' && t === 'users' && r.admin === undefined ? (r.role === 'manager' ? 1 : 0) : r[k] === undefined ? (k === 'email' ? '' : t.startsWith('ui_') && !['id', 'aluno_id', 'solicitacao_id'].includes(k) ? (['pede_cpf', 'lembretes', 'modelo_id', 'modelo_versao', 'tentativas', 'ativo', 'versao', 'tamanho'].includes(k) ? 0 : '') : null) : r[k])));
         if (spec.restore === 'replace') {
           await c.query(`DELETE FROM ${t}`);
           await insertChunks(c, t, spec.cols, data);

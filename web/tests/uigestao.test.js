@@ -14,7 +14,7 @@ const traco = async () => 'data:image/png;base64,' + (await sharp(Buffer.from('<
 const dia = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 (async () => {
   const G = await U.entrar(process.argv[2]), E = await U.entrar(process.argv[2], 'ANT-3302', 'Ant26ab');
-  const modBase = (await G.get('/imagem/modelos')).rows[0];
+  const modBase = { corpo: U.CORPO_TESTE };
   const novoModelo = async (nome, periodo_tipo, periodo_valor) => (await G.post('/imagem/modelos', { nome, tipo: 'EVENTO', finalidade: 'Finalidade de teste do módulo.', canais: ['Instagram'], local_uso: 'Teste', periodo_tipo, periodo_valor, observacoes: '', corpo: modBase.corpo })).id;
   const novaSol = async (n, modelo_id, seg = 'FUND1', turma = '5º Ano A') => { const a = await G.post('/imagem/alunos', { nome: `Aluno Gestão ${n}`, matricula: `G-${n}`, turma, segmento: seg }); const r = await G.post('/imagem/solicitacoes/criar', { modelo_id, alunos: [{ id: a.id, telefone: '83988880000', email: `g${n}@exemplo.com` }] }); return { ...r.criadas[0], alunoId: a.id }; };
   const gerar = id => G.post('/imagem/solicitacoes/link', { id });

@@ -16,7 +16,7 @@ const traco = async (ink = true) => { // PNG como o canvas gera: fundo branco; c
 };
 (async () => {
   const G = await U.entrar(process.argv[2]), E = await U.entrar(process.argv[2], 'ANT-3302', 'Ant26ab');
-  const mod = (await G.get('/imagem/modelos')).rows[0];
+  const mod = { id: (await G.post('/imagem/modelos', { nome: 'Modelo de teste do portal', tipo: 'EVENTO', finalidade: 'Finalidade de teste.', canais: ['Instagram'], local_uso: 'Teste', periodo_tipo: 'INDETERMINADO', periodo_valor: '', observacoes: '', corpo: U.CORPO_TESTE })).id };
   const novoAluno = async (n, resp) => { const a = await G.post('/imagem/alunos', { nome: `Aluno Portal ${n}`, matricula: `P-${n}`, turma: '4º Ano B', segmento: 'FUND1' }); const r = await G.post('/imagem/solicitacoes/criar', { modelo_id: mod.id, alunos: [{ id: a.id, responsavel: resp || '', telefone: '83999990000', email: `resp${n}@exemplo.com` }] }); return r.criadas[0]; };
   const gerar = async id => G.post('/imagem/solicitacoes/link', { id, dias: 15 });
   const decidir = (tk, cod, extra = {}) => pub('/public/imagem/decidir', { token: tk, codigo: cod, decisao: 'AUTORIZO', responsavel_nome: 'Maria Responsável Teste', parentesco: 'Mãe', leu_termo: true, dados_corretos: true, sou_responsavel: true, ...extra });
@@ -120,6 +120,29 @@ const traco = async (ink = true) => { // PNG como o canvas gera: fundo branco; c
   t('painel conta autorizados e não autorizados reais', pn.autorizados === 2 && pn.naoAutorizados === 1, pn);
   t('a resposta do portal não é guardada em cache', (await fetch(U.B + '/public/imagem/abrir', { method: 'POST', headers: H, body: JSON.stringify({ token: tC, codigo: kC.codigo }) })).headers.get('cache-control') === 'no-store');
 
+
+  // ---------- termo real do colégio (mídia paga): CPF, opção marcada, data e layout ----------
+  const txtPdf = buf => { const f = require('path').join(require('os').tmpdir(), 'uiportal_' + Date.now() + '.pdf'); fs.writeFileSync(f, buf); try { return execFileSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' }); } finally { fs.unlinkSync(f); } };
+  const termoReal = (await G.get('/imagem/modelos')).rows.find(m => /mídia paga/i.test(m.nome));
+  const aR = await G.post('/imagem/alunos', { nome: 'Aluno Termo Real', matricula: 'P-CPF', turma: '3º Ano B', segmento: 'FUND1' });
+  const sR = (await G.post('/imagem/solicitacoes/criar', { modelo_id: termoReal.id, alunos: [{ id: aR.id }] })).criadas[0], kR = await gerar(sR.id), tR = tokenDe(kR.link);
+  const brancoR = txtPdf(await fetch(U.B + '/imagem/solicitacoes/pdf?ids=' + sR.id, { headers: G.H }).then(x => x.arrayBuffer()).then(b => Buffer.from(b)));
+  t('o PDF da equipe antes da resposta sai em branco, para imprimir: nome, CPF, opção e data para preencher à mão', /Nome do\(a\) responsável legal: _{20,}/.test(brancoR) && /CPF do\(a\) responsável legal: _{15,}/.test(brancoR) && /\[\s*\] AUTORIZO/.test(brancoR) && /João Pessoa, ____ de ________________ de \d{4}\./.test(brancoR) && /Assinatura do\(a\) responsável legal/.test(brancoR), brancoR.slice(0, 800));
+  let vR = await pub('/public/imagem/abrir', { token: tR, codigo: kR.codigo });
+  t('o termo do colégio pede o CPF no portal e traz o texto exato com título, seções e Meta Ads / Google Ads / TikTok Ads', vR.j.pedeCpf === true && /^# TERMO DE AUTORIZAÇÃO PARA USO DE IMAGEM EM CAMPANHAS DE MÍDIA PAGA/m.test(vR.j.texto) && /Google Ads, TikTok Ads/.test(vR.j.texto), vR.j.pedeCpf);
+  const dec = (extra = {}) => pub('/public/imagem/decidir', { token: tR, codigo: kR.codigo, decisao: 'AUTORIZO', responsavel_nome: 'Sandra Responsável Teste', parentesco: 'Mãe', leu_termo: true, dados_corretos: true, sou_responsavel: true, ...extra });
+  t('autorizar sem CPF, ou com CPF inválido, é recusado (400)', (await dec()).s === 400 && (await dec({ cpf: '11111111111' })).s === 400 && (await dec({ cpf: '52998224726' })).s === 400);
+  t('para NÃO autorizar o CPF não é pedido', await (async () => { const sn = (await G.post('/imagem/solicitacoes/criar', { modelo_id: termoReal.id, alunos: [{ id: (await G.post('/imagem/alunos', { nome: 'Aluno Recusa Real', matricula: 'P-CPF2', turma: '1º Ano', segmento: 'FUND1' })).id }] })).criadas[0]; const kn = await gerar(sn.id); const rn = await pub('/public/imagem/decidir', { token: tokenDe(kn.link), codigo: kn.codigo, decisao: 'NAO_AUTORIZO', responsavel_nome: 'Pai Que Recusa', parentesco: 'Pai', leu_termo: true, dados_corretos: true, sou_responsavel: true }); return rn.s === 200 && rn.j.status === 'NAO_AUTORIZADO'; })());
+  t('com um CPF válido (digitado com pontos) a escolha AUTORIZO é aceita', (await dec({ cpf: '529.982.247-25' })).s === 200 && (await status(sR.id)) === 'AGUARDANDO_ASSINATURA');
+  const origR = await pub('/public/imagem/pdf', { token: tR, codigo: kR.codigo, tipo: 'original' }), txtO = txtPdf(origR.buf);
+  t('PDF para o GOV.BR: já sai com o nome, o CPF e a opção marcada, e a data ainda em branco', /Nome do\(a\) responsável legal: Sandra Responsável Teste/.test(txtO) && /CPF do\(a\) responsável legal: 529\.982\.247-25/.test(txtO) && /\[ X \] AUTORIZO/.test(txtO) && /____ de ________________ de \d{4}/.test(txtO), txtO.slice(0, 900));
+  r = await pub('/public/imagem/assinar', { token: tR, codigo: kR.codigo, assinatura: await traco(true), confirmo_assinatura: true });
+  const finR = await pub('/public/imagem/pdf', { token: tR, codigo: kR.codigo, tipo: 'final' }), txtF = txtPdf(finR.buf);
+  if (process.env.CAPTURAS) { fs.mkdirSync(process.env.CAPTURAS, { recursive: true }); fs.writeFileSync(process.env.CAPTURAS + '/termo-midia-paga-assinado.pdf', finR.buf); fs.writeFileSync(process.env.CAPTURAS + '/termo-midia-paga-branco.pdf', (await fetch(U.B + '/imagem/solicitacoes/pdf?ids=' + sR.id, { headers: G.H }).then(x => x.arrayBuffer()).then(b => Buffer.from(b)))); }
+  t('PDF assinado: título, identificação, finalidade, condições, base legal, nome, CPF, “[ X ] AUTORIZO” e a data de hoje no “João Pessoa, … de … de …”', r.s === 200 && /TERMO DE AUTORIZAÇÃO PARA USO DE IMAGEM EM CAMPANHAS DE MÍDIA PAGA \(TRÁFEGO\s+PAGO\)/.test(txtF) && /Identificação/.test(txtF) && /Condições de uso/.test(txtF) && /Manifestação de vontade/.test(txtF) && /Meta Ads/.test(txtF) && /Lei nº 15\.211\/2025/.test(txtF) && /CPF do\(a\) responsável legal: 529\.982\.247-25/.test(txtF) && /\[ X \] AUTORIZO/.test(txtF) && /João Pessoa, \d{1,2} de [a-zç]+ de \d{4}\./.test(txtF) && /Rua Ovídio Mendonça, 130/.test(txtF) && /3244-7711/.test(txtF), txtF.slice(0, 1500));
+  const detR = (await G.get('/imagem/solicitacoes/detalhe?id=' + sR.id)).solicitacao;
+  t('a equipe vê o CPF só parcialmente (***.982.247-**), nunca inteiro, e ele não vai para os relatórios', detR.cpfResponsavel === '***.982.247-**' && !JSON.stringify(detR).includes('52998224725') && !JSON.stringify(await G.get('/imagem/relatorio')).includes('52998224725') && !JSON.stringify(await G.get('/imagem/alunos/ficha?id=' + aR.id)).includes('52998224725'), detR.cpfResponsavel);
+
   // ---------- telas reais do portal (celular com toque, e computador) ----------
   const dir = process.env.CAPTURAS; if (dir) fs.mkdirSync(dir, { recursive: true });
   const b = await U.abrir(), b2 = b;
@@ -170,6 +193,21 @@ const traco = async (ink = true) => { // PNG como o canvas gera: fundo branco; c
   const [dlf] = await Promise.all([p.waitForEvent('download'), p.click('#bFinal')]);
   t('portal: o responsável baixa o documento assinado', /\.pdf$/.test(dlf.suggestedFilename()));
   t('portal: sem estouro horizontal e sem erros de script', await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth <= 2) && erros.length === 0, erros);
+
+  // portal com o termo real: o CPF só aparece para quem escolhe AUTORIZO; o termo aparece com título e seções
+  { const aT = await G.post('/imagem/alunos', { nome: 'Aluno Termo Tela', matricula: 'P-CPF3', turma: 'Infantil 5 B', segmento: 'INFANTIL' });
+    const sT = (await G.post('/imagem/solicitacoes/criar', { modelo_id: termoReal.id, alunos: [{ id: aT.id }] })).criadas[0], kT = await gerar(sT.id);
+    const cx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }), pt = await cx.newPage();
+    await pt.goto(BASE + '/autorizar.html#' + tokenDe(kT.link)); await pt.waitForSelector('#codigo'); await pt.fill('#codigo', kT.codigo); await pt.click('#fCod button'); await pt.waitForSelector('.aut-doc');
+    t('portal: o termo aparece com o título e as seções do documento do colégio', /TERMO DE AUTORIZAÇÃO PARA USO DE IMAGEM EM CAMPANHAS DE MÍDIA PAGA/.test(await pt.innerText('.aut-doc h2')) && (await pt.$$('.aut-doc h3')).length >= 4 && /Turma \/ Ano letivo: Infantil 5 B/.test(await pt.innerText('.aut-doc')));
+    if (dir) await pt.screenshot({ path: `${dir}/portal-9-termo-real.png`, fullPage: true });
+    t('portal: o campo CPF só aparece quando o responsável escolhe AUTORIZO', !(await pt.isVisible('#rCpf')) && (await pt.check('[value=AUTORIZO]'), await pt.isVisible('#rCpf')) && (await pt.check('[value=NAO_AUTORIZO]'), !(await pt.isVisible('#rCpf'))));
+    await pt.check('[value=AUTORIZO]'); await pt.fill('#rNome', 'Teresa Responsável Teste'); await pt.selectOption('#rPar', 'Mãe'); await pt.check('#c1'); await pt.check('#c2'); await pt.check('#c3');
+    await pt.click('#fTermo button[type=submit]'); await pt.waitForSelector('#eT:not([hidden])');
+    t('portal: AUTORIZO sem CPF mostra a mensagem pedindo o CPF', /CPF/.test(await pt.innerText('#eT')));
+    await pt.fill('#rCpf', '529.982.247-25'); await pt.click('#fTermo button[type=submit]'); await pt.waitForSelector('#bDes');
+    t('portal: com o CPF correto avança para a escolha da assinatura', await pt.$('#bGov') !== null);
+    await cx.close(); }
   // mouse no computador (recusa) e link vencido
   const pc = await (await b.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   const H6 = await novoAluno(7), k6 = await gerar(H6.id);

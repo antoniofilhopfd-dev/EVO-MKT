@@ -4,7 +4,7 @@ import { q, q1, run } from '../db';
 import { audit } from '../records';
 import { respostaPdf } from '../pdf';
 import { hashBytes, termosPdf, TermoPdf } from '../imagemPdf';
-import { CANAIS, hashTexto, montarTermo, PLACEHOLDERS, validaModelo } from '../imagemTermo';
+import { CANAIS, cpfMascarado, hashTexto, montarTermo, PLACEHOLDERS, validaModelo } from '../imagemTermo';
 import { fail, now, Row, strv } from '../util';
 import { randHex, sha256 } from '../crypto';
 import { publicUrl } from '../integrations/http';
@@ -76,7 +76,7 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
     if (b.modelo_id) m = await q1('SELECT * FROM ui_modelos WHERE id=?', [Number(b.modelo_id)]) ?? fail(404, 'Modelo não encontrado.');
     else { const v = validaModelo((b.modelo ?? {}) as Row); if ('erro' in v) fail(400, v.erro); m = v.m as unknown as Row; }
     const al = b.aluno_id ? await q1('SELECT nome,matricula,turma FROM ui_alunos WHERE id=?', [Number(b.aluno_id)]) : undefined;
-    const texto = montarTermo(m as never, { aluno: al?.nome ?? 'Nome do Aluno (exemplo)', matricula: al?.matricula ?? '000000', turma: al?.turma ?? '0º Ano A', responsavel: limpa(b.responsavel, 160) });
+    const texto = montarTermo(m as never, { aluno: al?.nome ?? 'Nome do Aluno (exemplo)', matricula: al?.matricula ?? '000000', turma: al?.turma ?? '0º Ano A', responsavel: limpa(b.responsavel, 160) }, undefined, now().slice(0, 4));
     return json({ texto, hash: hashTexto(texto), versao: m.versao ?? null });
   }
 
@@ -114,11 +114,11 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
       const resp = limpa(it.responsavel, 160), email = limpa(it.email, 190).toLowerCase(), tel = String(it.telefone ?? '').replace(/\D/g, '').slice(0, 15);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { ignoradas.push({ aluno: al.nome, motivo: 'E-mail do responsável inválido.' }); continue; }
       if (tel && (tel.length < 10 || tel.length > 13)) { ignoradas.push({ aluno: al.nome, motivo: 'Telefone do responsável inválido (use DDD + número).' }); continue; }
-      await run('INSERT INTO ui_solicitacoes(aluno_id,modelo_id,modelo_nome,modelo_versao,termo_texto,periodo_tipo,periodo_valor,responsavel_nome,responsavel_email,responsavel_tel,status,lote,criado_por,criado_em,atualizado_em) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [id, m.id, m.nome, m.versao, '', m.periodo_tipo, m.periodo_valor, resp, email, tel, 'AGUARDANDO_ENVIO', lote, ator, now(), now()]);
+      await run('INSERT INTO ui_solicitacoes(aluno_id,modelo_id,modelo_nome,modelo_versao,termo_texto,periodo_tipo,periodo_valor,responsavel_nome,responsavel_email,responsavel_tel,status,lote,criado_por,criado_em,atualizado_em,pede_cpf) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [id, m.id, m.nome, m.versao, '', m.periodo_tipo, m.periodo_valor, resp, email, tel, 'AGUARDANDO_ENVIO', lote, ator, now(), now(), /\{\{\s*cpf\s*\}\}/.test(String(m.corpo)) ? 1 : 0]);
       const sid = Number((await q1('SELECT LAST_INSERT_ID() id'))?.id);
       const protocolo = novoProtocolo(sid);
-      const texto = montarTermo(m as never, { aluno: al.nome, matricula: al.matricula, turma: al.turma, responsavel: resp });
+      const texto = montarTermo(m as never, { aluno: al.nome, matricula: al.matricula, turma: al.turma, responsavel: resp }, undefined, now().slice(0, 4));
       const hash = hashTexto(`${protocolo}\n${m.versao}\n${texto}`);
       await run('UPDATE ui_solicitacoes SET protocolo=?,termo_texto=?,termo_hash=? WHERE id=?', [protocolo, texto, hash, sid]);
       await evento(sid, ator, 'criada', `Modelo "${m.nome}" v${m.versao}`);
@@ -193,7 +193,7 @@ export async function imagemSolicRoute(c: Ctx, u: Row): Promise<Response | null>
     const arquivos = await q('SELECT tipo,nome,sha256,tamanho,info,criado_em FROM ui_arquivos WHERE solicitacao_id=? AND ativo=1 ORDER BY id', [id]);
     const ac = await q1('SELECT expira_em,tentativas,ativo,ultimo_acesso FROM ui_acessos WHERE solicitacao_id=? ORDER BY id DESC LIMIT 1', [id]);
     return json({
-      solicitacao: { ...solicPublica(s), decisao: s.decisao, decisaoEm: s.decisao_em, respConfirmado: s.resp_confirmado, parentesco: s.parentesco, modalidade: s.modalidade, termoHash: s.termo_hash, validadoPor: s.validado_por, validadoEm: s.validado_em, validacaoObs: s.validacao_obs, enviadoEm: s.enviado_em, enviadoCanal: s.enviado_canal, abertoEm: s.aberto_em },
+      solicitacao: { ...solicPublica(s), decisao: s.decisao, decisaoEm: s.decisao_em, respConfirmado: s.resp_confirmado, parentesco: s.parentesco, modalidade: s.modalidade, termoHash: s.termo_hash, cpfResponsavel: s.resp_cpf ? cpfMascarado(String(s.resp_cpf)) : '', validadoPor: s.validado_por, validadoEm: s.validado_em, validacaoObs: s.validacao_obs, enviadoEm: s.enviado_em, enviadoCanal: s.enviado_canal, abertoEm: s.aberto_em },
       eventos, arquivos, acesso: ac ? { expiraEm: ac.expira_em, ativo: !!Number(ac.ativo) && String(ac.expira_em) >= now() && Number(ac.tentativas) < 5, ultimoAcesso: ac.ultimo_acesso } : null,
     });
   }
