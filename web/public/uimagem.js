@@ -1,6 +1,17 @@
 /* Uso de Imagem › Painel e Alunos. O Marketing escolhe MANUALMENTE quem precisa de autorização; nada é selecionado sozinho.
    Dados de alunos ficam só nesta área interna e nunca vão para URLs públicas. */
-const UI = { sel: new Map(), busca: '', segmento: '', turma: '', situacao: '', inativos: false };
+/* Ordem escolar das turmas (igual à do servidor): Infantil 1-5, 1º-9º Ano, 1ª-3ª Série; depois a letra. */
+function uiChaveTurma(turma) {
+  const t = String(turma || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[º°ª]/g, '').replace(/\s+/g, ' ').trim();
+  const letra = (/(?:^|[\s\-/])([a-z])$/.exec(t) || [])[1] || '';
+  let m = /infantil\s*(\d)/.exec(t) || /(\d)\s*infantil/.exec(t);
+  if (m) return [0, +m[1], letra];
+  m = /(\d{1,2})\s*(?:o\s*)?(?:ano|serie)\b/.exec(t) || /\b(?:ano|serie)\s*(\d{1,2})/.exec(t);
+  if (m) return [/serie/.test(t) ? 2 : 1, +m[1], letra];
+  return [9, 0, t];
+}
+const uiCmpTurma = (a, b) => { const x = uiChaveTurma(a), y = uiChaveTurma(b); return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2], 'pt-BR') || String(a).localeCompare(String(b), 'pt-BR'); };
+const UI = { ordem: 'turma', sel: new Map(), busca: '', segmento: '', turma: '', situacao: '', inativos: false };
 const UI_ACOES = { 'aluno-criado': 'Aluno cadastrado', 'aluno-editado': 'Cadastro atualizado', 'aluno-inativado': 'Aluno inativado', 'aluno-reativado': 'Aluno reativado', importacao: 'Lista importada', 'solicitacoes-criadas': 'Solicitações criadas', 'alunos-excluidos': 'Alunos excluídos da lista' };
 const UI_SITU = [['', 'Todas as situações'], ['SEM', 'Sem solicitação'], ['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['AGUARDANDO_ENVIO', 'Aguardando envio'], ['ENVIADO', 'Enviado'], ['ABERTO', 'Aberto'], ['AGUARDANDO_ASSINATURA', 'Aguardando assinatura'], ['AGUARDANDO_VALIDACAO', 'Aguardando validação'], ['VENCIDO', 'Vencido'], ['REVOGADO', 'Revogado']];
 
@@ -69,11 +80,12 @@ PAGINAS.uialunos = async function () {
   };
   const desenha = () => {
     barra();
-    const rows = dados.rows, todosMarcados = rows.length && rows.every(r => UI.sel.has(r.id));
-    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 1.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th>Aluno</th><th>Matrícula</th><th>Turma</th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td>${uiBadge(r.situacao)}</td><td class="acoes-cel"><button type="button" class="btn soft" data-fi="${r.id}">Ficha</button><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
+    const rows = [...dados.rows].sort(UI.ordem === 'nome' ? (x, y) => String(x.nome).localeCompare(String(y.nome), 'pt-BR') : (x, y) => uiCmpTurma(x.turma, y.turma) || String(x.nome).localeCompare(String(y.nome), 'pt-BR')), todosMarcados = rows.length && rows.every(r => UI.sel.has(r.id));
+    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 3.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th><button type="button" class="ui-ord ${UI.ordem === 'nome' ? 'on' : ''}" data-ord="nome" title="Ordenar por nome">Aluno ${UI.ordem === 'nome' ? '▲' : ''}</button></th><th>Matrícula</th><th><button type="button" class="ui-ord ${UI.ordem === 'turma' ? 'on' : ''}" data-ord="turma" title="Ordenar pela ordem das turmas: Infantil 1 a 5, 1º ao 9º Ano, 1ª a 3ª Série">Turma ${UI.ordem === 'turma' ? '▲' : ''}</button></th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td>${uiBadge(r.situacao)}</td><td class="acoes-cel"><button type="button" class="btn soft" data-fi="${r.id}">Ficha</button><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
       : `<div class="empty-rich"><strong>${dados.total || UI.busca || UI.segmento || UI.turma || UI.situacao ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}</strong><p>${dados.total || UI.busca || UI.segmento || UI.turma || UI.situacao ? 'Mude a busca ou os filtros.' : 'Importe a lista (CSV ou planilha .xlsx) ou cadastre um aluno por vez.'}</p></div>`;
     $$('[data-sel]').forEach(c => { c.onchange = () => { const r = dados.rows.find(x => x.id === +c.dataset.sel); if (c.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); barra(); const t = $('#uiTodos'); if (t) t.checked = dados.rows.length && dados.rows.every(x => UI.sel.has(x.id)); }; });
     const t = $('#uiTodos'); if (t) t.onchange = () => { dados.rows.filter(r => r.ativo).forEach(r => { if (t.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); }); desenha(); };
+    $$('[data-ord]').forEach(b => { b.onclick = () => { UI.ordem = b.dataset.ord; desenha(); }; });
     $$('[data-fi]').forEach(b => { b.onclick = () => uiFicha(+b.dataset.fi); });
     $$('[data-ed]').forEach(b => { b.onclick = () => uiAlunoForm(dados.rows.find(x => x.id === +b.dataset.ed), carrega, dados.segmentos); });
   };

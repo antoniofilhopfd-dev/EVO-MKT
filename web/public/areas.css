@@ -385,3 +385,4 @@ a.btn,a.btn:hover{text-decoration:none}
 .ui-mf{grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr)}.ui-nt{grid-template-columns:2fr 1fr}.ui-texto textarea{min-height:46vh;font-size:15px;line-height:1.5;resize:vertical}.ui-marc .ui-chips{margin:6px 0 10px}.ui-det{border:1px solid var(--line,#e3e7ef);border-radius:12px;padding:8px 12px;margin:6px 0 12px}.ui-det summary{cursor:pointer;font-weight:600;padding:4px 0}
 @media(max-width:900px){.ui-mf{grid-template-columns:1fr}.ui-nt{grid-template-columns:1fr}}
 .ui-campo[hidden]{display:none}
+.ui-ord{background:none;border:0;padding:0;font:inherit;font-weight:700;cursor:pointer;color:inherit}.ui-ord.on{color:#063996}

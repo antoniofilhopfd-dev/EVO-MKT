@@ -2,6 +2,7 @@ import { q } from './db';
 import { escreverXlsx } from './xlsxEscrita';
 import { cabecalho, carregarLogo, cartoes, COR, dmy, gerarPdf, nota, tabela, titulo } from './pdf';
 import { Row } from './util';
+import { compararTurma } from './imagemTurma';
 
 export const ROTULO_STATUS: Record<string, string> = {
   AGUARDANDO_ENVIO: 'Aguardando envio', ENVIADO: 'Enviado', ABERTO: 'Aberto', AGUARDANDO_ASSINATURA: 'Aguardando assinatura', AGUARDANDO_VALIDACAO: 'Aguardando validação',
@@ -26,7 +27,8 @@ export async function dadosRelatorio(f: FiltroRel) {
   const porStatus: Record<string, number> = {}, porSeg: Record<string, Record<string, number>> = {}, porTurma: Record<string, Record<string, number>> = {};
   const soma = (m: Record<string, Record<string, number>>, k: string, st: string) => { (m[k] ??= {}); m[k][st] = (m[k][st] ?? 0) + 1; };
   for (const r of rows) { porStatus[r.status] = (porStatus[r.status] ?? 0) + 1; soma(porSeg, r.segmento || '', r.status); soma(porTurma, r.turma || '(sem turma)', r.status); }
-  return { linhas: rows, total: rows.length, alunos: new Set(rows.map((r) => r.matricula)).size, porStatus, porSegmento: porSeg, porTurma };
+  const turmasOrdenadas = Object.fromEntries(Object.entries(porTurma).sort((a, b) => compararTurma(a[0], b[0])));
+  return { linhas: rows, total: rows.length, alunos: new Set(rows.map((r) => r.matricula)).size, porStatus, porSegmento: porSeg, porTurma: turmasOrdenadas };
 }
 type Dados = Awaited<ReturnType<typeof dadosRelatorio>>;
 
