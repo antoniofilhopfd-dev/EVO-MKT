@@ -64,6 +64,31 @@ export async function imagemGestaoRoute(c: Ctx, u: Row): Promise<Response | null
     return new Response(new Uint8Array(relatorioXlsx(d)), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="Relatorio-Uso-de-Imagem_${now().slice(0, 10)}.xlsx"`, 'Cache-Control': 'no-store' } });
   }
 
+  /** Exclusão definitiva de solicitações (só Administrador): apaga também o histórico, os links e os arquivos (assinatura, PDF) da solicitação. */
+  if (path === '/imagem/solicitacoes/excluir' && method === 'POST') {
+    await requireAdmin(c);
+    const corpo = await c.body();
+    const ids: number[] = [...new Set((Array.isArray(corpo.ids) ? (corpo.ids as unknown[]) : []).map(Number).filter((n) => n > 0))].slice(0, 500);
+    if (!ids.length) fail(400, 'Marque ao menos uma solicitação.');
+    const protocolos: string[] = []; let respondidas = 0;
+    for (const id of ids) {
+      const s = await q1('SELECT id,protocolo,status FROM ui_solicitacoes WHERE id=?', [id]);
+      if (!s) continue;
+      if (['AUTORIZADO', 'NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO'].includes(s.status)) respondidas++;
+      for (const a of await q('SELECT caminho FROM ui_arquivos WHERE solicitacao_id=?', [id])) await run('DELETE FROM arquivos WHERE caminho=?', [a.caminho]);
+      await run('DELETE FROM ui_arquivos WHERE solicitacao_id=?', [id]);
+      await run('DELETE FROM ui_acessos WHERE solicitacao_id=?', [id]);
+      await run('DELETE FROM ui_solic_eventos WHERE solicitacao_id=?', [id]);
+      await run('DELETE FROM ui_solicitacoes WHERE id=?', [id]);
+      protocolos.push(String(s.protocolo));
+    }
+    if (protocolos.length) {
+      await run('INSERT INTO ui_eventos(quando,ator,acao,aluno_id,detalhe) VALUES(?,?,?,?,?)', [now(), ator, 'solicitacoes-excluidas', null, `${protocolos.length} solicitação(ões) excluída(s)`]);
+      await audit(ator, 'imagem-solicitacoes-excluidas', 'ui_solicitacoes', protocolos.join(',').slice(0, 200));
+    }
+    return json({ ok: true, excluidas: protocolos.length, respondidas });
+  }
+
   /** Revogação: o termo passa a REVOGADO; a evidência (arquivos, hash, histórico) fica. */
   if (path === '/imagem/solicitacoes/revogar' && method === 'POST') {
     if ((await lerConfig()).quemRevoga === 'admin') await requireAdmin(c);
