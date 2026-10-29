@@ -114,10 +114,10 @@ if (str_starts_with($p, '/graph')) {
     if ($g === '/act_111222333/insights') {
         $since = json_decode($_GET['time_range'] ?? '{}', true)['since'] ?? '';
         j(['data' => [
-            ['campaign_id' => 'c1', 'campaign_name' => '01 - EI | Matrículas 2027', 'spend' => '1234.56', 'impressions' => '90000', 'reach' => '41000', 'clicks' => '2100', 'account_currency' => 'BRL', 'actions' => [['action_type' => 'lead', 'value' => '35'], ['action_type' => 'onsite_conversion.messaging_conversation_started_7d', 'value' => '20'], ['action_type' => 'link_click', 'value' => '2000']]],
-            ['campaign_id' => 'c2', 'campaign_name' => 'Open day', 'spend' => '300.00', 'impressions' => '20000', 'reach' => '15000', 'clicks' => '500', 'account_currency' => 'BRL'],
-            ['campaign_id' => 'c3', 'campaign_name' => 'Boost do cartaz', 'spend' => '150.00', 'impressions' => '5000', 'reach' => '1200', 'clicks' => '20', 'account_currency' => 'BRL'],
-            ['campaign_id' => 'c4', 'campaign_name' => 'Captação de leads', 'spend' => '400.00', 'impressions' => '12000', 'reach' => '9000', 'clicks' => '300', 'account_currency' => 'BRL'],
+            ['campaign_id' => 'c1', 'campaign_name' => '01 - EI | Matrículas 2027', 'spend' => '1234.56', 'impressions' => '90000', 'reach' => '41000', 'clicks' => '2100', 'inline_link_clicks' => '1900', 'account_currency' => 'BRL', 'actions' => [['action_type' => 'lead', 'value' => '35'], ['action_type' => 'onsite_conversion.messaging_conversation_started_7d', 'value' => '20'], ['action_type' => 'link_click', 'value' => '2000']]],
+            ['campaign_id' => 'c2', 'campaign_name' => 'Open day', 'spend' => '300.00', 'impressions' => '20000', 'reach' => '15000', 'clicks' => '500', 'inline_link_clicks' => '450', 'account_currency' => 'BRL'],
+            ['campaign_id' => 'c3', 'campaign_name' => 'Boost do cartaz', 'spend' => '150.00', 'impressions' => '5000', 'reach' => '1200', 'clicks' => '20', 'inline_link_clicks' => '15', 'account_currency' => 'BRL'],
+            ['campaign_id' => 'c4', 'campaign_name' => 'Captação de leads', 'spend' => '400.00', 'impressions' => '12000', 'reach' => '9000', 'clicks' => '300', 'inline_link_clicks' => '280', 'account_currency' => 'BRL'],
         ], 'since' => $since]);
     }
     if ($g === '/me/accounts') { $d = [['name' => 'Colégio Evolução', 'id' => 'p1', 'instagram_business_account' => ['id' => $IG, 'username' => 'evolucaopb']]]; if ($tok === 'MULTI_TOKEN' || $tok === 'DUAL_TOKEN') $d[] = ['name' => 'Outra Página', 'id' => 'p2', 'instagram_business_account' => ['id' => '17841499999999999', 'username' => 'outraconta']]; j(['data' => $d]); }

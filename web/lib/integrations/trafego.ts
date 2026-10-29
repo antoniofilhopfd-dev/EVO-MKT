@@ -130,7 +130,7 @@ async function contaDeAnuncios(): Promise<string> {
 }
 
 async function insights(conta: string, nivel: 'campaign' | 'adset' | 'ad' | 'account', de: string, ate: string, diario = false): Promise<{ linhas: Row[]; truncado: boolean }> {
-  const campos = nivel === 'account' ? 'spend,impressions,reach,clicks,inline_link_clicks,actions' : nivel === 'campaign' ? 'campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : nivel === 'adset' ? 'adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions' : 'ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,actions';
+  const campos = nivel === 'account' ? 'spend,impressions,reach,clicks,inline_link_clicks,actions' : nivel === 'campaign' ? 'campaign_id,campaign_name,spend,impressions,reach,clicks,inline_link_clicks,actions' : nivel === 'adset' ? 'adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,inline_link_clicks,actions' : 'ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,inline_link_clicks,actions';
   const linhas: Row[] = [];
   let after = '', truncado = false;
   for (let pagina = 0; pagina < 12; pagina++) {
@@ -213,7 +213,7 @@ export async function resumoTrafego(de: string, ate: string, tipo = '', forcar =
   const comConversa = campanhas.filter((c) => c.conversas > 0);
   const dados: Row = {
     periodo: { de, ate, dias: dias.length }, anterior: ant, atual, anteriorTotais: anterior,
-    variacoes: Object.fromEntries((['investimento', 'impressoes', 'alcance', 'cliques', 'ctr', 'cpc', 'conversas', 'custoConversa'] as const).map((k) => [k, variacao(atual[k], anterior[k])])),
+    variacoes: Object.fromEntries((['investimento', 'impressoes', 'alcance', 'cliques', 'ctr', 'cpc', 'conversas', 'custoConversa', 'frequencia', 'cpm', 'cliquesLink', 'ctrLink', 'cpcLink'] as const).map((k) => [k, variacao(atual[k], anterior[k])])),
     campanhas, conjuntos, anuncios, segmentos, diario: { dias, series, total, conversas: conversasDia, impressoes: impressoesDia, cliques: cliquesDia },
     destaques: {
       melhorCampanha: comConversa.length ? [...comConversa].sort((a, b) => (a.custoConversa ?? 0) - (b.custoConversa ?? 0))[0] : null,
