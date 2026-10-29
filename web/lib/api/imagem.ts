@@ -102,18 +102,18 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
 
   /** Planilha modelo para a importação: cabeçalho certo e linhas de exemplo (marcadas para apagar; a importação ignora essas linhas). */
   if (path === '/imagem/alunos/modelo.xlsx' && method === 'GET') {
-    const buf = escreverXlsx('Alunos', ['Nome', 'Matrícula', 'Turma', 'Segmento'], [
-      ['Aluno Exemplo Um (apague esta linha)', 'EXEMPLO-1', '3º Ano A', 'Anos Iniciais'],
-      ['Aluno Exemplo Dois (apague esta linha)', 'EXEMPLO-2', '8º Ano B', 'Anos Finais'],
-      ['Aluno Exemplo Três (apague esta linha)', 'EXEMPLO-3', '2ª Série', 'Ensino Médio'],
+    const buf = escreverXlsx('Alunos', ['Matrícula', 'Nome', 'Turma', 'Segmento'], [
+      ['EXEMPLO-1', 'Aluno Exemplo Um (apague esta linha)', '3º Ano A', 'Anos Iniciais'],
+      ['EXEMPLO-2', 'Aluno Exemplo Dois (apague esta linha)', '8º Ano B', 'Anos Finais'],
+      ['EXEMPLO-3', 'Aluno Exemplo Três (apague esta linha)', '2ª Série', 'Ensino Médio'],
       ['', '', '', ''],
       ['Como preencher:', '', '', ''],
-      ['Nome: nome completo do aluno.', '', '', ''],
       ['Matrícula: obrigatória e única (é por ela que o aluno é reconhecido).', '', '', ''],
+      ['Nome: nome completo do aluno.', '', '', ''],
       ['Turma: como a escola chama (ex.: 3º Ano A).', '', '', ''],
       ['Segmento: Educação Infantil, Anos Iniciais, Anos Finais ou Ensino Médio (se ficar em branco, o sistema tenta deduzir pela turma).', '', '', ''],
       ['Apague as linhas de exemplo e estas instruções antes de importar. Quem já estiver cadastrado é atualizado; ninguém é apagado.', '', '', ''],
-    ], [44, 16, 18, 22]);
+    ], [16, 44, 18, 22]);
     return new Response(new Uint8Array(buf), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="Modelo-lista-de-alunos.xlsx"', 'Cache-Control': 'no-store' } });
   }
 

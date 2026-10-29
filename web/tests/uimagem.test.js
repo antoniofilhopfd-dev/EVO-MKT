@@ -65,9 +65,9 @@ const xlsx = linhas => {
   // ---------- planilha modelo ----------
   const mod = await fetch(U.B + '/imagem/alunos/modelo.xlsx', { headers: G.H }), modB = Buffer.from(await mod.arrayBuffer());
   const modZ = require('fflate').unzipSync(new Uint8Array(modB)), modFolha = require('fflate').strFromU8(modZ['xl/worksheets/sheet1.xml']);
-  t('planilha modelo: .xlsx real com as colunas Nome, Matrícula, Turma e Segmento e instruções', mod.status === 200 && modB.subarray(0, 2).toString() === 'PK' && /Nome/.test(modFolha) && /Matrícula/.test(modFolha) && /Segmento/.test(modFolha) && /Como preencher/.test(modFolha) && /modelo-lista-de-alunos/i.test(mod.headers.get('content-disposition')));
+  t('planilha modelo: .xlsx real com as colunas Matrícula, Nome, Turma e Segmento (nessa ordem) e instruções', mod.status === 200 && modB.subarray(0, 2).toString() === 'PK' && /Nome/.test(modFolha) && /Matrícula/.test(modFolha) && /Segmento/.test(modFolha) && /Como preencher/.test(modFolha) && /modelo-lista-de-alunos/i.test(mod.headers.get('content-disposition')));
   const lm = (await G.post('/imagem/alunos/ler-planilha', { base64: modB.toString('base64') })).linhas;
-  t('o modelo é lido pela própria importação (cabeçalho reconhecido)', lm[0].join('|') === 'Nome|Matrícula|Turma|Segmento' && lm.length >= 4, lm[0]);
+  t('o modelo é lido pela própria importação (cabeçalho reconhecido)', lm[0].join('|') === 'Matrícula|Nome|Turma|Segmento' && lm.length >= 4, lm[0]);
   t('planilha modelo exige login (401)', (await fetch(U.B + '/imagem/alunos/modelo.xlsx')).status === 401);
   // ---------- excluir alunos da lista ----------
   const ex1 = await G.post('/imagem/alunos', { nome: 'Aluno Para Excluir', matricula: 'X-1', turma: '1º Ano', segmento: 'FUND1' }), ex2 = await G.post('/imagem/alunos', { nome: 'Aluno Para Excluir 2', matricula: 'X-2', turma: '1º Ano', segmento: 'FUND1' });
@@ -145,8 +145,10 @@ const xlsx = linhas => {
     await foto('alunos-selecao');
     await p.click('#uiImp'); await p.waitForSelector('#uiTxt');
     t(`${nome}: a importação oferece a planilha modelo, e o modelo sem preencher não importa ninguém`, await p.$('#uiModelo') !== null && await (async () => { await p.setInputFiles('#uiArq', { name: 'modelo.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: modB }); await p.waitForSelector('#uiErro:not([hidden])'); return /Escolha um arquivo/.test(await p.innerText('#uiErro')) && (await p.$$('.ui-resumo')).length === 0; })());
+    await p.fill('#uiTxt', 'ZZ-9001;Fulano Sem Cabeçalho;1º Ano;Anos Iniciais\n20260077;Ciclana Sem Cabeçalho;2º Ano;Anos Iniciais'); await p.click('#uiConferir'); await p.waitForSelector('.ui-resumo');
+    t(`${nome}: lista colada sem cabeçalho entende matrícula primeiro, depois o nome`, /2\s*novo/.test(await p.innerText('.ui-resumo')) && /0\s*com problema/.test(await p.innerText('.ui-resumo')), await p.innerText('.ui-resumo'));
     await p.fill('#uiTxt', `nome;matrícula;turma;segmento\nIris Colada;T-4001${nome === 'desktop' ? '' : '9'};4º Ano;Anos Iniciais\nJoao Colado;T-4002${nome === 'desktop' ? '' : '9'};7º Ano;Anos Finais\nAna Fictícia de Souza;T-1001;3º Ano A;Anos Iniciais`); await p.click('#uiConferir');
-    await p.waitForSelector('.ui-resumo');
+    await p.waitForFunction(() => /1\s*sem mudança/.test(document.querySelector('.ui-resumo')?.innerText || ''));
     t(`${nome}: importação mostra a prévia (2 novos, 1 sem mudança) antes de gravar`, /2\s*novo/.test(await p.innerText('.ui-resumo')) && /1\s*sem mudança/.test(await p.innerText('.ui-resumo')), await p.innerText('.ui-resumo'));
     await foto('importar-previa');
     await p.click('#uiOk'); await p.waitForTimeout(900);
