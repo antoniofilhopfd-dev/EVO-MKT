@@ -6,7 +6,7 @@ const tfPct = v => v === null || v === undefined ? '—' : Number(v).toLocaleStr
 const tfN = v => v === null || v === undefined ? '—' : fmtN(v);
 const tfMoney = v => v === null || v === undefined ? '—' : money(v);
 const TF_INDICADORES = [['investimento', 'Investimento', money, true], ['impressoes', 'Impressões', fmtN, true], ['alcance', 'Alcance', fmtN, true], ['cliques', 'Cliques', fmtN, true], ['ctr', 'CTR médio', tfPct, true], ['cpc', 'CPC médio', money, false], ['conversas', 'Conversas iniciadas', fmtN, true], ['custoConversa', 'Custo por conversa', money, false], ['frequencia', 'Frequência', v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 }), false], ['cpm', 'CPM', tfMoney, false], ['cliquesLink', 'Cliques no link', tfN, true], ['ctrLink', 'CTR do link', tfPct, true], ['cpcLink', 'CPC do link', tfMoney, false]];
-const TF_ICONES = { investimento: '＄', impressoes: '◉', alcance: '☺', cliques: '⌖', ctr: '%', cpc: '⚙', conversas: '✉', custoConversa: '◎' };
+const TF_ICONES = { investimento: '＄', impressoes: '◉', alcance: '☺', cliques: '⌖', ctr: '%', cpc: '⚙', conversas: '✉', custoConversa: '◎', frequencia: '↻', cpm: '‰', cliquesLink: '↗', ctrLink: '％', cpcLink: '⚖' };
 
 async function tfEstado() {
   const e = await api('/trafego/estado').catch(() => null);
@@ -108,7 +108,7 @@ function tfAlertasVisao(d) {
 PAGINAS.trafego = async function () {
   const d = await tfPagina(d => {
     const a = d.atual, v = d.variacoes;
-    const kpis = TF_INDICADORES.map(([k, rot, fmt, bom]) => `<div class="kpi tf-kpi"><span class="tf-ico" aria-hidden="true">${TF_ICONES[k]}</span><small>${rot}</small><strong>${a[k] === null || a[k] === undefined ? '—' : fmt(a[k])}</strong>${delta(v[k], { bomSubir: bom })}<i class="kd flat">vs. ${esc(k === 'investimento' ? tfMoney(d.anteriorTotais?.investimento) : (d.anteriorTotais && d.anteriorTotais[k] !== null && d.anteriorTotais[k] !== undefined ? fmt(d.anteriorTotais[k]) : 'sem base'))}</i></div>`).join('');
+    const kpis = TF_INDICADORES.map(([k, rot, fmt, bom]) => `<div class="kpi tf-kpi"><span class="tf-ico" aria-hidden="true">${TF_ICONES[k] || '•'}</span><small>${rot}</small><strong>${a[k] === null || a[k] === undefined ? '—' : fmt(a[k])}</strong>${delta(v[k], { bomSubir: bom })}<i class="kd flat">vs. ${esc(k === 'investimento' ? tfMoney(d.anteriorTotais?.investimento) : (d.anteriorTotais && d.anteriorTotais[k] !== null && d.anteriorTotais[k] !== undefined ? fmt(d.anteriorTotais[k]) : 'sem base'))}</i></div>`).join('');
     const linhas = d.campanhas.map(c => `<tr><td class="titlecell"><b>${esc(c.nome)}</b>${c.segmento ? `<br><small>${esc(tfSegRotulo(c.segmento))}</small>` : ''}</td><td>${tfBadge(c)}</td>${tfCelulasMetricas(c)}</tr>`).join('');
     const t = d.atual;
     const total = `<tr><th colspan="2">Total (${d.campanhas.length} campanha(s))</th><th class="num">${money(t.investimento)}</th><th class="num">${fmtN(t.impressoes)}</th><th class="num">${tfN(t.alcance)}*</th><th class="num">${fmtN(t.cliques)}</th><th class="num">${tfPct(t.ctr)}</th><th class="num">${tfMoney(t.cpc)}</th><th class="num">${fmtN(t.conversas)}</th><th class="num">${tfMoney(t.custoConversa)}</th></tr>`;
