@@ -79,7 +79,7 @@ const xlsx = linhas => {
   const ids = {}; for (const a of (await G.get('/imagem/alunos')).rows) ids[a.matricula] = a.id;
   let md = await G.get('/imagem/modelos');
   const padrao = md.rows.find(m => /padrão/i.test(m.nome));
-  t('existe o modelo padrão de exemplo (v1) e o Administrador pode editar', padrao && padrao.versao === 1 && md.podeEditar === true && md.canais.length >= 5, md.rows.map(m => m.nome));
+  t('existe o modelo padrão de exemplo (v1) e o Administrador pode editar', padrao && padrao.versao === 1 && md.podeEditar === true && md.canais.length >= 5 && md.canais.includes('Tráfego pago (anúncios)'), md.rows.map(m => m.nome));
   t('a Equipe vê os modelos, mas não pode editar', (await E.get('/imagem/modelos')).podeEditar === false && (await E.req('POST', '/imagem/modelos', { nome: 'x' })).status === 403);
   const base = { nome: 'Modelo da Feira (teste)', tipo: 'EVENTO', finalidade: 'Divulgar a Feira Cultural nas redes do colégio.', canais: ['Instagram', 'Site'], local_uso: 'Feira Cultural', periodo_tipo: 'MESES', periodo_valor: '12', observacoes: '', corpo: padrao.corpo };
   t('modelo sem canal, sem finalidade ou sem {{aluno}} é recusado (400)', (await G.req('POST', '/imagem/modelos', { ...base, canais: [] })).status === 400 && (await G.req('POST', '/imagem/modelos', { ...base, finalidade: '' })).status === 400 && (await G.req('POST', '/imagem/modelos', { ...base, corpo: 'Texto sem o aluno, mas com mais de quarenta caracteres no total aqui.' })).status === 400);
@@ -161,6 +161,7 @@ const xlsx = linhas => {
     t(`${nome}: Modelos mostra o aviso de texto de exemplo e o modelo padrão`, /revisão jurídica/.test(await p.innerText('#content')) && /Modelo padrão/.test(await p.innerText('#content')));
     await foto('modelos');
     await p.click('[data-ed]'); await p.waitForSelector('#mfPrev .ui-doc'); await foto('modelo-editar');
+    t(`${nome}: o modelo oferece o canal Tráfego pago (anúncios) e só mostra o campo Valor quando o prazo não é indeterminado`, await p.$('[name=mfC][value="Tráfego pago (anúncios)"]') !== null && (await p.isVisible('#mfVw')) === ((await p.inputValue('#mfP')) !== 'INDETERMINADO') && await (async () => { await p.selectOption('#mfP', 'INDETERMINADO'); const oculto = !(await p.isVisible('#mfVw')); await p.selectOption('#mfP', 'MESES'); return oculto && await p.isVisible('#mfVw'); })());
     t(`${nome}: o formulário do modelo mostra a prévia ao vivo`, /AUTORIZO/.test(await p.innerText('#mfPrev')));
     await p.evaluate(() => document.querySelectorAll('.admin-overlay').forEach(o => o.remove()));
     t(`${nome}: sem estouro horizontal`, await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth <= 2));

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 /** Texto do termo de uso de imagem: montagem a partir do modelo, prazo e hash. Funções puras (sem banco, sem rede). */
-export const CANAIS = ['Instagram', 'Facebook', 'Site', 'YouTube', 'Materiais impressos', 'Eventos e telões', 'Imprensa e parceiros'];
+export const CANAIS = ['Instagram', 'Facebook', 'Site', 'YouTube', 'Materiais impressos', 'Eventos e telões', 'Imprensa e parceiros', 'Tráfego pago (anúncios)'];
 export const PERIODOS = ['INDETERMINADO', 'ATE_DATA', 'MESES'];
 export const PLACEHOLDERS = ['responsavel', 'aluno', 'matricula', 'turma', 'colegio', 'finalidade', 'canais', 'local', 'prazo', 'observacoes', 'decisao'];
 
