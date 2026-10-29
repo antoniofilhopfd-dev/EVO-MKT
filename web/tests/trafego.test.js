@@ -72,6 +72,7 @@ const { t, fim } = U.contador();
   await U.ir(p, 'trafego', 1500); let txt = await U.textoConteudo(p);
   t('Visão Geral mostra os 8 indicadores, evolução e a origem', ['Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR médio', 'CPC médio', 'Conversas iniciadas', 'Custo por conversa'].every(k => new RegExp(k, 'i').test(txt)) && /Evolução no período/.test(txt) && (await p.$('.origem-btn')) !== null, txt.slice(0, 300));
   t('a tela não oferece criar, editar, ativar nem pausar', !/Criar campanha|Pausar|Ativar|Editar orçamento|Impulsionar/i.test(txt) && /somente consulta/i.test(txt));
+  t('Visão Geral: nenhum cartão mostra “undefined” e todos têm ícone', !/undefined/.test(await p.innerText('#content')) && (await p.$$eval('.tf-kpi .tf-ico', e => e.map(x => x.textContent.trim()))).every(x => x && x !== 'undefined'));
   t('exatamente três abas: Visão Geral, Desempenho e Relatórios', JSON.stringify(await p.$$eval('#subtabs .subtab', e => e.map(x => x.textContent))) === JSON.stringify(['Visão Geral', 'Desempenho', 'Relatórios']));
   t('filtro de período do Tráfego: Esta semana, Este mês, Mês anterior, Este ano e Personalizado', JSON.stringify(await p.$$eval('#filtros .tf-periodos .pill', e => e.map(x => x.textContent))) === JSON.stringify(['Esta semana', 'Este mês', 'Mês anterior', 'Este ano', 'Personalizado']));
   t('a semana mostra o número e vai de domingo a sábado', /Semana \d+/.test(txt) && /Dom, \d+ \w+ – Sáb, \d+ \w+/.test(txt), txt.slice(0, 200));
