@@ -35,19 +35,22 @@ async function uiPrevia(corpo) {
 function uiModeloForm(m, d) {
   const novo = !m; m = m || { nome: '', tipo: 'EVENTO', finalidade: '', canais: [], local_uso: '', periodo_tipo: 'INDETERMINADO', periodo_valor: '', observacoes: '', corpo: d.rows[0]?.corpo || '' };
   const dlg = dialogo(`<form id="uiMF" novalidate class="ui-mf"><div class="ui-mf-col"><h3>${novo ? 'Novo modelo' : 'Editar modelo'}</h3>
-    <label class="ui-campo">Nome<input class="control" id="mfN" maxlength="120" value="${attr(m.nome)}"></label>
-    <label class="ui-campo">Tipo<select class="control" id="mfT">${Object.entries(UI_TIPOS).map(([k, v]) => `<option value="${k}" ${m.tipo === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <div class="ui-linha ui-nt"><label class="ui-campo">Nome do modelo<input class="control" id="mfN" maxlength="120" value="${attr(m.nome)}"></label>
+    <label class="ui-campo">Tipo<select class="control" id="mfT">${Object.entries(UI_TIPOS).map(([k, v]) => `<option value="${k}" ${m.tipo === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
+    <label class="ui-campo ui-texto">Texto do termo<textarea class="control" id="mfB" rows="16">${esc(m.corpo)}</textarea></label>
+    <div class="ui-marc"><small class="kpi-note">Toque num marcador para inserir no texto, onde está o cursor (o sistema troca pelo dado de cada aluno):</small><div class="ui-chips">${d.marcadores.map(x => `<button type="button" class="ui-chip" data-marc="${x}">{{${x}}}</button>`).join('')}</div></div>
+    <details class="ui-det" open><summary>Detalhes do termo (finalidade, canais, local, prazo e observações)</summary>
     <label class="ui-campo">Finalidade (explícita e específica)<textarea class="control" id="mfF" rows="3" maxlength="1000">${esc(m.finalidade)}</textarea></label>
     <fieldset class="ui-campo"><legend>Canais de divulgação</legend><div class="ui-canais">${d.canais.map(c => `<label class="check-row"><input type="checkbox" name="mfC" value="${attr(c)}" ${m.canais.includes(c) ? 'checked' : ''}> ${esc(c)}</label>`).join('')}</div></fieldset>
     <label class="ui-campo">Local ou evento<input class="control" id="mfL" maxlength="200" value="${attr(m.local_uso)}"></label>
     <div class="ui-linha"><label class="ui-campo">Prazo<select class="control" id="mfP"><option value="INDETERMINADO">Indeterminado</option><option value="ATE_DATA">Até uma data</option><option value="MESES">Quantidade de meses</option></select></label><label class="ui-campo" id="mfVw">Valor<input class="control" id="mfV" value="${attr(m.periodo_valor)}"></label></div>
-    <label class="ui-campo">Observações (aparecem no termo)<textarea class="control" id="mfO" rows="2" maxlength="1000">${esc(m.observacoes)}</textarea></label>
-    <label class="ui-campo">Texto do termo<textarea class="control" id="mfB" rows="9">${esc(m.corpo)}</textarea><small class="kpi-note">Marcadores: ${d.marcadores.map(x => `{{${x}}}`).join(' ')}</small></label>
+    <label class="ui-campo">Observações (aparecem no termo)<textarea class="control" id="mfO" rows="2" maxlength="1000">${esc(m.observacoes)}</textarea></label></details>
     <div class="igp-erro" id="mfE" role="alert" hidden></div><div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn soft" data-close>Cancelar</button><button type="submit" class="btn">Salvar modelo</button></div></div>
     <aside class="ui-mf-prev"><h3>Prévia</h3><div id="mfPrev"></div></aside></form>`, { larga: true });
   dlg.el.firstElementChild.classList.add('ui-box');
   const g = id => $('#' + id, dlg.el);
   g('mfP').value = m.periodo_tipo;
+  $$('[data-marc]', dlg.el).forEach(b => { b.onclick = () => { const t = g('mfB'), i = t.selectionStart ?? t.value.length, f = t.selectionEnd ?? i, ins = `{{${b.dataset.marc}}}`; t.value = t.value.slice(0, i) + ins + t.value.slice(f); t.focus(); t.setSelectionRange(i + ins.length, i + ins.length); t.dispatchEvent(new Event('input')); }; });
   const valor = () => {
     const t = g('mfP').value, w = g('mfVw'); w.hidden = t === 'INDETERMINADO';
     const v = g('mfV'); v.type = t === 'ATE_DATA' ? 'date' : t === 'MESES' ? 'number' : 'text'; if (t === 'MESES') { v.min = 1; v.max = 120; }
