@@ -62,6 +62,13 @@ const xlsx = linhas => {
   const painel = await G.get('/imagem/painel');
   t('painel: total de alunos ativos, segmentos e atividade recente', painel.totalAlunos === 4 && painel.segmentos.find(s => s.k === 'FUND1').n === 1 && painel.recentes.length > 0 && painel.autorizados === 0, painel);
 
+  // ---------- planilha modelo ----------
+  const mod = await fetch(U.B + '/imagem/alunos/modelo.xlsx', { headers: G.H }), modB = Buffer.from(await mod.arrayBuffer());
+  const modZ = require('fflate').unzipSync(new Uint8Array(modB)), modFolha = require('fflate').strFromU8(modZ['xl/worksheets/sheet1.xml']);
+  t('planilha modelo: .xlsx real com as colunas Nome, Matrícula, Turma e Segmento e instruções', mod.status === 200 && modB.subarray(0, 2).toString() === 'PK' && /Nome/.test(modFolha) && /Matrícula/.test(modFolha) && /Segmento/.test(modFolha) && /Como preencher/.test(modFolha) && /modelo-lista-de-alunos/i.test(mod.headers.get('content-disposition')));
+  const lm = (await G.post('/imagem/alunos/ler-planilha', { base64: modB.toString('base64') })).linhas;
+  t('o modelo é lido pela própria importação (cabeçalho reconhecido)', lm[0].join('|') === 'Nome|Matrícula|Turma|Segmento' && lm.length >= 4, lm[0]);
+  t('planilha modelo exige login (401)', (await fetch(U.B + '/imagem/alunos/modelo.xlsx')).status === 401);
   // ---------- excluir alunos da lista ----------
   const ex1 = await G.post('/imagem/alunos', { nome: 'Aluno Para Excluir', matricula: 'X-1', turma: '1º Ano', segmento: 'FUND1' }), ex2 = await G.post('/imagem/alunos', { nome: 'Aluno Para Excluir 2', matricula: 'X-2', turma: '1º Ano', segmento: 'FUND1' });
   t('a Equipe não exclui alunos (403): só o Administrador', (await E.req('POST', '/imagem/alunos/excluir', { ids: [ex1.id] })).status === 403 && (await G.get('/imagem/alunos?busca=X-1')).rows.length === 1);
@@ -133,6 +140,7 @@ const xlsx = linhas => {
     t(`${nome}: a barra de seleção oferece “Excluir marcados” com confirmação`, await p.$('#uiExcl') !== null && await (async () => { await p.click('#uiExcl'); await p.waitForSelector('#xlF'); const ok = /Exclusão definitiva/.test(await p.innerText('#xlF')) && /não.*é excluído/.test(await p.innerText('#xlF')); await p.evaluate(() => document.querySelectorAll('.admin-overlay').forEach(o => o.remove())); return ok; })());
     await foto('alunos-selecao');
     await p.click('#uiImp'); await p.waitForSelector('#uiTxt');
+    t(`${nome}: a importação oferece a planilha modelo, e o modelo sem preencher não importa ninguém`, await p.$('#uiModelo') !== null && await (async () => { await p.setInputFiles('#uiArq', { name: 'modelo.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: modB }); await p.waitForSelector('#uiErro:not([hidden])'); return /Escolha um arquivo/.test(await p.innerText('#uiErro')) && (await p.$$('.ui-resumo')).length === 0; })());
     await p.fill('#uiTxt', `nome;matrícula;turma;segmento\nIris Colada;T-4001${nome === 'desktop' ? '' : '9'};4º Ano;Anos Iniciais\nJoao Colado;T-4002${nome === 'desktop' ? '' : '9'};7º Ano;Anos Finais\nAna Fictícia de Souza;T-1001;3º Ano A;Anos Iniciais`); await p.click('#uiConferir');
     await p.waitForSelector('.ui-resumo');
     t(`${nome}: importação mostra a prévia (2 novos, 1 sem mudança) antes de gravar`, /2\s*novo/.test(await p.innerText('.ui-resumo')) && /1\s*sem mudança/.test(await p.innerText('.ui-resumo')), await p.innerText('.ui-resumo'));

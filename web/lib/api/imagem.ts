@@ -4,6 +4,7 @@ import { q, q1, run } from '../db';
 import { audit } from '../records';
 import { fail, lower, now, Row, strv } from '../util';
 import { lerXlsx } from '../xlsxLeitura';
+import { escreverXlsx } from '../xlsxEscrita';
 import { json } from './handlers';
 import { imagemSolicRoute } from './imagemSolic';
 import { atualizarVencimentos } from '../imagemDados';
@@ -97,6 +98,23 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
     await evento(ator, ativo ? 'aluno-reativado' : 'aluno-inativado', id, String(r.nome));
     await audit(ator, ativo ? 'imagem-aluno-reativado' : 'imagem-aluno-inativado', 'ui_alunos', String(id));
     return json({ ok: true });
+  }
+
+  /** Planilha modelo para a importação: cabeçalho certo e linhas de exemplo (marcadas para apagar; a importação ignora essas linhas). */
+  if (path === '/imagem/alunos/modelo.xlsx' && method === 'GET') {
+    const buf = escreverXlsx('Alunos', ['Nome', 'Matrícula', 'Turma', 'Segmento'], [
+      ['Aluno Exemplo Um (apague esta linha)', 'EXEMPLO-1', '3º Ano A', 'Anos Iniciais'],
+      ['Aluno Exemplo Dois (apague esta linha)', 'EXEMPLO-2', '8º Ano B', 'Anos Finais'],
+      ['Aluno Exemplo Três (apague esta linha)', 'EXEMPLO-3', '2ª Série', 'Ensino Médio'],
+      ['', '', '', ''],
+      ['Como preencher:', '', '', ''],
+      ['Nome: nome completo do aluno.', '', '', ''],
+      ['Matrícula: obrigatória e única (é por ela que o aluno é reconhecido).', '', '', ''],
+      ['Turma: como a escola chama (ex.: 3º Ano A).', '', '', ''],
+      ['Segmento: Educação Infantil, Anos Iniciais, Anos Finais ou Ensino Médio (se ficar em branco, o sistema tenta deduzir pela turma).', '', '', ''],
+      ['Apague as linhas de exemplo e estas instruções antes de importar. Quem já estiver cadastrado é atualizado; ninguém é apagado.', '', '', ''],
+    ], [44, 16, 18, 22]);
+    return new Response(new Uint8Array(buf), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="Modelo-lista-de-alunos.xlsx"', 'Cache-Control': 'no-store' } });
   }
 
   /** Exclusão definitiva de alunos (só Administrador). Quem já tem solicitação fica: o histórico de autorização é prova e não se apaga; nesse caso use Inativar. */

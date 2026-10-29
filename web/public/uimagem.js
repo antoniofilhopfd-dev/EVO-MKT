@@ -44,7 +44,7 @@ function uiLinhasParaAlunos(linhas) {
   const cab = linhas[0].map(uiNorm), idx = (...nomes) => cab.findIndex(c => nomes.includes(c));
   const iN = idx('nome', 'aluno', 'nomedoaluno', 'estudante'), iM = idx('matricula', 'mat', 'ra', 'codigo'), iT = idx('turma', 'classe', 'serie', 'anoturma'), iS = idx('segmento', 'nivel', 'etapa', 'modalidade');
   const temCab = iN >= 0 && iM >= 0;
-  const corpo = temCab ? linhas.slice(1) : linhas;
+  const corpo = (temCab ? linhas.slice(1) : linhas).filter(l => !/apague esta linha|^como preencher|^apague as linhas/i.test(String(l[0] || '')) && !(String(l[0] || '').includes(':') && !String(l[1] || '').trim() && !String(l[2] || '').trim() && !String(l[3] || '').trim()) && String(l[1] || '').toUpperCase().indexOf('EXEMPLO-') !== 0);
   return corpo.map(l => temCab ? { nome: l[iN] || '', matricula: l[iM] || '', turma: iT >= 0 ? l[iT] || '' : '', segmento: iS >= 0 ? l[iS] || '' : '' } : { nome: l[0] || '', matricula: l[1] || '', turma: l[2] || '', segmento: l[3] || '' });
 }
 
@@ -112,7 +112,7 @@ function uiAlunoForm(a, aoSalvar, segmentos) {
 
 function uiImportar(aoFim) {
   const d = dialogo(`<h3>Importar lista de alunos</h3><p class="kpi-note">Aceita planilha .xlsx, arquivo .csv ou texto colado, com as colunas <b>nome, matrícula, turma e segmento</b> (a primeira linha pode ser o cabeçalho). Quem já está cadastrado é atualizado pela matrícula; <b>ninguém é apagado</b>.</p>
-    <div class="ui-imp"><label class="igp-upload"><input type="file" id="uiArq" accept=".xlsx,.csv,.txt"><b>Escolher arquivo</b><small>.xlsx, .csv ou .txt</small></label><textarea id="uiTxt" class="control" rows="5" placeholder="Ou cole aqui: nome;matrícula;turma;segmento"></textarea></div>
+    <p><a class="btn soft" id="uiModelo" href="${API}/imagem/alunos/modelo.xlsx" download>Baixar planilha modelo (.xlsx)</a> <span class="kpi-note">Já vem com as colunas certas e instruções.</span></p><div class="ui-imp"><label class="igp-upload"><input type="file" id="uiArq" accept=".xlsx,.csv,.txt"><b>Escolher arquivo</b><small>.xlsx, .csv ou .txt</small></label><textarea id="uiTxt" class="control" rows="5" placeholder="Ou cole aqui: nome;matrícula;turma;segmento"></textarea></div>
     <div id="uiPrevia"></div><div class="igp-erro" id="uiErro" role="alert" hidden></div>
     <div class="actions dlg-acoes"><span class="cm-esp"></span><button type="button" class="btn soft" data-close>Cancelar</button><button type="button" class="btn soft" id="uiConferir">Conferir lista</button><button type="button" class="btn" id="uiOk" disabled>Importar</button></div>`, { larga: true });
   let alunos = [];
