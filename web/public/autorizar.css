@@ -17,3 +17,4 @@ fieldset{border:0;padding:0;margin:0 0 8px}legend{font-weight:700;margin-bottom:
 .aut-rodape{color:var(--cz);padding-bottom:32px}.aut-carregando{color:var(--cz)}
 @media(min-width:700px){.aut-escolha{grid-template-columns:1fr 1fr}}
 .aut-doc h3{font-size:15px;color:var(--esc);margin:14px 0 4px}.aut-doc p{margin:0 0 6px}.aut-doc h2{font-size:15px;line-height:1.3}
+.aut-campo-termo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:4px 0 8px!important}.aut-campo-termo label{margin:0;font-weight:400}.aut-in-termo{flex:1 1 220px;min-height:40px;background:#FFFBEA;border-color:#E0B100}

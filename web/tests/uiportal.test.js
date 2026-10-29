@@ -201,10 +201,11 @@ const traco = async (ink = true) => { // PNG como o canvas gera: fundo branco; c
     await pt.goto(BASE + '/autorizar.html#' + tokenDe(kT.link)); await pt.waitForSelector('#codigo'); await pt.fill('#codigo', kT.codigo); await pt.click('#fCod button'); await pt.waitForSelector('.aut-doc');
     t('portal: o termo aparece com o título e as seções do documento do colégio', /TERMO DE AUTORIZAÇÃO PARA USO DE IMAGEM EM CAMPANHAS DE MÍDIA PAGA/.test(await pt.innerText('.aut-doc h2')) && (await pt.$$('.aut-doc h3')).length >= 4 && /Turma \/ Ano letivo: Infantil 5 B/.test(await pt.innerText('.aut-doc')));
     if (dir) await pt.screenshot({ path: `${dir}/portal-9-termo-real.png`, fullPage: true });
-    t('portal: o campo CPF só aparece quando o responsável escolhe AUTORIZO', !(await pt.isVisible('#rCpf')) && (await pt.check('[value=AUTORIZO]'), await pt.isVisible('#rCpf')) && (await pt.check('[value=NAO_AUTORIZO]'), !(await pt.isVisible('#rCpf'))));
+    t('portal: nome e CPF do responsável são campos para digitar dentro do próprio termo (linhas de Identificação), mesmo sem o colégio ter preenchido', await pt.isVisible('.aut-doc #rNome') && await pt.isVisible('.aut-doc #rCpf') && (await pt.inputValue('#rNome')) === '' && (await pt.$$('#fTermo #rNome')).length === 0 && /nas linhas de Identificação/.test(await pt.innerText('#fTermo')));
+    await pt.fill('#rCpf', '52998224725'); t('portal: o CPF ganha pontos e traço enquanto é digitado', (await pt.inputValue('#rCpf')) === '529.982.247-25'); await pt.fill('#rCpf', '');
     await pt.check('[value=AUTORIZO]'); await pt.fill('#rNome', 'Teresa Responsável Teste'); await pt.selectOption('#rPar', 'Mãe'); await pt.check('#c1'); await pt.check('#c2'); await pt.check('#c3');
     await pt.click('#fTermo button[type=submit]'); await pt.waitForSelector('#eT:not([hidden])');
-    t('portal: AUTORIZO sem CPF mostra a mensagem pedindo o CPF', /CPF/.test(await pt.innerText('#eT')));
+    t('portal: AUTORIZO sem CPF mostra a mensagem e leva o cursor ao campo do CPF', /CPF/.test(await pt.innerText('#eT')) && await pt.evaluate(() => document.activeElement && document.activeElement.id === 'rCpf'));
     await pt.fill('#rCpf', '529.982.247-25'); await pt.click('#fTermo button[type=submit]'); await pt.waitForSelector('#bDes');
     t('portal: com o CPF correto avança para a escolha da assinatura', await pt.$('#bGov') !== null);
     await cx.close(); }
