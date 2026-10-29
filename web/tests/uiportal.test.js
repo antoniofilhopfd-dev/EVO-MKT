@@ -97,6 +97,12 @@ const traco = async (ink = true) => { // PNG como o canvas gera: fundo branco; c
   det = await G.get('/imagem/solicitacoes/detalhe?id=' + D.id);
   t('a equipe vê o arquivo, o hash e se ele contém o termo original', det.arquivos.some(a => a.tipo === 'govbr' && /assinatura_detectada=sim; contem_original=sim/.test(a.info) && a.sha256.length === 64), det.arquivos);
   t('com o arquivo em validação, o responsável não consegue trocar a decisão (409)', (await decidir(tD, kD.codigo, { decisao: 'NAO_AUTORIZO' })).s === 409);
+  const txtPdfC = buf => { const f = require('path').join(require('os').tmpdir(), 'comp_' + Date.now() + '.pdf'); fs.writeFileSync(f, buf); try { return execFileSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' }); } finally { fs.unlinkSync(f); } };
+  const compPub = await pub('/public/imagem/pdf', { token: tD, codigo: kD.codigo, tipo: 'comprovante' }), txtC1 = txtPdfC(compPub.buf);
+  t('comprovante de recebimento (responsável): data e hora do envio, SHA-256 do arquivo e “aguardando validação”', compPub.s === 200 && /COMPROVANTE DE RECEBIMENTO DO TERMO ASSINADO/.test(txtC1) && /Data e hora do recebimento\s+\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/.test(txtC1) && txtC1.replace(/\s/g, '').includes(require('crypto').createHash('sha256').update(assinado).digest('hex')) && /Aguardando validação da equipe/.test(txtC1) && /Ainda não validado/.test(txtC1), txtC1.slice(0, 1200));
+  if (process.env.CAPTURAS) { fs.mkdirSync(process.env.CAPTURAS, { recursive: true }); fs.writeFileSync(process.env.CAPTURAS + '/comprovante.pdf', compPub.buf); }
+  const compStaff = await fetch(U.B + '/imagem/solicitacoes/comprovante?id=' + D.id, { headers: G.H });
+  t('a equipe baixa o mesmo comprovante; sem login é 401; sem arquivo enviado é 404', compStaff.status === 200 && (await fetch(U.B + '/imagem/solicitacoes/comprovante?id=' + D.id)).status === 401 && (await G.req('GET', '/imagem/solicitacoes/comprovante?id=' + A.id)).status === 404);
   t('validar sem a conferência marcada é recusado (400)', (await G.req('POST', '/imagem/solicitacoes/validar', { id: D.id, resultado: 'VALIDO' })).status === 400);
   t('recusar o arquivo exige o motivo (400)', (await G.req('POST', '/imagem/solicitacoes/validar', { id: D.id, resultado: 'INVALIDO', obs: '' })).status === 400);
   await G.post('/imagem/solicitacoes/validar', { id: D.id, resultado: 'INVALIDO', obs: 'O nome no certificado não é o do responsável.' });
@@ -107,6 +113,8 @@ const traco = async (ink = true) => { // PNG como o canvas gera: fundo branco; c
   r = await G.post('/imagem/solicitacoes/validar', { id: D.id, resultado: 'VALIDO', obs: 'Assinatura válida; titular confere.', conferido_no_validar: true });
   det = await G.get('/imagem/solicitacoes/detalhe?id=' + D.id);
   t('validação manual registrada (quem, quando, resultado) e só então AUTORIZADO', r.ok && det.solicitacao.status === 'AUTORIZADO' && det.solicitacao.validadoPor && det.solicitacao.validadoEm && det.solicitacao.modalidade === 'GOVBR' && det.eventos.some(e => e.acao === 'validado'), det.solicitacao);
+  const txtC2 = txtPdfC((await pub('/public/imagem/pdf', { token: tD, codigo: kD.codigo, tipo: 'comprovante' })).buf);
+  t('depois da validação, o comprovante mostra quem validou, quando e “Autorizado (assinatura conferida)”', /Autorizado \(assinatura conferida\)/.test(txtC2) && /Validado por\s+\S+/.test(txtC2) && /Data e hora da validação\s+\d{2}\/\d{2}\/\d{4}/.test(txtC2) && /Assinatura válida; titular confere/.test(txtC2), txtC2.slice(0, 1500));
   const fin = await pub('/public/imagem/pdf', { token: tD, codigo: kD.codigo, tipo: 'final' });
   t('o responsável baixa exatamente o arquivo assinado que enviou (bytes preservados)', fin.s === 200 && fin.buf.equals(assinado));
   t('validar uma solicitação que não está aguardando é recusado (409)', (await G.req('POST', '/imagem/solicitacoes/validar', { id: D.id, resultado: 'VALIDO', conferido_no_validar: true })).status === 409);
