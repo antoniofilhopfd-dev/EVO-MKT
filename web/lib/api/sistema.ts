@@ -92,7 +92,7 @@ export async function sistemaRoute(c: Ctx): Promise<Response> {
   }
   if (path === '/admin/arquivos-sem-vinculo') {
     const base = await usados();
-    const rows = (await q("SELECT caminho,tamanho,criado_em FROM arquivos WHERE caminho NOT LIKE 'CONFIG/%' ORDER BY criado_em DESC")).filter((r) => !base.includes(String(r.caminho)));
+    const rows = (await q("SELECT caminho,tamanho,criado_em FROM arquivos WHERE caminho NOT LIKE 'CONFIG/%' AND caminho NOT LIKE 'USO-IMAGEM/%' AND caminho NOT LIKE 'CAROMETRO/%' ORDER BY criado_em DESC")).filter((r) => !base.includes(String(r.caminho)));
     return json({ total: rows.length, bytes: rows.reduce((s, r) => s + Number(r.tamanho ?? 0), 0), rows: rows.slice(0, 500).map((r) => ({ caminho: r.caminho, tamanho: Number(r.tamanho), criadoEm: r.criado_em })) });
   }
   if (path === '/admin/arquivos-sem-vinculo/excluir' && method === 'POST') {
@@ -102,6 +102,7 @@ export async function sistemaRoute(c: Ctx): Promise<Response> {
     if (!alvos.length) fail(400, 'Escolha ao menos um arquivo.');
     const base = await usados();
     if (alvos.some((p) => p.startsWith('CONFIG/'))) fail(400, 'Arquivos de configuração (como a logo) não são excluídos por aqui.');
+    if (alvos.some((p) => p.startsWith('USO-IMAGEM/') || p.startsWith('CAROMETRO/'))) fail(400, 'Fotos do Carômetro e comprovantes do Uso de Imagem não são excluídos por aqui.');
     const livres = alvos.filter((p) => !base.includes(p));
     if (livres.length !== alvos.length) fail(409, 'Algum arquivo passou a ser usado por uma publicação. Atualize a lista.');
     const backup = await makeBackup('antesexcluirarquivos', { completo: true }); // ponto de volta antes de apagar
