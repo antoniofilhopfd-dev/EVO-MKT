@@ -26,7 +26,7 @@ export async function calcularPendencias(): Promise<Pend[]> {
   }
   for (const a of alunos) {
     if (!a.foto_id) add('sem_foto', a, a.id, 'Nenhuma foto vinculada.');
-    else if (Number(a.largura) < 450 || Number(a.altura) < 600 || /baixa/i.test(String(a.aviso))) add('imagem_baixa', a, a.id, `Resolução ${a.largura}×${a.altura}; o recomendado é 600×800.`);
+    else if (Number(a.largura) < 100 || Number(a.altura) < 100) add('imagem_baixa', a, a.id, `Imagem muito pequena (${a.largura}×${a.altura}).`);
     if ((porNomeTurma.get(`${a.turma}|${normNome(String(a.nome))}`) ?? []).length > 1) add('duplicado', a, a.id, 'Há outro aluno com o mesmo nome nesta turma (confira se não é cadastro repetido).');
     const outras = (porNome.get(normNome(String(a.nome))) ?? []).filter((x) => x.turma !== a.turma);
     if (outras.length && String(a.turma)) add('varias_turmas', a, a.id, `Também aparece em: ${[...new Set(outras.map((x) => String(x.turma)))].slice(0, 3).join(', ')}. Pode ser troca de turma não atualizada.`);

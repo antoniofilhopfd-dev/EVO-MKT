@@ -15,7 +15,7 @@ const { t, fim } = U.contador();
   t('base de teste importada', (imp.novos ?? imp.body?.novos) >= 8, imp);
   r = await G.get('/carometro/alunos');
   const seg = n => r.rows.find(a => a.nome === n)?.segmento;
-  t('segmentos do carômetro deduzidos da turma', seg('Ana Fictícia') === 'MATERNAL' && seg('Bia Exemplo') === 'INFANTIL' && seg('Caio Teste') === 'JARDINS' && seg('Davi Modelo') === 'JARDINS' && seg('Eva Nome') === 'INICIAIS' && seg('Fabi Final') === 'FINAIS' && seg('Gabi Médio') === 'MEDIO' && seg('Hugo Sem Turma') === '', r.rows.map(a => [a.nome, a.segmento]));
+  t('segmentos do carômetro deduzidos da turma', seg('Ana Fictícia') === 'INFANTIL' && seg('Bia Exemplo') === 'INFANTIL' && seg('Caio Teste') === 'JARDINS' && seg('Davi Modelo') === 'JARDINS' && seg('Eva Nome') === 'INICIAIS' && seg('Fabi Final') === 'FINAIS' && seg('Gabi Médio') === 'MEDIO' && seg('Hugo Sem Turma') === '', r.rows.map(a => [a.nome, a.segmento]));
   t('ordem escolar: maternal, infantil, 1º ano… série; sem turma por último', r.rows.map(a => a.turma).join('|').startsWith('Maternal A|Infantil 2 A|Infantil 4 B|1º Ano A|3º Ano A') && r.rows.at(-1).nome === 'Hugo Sem Turma', r.rows.map(a => a.turma));
   t('indicadores: total, sem foto, duplicados e sem turma reconhecida', r.indicadores.alunos === 10 && r.indicadores.comFoto === 0 && r.indicadores.semFoto === 10 && r.indicadores.duplicados === 2 && r.indicadores.semTurma === 1, r.indicadores);
   t('nenhuma foto nem dado extra (CPF, responsável) nas linhas', r.rows.every(a => a.fotoId === null && !('cpf' in a) && !('responsavel_nome' in a) && !('_vence' in a)));
@@ -30,14 +30,14 @@ const { t, fim } = U.contador();
   t('sem solicitação: ninguém autorizado; todos "sem informação"', r.rows.length === 0 && (await G.get('/carometro/alunos?autorizacao=SEM_INFORMACAO')).rows.length === 10);
   const tr = await G.get('/carometro/turmas');
   const ini = tr.segmentos.find(s => s.k === 'INICIAIS');
-  t('árvore de turmas: segmentos na ordem, contagens e séries', tr.segmentos.map(s => s.k).join() === 'MATERNAL,INFANTIL,JARDINS,INICIAIS,FINAIS,MEDIO' && ini.alunos === 3 && ini.series[0].serie === '3º Ano' && ini.series[0].turmas.map(x => x.alunos).join() === '2,1' && tr.semSegmento === 1 && tr.total === 10, tr);
+  t('árvore de turmas: segmentos na ordem, contagens e séries', tr.segmentos.map(s => s.k).join() === 'INFANTIL,JARDINS,INICIAIS,FINAIS,MEDIO' && ini.alunos === 3 && ini.series[0].serie === '3º Ano' && ini.series[0].turmas.map(x => x.alunos).join() === '2,1' && tr.semSegmento === 1 && tr.total === 10, tr);
   // autorização informativa vinda do Uso de Imagem
   const mod = (await G.get('/imagem/modelos')).rows.find(m => m.ativo) ?? (await G.get('/imagem/modelos')).rows[0];
   const ana = (await G.get('/carometro/alunos?busca=C-1')).rows[0];
   const cr = await G.post('/imagem/solicitacoes/criar', { modelo_id: mod.id, alunos: [{ id: ana.id }] });
   t('solicitação pendente não vira autorização', (await G.get('/carometro/aluno?id=' + ana.id)).aluno.autorizacao === 'SEM_INFORMACAO', cr);
   const f = await G.get('/carometro/aluno?id=' + ana.id);
-  t('ficha traz os dados mínimos e o ano letivo', f.aluno.matricula === 'C-1' && f.aluno.turma === 'Maternal A' && f.aluno.segmento === 'MATERNAL' && f.aluno.colegasNaTurma === 1 && /^\d{4}$/.test(f.aluno.anoLetivo), f);
+  t('ficha traz os dados mínimos e o ano letivo', f.aluno.matricula === 'C-1' && f.aluno.turma === 'Maternal A' && f.aluno.segmento === 'INFANTIL' && f.aluno.colegasNaTurma === 1 && /^\d{4}$/.test(f.aluno.anoLetivo), f);
   t('ficha de aluno inexistente: 404', (await G.req('GET', '/carometro/aluno?id=999999')).status === 404);
 
   // ---- fotos (etapa 2) ----
@@ -50,7 +50,11 @@ const { t, fim } = U.contador();
   t('sem login: envio e leitura recusados (401)', (await fetch(U.B + '/carometro/foto', { method: 'POST', headers: { 'X-EVO': '1' }, body: new FormData() })).status === 401 && (await fetch(U.B + '/carometro/foto?id=1')).status === 401);
   t('arquivo que não é imagem (texto com nome .jpg) é recusado', (await envia(G, iara.id, Buffer.from('não sou uma foto'), 'x.jpg')).status === 400);
   t('GIF é recusado (formato não aceito)', (await envia(G, iara.id, await sharp({ create: { width: 300, height: 400, channels: 3, background: '#fff' } }).gif().toBuffer(), 'x.gif', 'image/gif')).status === 400);
-  t('foto pequena demais (100×100) é recusada', (await envia(G, iara.id, await jpg(100, 100))).status === 400);
+  t('foto pequena demais (80×80) é recusada', (await envia(G, iara.id, await jpg(80, 80))).status === 400);
+  const peq = await envia(G, bia.id, await jpg(150, 150));
+  const peqPad = await sharp(Buffer.from(await (await baixa(G, `/carometro/foto?id=${peq.j.id}&tam=padrao`)).arrayBuffer())).metadata();
+  t('foto pequena (150×150, como as da escola) é aceita, sem aviso de resolução e sem ser ampliada', peq.status === 200 && !/Resolu/i.test(peq.j.aviso || '') && peqPad.width <= 150 && peqPad.height <= 200, [peq.j, peqPad.width, peqPad.height]);
+  if ((await G.get('/carometro/aluno?id=' + iara.id)).podeExcluir) await G.post('/carometro/foto/excluir', { id: peq.j.id });
   t('foto de mais de 5 MB é recusada (413)', (await envia(G, iara.id, Buffer.alloc(5 * 1048576 + 10, 1))).status === 413);
   t('aluno inexistente: 404', (await envia(G, 999999, await jpg(600, 800))).status === 404);
   let up = await envia(G, iara.id, await jpg(900, 1200));
