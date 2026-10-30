@@ -24,7 +24,11 @@ let internalSession = null;
 const pref = (key, def = null) => { try { const v = localStorage.getItem(`evo.${key}`); return v === null ? def : JSON.parse(v); } catch { return def; } };
 const setPref = (key, v) => { try { localStorage.setItem(`evo.${key}`, JSON.stringify(v)); } catch { /* armazenamento indisponível */ } };
 
-function toast(msg, type = 'ok') { const t = $('#toast'); if (!t) return; t.textContent = msg; t.className = `toast ${type}`; clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 3600); }
+function mensagemErro(erro, padrao = 'Não foi possível concluir a operação. Tente novamente.') {
+  const texto = typeof erro === 'string' ? erro : erro?.message;
+  return typeof texto === 'string' && texto.trim() ? texto.trim() : padrao;
+}
+function toast(msg, type = 'ok') { const t = $('#toast'); if (!t) return; t.textContent = mensagemErro(msg); t.setAttribute('role', type === 'ok' ? 'status' : 'alert'); t.className = `toast ${type}`; clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), type === 'ok' ? 3600 : 12000); }
 function setTitle(title, sub = '') { $('#pageTitle').textContent = title; $('#pageSub').textContent = sub; document.title = `${title} · EVO MKT`; }
 
 /** Consultas de leitura de uma tela que já não é a atual (a pessoa mudou de aba ou de filtro) ficam sem resposta: nunca sobrescrevem a tela mais recente. */

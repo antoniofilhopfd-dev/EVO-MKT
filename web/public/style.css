@@ -231,3 +231,11 @@ body{font-size:15px}
 .int-warn{background:#fff4dd;border-radius:10px;padding:8px 10px;color:#7a4a00;font-size:13px;margin:8px 0}
 
 @media(max-width:1000px){body:has(#sidebar.open)::after{content:'';position:fixed;inset:0;background:rgba(0,20,60,.38);z-index:29}}
+
+/* Avisos de importação permanecem visíveis para consulta. */
+.cm-importacao-aviso{margin:12px 0;padding:14px 16px;border:1px solid #d9b768;border-radius:10px;background:#fff8e8;color:#593b00;font:500 14px/1.5 system-ui,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+.cm-importacao-aviso[hidden]{display:none}
+.toast{font-family:system-ui,sans-serif;color:#fff;white-space:pre-wrap;overflow-wrap:anywhere;max-width:min(480px,calc(100vw - 32px))}
+
+/* A regra genérica .warn de areas.css não pode apagar o contraste do aviso. */
+.toast.warn,.toast.bad,.toast.ok{color:#fff}
