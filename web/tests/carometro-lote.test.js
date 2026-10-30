@@ -74,6 +74,34 @@ const { t, fim } = U.contador();
   r = await lote(G, Array.from({ length: 3 }, (_, i) => [`x${i}.jpg`, Buffer.from('x')]), '', 424242);
   t('lote inexistente: 404', r.status === 404);
 
+  // ---- lote de uma turma só ----
+  await G.post('/imagem/alunos/importar', { linhas: [
+    { matricula: 'T-1', nome: 'João Pedro Silva', turma: 'Turma T 1º Ano A', segmento: 'Anos Iniciais' }, { matricula: 'T-2', nome: 'Maria Clara Souza', turma: 'Turma T 1º Ano A', segmento: 'Anos Iniciais' },
+    { matricula: 'T-3', nome: 'Maria Clara Lima', turma: 'Turma T 1º Ano A', segmento: 'Anos Iniciais' }, { matricula: 'T-4', nome: 'Pedro Alves', turma: 'Turma T 1º Ano A', segmento: 'Anos Iniciais' },
+    { matricula: 'U-1', nome: 'Uma Aluna', turma: '2º Ano U', segmento: '' }, { matricula: 'U-2', nome: 'Outro Aluno', turma: '2º Ano U', segmento: '' }] });
+  const TT = 'Turma T 1º Ano A';
+  const loteT = (arqs, turma) => { const fd = new FormData(); if (turma) fd.append('turma', turma); for (const [n, b] of arqs) fd.append('arquivo', new Blob([b], { type: 'image/jpeg' }), n); return raw(G, '/carometro/lote/fotos', { method: 'POST', body: fd }); };
+  t('turma sem alunos: 404', (await loteT([['a.jpg', await jpg()]], 'Turma Fantasma')).status === 404);
+  r = await loteT([['T-1.jpg', await jpg()], ['maria-souza.jpg', await jpg()], ['maria-clara.jpg', await jpg()], ['M-001.jpg', await jpg()], ['pedro.jpg', await jpg()]], TT);
+  const LT = r.j.loteId; d = (await raw(G, '/carometro/lote?id=' + LT)).j;
+  const itT = n => d.itens.find(i => i.arquivo === n);
+  t('lote da turma: guarda a turma e lista os 4 alunos dela', d.lote.turma === TT && d.alunosTurma.length === 4 && d.faltam.length === 2, d.lote);
+  t('matrícula exata dentro da turma = pronta', itT('T-1.jpg').estado === 'ok' && itT('T-1.jpg').alunoId === (await G.get('/carometro/alunos?busca=T-1')).rows[0].id);
+  t('parte do nome ("maria souza") que aponta para um só aluno da turma = sugestão', itT('maria-souza.jpg').estado === 'sugerida' && itT('maria-souza.jpg').aluno === 'Maria Clara Souza', itT('maria-souza.jpg'));
+  t('parte do nome que serve para dois alunos = ambígua, sem escolher', itT('maria-clara.jpg').estado === 'ambigua' && itT('pedro.jpg').estado === 'ambigua' && itT('pedro.jpg').alunoId === null);
+  t('matrícula de aluno de OUTRA turma não vale neste lote (órfã)', itT('M-001.jpg').estado === 'orfa' && /desta turma/.test(itT('M-001.jpg').motivo));
+  t('vincular a aluno de outra turma é recusado (409)', (await G.req('POST', '/carometro/lote/resolver', { lote_id: LT, item_id: itT('maria-clara.jpg').id, acao: 'vincular', aluno_id: id('M-002') })).status === 409);
+  const tId = m => (d.alunosTurma.find(a => a.matricula === m) || {}).id;
+  await G.post('/carometro/lote/resolver', { lote_id: LT, item_id: itT('maria-clara.jpg').id, acao: 'vincular', aluno_id: tId('T-3') });
+  await G.post('/carometro/lote/resolver', { lote_id: LT, item_id: itT('maria-souza.jpg').id, acao: 'confirmar' });
+  await G.post('/carometro/lote/resolver', { lote_id: LT, item_id: itT('pedro.jpg').id, acao: 'ignorar' });
+  await G.post('/carometro/lote/resolver', { lote_id: LT, item_id: itT('M-001.jpg').id, acao: 'ignorar' });
+  d = (await raw(G, '/carometro/lote?id=' + LT)).j;
+  t('depois de decidir: faltam só os alunos sem foto no lote (Pedro Alves)', d.pendencias === 0 && d.faltam.map(a => a.matricula).join() === 'T-4', d.faltam);
+  const apT = await G.post('/carometro/lote/aplicar', { lote_id: LT });
+  t('aplica as 3 fotos da turma', apT.aplicadas === 3 && (await G.get('/carometro/alunos?turma=' + encodeURIComponent(TT))).rows.filter(a => a.fotoId).length === 3);
+  t('lotes recentes mostram a turma', (await raw(G, '/carometro/lotes')).j.rows.some(x => x.id === LT && x.turma === TT));
+
   // ---- telas reais ----
   const dir = process.env.CAPTURAS; if (dir) fs.mkdirSync(dir, { recursive: true });
   const b = await U.abrir();
@@ -94,6 +122,19 @@ const { t, fim } = U.contador();
     await p.click('#cmAplicar'); await p.click('#dlgOk');
     await p.waitForFunction(() => /Aplicado/.test(document.querySelector('#cmLoteCard h2')?.innerText || ''));
     t(`${nome}: lote aplicado aparece em "Lotes recentes" com opção de desfazer`, /Desfazer/.test(await p.innerText('#cmLotes')));
+    if (nome === 'desktop') {
+      t(`${nome}: a seção "turma por turma" lista as turmas`, (await p.$$eval('#cmTurmaLote option', o => o.length)) >= 5);
+      await p.selectOption('#cmTurmaLote', '2º Ano U');
+      await p.setInputFiles('#cmFotosT', await Promise.all(['U-1.jpg', 'qualquer-coisa.jpg'].map(async n => ({ name: n, mimeType: 'image/jpeg', buffer: await jpg() }))));
+      await p.click('#cmSimularT'); await p.waitForFunction(() => /2º Ano U/.test(document.querySelector('#cmLoteCard h2')?.innerText || ''));
+      t(`${nome}: lote da turma mostra quem ainda está sem foto e um seletor com os alunos da turma`, /Ainda sem foto neste lote \(1 de 2\)/.test(await p.innerText('#cmLoteCard')) && await p.$('[data-alu]') !== null);
+      await p.selectOption('[data-alu]', { label: 'Outro Aluno (U-2)' }); await p.click('[data-vinc-alu]');
+      await p.waitForFunction(() => /Todos os alunos da turma têm foto neste lote/.test(document.querySelector('#cmLoteCard').innerText));
+      await p.click('#cmAplicar'); await p.click('#dlgOk');
+      await p.waitForFunction(() => /Aplicado/.test(document.querySelector('#cmLoteCard h2')?.innerText || ''));
+      t(`${nome}: vincular pelo seletor e aplicar a turma`, true);
+      await foto('importacao-turma');
+    }
     await foto('importacao-aplicado');
     t(`${nome}: sem estouro horizontal`, await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth <= 2));
     t(`${nome}: sem erros de script`, p.errs.length === 0, p.errs);

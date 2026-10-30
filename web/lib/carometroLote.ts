@@ -23,7 +23,7 @@ export function lerManifesto(txt: string): Map<string, string> {
 export interface AlunoLote { id: number; matricula: string; nome: string; turma: string }
 export interface Conc { estado: 'ok' | 'sugerida' | 'ambigua' | 'orfa'; regra: string; confianca: string; aluno_id: number | null; motivo: string }
 
-export function conciliar(arquivo: string, alunos: AlunoLote[], manifesto: Map<string, string>): Conc {
+export function conciliar(arquivo: string, alunos: AlunoLote[], manifesto: Map<string, string>, porTurma = false): Conc {
   const porMat = new Map(alunos.map((a) => [a.matricula.toLowerCase(), a]));
   const man = manifesto.get(arquivo.toLowerCase());
   if (man) {
@@ -36,19 +36,28 @@ export function conciliar(arquivo: string, alunos: AlunoLote[], manifesto: Map<s
   const nome = normNome(base.replace(/[_\-.]+/g, ' ')), cand = nome.length >= 5 ? alunos.filter((a) => normNome(a.nome) === nome) : [];
   if (cand.length === 1) return { estado: 'sugerida', regra: 'Nome', confianca: 'baixa', aluno_id: cand[0].id, motivo: 'Sugestão pelo nome do arquivo; confirme antes de aplicar.' };
   if (cand.length > 1) return { estado: 'ambigua', regra: 'Nome', confianca: '', aluno_id: null, motivo: `${cand.length} alunos com este nome; escolha o aluno.` };
-  return { estado: 'orfa', regra: '', confianca: '', aluno_id: null, motivo: 'Nenhum aluno com esta matrícula ou nome.' };
+  // lote de uma turma só: o nome do arquivo pode ter só parte do nome (ex.: "joao silva" para "João Pedro Silva") se isso apontar para um único aluno da turma
+  if (porTurma) {
+    const toks = nome.split(' ').filter((x) => x.length >= 2);
+    if (toks.length >= 2 || (toks[0]?.length ?? 0) >= 4) {
+      const parte = alunos.filter((a) => { const n = normNome(a.nome).split(' '); return toks.every((tk) => n.includes(tk)); });
+      if (parte.length === 1) return { estado: 'sugerida', regra: 'Nome (na turma)', confianca: 'baixa', aluno_id: parte[0].id, motivo: 'Sugestão pelo nome do arquivo dentro da turma; confirme antes de aplicar.' };
+      if (parte.length > 1) return { estado: 'ambigua', regra: 'Nome (na turma)', confianca: '', aluno_id: null, motivo: `${parte.length} alunos da turma combinam com este nome; escolha o aluno.` };
+    }
+  }
+  return { estado: 'orfa', regra: '', confianca: '', aluno_id: null, motivo: porTurma ? 'Nenhum aluno desta turma com esta matrícula ou nome.' : 'Nenhum aluno com esta matrícula ou nome.' };
 }
 
 const staged = (loteId: number, n: number, k: string) => `CAROMETRO/LOTE/${loteId}/${n}_${k}`;
 const ins = (c: string, mime: string, b: Buffer) => run('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)', [c, mime, b.length, b, now()]);
 
-export async function novoLote(ator: string, manifesto: string): Promise<number> {
+export async function novoLote(ator: string, manifesto: string, turma = ''): Promise<number> {
   const codigo = 'L' + randomBytes(8).toString('hex');
-  await run('INSERT INTO cm_lotes(codigo,estado,criado_por,criado_em,manifesto) VALUES(?,?,?,?,?)', [codigo, 'simulado', ator, now(), manifesto.slice(0, 500_000)]);
+  await run('INSERT INTO cm_lotes(codigo,estado,criado_por,criado_em,manifesto,turma) VALUES(?,?,?,?,?,?)', [codigo, 'simulado', ator, now(), manifesto.slice(0, 500_000), turma || null]);
   return Number((await q1('SELECT id FROM cm_lotes WHERE codigo=?', [codigo]))?.id);
 }
 
-export async function adicionarArquivo(loteId: number, nome: string, buf: Buffer, alunos: AlunoLote[], manifesto: Map<string, string>): Promise<void> {
+export async function adicionarArquivo(loteId: number, nome: string, buf: Buffer, alunos: AlunoLote[], manifesto: Map<string, string>, porTurma = false): Promise<void> {
   const total = Number((await q1('SELECT COUNT(*) n FROM cm_lote_itens WHERE lote_id=?', [loteId]))?.n ?? 0);
   const n = total + 1, limpo = nome.replace(/[^\w.\- ]/g, '_').slice(0, 190);
   const r = await prepararFoto(buf);
@@ -56,7 +65,7 @@ export async function adicionarArquivo(loteId: number, nome: string, buf: Buffer
     await run("INSERT INTO cm_lote_itens(lote_id,nome_arquivo,estado,motivo) VALUES(?,?, 'invalida', ?)", [loteId, limpo, r.erro]);
     return;
   }
-  const f = r as FotoPronta, c = conciliar(limpo, alunos, manifesto);
+  const f = r as FotoPronta, c = conciliar(limpo, alunos, manifesto, porTurma);
   const cam = { o: staged(loteId, n, 'original'), p: staged(loteId, n, 'padrao.jpg'), m: staged(loteId, n, 'mini.jpg') };
   await ins(cam.o, f.mime, f.original); await ins(cam.p, 'image/jpeg', f.padrao); await ins(cam.m, 'image/jpeg', f.mini);
   const ant = c.aluno_id ? (await q1('SELECT id FROM cm_fotos WHERE aluno_id=? AND ativa=1', [c.aluno_id]))?.id ?? null : null;

@@ -24,6 +24,9 @@ Segmentos: Maternais; Infantil 1, 2 e 3; Jardins (Infantil 4, 5 e 1º ano); Anos
 - `/file` não serve caminhos do Carômetro; a tela "arquivos sem vínculo" não lista nem apaga `CAROMETRO/` e `USO-IMAGEM/`.
 
 ## Importação de fotos em lote
+**Turma por turma:** em Importação › “Fotos de uma turma”, escolha a turma e envie as fotos dela. O lote só enxerga os alunos da turma: matrícula exata (de outra turma não vale) ou parte do nome do arquivo (ex.: `maria-souza.jpg`) que aponte para um único aluno vira *sugestão* a confirmar; o que sobrar você liga ao aluno por uma lista da turma. A tela mostra quem ainda está sem foto no lote e, ao aplicar, já deixa a próxima turma selecionada.
+
+**Várias turmas (por matrícula):**
 1. Simulação: cada arquivo é conciliado — matrícula exata no nome (alta), manifesto `matricula;nome_arquivo;origem` (alta), nome igual ao de um aluno (baixa, só sugestão), nome ambíguo ou sem aluno (decisão humana).
 2. Conflitos (duas fotos para o mesmo aluno), sugestões, ambíguas e órfãs bloqueiam o "Aplicar".
 3. Aplicar cria versões novas (as antigas ficam no histórico). Desfazer reverte só o que não foi alterado depois.
