@@ -1,3 +1,4 @@
+import { contextoCm } from '../carometroAcesso';
 import { Ctx } from '../ctx';
 import { requireAdmin } from '../auth';
 import { q, q1, run } from '../db';
@@ -12,6 +13,7 @@ const publico = (r: Row) => ({ id: Number(r.id), nome: r.nome, link: linkPastaDr
 /** Referências de pastas do Drive: qualquer usuário interno consulta; só o Administrador registra, confere ou remove. */
 export async function carometroDriveRoute(c: Ctx, u: Row, ator: string): Promise<Response | null> {
   const { path, method } = c;
+  if(path.startsWith('/carometro/drive') && contextoCm.getStore()?.segmentos.length) fail(403,'As pastas gerais do Drive são restritas à equipe com acesso a todos os segmentos.');
   if (!path.startsWith('/carometro/drive')) return null;
   if (path === '/carometro/drive' && method === 'GET') {
     const rows = await q('SELECT * FROM cm_drive_refs WHERE ativo=1 ORDER BY id DESC');

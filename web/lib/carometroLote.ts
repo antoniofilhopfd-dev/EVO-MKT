@@ -1,6 +1,6 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { q, q1, run } from './db';
-import { now, Row } from './util';
+import { fail, now, Row } from './util';
 import { normNome } from './carometro';
 import { auditar, guardarFoto, prepararFoto, FotoPronta } from './carometroFoto';
 
@@ -58,38 +58,43 @@ export async function novoLote(ator: string, manifesto: string, turma = ''): Pro
 }
 
 export async function adicionarArquivo(loteId: number, nome: string, buf: Buffer, alunos: AlunoLote[], manifesto: Map<string, string>, porTurma = false): Promise<void> {
+  const hash=createHash('sha256').update(buf).digest('hex');
+  if(await q1('SELECT id FROM cm_lote_itens WHERE lote_id=? AND arquivo_hash=? AND nome_arquivo=?',[loteId,hash,nome.replace(/[^\w.\- ]/g,'_').slice(0,190)]))return;
   const total = Number((await q1('SELECT COUNT(*) n FROM cm_lote_itens WHERE lote_id=?', [loteId]))?.n ?? 0);
+  if(total>=MAX_ITENS_LOTE)fail(400,`Cada lote aceita até ${MAX_ITENS_LOTE} fotos. Divida em lotes menores.`);
   const n = total + 1, limpo = nome.replace(/[^\w.\- ]/g, '_').slice(0, 190);
   const r = await prepararFoto(buf);
   if ('erro' in r) {
     await run("INSERT INTO cm_lote_itens(lote_id,nome_arquivo,estado,motivo) VALUES(?,?, 'invalida', ?)", [loteId, limpo, r.erro]);
     return;
   }
-  const f = r as FotoPronta, c = conciliar(limpo, alunos, manifesto, porTurma);
+  const f = r as FotoPronta, c = conciliar(nome.split('/').pop() || nome, alunos, manifesto, porTurma);
   const cam = { o: staged(loteId, n, 'original'), p: staged(loteId, n, 'padrao.jpg'), m: staged(loteId, n, 'mini.jpg') };
   await ins(cam.o, f.mime, f.original); await ins(cam.p, 'image/jpeg', f.padrao); await ins(cam.m, 'image/jpeg', f.mini);
+  const origemTurma = c.aluno_id ? alunos.find(a=>a.id===c.aluno_id)?.turma ?? '' : '';
   const ant = c.aluno_id ? (await q1('SELECT id FROM cm_fotos WHERE aluno_id=? AND ativa=1', [c.aluno_id]))?.id ?? null : null;
-  await run('INSERT INTO cm_lote_itens(lote_id,nome_arquivo,estado,regra,confianca,aluno_id,motivo,caminho_original,caminho_padrao,caminho_mini,mime,largura,altura,tamanho,aviso,anterior_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-    [loteId, limpo, c.estado, c.regra, c.confianca, c.aluno_id, c.motivo, cam.o, cam.p, cam.m, f.mime, f.largura, f.altura, f.original.length, f.aviso, ant]);
+  await run('INSERT INTO cm_lote_itens(lote_id,nome_arquivo,estado,regra,confianca,aluno_id,motivo,caminho_original,caminho_padrao,caminho_mini,mime,largura,altura,tamanho,aviso,anterior_id,turma_origem,arquivo_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [loteId, limpo, c.estado, c.regra, c.confianca, c.aluno_id, c.motivo, cam.o, cam.p, cam.m, f.mime, f.largura, f.altura, f.original.length, f.aviso, ant, origemTurma, hash]);
 }
 
 /** Itens do lote com o aluno, a foto atual e o conflito (várias fotos para o mesmo aluno) já calculados. */
 export async function itensDoLote(loteId: number): Promise<Row[]> {
   const rows = await q(`SELECT i.*, a.nome aluno_nome, a.matricula, a.turma, (SELECT f.id FROM cm_fotos f WHERE f.aluno_id=i.aluno_id AND f.ativa=1 LIMIT 1) foto_atual FROM cm_lote_itens i LEFT JOIN ui_alunos a ON a.id=i.aluno_id WHERE i.lote_id=? ORDER BY i.id`, [loteId]);
+  const externos=await q("SELECT i.aluno_id,i.lote_id FROM cm_lote_itens i JOIN cm_lotes l ON l.id=i.lote_id WHERE l.estado='simulado' AND i.lote_id<>? AND i.estado IN ('ok','sugerida') AND i.aluno_id IS NOT NULL",[loteId]);
   const cont = new Map<number, number>();
   for (const r of rows) if (r.aluno_id && ['ok', 'sugerida'].includes(String(r.estado))) cont.set(Number(r.aluno_id), (cont.get(Number(r.aluno_id)) ?? 0) + 1);
   return rows.map((r) => ({
     id: Number(r.id), arquivo: r.nome_arquivo, estado: r.estado, regra: r.regra, confianca: r.confianca, alunoId: r.aluno_id ? Number(r.aluno_id) : null,
-    aluno: r.aluno_nome ?? '', matricula: r.matricula ?? '', turma: r.turma ?? '', motivo: r.motivo, largura: r.largura, altura: r.altura, tamanho: r.tamanho, aviso: r.aviso,
-    substitui: !!r.foto_atual && ['ok', 'sugerida'].includes(String(r.estado)), conflito: !!r.aluno_id && ['ok', 'sugerida'].includes(String(r.estado)) && (cont.get(Number(r.aluno_id)) ?? 0) > 1, aplicado: !!r.foto_id,
+    aluno: r.aluno_nome ?? '', matricula: r.matricula ?? '', turma: r.turma ?? '', outrosLotes: externos.filter(i=>Number(i.aluno_id)===Number(r.aluno_id)).map(i=>Number(i.lote_id)), turmaDivergente: !!r.turma_origem && String(r.turma_origem)!==String(r.turma), motivo: r.motivo, largura: r.largura, altura: r.altura, tamanho: r.tamanho, aviso: r.aviso,
+    substitui: !!r.foto_atual && ['ok', 'sugerida'].includes(String(r.estado)), conflito: !!r.aluno_id && ['ok', 'sugerida'].includes(String(r.estado)) && (cont.get(Number(r.aluno_id)) ?? 0) > 1, fotoAtual: r.foto_atual ? Number(r.foto_atual) : null, aplicado: !!r.foto_id,
   }));
 }
 export const resumoItens = (its: Row[]) => ({
-  total: its.length, prontos: its.filter((i) => i.estado === 'ok' && !i.conflito).length, sugeridas: its.filter((i) => i.estado === 'sugerida').length, ambiguas: its.filter((i) => i.estado === 'ambigua').length,
+  turmas: new Set(its.filter((i) => i.alunoId).map((i) => i.turma)).size, total: its.length, prontos: its.filter((i) => i.estado === 'ok' && !i.conflito).length, sugeridas: its.filter((i) => i.estado === 'sugerida').length, ambiguas: its.filter((i) => i.estado === 'ambigua').length,
   orfas: its.filter((i) => i.estado === 'orfa').length, invalidas: its.filter((i) => i.estado === 'invalida').length, ignoradas: its.filter((i) => i.estado === 'ignorada').length,
   conflitos: its.filter((i) => i.conflito).length, substituem: its.filter((i) => i.substitui && i.estado === 'ok').length,
 });
-export const pendentes = (its: Row[]) => its.filter((i) => ['sugerida', 'ambigua', 'orfa'].includes(String(i.estado)) || i.conflito).length;
+export const pendentes = (its: Row[]) => its.filter((i) => ['sugerida', 'ambigua', 'orfa'].includes(String(i.estado)) || i.conflito || i.turmaDivergente).length;
 
 async function apagarStaging(loteId: number): Promise<void> {
   await run('DELETE FROM arquivos WHERE caminho LIKE ?', [`CAROMETRO/LOTE/${loteId}/%`]);
@@ -104,10 +109,15 @@ export async function aplicarLote(loteId: number, ator: string): Promise<{ aplic
   const itens = await q("SELECT * FROM cm_lote_itens WHERE lote_id=? AND estado='ok' AND aluno_id IS NOT NULL ORDER BY id", [loteId]);
   let aplicadas = 0, substituidas = 0;
   for (const it of itens) {
-    const buf = async (c: string) => Buffer.from((await q1('SELECT conteudo FROM arquivos WHERE caminho=?', [c]))?.conteudo);
+    const buf = async (c: string) => {const a=await q1('SELECT conteudo FROM arquivos WHERE caminho=?',[c]);if(!a)fail(409,'Foto incompleta no lote. Reenvie o arquivo antes de aplicar.');return Buffer.from(a.conteudo);};
+    if (it.foto_id) continue; // retomada: não aplicar a mesma foto duas vezes
     const original = await buf(it.caminho_original);
     const pronta = await prepararFoto(original);
-    if ('erro' in pronta) continue;
+    if ('erro' in pronta) throw new Error(pronta.erro);
+    pronta.padrao = await buf(it.caminho_padrao);
+    pronta.mini = await buf(it.caminho_mini);
+    const aluno=await q1('SELECT turma,ativo FROM ui_alunos WHERE id=? FOR UPDATE',[it.aluno_id]);
+    if(!aluno || !Number(aluno.ativo) || (it.turma_origem && String(it.turma_origem)!==String(aluno.turma))) throw new Error('Aluno ou turma alterado. Refaça a associação antes de aplicar.');
     const ant = (await q1('SELECT id FROM cm_fotos WHERE aluno_id=? AND ativa=1', [it.aluno_id]))?.id ?? null;
     const fotoId = await guardarFoto(Number(it.aluno_id), pronta, String(it.nome_arquivo), `lote-${loteId}`, ator);
     await run('UPDATE cm_lote_itens SET foto_id=?, anterior_id=? WHERE id=?', [fotoId, ant, it.id]);

@@ -30,7 +30,9 @@ export async function prepararFoto(bruto: Buffer): Promise<FotoPronta | { erro: 
     const padrao = await base().resize(FOTO_PADRAO.w, FOTO_PADRAO.h, { fit: 'cover', position: 'attention', withoutEnlargement: true }).jpeg({ quality: 86, mozjpeg: true }).toBuffer();
     const mini = await base().resize(FOTO_MINI.w, FOTO_MINI.h, { fit: 'cover', position: 'attention', withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
     const avisos: string[] = [];
+    if(await possivelDesfoque(bruto)) avisos.push('Possível desfoque: confira a nitidez.');
     const prop = largura / altura;
+    if (largura < 600 || altura < 800) avisos.push('Resolução baixa: confira a nitidez antes de imprimir.');
     if (prop > 1.05) avisos.push('Foto na horizontal: foi recortada no centro. Confira o enquadramento.');
     return { original: bruto, padrao, mini, mime, largura, altura, sha256: sha(bruto), aviso: avisos.join(' ').slice(0, 200) };
   } catch (e) {
@@ -72,4 +74,26 @@ export async function lerArquivoFoto(fotoId: number, tam: 'mini' | 'padrao' | 'o
   const a = await q1('SELECT mime, conteudo FROM arquivos WHERE caminho=?', [cam]);
   if (!a) return null;
   return { buf: Buffer.from(a.conteudo), mime: String(a.mime), nome: String(f.nome_original), alunoId: Number(f.aluno_id) };
+}
+
+/** Enquadramento normalizado sobre a imagem orientada. Mantém o original intacto. */
+export async function enquadrarFoto(bruto: Buffer, dados: unknown): Promise<{ padrao: Buffer; mini: Buffer }> {
+  const d = dados as Record<string, unknown>;
+  const x = Number(d?.x), y = Number(d?.y), w = Number(d?.w), h = Number(d?.h), giro = Number(d?.giro ?? 0);
+  if (![x,y,w,h,giro].every(Number.isFinite) || x < 0 || y < 0 || w <= 0 || h <= 0 || x+w > 1.001 || y+h > 1.001 || ![0,90,180,270].includes(giro)) throw new Error('Enquadramento inválido.');
+  const { data, info } = await sharp(await sharp(bruto).rotate().toBuffer()).rotate(giro).flatten({background:'#fff'}).toBuffer({resolveWithObject:true});
+  const left = Math.min(info.width-1, Math.round(x*info.width)), top = Math.min(info.height-1, Math.round(y*info.height));
+  const crop = { left, top, width: Math.max(1, Math.min(info.width-left, Math.round(w*info.width))), height: Math.max(1, Math.min(info.height-top, Math.round(h*info.height))) };
+  const versao = (width: number, height: number) => sharp(data).extract(crop).resize(width,height,{fit:'cover'}).jpeg({quality:86}).toBuffer();
+  return {padrao:await versao(600,800),mini:await versao(240,320)};
+}
+
+/** Variância do Laplaciano: apenas um alerta de conferência, nunca bloqueia uma foto. */
+export async function possivelDesfoque(buf: Buffer): Promise<boolean> {
+ const {data,info}=await sharp(buf).rotate().resize(192,192,{fit:'inside'}).greyscale().raw().toBuffer({resolveWithObject:true});
+ let sum=0,squares=0,n=0;
+ for(let y=1;y<info.height-1;y++)for(let x=1;x<info.width-1;x++){
+  const i=y*info.width+x,v=4*data[i]-data[i-1]-data[i+1]-data[i-info.width]-data[i+info.width];sum+=v;squares+=v*v;n++;
+ }
+ return n>0 && squares/n-(sum/n)**2<20;
 }
