@@ -103,10 +103,17 @@ export async function baixarVarias(urls: string[], n = 4): Promise<(Buffer | nul
 }
 
 /** Imagem dentro de uma caixa, mantendo a proporção (nunca distorce) e centralizada. */
-export function imagemNaCaixa(doc: Doc, img: Buffer, x: number, y: number, w: number, h: number, fundo = '#F3F5F9'): boolean {
+export function imagemNaCaixa(doc: Doc, img: Buffer, x: number, y: number, w: number, h: number, fundo = '#F3F5F9', preencher = false): boolean {
   try {
     doc.save().roundedRect(x, y, w, h, 3).fill(fundo).restore();
-    doc.image(img, x + 1, y + 1, { fit: [w - 2, h - 2], align: 'center', valign: 'center' });
+    if (preencher) {
+      // Recorta só a exibição; o arquivo e o enquadramento salvo permanecem intactos.
+      doc.save();
+      try {
+        doc.roundedRect(x, y, w, h, 3).clip();
+        doc.image(img, x, y, { cover: [w, h], align: 'center', valign: 'center' });
+      } finally { doc.restore(); }
+    } else doc.image(img, x + 1, y + 1, { fit: [w - 2, h - 2], align: 'center', valign: 'center' });
     return true;
   } catch { return false; }
 }
