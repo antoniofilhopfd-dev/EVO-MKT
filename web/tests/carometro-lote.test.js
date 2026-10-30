@@ -1,6 +1,7 @@
 // Carômetro Escolar, etapa 3: importação de fotos em lote (simulação, conciliação por matrícula, conflitos, aplicar, desfazer). Dados fictícios.
 const fs = require('fs');
 const sharp = require('sharp');
+const { zipSync, strToU8 } = require('fflate');
 const U = require('./lib/ui');
 const { t, fim } = U.contador();
 (async () => {
@@ -102,6 +103,30 @@ const { t, fim } = U.contador();
   t('aplica as 3 fotos da turma', apT.aplicadas === 3 && (await G.get('/carometro/alunos?turma=' + encodeURIComponent(TT))).rows.filter(a => a.fotoId).length === 3);
   t('lotes recentes mostram a turma', (await raw(G, '/carometro/lotes')).j.rows.some(x => x.id === LT && x.turma === TT));
 
+  // ---- turma completa: ZIP + ligar pela ordem ----
+  await G.post('/imagem/alunos/importar', { linhas: ['Ana Z', 'Bia Z', 'Caio Z', 'Davi Z'].map((nome, i) => ({ matricula: 'Z-' + (i + 1), nome, turma: 'Turma Z 3º Ano A', segmento: 'Anos Iniciais' })) });
+  const TZ = 'Turma Z 3º Ano A';
+  const zipDe = async n => zipSync({ ...Object.fromEntries(await Promise.all(Array.from({ length: n }, async (_, i) => ['fotos/IMG_' + String(i + 1).padStart(4, '0') + '.jpg', new Uint8Array(await jpg())]))), '__MACOSX/fotos/._IMG_0001.jpg': strToU8('lixo'), 'fotos/leiame.txt': strToU8('nada') });
+  const enviaZip = (bytes, turma, nome = 'turma.zip') => { const fd = new FormData(); if (turma) fd.append('turma', turma); fd.append('arquivo', new Blob([bytes], { type: 'application/zip' }), nome); return raw(G, '/carometro/lote/fotos', { method: 'POST', body: fd }); };
+  t('ZIP inválido e ZIP sem fotos são recusados (400)', (await enviaZip(Buffer.from('não é zip'), TZ)).status === 400 && (await enviaZip(zipSync({ 'a.txt': strToU8('x') }), TZ)).status === 400);
+  r = await enviaZip(await zipDe(4), TZ);
+  const LZ = r.j.loteId; d = (await raw(G, '/carometro/lote?id=' + LZ)).j;
+  t('o ZIP vira uma foto por imagem (ignora lixo do Mac e texto)', r.status === 200 && d.itens.length === 4 && d.itens.map(i => i.arquivo).join() === 'IMG_0001.jpg,IMG_0002.jpg,IMG_0003.jpg,IMG_0004.jpg' && d.itens.every(i => i.estado === 'orfa'), d.itens.map(i => [i.arquivo, i.estado]));
+  t('ligar pela ordem só vale para lote de turma e exige fotos soltas', (await G.req('POST', '/carometro/lote/preencher-ordem', { lote_id: L })).status === 409 || (await G.req('POST', '/carometro/lote/preencher-ordem', { lote_id: L })).status === 400);
+  const po = await G.post('/carometro/lote/preencher-ordem', { lote_id: LZ });
+  const itZ = po.itens;
+  t('ligar pela ordem: arquivo 1 → 1º aluno (ordem alfabética), como sugestão de baixa confiança', po.ligadas === 4 && po.sobraram === 0 && itZ.map(i => i.aluno).join() === 'Ana Z,Bia Z,Caio Z,Davi Z' && itZ.every(i => i.estado === 'sugerida' && i.regra === 'Ordem dos arquivos' && i.confianca === 'baixa'), itZ.map(i => [i.arquivo, i.aluno, i.estado]));
+  t('sugestões ainda bloqueiam o aplicar (409)', (await G.req('POST', '/carometro/lote/aplicar', { lote_id: LZ })).status === 409);
+  const ct = await G.post('/carometro/lote/confirmar-todas', { lote_id: LZ });
+  t('confirmar todas as sugestões libera o lote', ct.confirmadas === 4 && ct.pendencias === 0 && ct.resumo.prontos === 4, ct.resumo);
+  t('ligar pela ordem de novo: 409 (nada solto)', (await G.req('POST', '/carometro/lote/preencher-ordem', { lote_id: LZ })).status === 409);
+  t('aplica a turma inteira de uma vez', (await G.post('/carometro/lote/aplicar', { lote_id: LZ })).aplicadas === 4 && (await G.get('/carometro/alunos?turma=' + encodeURIComponent(TZ))).rows.every(a => a.fotoId));
+  // menos fotos que alunos: sobram alunos; mais fotos que alunos: sobram fotos
+  r = await enviaZip(await zipDe(6), 'Turma T 1º Ano A'); const LM = r.j.loteId;
+  const pm = await G.post('/carometro/lote/preencher-ordem', { lote_id: LM });
+  t('mais fotos que alunos livres: liga até acabar os alunos e avisa que sobraram', pm.ligadas >= 1 && pm.sobraram === 6 - pm.ligadas && pm.itens.filter(i => i.estado === 'orfa').length === pm.sobraram, [pm.ligadas, pm.sobraram]);
+  await G.post('/carometro/lote/cancelar', { lote_id: LM });
+
   // ---- telas reais ----
   const dir = process.env.CAPTURAS; if (dir) fs.mkdirSync(dir, { recursive: true });
   const b = await U.abrir();
@@ -128,7 +153,7 @@ const { t, fim } = U.contador();
       await p.setInputFiles('#cmFotosT', await Promise.all(['U-1.jpg', 'qualquer-coisa.jpg'].map(async n => ({ name: n, mimeType: 'image/jpeg', buffer: await jpg() }))));
       await p.click('#cmSimularT'); await p.waitForFunction(() => /2º Ano U/.test(document.querySelector('#cmLoteCard h2')?.innerText || ''));
       t(`${nome}: lote da turma mostra quem ainda está sem foto e um seletor com os alunos da turma`, /Ainda sem foto neste lote \(1 de 2\)/.test(await p.innerText('#cmLoteCard')) && await p.$('[data-alu]') !== null);
-      await p.selectOption('[data-alu]', { label: 'Outro Aluno (U-2)' }); await p.click('[data-vinc-alu]');
+      await p.selectOption('[data-alu]', { label: 'Outro Aluno (U-2)' });
       await p.waitForFunction(() => /Todos os alunos da turma têm foto neste lote/.test(document.querySelector('#cmLoteCard').innerText));
       await p.click('#cmAplicar'); await p.click('#dlgOk');
       await p.waitForFunction(() => /Aplicado/.test(document.querySelector('#cmLoteCard h2')?.innerText || ''));
