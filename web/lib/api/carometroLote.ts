@@ -2,6 +2,7 @@ import { Ctx } from '../ctx';
 import { requireManager } from '../auth';
 import { q, q1, run } from '../db';
 import { fail, Row } from '../util';
+import { unzipSync } from 'fflate';
 import { json } from './handlers';
 import { auditar, FOTO_MAX_BYTES } from '../carometroFoto';
 import { adicionarArquivo, aplicarLote, AlunoLote, cancelarLote, desfazerLote, itensDoLote, lerManifesto, MAX_ITENS_LOTE, novoLote, pendentes, resumoItens } from '../carometroLote';
@@ -51,6 +52,19 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     const ja = Number((await q1('SELECT COUNT(*) n FROM cm_lote_itens WHERE lote_id=?', [id]))?.n ?? 0);
     if (ja + arqs.length > MAX_ITENS_LOTE) fail(400, `Cada lote aceita até ${MAX_ITENS_LOTE} fotos. Divida em lotes menores.`);
     for (const f of arqs) {
+      if (/\.zip$/i.test(f.name) || f.type === 'application/zip' || f.type === 'application/x-zip-compressed') {
+        // pasta compactada: cada imagem dentro vira uma foto do lote (sem subpastas do sistema, no máximo 400 e 5 MB cada)
+        if (f.size > 60 * 1048576) fail(413, 'O ZIP passa de 60 MB. Divida a turma em dois arquivos.');
+        let entradas: Record<string, Uint8Array>;
+        try { entradas = unzipSync(new Uint8Array(await f.arrayBuffer()), { filter: (e) => e.originalSize <= FOTO_MAX_BYTES && !/(^|\/)(__MACOSX|\.)/.test(e.name) && /\.(jpe?g|png|webp)$/i.test(e.name) }); }
+        catch { fail(400, 'Não foi possível abrir o ZIP. Envie um ZIP comum com as fotos.'); }
+        const nomes = Object.keys(entradas).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+        if (!nomes.length) fail(400, 'O ZIP não tem fotos JPG, PNG ou WebP.');
+        const ja2 = Number((await q1('SELECT COUNT(*) n FROM cm_lote_itens WHERE lote_id=?', [id]))?.n ?? 0);
+        if (ja2 + nomes.length > MAX_ITENS_LOTE) fail(400, `Cada lote aceita até ${MAX_ITENS_LOTE} fotos. Divida em lotes menores.`);
+        for (const n of nomes) await adicionarArquivo(id, n.split('/').pop() || 'foto', Buffer.from(entradas[n]), alunos, man, !!turmaLote);
+        continue;
+      }
       if (f.size > FOTO_MAX_BYTES) await run("INSERT INTO cm_lote_itens(lote_id,nome_arquivo,estado,motivo) VALUES(?,?, 'invalida', 'A foto passa de 5 MB.')", [id, f.name.replace(/[^\w.\- ]/g, '_').slice(0, 190)]);
       else await adicionarArquivo(id, f.name || 'foto', Buffer.from(await f.arrayBuffer()), alunos, man, !!turmaLote);
     }
@@ -82,6 +96,29 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     if (!d.resumo.prontos) fail(409, 'Nenhuma foto pronta para aplicar.');
     const r = await aplicarLote(id, ator);
     return json({ ok: true, ...r });
+  }
+  /** Turma inteira: liga as fotos ainda sem aluno aos alunos que faltam, na ordem dos arquivos × ordem alfabética. Entram como sugestão: a Gerência confere os rostos. */
+  if (path === '/carometro/lote/preencher-ordem') {
+    const l = await abrir(id); if (l.estado !== 'simulado') fail(409, 'Este lote já foi encerrado.');
+    if (!l.turma) fail(400, 'Esta opção é só para lote de uma turma.');
+    const d0 = await detalhe(id);
+    const soltas = d0.itens.filter((i) => ['orfa', 'ambigua'].includes(String(i.estado))).sort((a, b) => String(a.arquivo).localeCompare(String(b.arquivo), 'pt-BR', { numeric: true }));
+    const livres = [...d0.faltam].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    if (!soltas.length) fail(409, 'Não há fotos sem aluno neste lote.');
+    if (!livres.length) fail(409, 'Todos os alunos da turma já têm foto neste lote.');
+    let n = 0;
+    for (let k = 0; k < Math.min(soltas.length, livres.length); k++) {
+      await run("UPDATE cm_lote_itens SET estado='sugerida', aluno_id=?, regra='Ordem dos arquivos', confianca='baixa', motivo='Ligada pela ordem do arquivo e pela ordem alfabética da turma; confira o rosto.' WHERE id=?", [livres[k].id, soltas[k].id]);
+      n++;
+    }
+    await auditar(ator, 'lote-ordem', null, `lote ${id}: ${n} foto(s) ligadas pela ordem`);
+    return json({ ...(await detalhe(id)), ligadas: n, sobraram: soltas.length - n });
+  }
+  if (path === '/carometro/lote/confirmar-todas') {
+    const l = await abrir(id); if (l.estado !== 'simulado') fail(409, 'Este lote já foi encerrado.');
+    const n = await run("UPDATE cm_lote_itens SET estado='ok', confianca='manual', motivo='Confirmada pela Gerência.' WHERE lote_id=? AND estado='sugerida' AND aluno_id IS NOT NULL", [id]);
+    await auditar(ator, 'lote-confirmadas', null, `lote ${id}: ${n} sugestão(ões) confirmadas`);
+    return json({ ...(await detalhe(id)), confirmadas: n });
   }
   if (path === '/carometro/lote/cancelar') {
     const l = await abrir(id); if (l.estado !== 'simulado') fail(409, 'Só dá para cancelar um lote ainda não aplicado.');

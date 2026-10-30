@@ -34,7 +34,12 @@ export async function prepararFoto(bruto: Buffer): Promise<FotoPronta | { erro: 
     const prop = largura / altura;
     if (prop > 1.05) avisos.push('Foto na horizontal: foi recortada no centro. Confira o enquadramento.');
     return { original: bruto, padrao, mini, mime, largura, altura, sha256: sha(bruto), aviso: avisos.join(' ').slice(0, 200) };
-  } catch {
+  } catch (e) {
+    const m = String((e as Error)?.message ?? e);
+    if (/sharp|libvips|glibc|Cannot find module|dlopen/i.test(m)) {
+      console.error('[carometro] processamento de imagens indisponível:', m.slice(0, 300));
+      return { erro: 'O servidor não conseguiu processar a imagem (módulo de imagens indisponível). Avise o suporte.' };
+    }
     return { erro: 'Não foi possível ler esta imagem. Envie um JPG, PNG ou WebP válido.' };
   }
 }

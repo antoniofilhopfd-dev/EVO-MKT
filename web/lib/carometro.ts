@@ -28,7 +28,11 @@ export function segmentoCm(turma: string): string {
   return '';
 }
 /** Série = turma sem a letra final ("3º Ano A" → "3º Ano"). */
-export const serieDe = (turma: string): string => String(turma ?? '').replace(/[\s\-/]+[A-Za-z]$/, '').trim();
+/** "1º ANO B" e "1º Ano A" são a mesma série: padroniza a escrita (só quando segue o padrão conhecido). */
+export const serieDe = (turma: string): string => {
+  const s = String(turma ?? '').replace(/[\s\-/]+[A-Za-z]$/, '').trim();
+  return /^(infantil\s*\d|maternal|\d{1,2}\s*[ºª°o]?\s*(ano|s[ée]rie))/i.test(s) ? s.replace(/\s+/g, ' ').replace(/\S+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase()) : s;
+};
 
 export const compararTurmaCm = (a: string, b: string): number => {
   const ma = /maternal/.test(semAcento(a)), mb = /maternal/.test(semAcento(b));
