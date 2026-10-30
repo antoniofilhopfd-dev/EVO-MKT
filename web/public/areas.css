@@ -398,3 +398,5 @@ a.btn,a.btn:hover{text-decoration:none}
 .admin-box:has(.cm-ficha){width:min(920px,96vw);max-width:96vw;max-height:92vh;overflow:auto}.cm-ficha{grid-template-columns:200px minmax(0,1fr)}.cm-ficha>div{min-width:0}.cm-ficha .datatable tbody th{width:34%;text-align:left}.cm-ficha .tablewrap .datatable{min-width:0}.cm-ficha .datatable td{word-break:break-word}.cm-ficha h4{margin:14px 0 6px}.cm-ficha .tablewrap{overflow-x:auto}.cm-ficha .ig-barra{margin-top:12px}.cm-ficha .kpi-note{display:block;margin:8px 0}
 @media(max-width:600px){.cm-ficha{grid-template-columns:minmax(0,1fr)}.cm-ficha>div:first-child{max-width:220px}}
 .cm-mini{width:48px;height:64px;object-fit:cover;border-radius:6px;display:block}.cm-lote td{vertical-align:middle}.cm-mat{width:120px;margin-right:6px}
+.cm-chk{display:flex;gap:8px;align-items:center;margin:10px 0}.cm-erro{color:#b3261e;font-size:13px;min-height:1em}.cm-edlist{max-height:46vh;overflow:auto}
+#cmSessaoCard td,#cmLotes td,#content td.cm-acoes{vertical-align:middle}

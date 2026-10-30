@@ -44,6 +44,10 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   cm_auditoria: { cols: ['id', 'quando', 'ator', 'acao', 'aluno_id', 'detalhe'], restore: 'replace', opt: true },
   cm_lotes: { cols: ['id', 'codigo', 'estado', 'criado_por', 'criado_em', 'aplicado_em', 'aplicado_por', 'desfeito_em', 'manifesto', 'resumo'], restore: 'replace', opt: true },
   cm_lote_itens: { cols: ['id', 'lote_id', 'nome_arquivo', 'estado', 'regra', 'confianca', 'aluno_id', 'motivo', 'caminho_original', 'caminho_padrao', 'caminho_mini', 'mime', 'largura', 'altura', 'tamanho', 'aviso', 'foto_id', 'anterior_id'], restore: 'replace', opt: true },
+  cm_selecoes: { cols: ['id', 'nome', 'dono', 'dono_nome', 'compartilhada', 'criado_em', 'atualizado_em'], restore: 'replace', opt: true },
+  cm_selecao_itens: { cols: ['selecao_id', 'aluno_id'], restore: 'replace', opt: true },
+  cm_sessoes: { cols: ['id', 'nome', 'data', 'turma', 'status', 'obs', 'criado_por', 'criado_em'], restore: 'replace', opt: true },
+  cm_sessao_itens: { cols: ['sessao_id', 'aluno_id', 'situacao'], restore: 'replace', opt: true },
   user_prefs: { cols: ['codigo', 'chave', 'valor', 'atualizado'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };

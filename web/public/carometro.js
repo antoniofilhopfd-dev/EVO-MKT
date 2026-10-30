@@ -10,7 +10,7 @@ const cmFoto = (a, tam = 'mini') => a.fotoId
 
 PAGINAS.cmvisao = async function () {
   $('#content').innerHTML = `<div class="ig-barra"><input id="cmBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(CM.busca)}"><select id="cmSeg" class="control" aria-label="Segmento"></select><select id="cmSerie" class="control" aria-label="Série"></select><select id="cmTurma" class="control" aria-label="Turma"></select><select id="cmAut" class="control" aria-label="Autorização de imagem"><option value="">Toda autorização</option><option value="AUTORIZADO">Autorizado</option><option value="NAO_AUTORIZADO">Não autorizado</option><option value="SEM_INFORMACAO">Sem informação</option></select></div>
-    <div id="cmInd"></div><div class="ig-barra"><div class="cm-vistas" role="group" aria-label="Forma de exibição"><button type="button" class="btn ghost" data-vista="grade">▦ Grade</button><button type="button" class="btn ghost" data-vista="lista">☰ Lista</button></div><span class="kpi-note" id="cmSelTxt"></span><button type="button" class="btn ghost" id="cmLimpar" hidden>Limpar seleção</button></div>
+    <div id="cmInd"></div><div class="ig-barra"><div class="cm-vistas" role="group" aria-label="Forma de exibição"><button type="button" class="btn ghost" data-vista="grade">▦ Grade</button><button type="button" class="btn ghost" data-vista="lista">☰ Lista</button></div><span class="kpi-note" id="cmSelTxt"></span><button type="button" class="btn" id="cmSalvarSel" hidden>Salvar seleção…</button><button type="button" class="btn ghost" id="cmLimpar" hidden>Limpar seleção</button></div>
     <div id="cmLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   $('#cmAut').value = CM.autorizacao;
   let atraso;
@@ -35,13 +35,14 @@ PAGINAS.cmvisao = async function () {
     $('#cmMais') && ($('#cmMais').onclick = () => { CM.mais++; carrega(); });
     $$('.cm-vistas [data-vista]').forEach(b => { b.classList.toggle('active', b.dataset.vista === CM.vista); b.setAttribute('aria-pressed', String(b.dataset.vista === CM.vista)); });
   };
-  const atualizaSel = () => { const n = CM.sel.size, turmas = new Set([...CM.sel.values()].map(a => a.turma)).size; $('#cmSelTxt').textContent = n ? `${n} selecionado(s) de ${turmas} turma(s)` : ''; $('#cmLimpar').hidden = !n; };
+  const atualizaSel = () => { const n = CM.sel.size, turmas = new Set([...CM.sel.values()].map(a => a.turma)).size; $('#cmSelTxt').textContent = n ? `${n} selecionado(s) de ${turmas} turma(s)` : ''; $('#cmLimpar').hidden = !n; $('#cmSalvarSel').hidden = !n; };
   const muda = () => { CM.mais = 1; carrega(); };
   $('#cmBusca').oninput = e => { clearTimeout(atraso); atraso = setTimeout(() => { CM.busca = e.target.value; muda(); }, 250); };
   $('#cmSeg').onchange = e => { CM.segmento = e.target.value; CM.serie = ''; CM.turma = ''; muda(); };
   $('#cmSerie').onchange = e => { CM.serie = e.target.value; CM.turma = ''; muda(); };
   $('#cmTurma').onchange = e => { CM.turma = e.target.value; muda(); };
   $('#cmAut').onchange = e => { CM.autorizacao = e.target.value; muda(); };
+  $('#cmSalvarSel').onclick = () => cmSalvarSelecao([...CM.sel.keys()], () => { CM.sel.clear(); go('cmselecoes'); });
   $('#cmLimpar').onclick = () => { CM.sel.clear(); atualizaSel(); carrega(); };
   $$('.cm-vistas [data-vista]').forEach(b => { b.onclick = () => { CM.vista = b.dataset.vista; carrega(); }; });
   atualizaSel();
@@ -143,4 +144,56 @@ PAGINAS.cmimport = async function () {
   };
   await desenhaLotes();
   const aberto = (await api('/carometro/lotes')).rows.find(l => l.estado === 'simulado'); if (aberto) desenhaLote(aberto.id);
+};
+
+/* ---- Seleções salvas ---- */
+function cmSalvarSelecao(ids, aoSalvar, atual) {
+  const d = dialogo(`<h3>${atual ? 'Editar seleção' : 'Salvar seleção'}</h3><label class="ui-campo">Nome da seleção<input id="cmSelNome" class="control" maxlength="120" value="${attr(atual ? atual.nome : '')}" placeholder="Ex.: Monitores 2026"></label><label class="cm-chk"><input type="checkbox" id="cmSelComp" ${atual && atual.compartilhada ? 'checked' : ''}> Compartilhar com a equipe</label><p class="kpi-note">${fmtN(ids.length)} aluno(s). Salvar uma seleção não altera a matrícula nem o cadastro.</p><p class="cm-erro" id="cmSelErro" role="alert"></p><div class="actions dlg-acoes"><button type="button" class="btn soft" data-close>Cancelar</button><button type="button" class="btn" id="cmSelOk">Salvar</button></div>`);
+  $('#cmSelNome', d.el).focus();
+  $('#cmSelOk', d.el).onclick = async () => {
+    try { await post('/carometro/selecao', { id: atual ? atual.id : 0, nome: $('#cmSelNome', d.el).value, compartilhada: $('#cmSelComp', d.el).checked, aluno_ids: ids }); d.close(); toast('Seleção salva'); aoSalvar(); }
+    catch (e) { $('#cmSelErro', d.el).textContent = e.message; }
+  };
+}
+PAGINAS.cmselecoes = async function () {
+  $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
+  const d = await api('/carometro/selecoes');
+  $('#content').innerHTML = `<div class="ig-barra"><button type="button" class="btn" id="cmNovaSel">+ Nova seleção</button><span class="kpi-note">Para criar: marque alunos (de uma ou várias turmas) na Visão geral e clique em “Salvar seleção”.</span></div>
+    <section class="card">${d.rows.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Nome</th><th>Alunos</th><th>Turmas</th><th>Criada por</th><th>Atualizada</th><th></th></tr></thead><tbody>${d.rows.map(r => `<tr><td><b>${esc(r.nome)}</b>${r.compartilhada ? ' <span class="cm-selo mute">compartilhada</span>' : ''}</td><td>${fmtN(r.alunos)}</td><td>${fmtN(r.turmas)}</td><td>${esc(r.dono)}</td><td>${esc(fmtDateTime(r.atualizadoEm))}</td><td class="cm-acoes"><button type="button" class="btn ghost" data-abrir="${r.id}">Abrir</button>${r.podeEditar ? `<button type="button" class="btn ghost" data-edit="${r.id}">Editar</button>` : ''}<button type="button" class="btn ghost" data-dup="${r.id}">Duplicar</button>${r.podeEditar ? `<button type="button" class="btn ghost danger" data-del="${r.id}">Excluir</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>Nenhuma seleção salva.</b><br>Marque alunos na Visão geral e salve a lista para reutilizar.</div>'}</section>`;
+  $('#cmNovaSel').onclick = () => go('cmvisao');
+  $$('#content [data-abrir]').forEach(b => { b.onclick = async () => { const x = await api('/carometro/selecao?id=' + b.dataset.abrir); CM.sel = new Map(x.alunos.map(a => [a.id, a])); CM.busca = ''; CM.segmento = ''; CM.serie = ''; CM.turma = ''; CM.autorizacao = ''; go('cmvisao'); toast(`${x.alunos.length} aluno(s) selecionados`); }; });
+  $$('#content [data-edit]').forEach(b => { b.onclick = async () => { const x = await api('/carometro/selecao?id=' + b.dataset.edit); cmEditarSelecao(x, () => PAGINAS.cmselecoes()); }; });
+  $$('#content [data-dup]').forEach(b => { b.onclick = async () => { await post('/carometro/selecao/duplicar', { id: +b.dataset.dup }); toast('Seleção duplicada'); PAGINAS.cmselecoes(); }; });
+  $$('#content [data-del]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Excluir a seleção?', texto: 'Só a lista é apagada; os alunos e as fotos não são afetados.', confirmar: 'Excluir', perigo: true })) { await post('/carometro/selecao/excluir', { id: +b.dataset.del }); toast('Seleção excluída'); PAGINAS.cmselecoes(); } }; });
+};
+function cmEditarSelecao(x, aoFim) {
+  const manter = new Set(x.alunos.map(a => a.id));
+  const d = dialogo(`<h3>Editar seleção</h3><label class="ui-campo">Nome<input id="cmEdNome" class="control" maxlength="120" value="${attr(x.selecao.nome)}"></label><label class="cm-chk"><input type="checkbox" id="cmEdComp" ${x.selecao.compartilhada ? 'checked' : ''}> Compartilhar com a equipe</label><div class="tablewrap cm-edlist"><table class="datatable"><thead><tr><th>Aluno</th><th>Turma</th><th></th></tr></thead><tbody>${x.alunos.map(a => `<tr data-linha="${a.id}"><td>${esc(a.nome)}</td><td>${esc(a.turma)}</td><td><button type="button" class="btn ghost danger" data-tira="${a.id}">Tirar</button></td></tr>`).join('')}</tbody></table></div><p class="cm-erro" id="cmEdErro" role="alert"></p><div class="actions dlg-acoes"><button type="button" class="btn soft" data-close>Cancelar</button><button type="button" class="btn" id="cmEdOk">Salvar</button></div>`, { larga: true });
+  $$('[data-tira]', d.el).forEach(b => { b.onclick = () => { manter.delete(+b.dataset.tira); b.closest('tr').remove(); }; });
+  $('#cmEdOk', d.el).onclick = async () => { try { await post('/carometro/selecao', { id: x.selecao.id, nome: $('#cmEdNome', d.el).value, compartilhada: $('#cmEdComp', d.el).checked, aluno_ids: [...manter] }); d.close(); toast('Seleção salva'); aoFim(); } catch (e) { $('#cmEdErro', d.el).textContent = e.message; } };
+}
+
+/* ---- Sessões de fotos ---- */
+const CM_SIT = [['pendente', 'Pendente'], ['fotografado', 'Fotografado'], ['ausente', 'Ausente'], ['refazer', 'Refazer']];
+PAGINAS.cmsessoes = async function (abrirId) {
+  $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
+  const d = await api('/carometro/sessoes');
+  const hoje = new Date().toISOString().slice(0, 10);
+  $('#content').innerHTML = `${d.podeEditar ? '<div class="ig-barra"><button type="button" class="btn" id="cmNovaSes">+ Nova sessão</button></div>' : ''}<section class="card">${d.rows.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Sessão</th><th>Data</th><th>Turma</th><th>Progresso</th><th>Situação</th><th></th></tr></thead><tbody>${d.rows.map(r => `<tr><td><b>${esc(r.nome)}</b></td><td>${esc(fmtDate(r.data))}</td><td>${esc(r.turma)}</td><td><div class="ui-barra"><i style="width:${r.total ? Math.round(r.fotografados / r.total * 100) : 0}%"></i></div><small>${r.fotografados}/${r.total}${r.ausentes ? ` · ${r.ausentes} ausente(s)` : ''}${r.refazer ? ` · ${r.refazer} p/ refazer` : ''}</small></td><td><span class="cm-selo ${r.status === 'concluida' ? 'ok' : 'warn'}">${r.status === 'concluida' ? 'Concluída' : 'Aberta'}</span></td><td class="cm-acoes"><button type="button" class="btn ghost" data-sess="${r.id}">Abrir</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>Nenhuma sessão de fotos.</b>' + (d.podeEditar ? '<br>Crie uma sessão para acompanhar quem já foi fotografado em cada turma.' : '') + '</div>'}</section><div id="cmSessao"></div>`;
+  $('#cmNovaSes') && ($('#cmNovaSes').onclick = () => {
+    const dl = dialogo(`<h3>Nova sessão de fotos</h3><label class="ui-campo">Nome<input id="cmSsNome" class="control" maxlength="120" placeholder="Ex.: Fotos de rematrícula"></label><label class="ui-campo">Data<input id="cmSsData" class="control" type="date" value="${hoje}"></label><label class="ui-campo">Turma<select id="cmSsTurma" class="control"><option value="">Escolha…</option>${d.turmas.map(t => `<option>${esc(t)}</option>`).join('')}</select></label><label class="ui-campo">Observação (opcional)<input id="cmSsObs" class="control" maxlength="400"></label><p class="cm-erro" id="cmSsErro" role="alert"></p><div class="actions dlg-acoes"><button type="button" class="btn soft" data-close>Cancelar</button><button type="button" class="btn" id="cmSsOk">Criar sessão</button></div>`);
+    $('#cmSsOk', dl.el).onclick = async () => { try { const r = await post('/carometro/sessao', { nome: $('#cmSsNome', dl.el).value, data: $('#cmSsData', dl.el).value, turma: $('#cmSsTurma', dl.el).value, obs: $('#cmSsObs', dl.el).value }); dl.close(); toast('Sessão criada'); await PAGINAS.cmsessoes(r.id); } catch (e) { $('#cmSsErro', dl.el).textContent = e.message; } };
+  });
+  const abre = async id => {
+    const x = await api('/carometro/sessao?id=' + id), s = x.sessao, ed = x.podeEditar;
+    $('#cmSessao').innerHTML = `<section class="card" id="cmSessaoCard"><div class="db-tit"><h2>${esc(s.nome)} · ${esc(s.turma)} · ${esc(fmtDate(s.data))}</h2></div>${s.obs ? `<p class="kpi-note">${esc(s.obs)}</p>` : ''}<p class="kpi-note">${s.fotografados} de ${s.total} fotografado(s). Quem já tem foto enviada a partir do dia da sessão aparece como fotografado.</p>
+      <div class="tablewrap"><table class="datatable"><thead><tr><th>Aluno</th><th>Matrícula</th><th>Situação</th><th></th></tr></thead><tbody>${x.itens.map(i => `<tr><td>${esc(i.nome)}</td><td>${esc(i.matricula)}</td><td>${ed ? `<select class="control" data-sit="${i.id}" aria-label="Situação de ${attr(i.nome)}">${CM_SIT.map(([k, t]) => `<option value="${k}" ${i.situacao === k ? 'selected' : ''}>${t}</option>`).join('')}</select>` : esc((CM_SIT.find(c => c[0] === i.situacao) || [])[1] || i.situacao)}</td><td class="cm-acoes">${ed ? `<button type="button" class="btn ghost" data-foto="${i.id}">Foto…</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+      ${ed ? `<div class="ig-barra"><button type="button" class="btn" id="cmSsStatus">${s.status === 'concluida' ? 'Reabrir sessão' : 'Concluir sessão'}</button><button type="button" class="btn ghost danger" id="cmSsExcluir">Excluir sessão</button></div>` : ''}</section>`;
+    $$('#cmSessao [data-sit]').forEach(b => { b.onchange = async () => { await post('/carometro/sessao/item', { sessao_id: id, aluno_id: +b.dataset.sit, situacao: b.value }); toast('Situação atualizada'); }; });
+    $$('#cmSessao [data-foto]').forEach(b => { b.onclick = () => cmFicha(+b.dataset.foto); });
+    $('#cmSsStatus') && ($('#cmSsStatus').onclick = async () => { await post('/carometro/sessao/status', { id, status: s.status === 'concluida' ? 'aberta' : 'concluida' }); PAGINAS.cmsessoes(id); });
+    $('#cmSsExcluir') && ($('#cmSsExcluir').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Excluir a sessão?', texto: 'Só o acompanhamento é apagado; as fotos dos alunos continuam.', confirmar: 'Excluir', perigo: true })) { await post('/carometro/sessao/excluir', { id }); toast('Sessão excluída'); PAGINAS.cmsessoes(); } });
+  };
+  $$('#content [data-sess]').forEach(b => { b.onclick = () => abre(+b.dataset.sess); });
+  if (abrirId) abre(abrirId);
 };

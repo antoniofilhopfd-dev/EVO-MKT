@@ -7,6 +7,7 @@ import { atualizarVencimentos } from '../imagemDados';
 import { auditar, guardarFoto, historicoFotos, lerArquivoFoto, prepararFoto, FOTO_MAX_BYTES } from '../carometroFoto';
 import { run } from '../db';
 import { carometroLoteRoute } from './carometroLote';
+import { carometroSelRoute } from './carometroSel';
 import { autorizacaoDe, compararTurmaCm, normNome, segmentoCm, SEGMENTOS_CM, serieDe } from '../carometro';
 
 /**
@@ -41,6 +42,8 @@ export async function carometroRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   const ator = String(u.nome ?? u.codigo ?? '');
 
+  const sel = await carometroSelRoute(c, u, ator);
+  if (sel) return sel;
   const lote = await carometroLoteRoute(c, ator);
   if (lote) return lote;
 
