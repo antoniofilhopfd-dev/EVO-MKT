@@ -67,3 +67,10 @@ O Administrador pode selecionar alunos na Visão geral e usar **Excluir aluno** 
 A API exige confirmação e verifica se nome/matrícula ainda correspondem ao cadastro selecionado. A exclusão transacional limpa fotos/arquivos, itens de lotes, seleções, sessões e revisões anuais, preservando auditoria da operação. Alunos com solicitações de autorização são mantidos; nesse caso, use a opção Inativar já existente em Uso de Imagem.
 
 O endpoint de exclusão de Uso de Imagem utiliza a mesma limpeza. Nenhum aluno real é excluído pela instalação desta mudança.
+
+
+## Acrescentar fotos a um lote em simulação
+
+Abra o lote e use **Adicionar mais fotos a este lote**. Os arquivos são acrescentados ao mesmo lote, preservando os itens e as decisões anteriores. Se os arquivos já foram selecionados na seção de várias turmas, use **Adicionar ao lote #N** ao lado de Simular importação (novo lote).
+
+Um lote de turma continua restrito àquela turma; para outra turma, crie outro lote na fila. Lotes aplicados/cancelados não aceitam novos arquivos.
