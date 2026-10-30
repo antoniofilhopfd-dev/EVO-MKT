@@ -23,9 +23,18 @@ async function entrar(installOut, cod = 'NAT-3301', nova = 'Nat26ab') {
   const H = { ...J, Cookie: cookie(r) };
   return { H, pw, nova, cod, get: u => fetch(B + u, { headers: H }).then(x => x.json()), post: (u, b) => fetch(B + u, { method: 'POST', headers: H, body: JSON.stringify(b ?? {}) }).then(async x => ({ ...(await x.json().catch(() => ({}))), http: x.status })), put: (u, b) => fetch(B + u, { method: 'PUT', headers: H, body: JSON.stringify(b ?? {}) }).then(async x => ({ ...(await x.json().catch(() => ({}))), http: x.status })), req: (m, u, b) => fetch(B + u, { method: m, headers: H, body: b ? JSON.stringify(b) : undefined }) };
 }
-async function abrir() { return chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }); }
+async function abrir() {
+  const options={executablePath:process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:JSON.parse(process.env.CHROME_ARGS || '[]')};
+  // Chromium de processo único não suporta reutilizar vários contextos. Só o ambiente local isolado usa este caminho.
+  if(process.env.TEST_ISOLATED_BROWSER==='1') {
+    const browsers=[];
+    return {newContext:async opts=>{const b=await chromium.launch(options);browsers.push(b);return b.newContext(opts);},close:async()=>{await Promise.all(browsers.map(b=>b.close().catch(()=>{})));}};
+  }
+  return chromium.launch(options);
+}
 async function pagina(browser, cod, senha, vp = { width: 1440, height: 900 }) {
   const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 1 });
+  if(process.env.TEST_LOCAL_ONLY==='1') await ctx.route('**/*',route=>{const u=new URL(route.request().url());return ['127.0.0.1','localhost'].includes(u.hostname)||!/^https?:/.test(u.protocol)?route.continue():route.abort();});
   const p = await ctx.newPage(); p.errs = []; p.on('pageerror', e => p.errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) p.errs.push(m.text()); }); p.on('dialog', d => { p.errs.push('DIALOGO NATIVO: ' + d.type()); d.dismiss(); });
   await p.goto(BASE + '/'); await p.fill('#internalCode', cod); await p.fill('#internalPass', senha); await p.click('#internalLoginBtn');
   await p.waitForSelector('#nav .navitem', { timeout: 15000 });

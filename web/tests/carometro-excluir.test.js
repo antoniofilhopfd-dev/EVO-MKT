@@ -1,0 +1,44 @@
+const assert=require('node:assert/strict'),mysql=require('mysql2/promise'),sharp=require('sharp'),U=require('./lib/ui');
+(async()=>{
+ const G=await U.entrar(process.argv[2]),E=await U.entrar(process.argv[2],'ANT-3302','Ant26ab');let checks=0;
+ const ok=(name,v)=>{assert.ok(v,name);checks++;console.log('OK',name);};
+ const db=await mysql.createConnection({host:process.env.DB_HOST,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME});
+ await G.post('/imagem/alunos/importar',{linhas:[['D1','Aluno Foto'],['D2','Aluno Protegido'],['D3','Aluno Simulacao'],['D4','Aluno Interface']].map(([matricula,nome])=>({matricula,nome,turma:'2º Ano A'}))});
+ const alunos=(await G.get('/carometro/alunos')).rows,a=m=>alunos.find(a=>a.matricula===m),body=xs=>({confirmar:true,alunos:xs.map(a=>({id:a.id,nome:a.nome,matricula:a.matricula}))});
+ const del=(xs,H=G)=>H.req('POST','/carometro/alunos/excluir',body(xs));
+ ok('sem login não exclui',(await fetch(U.B+'/carometro/alunos/excluir',{method:'POST',headers:{'X-EVO':'1'}})).status===401);
+ ok('Equipe não exclui',(await del([a('D1')],E)).status===403);
+ ok('exige confirmação explícita',(await G.req('POST','/carometro/alunos/excluir',{alunos:[a('D1')]})).status===400);
+ ok('seleção desatualizada não exclui',(await del([{...a('D3'),matricula:'OUTRA'}])).status===409);
+ ok('falha em seleção múltipla reverte o lote',(await del([a('D1'),{...a('D3'),matricula:'ALTERADA'}])).status===409 && (await G.get('/carometro/alunos')).rows.some(x=>x.id===a('D1').id));
+ const jpg=await sharp({create:{width:600,height:800,channels:3,background:'#357'}}).jpeg().toBuffer();
+ const fd=new FormData();fd.append('aluno_id',a('D1').id);fd.append('arquivo',new Blob([jpg]),'D1.jpg');
+ await fetch(U.B+'/carometro/foto',{method:'POST',headers:{Cookie:G.H.Cookie,'X-EVO':'1'},body:fd});
+ const fotos=(await G.get('/carometro/aluno?id='+a('D1').id)).fotos;
+ await G.post('/carometro/selecao',{nome:'Selecao teste',aluno_ids:[a('D1').id,a('D2').id]});await G.post('/carometro/sessao',{nome:'Sessao teste',turma:'2º Ano A',data:'2026-10-30'});
+ await db.query("INSERT INTO cm_anos(ano,aluno_id,turma) VALUES(2026,?,'2º Ano A')",[a('D1').id]);
+ let r=await del([a('D1')]);let j=await r.json();ok('exclui aluno com foto',r.status===200 && j.excluidos===1 && j.excluidosIds[0]===a('D1').id);
+ const count=async(t)=>Number((await db.query(`SELECT COUNT(*) n FROM ${t} WHERE aluno_id=?`,[a('D1').id]))[0][0].n);
+ ok('remove versões da foto',await count('cm_fotos')===0);
+ ok('remove vínculo de seleção',await count('cm_selecao_itens')===0);ok('remove vínculo de sessão',await count('cm_sessao_itens')===0);ok('remove revisão anual',await count('cm_anos')===0);
+ ok('foto excluída deixa de abrir',(await fetch(U.B+`/carometro/foto?id=${fotos[0].id}&tam=mini`,{headers:G.H})).status===404);
+ ok('aluno deixa de constar no carômetro',!(await G.get('/carometro/alunos')).rows.some(x=>x.id===a('D1').id));
+ ok('cadastro compartilhado foi removido',!(await db.query('SELECT id FROM ui_alunos WHERE id=?',[a('D1').id]))[0].length);
+ await db.query("INSERT INTO ui_solicitacoes(protocolo,aluno_id,modelo_id,termo_texto) VALUES('EXCL-TESTE',?,0,'Termo fictício')",[a('D2').id]);
+ r=await del([a('D2')]);j=await r.json();ok('histórico de autorização impede exclusão',r.status===200 && j.excluidos===0 && j.mantidos.length===1);
+ const l=await G.post('/carometro/lote/criar',{turma:'2º Ano A'}),form=new FormData();form.append('lote_id',l.loteId);form.append('arquivo',new Blob([jpg]),'D3.jpg');await fetch(U.B+'/carometro/lote/fotos',{method:'POST',headers:{Cookie:G.H.Cookie,'X-EVO':'1'},body:form});
+ r=await G.req('POST','/imagem/alunos/excluir',{ids:[a('D3').id]});j=await r.json();ok('exclusão em Uso de Imagem usa a mesma limpeza',r.status===200&&j.excluidos===1);
+ ok('remove foto em simulação',Number((await db.query('SELECT COUNT(*) n FROM cm_lote_itens WHERE aluno_id=?',[a('D3').id]))[0][0].n)===0);
+ ok('não deixa arquivos do carômetro órfãos',Number((await db.query('SELECT COUNT(*) n FROM arquivos WHERE caminho LIKE ?', [`CAROMETRO/${a('D1').id}/%`]))[0][0].n)===0 && Number((await db.query('SELECT COUNT(*) n FROM arquivos WHERE caminho LIKE ?',[`CAROMETRO/LOTE/${l.loteId}/%`]))[0][0].n)===0);
+ const b=await U.abrir();try{
+  const p=await U.pagina(b,'NAT-3301',G.nova);await U.ir(p,'cmvisao');ok('botão oculto sem seleção',await p.isHidden('#cmExcluirAlunos'));
+  await p.check(`[data-sel="${a('D4').id}"]`);await p.click('#cmExcluirAlunos');ok('confirmação mostra nome e matrícula',await p.locator('.admin-overlay').innerText().then(t=>t.includes('Aluno Interface')&&t.includes('D4')&&t.includes('Uso de Imagem')));
+  await p.screenshot({path:'test-results/carometro-excluir-confirmacao.png'});await p.click('.admin-overlay [data-close]');ok('cancelar mantém o aluno',(await G.get('/carometro/alunos')).rows.some(x=>x.id===a('D4').id));
+  await p.click('#cmExcluirAlunos');await p.click('#cmConfirmarExclusao');await p.waitForSelector(`[data-sel="${a('D4').id}"]`,{state:'detached'});ok('confirmação exclui e atualiza a tela',await p.isHidden('#cmExcluirAlunos'));
+  await p.screenshot({path:'test-results/carometro-excluir-concluido.png'});ok('tela sem erros de script',p.errs.length===0);
+  const e=await U.pagina(b,'ANT-3302',E.nova);await U.ir(e,'cmvisao');await e.check(`[data-sel="${a('D2').id}"]`);ok('Equipe não vê ação de exclusão',await e.isHidden('#cmExcluirAlunos'));
+ }finally{await b.close();}
+ const bk=await G.post('/backup',{completo:true});ok('backup completo continua válido após exclusões',bk.http===200 && (await G.get('/backup/validate?file='+encodeURIComponent(bk.file))).ok);
+ ok('auditoria preserva identificação da exclusão',Number((await db.query("SELECT COUNT(*) n FROM cm_auditoria WHERE acao='aluno-excluido' AND detalhe LIKE '%matrícula D1%'"))[0][0].n)===1);
+ await db.end();console.log(`${checks} verificações passaram.`);
+})().catch(e=>{console.error(e);process.exit(1);});

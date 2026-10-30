@@ -1,3 +1,4 @@
+import { contextoCm, exigirCm, exigirAluno, exigirTurma, permiteTurma } from '../carometroAcesso';
 import { Ctx } from '../ctx';
 import { requireManager } from '../auth';
 import { q, q1, run } from '../db';
@@ -21,6 +22,7 @@ const ordena = (rows: Row[]) => rows.sort((x, y) => compararTurmaCm(String(x.tur
 export async function carometroSelRoute(c: Ctx, u: Row, ator: string): Promise<Response | null> {
   const { path, method } = c;
   if (!/^\/carometro\/(selec|sess)/.test(path)) return null;
+  const selecaoPermitida=async(id: number)=>{const rows=await q('SELECT a.turma FROM cm_selecao_itens i JOIN ui_alunos a ON a.id=i.aluno_id WHERE i.selecao_id=?',[id]);return rows.every(a=>permiteTurma(String(a.turma)));};
   const admin = !!Number(u.admin), meu = String(u.codigo ?? '');
   const podeSel = (s: Row) => admin || String(s.dono) === meu;
 
@@ -29,11 +31,13 @@ export async function carometroSelRoute(c: Ctx, u: Row, ator: string): Promise<R
     const rows = await q(`SELECT s.*, (SELECT COUNT(*) FROM cm_selecao_itens i JOIN ui_alunos a ON a.id=i.aluno_id AND a.ativo=1 WHERE i.selecao_id=s.id) n,
       (SELECT COUNT(DISTINCT a.turma) FROM cm_selecao_itens i JOIN ui_alunos a ON a.id=i.aluno_id AND a.ativo=1 WHERE i.selecao_id=s.id) turmas
       FROM cm_selecoes s WHERE s.dono=? OR s.compartilhada=1 ORDER BY s.atualizado_em DESC, s.id DESC`, [meu]);
-    return json({ rows: rows.map((s) => ({ id: Number(s.id), nome: s.nome, dono: s.dono_nome, meu: String(s.dono) === meu, podeEditar: podeSel(s), compartilhada: !!Number(s.compartilhada), alunos: Number(s.n), turmas: Number(s.turmas), atualizadoEm: s.atualizado_em })) });
+    const visiveis=[];for(const row of rows)if(await selecaoPermitida(Number(row.id)))visiveis.push(row);
+    return json({ rows: visiveis.map((s) => ({ id: Number(s.id), nome: s.nome, dono: s.dono_nome, meu: String(s.dono) === meu, podeEditar: podeSel(s), compartilhada: !!Number(s.compartilhada), alunos: Number(s.n), turmas: Number(s.turmas), atualizadoEm: s.atualizado_em })) });
   }
   if (path === '/carometro/selecao' && method === 'GET') {
     const s = await q1('SELECT * FROM cm_selecoes WHERE id=?', [Number(c.qs('id')) || 0]);
     if (!s || (String(s.dono) !== meu && !Number(s.compartilhada) && !admin)) fail(404, 'Seleção não encontrada.');
+    if(!await selecaoPermitida(Number(s.id)))fail(404,'Seleção não encontrada.');
     const ids = (await q('SELECT aluno_id FROM cm_selecao_itens WHERE selecao_id=?', [s.id])).map((r) => Number(r.aluno_id));
     return json({ selecao: { id: Number(s.id), nome: s.nome, dono: s.dono_nome, compartilhada: !!Number(s.compartilhada), podeEditar: podeSel(s) }, alunos: ordena(await alunosDe(ids)).map(publico) });
   }
@@ -45,6 +49,7 @@ export async function carometroSelRoute(c: Ctx, u: Row, ator: string): Promise<R
     if (ids.length > MAX_SEL) fail(400, `Uma seleção aceita até ${MAX_SEL} alunos.`);
     const validos = (await alunosDe(ids)).map((a) => Number(a.id));
     if (!validos.length) fail(400, 'Nenhum dos alunos escolhidos está ativo.');
+    for(const id of validos)await exigirAluno(id);
     const comp = b.compartilhada ? 1 : 0;
     let sid = id;
     if (id) {
@@ -63,6 +68,7 @@ export async function carometroSelRoute(c: Ctx, u: Row, ator: string): Promise<R
   if (path === '/carometro/selecao/duplicar' && method === 'POST') {
     const b = await c.body(), s = await q1('SELECT * FROM cm_selecoes WHERE id=?', [Number(b.id) || 0]);
     if (!s || (String(s.dono) !== meu && !Number(s.compartilhada) && !admin)) fail(404, 'Seleção não encontrada.');
+    if(!await selecaoPermitida(Number(s.id)))fail(404,'Seleção não encontrada.');
     await run('INSERT INTO cm_selecoes(nome,dono,dono_nome,compartilhada,criado_em,atualizado_em) VALUES(?,?,?,0,?,?)', [`${String(s.nome).slice(0, 110)} (cópia)`, meu, ator, now(), now()]);
     const sid = Number((await q1('SELECT id FROM cm_selecoes WHERE dono=? ORDER BY id DESC LIMIT 1', [meu]))?.id);
     await run('INSERT INTO cm_selecao_itens(selecao_id,aluno_id) SELECT ?, aluno_id FROM cm_selecao_itens WHERE selecao_id=?', [sid, s.id]);
@@ -79,6 +85,7 @@ export async function carometroSelRoute(c: Ctx, u: Row, ator: string): Promise<R
 
   // ---------- sessões de fotos ----------
   const resumoSessao = async (s: Row) => {
+    exigirTurma(String(s.turma));
     const itens = await sessaoItens(s);
     const n = itens.length, feitos = itens.filter((i) => i.situacao === 'fotografado').length;
     return { id: Number(s.id), nome: s.nome, data: s.data, turma: s.turma, status: s.status, obs: s.obs, criadoPor: s.criado_por, total: n, fotografados: feitos, ausentes: itens.filter((i) => i.situacao === 'ausente').length, refazer: itens.filter((i) => i.situacao === 'refazer').length };
@@ -93,16 +100,17 @@ export async function carometroSelRoute(c: Ctx, u: Row, ator: string): Promise<R
       situacao: r.situacao === 'pendente' && r.foto_id && String(r.foto_em).slice(0, 10) >= String(s.data) ? 'fotografado' : String(r.situacao) }));
   };
   if (path === '/carometro/sessoes' && method === 'GET') {
-    const rows = await q('SELECT * FROM cm_sessoes ORDER BY data DESC, id DESC LIMIT 100');
-    return json({ rows: await Promise.all(rows.map(resumoSessao)), podeEditar: u.role === 'manager', turmas: [...new Set((await q("SELECT DISTINCT turma FROM ui_alunos WHERE ativo=1 AND turma<>''")).map((r) => String(r.turma)))].sort(compararTurmaCm) });
+    const rows = (await q('SELECT * FROM cm_sessoes ORDER BY data DESC, id DESC LIMIT 100')).filter(s=>permiteTurma(String(s.turma)));
+    return json({ rows: await Promise.all(rows.map(resumoSessao)), podeEditar: !!contextoCm.getStore()?.importar, turmas: [...new Set((await q("SELECT DISTINCT turma FROM ui_alunos WHERE ativo=1 AND turma<>''")).filter(r=>permiteTurma(String(r.turma))).map((r) => String(r.turma)))].sort(compararTurmaCm) });
   }
   if (path === '/carometro/sessao' && method === 'GET') {
     const s = await q1('SELECT * FROM cm_sessoes WHERE id=?', [Number(c.qs('id')) || 0]) ?? fail(404, 'Sessão não encontrada.');
-    return json({ sessao: await resumoSessao(s), itens: await sessaoItens(s), podeEditar: u.role === 'manager' });
+    return json({ sessao: await resumoSessao(s), itens: await sessaoItens(s), podeEditar: !!contextoCm.getStore()?.importar });
   }
   if (method === 'POST' && path.startsWith('/carometro/sessao')) {
-    await requireManager(c);
+    await exigirCm(c,'importar');
     const b = await c.body();
+    if(b.sessao_id||b.id){const s=await q1('SELECT turma FROM cm_sessoes WHERE id=?',[Number(b.sessao_id||b.id)]);if(s)exigirTurma(String(s.turma));}
     if (path === '/carometro/sessao') {
       const nome = limpa(b.nome, 120), data = strv(b.data), turma = limpa(b.turma, 60), obs = limpa(b.obs, 400), id = Number(b.id) || 0;
       if (!nome) fail(400, 'Dê um nome à sessão.');
@@ -112,6 +120,7 @@ export async function carometroSelRoute(c: Ctx, u: Row, ator: string): Promise<R
         await run('UPDATE cm_sessoes SET nome=?, data=?, obs=? WHERE id=?', [nome, data, obs, id]);
         return json({ ok: true, id });
       }
+      exigirTurma(turma);
       if (!turma) fail(400, 'Escolha a turma.');
       const alunos = await q('SELECT id FROM ui_alunos WHERE ativo=1 AND turma=?', [turma]);
       if (!alunos.length) fail(400, 'Esta turma não tem alunos ativos.');

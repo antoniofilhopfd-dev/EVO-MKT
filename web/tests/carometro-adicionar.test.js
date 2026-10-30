@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict'),sharp=require('sharp'),U=require('./lib/ui');
+(async()=>{const G=await U.entrar(process.argv[2]);let checks=0;const ok=(n,v)=>{assert.ok(v,n);console.log('OK',n);checks++;};
+ await G.post('/imagem/alunos/importar',{linhas:[1,2,3].map(i=>({matricula:'ADD'+i,nome:'Aluno '+i,turma:'2º Ano A'}))});
+ const jpg=await sharp({create:{width:600,height:800,channels:3,background:'#789'}}).jpeg().toBuffer();
+ const l=await G.post('/carometro/lote/criar',{turma:'2º Ano A'}),fd=new FormData();fd.append('lote_id',l.loteId);fd.append('arquivo',new Blob([jpg]),'ADD1.jpg');
+ await fetch(U.B+'/carometro/lote/fotos',{method:'POST',headers:{Cookie:G.H.Cookie,'X-EVO':'1'},body:fd});let d=await G.get('/carometro/lote?id='+l.loteId);const original=d.itens[0].id;
+ await G.post('/carometro/lote/resolver',{lote_id:l.loteId,item_id:original,acao:'ignorar'});
+ const b=await U.abrir();try{const p=await U.pagina(b,'NAT-3301',G.nova);await U.ir(p,'cmimport');await p.waitForSelector('#cmAdicionarFotos');
+ ok('lote em simulação oferece adicionar fotos',await p.innerText('#cmAdicionarFotos')==='Adicionar mais fotos a este lote');
+ await p.setInputFiles('#cmMaisFotos',[{name:'ADD2.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');await p.waitForFunction(()=>document.querySelectorAll('.cm-lote tbody tr').length===2);
+ d=await G.get('/carometro/lote?id='+l.loteId);ok('acrescenta ao mesmo lote',d.itens.length===2 && (await G.get('/carometro/lotes')).rows.length===1);
+ ok('preserva associação e decisão anterior',d.itens.find(i=>i.id===original).estado==='ignorada');
+ await p.setInputFiles('#cmFotos',[{name:'ADD3.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarSelecionadas');await p.waitForFunction(()=>document.querySelectorAll('.cm-lote tbody tr').length===3);
+ ok('arquivos escolhidos no topo podem entrar no lote aberto',(await G.get('/carometro/lote?id='+l.loteId)).itens.length===3 && (await G.get('/carometro/lotes')).rows.length===1);
+ await p.setInputFiles('#cmMaisFotos',[{name:'ADD2.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');await p.waitForFunction(()=>document.querySelector('#cmProgMais')?.innerText.includes('salvo'));
+ ok('reenviar não duplica foto',(await G.get('/carometro/lote?id='+l.loteId)).itens.length===3);
+ await p.screenshot({path:'test-results/carometro-adicionar-ao-lote.png'});
+ await G.post('/carometro/lote/aplicar',{lote_id:l.loteId});await U.ir(p,'cmimport');ok('ação do topo fica oculta sem lote aberto',await p.isHidden('#cmAdicionarSelecionadas'));
+ // Um lote encerrado é recusado também pela API de upload.
+ const encerrado=new FormData();encerrado.append('lote_id',l.loteId);encerrado.append('arquivo',new Blob([jpg]),'ADD3.jpg');const resp=await fetch(U.B+'/carometro/lote/fotos',{method:'POST',headers:{Cookie:G.H.Cookie,'X-EVO':'1'},body:encerrado});ok('não acrescenta a lote encerrado',resp.status===409);
+ ok('sem erros de script',p.errs.length===0);
+ }finally{await b.close();}console.log(`${checks} verificações passaram.`);
+})().catch(e=>{console.error(e);process.exit(1)});

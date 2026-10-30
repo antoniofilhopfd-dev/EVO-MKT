@@ -1,4 +1,6 @@
 import mysql from 'mysql2/promise';
+import { AsyncLocalStorage } from 'node:async_hooks';
+const txContext = new AsyncLocalStorage<mysql.PoolConnection>();
 import { env, envInt, Row } from './util';
 
 let pool: mysql.Pool | undefined;
@@ -25,7 +27,7 @@ export function getPool(): mysql.Pool {
 
 /** SELECT: devolve as linhas. */
 export async function q<T = Row>(sql: string, params: unknown[] = []): Promise<T[]> {
-  const [rows] = await getPool().query(sql, params);
+  const [rows] = await (txContext.getStore() ?? getPool()).query(sql, params);
   return Array.isArray(rows) ? (rows as T[]) : [];
 }
 export async function q1<T = Row>(sql: string, params: unknown[] = []): Promise<T | undefined> {
@@ -33,14 +35,16 @@ export async function q1<T = Row>(sql: string, params: unknown[] = []): Promise<
 }
 /** INSERT/UPDATE/DELETE: devolve o número de linhas afetadas. */
 export async function run(sql: string, params: unknown[] = []): Promise<number> {
-  const [res] = await getPool().query(sql, params);
+  const [res] = await (txContext.getStore() ?? getPool()).query(sql, params);
   return (res as mysql.ResultSetHeader).affectedRows ?? 0;
 }
 export async function withTx<T>(fn: (c: mysql.PoolConnection) => Promise<T>): Promise<T> {
+  const atual = txContext.getStore();
+  if (atual) return fn(atual);
   const c = await getPool().getConnection();
   try {
     await c.beginTransaction();
-    const r = await fn(c);
+    const r = await txContext.run(c, () => fn(c));
     await c.commit();
     return r;
   } catch (e) {

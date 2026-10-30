@@ -1,3 +1,4 @@
+import { excluirAlunos } from '../excluirAlunos';
 import { Ctx } from '../ctx';
 import { requireAdmin, requireInternal } from '../auth';
 import { q, q1, run } from '../db';
@@ -125,20 +126,7 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
     const corpo = await c.body();
     const ids: number[] = [...new Set((Array.isArray(corpo.ids) ? (corpo.ids as unknown[]) : []).map(Number).filter((n) => n > 0))].slice(0, 500);
     if (!ids.length) fail(400, 'Marque ao menos um aluno.');
-    const excluidos: number[] = [], mantidos: { aluno: string; motivo: string }[] = [];
-    for (const id of ids) {
-      const a = await q1('SELECT id,nome,matricula FROM ui_alunos WHERE id=?', [id]);
-      if (!a) continue;
-      if (await q1('SELECT id FROM ui_solicitacoes WHERE aluno_id=? LIMIT 1', [id])) { mantidos.push({ aluno: a.nome, motivo: 'Tem solicitações de autorização. O histórico é mantido: use Inativar.' }); continue; }
-      await run('DELETE FROM ui_alunos WHERE id=?', [id]);
-      await run('UPDATE ui_eventos SET aluno_id=NULL WHERE aluno_id=?', [id]);
-      excluidos.push(id);
-    }
-    if (excluidos.length) {
-      await evento(ator, 'alunos-excluidos', null, `${excluidos.length} aluno(s) excluído(s) da lista`);
-      await audit(ator, 'imagem-alunos-excluidos', 'ui_alunos', String(excluidos.length));
-    }
-    return json({ ok: true, excluidos: excluidos.length, mantidos });
+    return json(await excluirAlunos(ids, ator));
   }
 
   /** Lê um .xlsx enviado em base64 e devolve as linhas para o navegador montar a prévia. Não grava nada. */
