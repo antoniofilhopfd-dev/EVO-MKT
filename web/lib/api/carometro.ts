@@ -157,13 +157,15 @@ export async function carometroRoute(c: Ctx): Promise<Response> {
   if (path === '/carometro/alunos') {
     const busca = lower(c.qs('busca')).trim(), seg = c.qs('segmento'), serie = c.qs('serie'), turma = c.qs('turma'), aut = c.qs('autorizacao');
     const nb = normNome(busca);
-    const rows = todos.filter((a) => (!seg || a.segmento === seg) && (!serie || a.serie === serie) && (!turma || a.turma === turma) && (!aut || a.autorizacao === aut)
+    const foto = c.qs('foto');
+    const base0 = todos.filter((a) => (!seg || a.segmento === seg) && (!serie || a.serie === serie) && (!turma || a.turma === turma) && (!aut || a.autorizacao === aut)
       && (!nb || normNome(a.nome).includes(nb) || lower(a.matricula).includes(busca)));
+    const rows = base0.filter((a) => foto === 'sem' ? !a.fotoId : foto === 'com' ? !!a.fotoId : true);
     rows.sort((x, y) => compararTurmaCm(x.turma, y.turma) || x.nome.localeCompare(y.nome, 'pt-BR'));
     const base = todos.filter((a) => (!seg || a.segmento === seg));
     const series = [...new Set(base.map((a) => a.serie).filter(Boolean))].sort(compararTurmaCm);
     const turmas = [...new Set(base.filter((a) => !serie || a.serie === serie).map((a) => a.turma).filter(Boolean))].sort(compararTurmaCm);
-    const ind = { alunos: rows.length, comFoto: rows.filter((a) => a.fotoId).length, semFoto: rows.filter((a) => !a.fotoId).length, duplicados: rows.filter((a) => a.duplicado).length, semTurma: rows.filter((a) => !a.segmento).length };
+    const ind = { alunos: base0.length, comFoto: base0.filter((a) => a.fotoId).length, semFoto: base0.filter((a) => !a.fotoId).length, duplicados: base0.filter((a) => a.duplicado).length, semTurma: base0.filter((a) => !a.segmento).length };
     return json({ anoLetivo: anoLetivo(), indicadores: ind, segmentos: SEGMENTOS_CM, series, turmas, total: rows.length, limite: 600, rows: rows.slice(0, 600).map(publico) });
   }
 

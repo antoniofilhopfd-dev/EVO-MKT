@@ -1,6 +1,6 @@
 /* Carômetro Escolar (etapa 1): consulta de alunos por segmento, série e turma, em grade ou lista, com ficha.
    Somente leitura sobre o cadastro do Uso de Imagem. Fotos entram na etapa 2; o selo de autorização é só informativo. */
-const CM = { vista: 'grade', busca: '', segmento: '', serie: '', turma: '', autorizacao: '', sel: new Map(), mais: 1 };
+const CM = { vista: 'grade', busca: '', segmento: '', serie: '', turma: '', foto: '', autorizacao: '', sel: new Map(), mais: 1 };
 const CM_AUT = { AUTORIZADO: ['Autorizado', 'ok'], NAO_AUTORIZADO: ['Não autorizado', 'bad'], SEM_INFORMACAO: ['Sem informação', 'mute'] };
 const cmSelo = a => { const [t, c] = CM_AUT[a] || CM_AUT.SEM_INFORMACAO; return `<span class="cm-selo ${c}">${t}</span>`; };
 const cmIniciais = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
@@ -24,21 +24,22 @@ async function cmPrepararFoto(f) {
 }
 
 PAGINAS.cmvisao = async function () {
-  $('#content').innerHTML = `<div class="ig-barra"><input id="cmBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(CM.busca)}"><select id="cmSeg" class="control" aria-label="Segmento"></select><select id="cmSerie" class="control" aria-label="Série"></select><select id="cmTurma" class="control" aria-label="Turma"></select><select id="cmAut" class="control" aria-label="Autorização de imagem"><option value="">Toda autorização</option><option value="AUTORIZADO">Autorizado</option><option value="NAO_AUTORIZADO">Não autorizado</option><option value="SEM_INFORMACAO">Sem informação</option></select></div>
+  $('#content').innerHTML = `<div class="ig-barra"><input id="cmBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(CM.busca)}"><select id="cmSeg" class="control" aria-label="Segmento"></select><select id="cmSerie" class="control" aria-label="Série"></select><select id="cmTurma" class="control" aria-label="Turma"></select><select id="cmFotoF" class="control" aria-label="Situação da foto"><option value="">Com e sem foto</option><option value="sem">Pendentes (sem foto)</option><option value="com">Com foto</option></select><select id="cmAut" class="control" aria-label="Autorização de imagem"><option value="">Toda autorização</option><option value="AUTORIZADO">Autorizado</option><option value="NAO_AUTORIZADO">Não autorizado</option><option value="SEM_INFORMACAO">Sem informação</option></select></div>
     <div id="cmInd"></div><div class="ig-barra"><div class="cm-vistas" role="group" aria-label="Forma de exibição"><button type="button" class="btn ghost" data-vista="grade">▦ Grade</button><button type="button" class="btn ghost" data-vista="lista">☰ Lista</button></div><span class="kpi-note" id="cmSelTxt"></span><button type="button" class="btn" id="cmFotosTurma" hidden>Enviar fotos desta turma</button><button type="button" class="btn" id="cmSalvarSel" hidden>Salvar seleção…</button><button type="button" class="btn ghost" id="cmLimpar" hidden>Limpar seleção</button></div>
     <div id="cmLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
-  $('#cmAut').value = CM.autorizacao;
+  $('#cmAut').value = CM.autorizacao; $('#cmFotoF').value = CM.foto;
   let atraso;
   const carrega = async () => {
-    const p = new URLSearchParams({ busca: CM.busca, segmento: CM.segmento, serie: CM.serie, turma: CM.turma, autorizacao: CM.autorizacao });
+    const p = new URLSearchParams({ busca: CM.busca, segmento: CM.segmento, serie: CM.serie, turma: CM.turma, foto: CM.foto, autorizacao: CM.autorizacao });
     const d = await api('/carometro/alunos?' + p);
     const opt = (v, t, sel) => `<option value="${attr(v)}" ${sel ? 'selected' : ''}>${esc(t)}</option>`;
     $('#cmSeg').innerHTML = opt('', 'Todos os segmentos', !CM.segmento) + d.segmentos.map(s => opt(s.k, s.nome, CM.segmento === s.k)).join('');
     $('#cmSerie').innerHTML = opt('', 'Todas as séries', !CM.serie) + d.series.map(s => opt(s, s, CM.serie === s)).join('');
     $('#cmTurma').innerHTML = opt('', 'Todas as turmas', !CM.turma) + d.turmas.map(s => opt(s, s, CM.turma === s)).join('');
     $('#cmFotosTurma').hidden = !CM.turma; $('#cmFotosTurma').onclick = () => { CM_IMP.turma = CM.turma; go('cmimport'); };
-    const i = d.indicadores, cart = (r, v, cls) => `<div class="db-cartao ui-cartao ${cls || ''}"><small>${r}</small><strong>${fmtN(v)}</strong></div>`;
-    $('#cmInd').innerHTML = `<div class="db-cartoes ui-seis">${cart('Alunos (ano ' + esc(d.anoLetivo) + ')', i.alunos)}${cart('Com foto', i.comFoto, 'ok')}${cart('Sem foto', i.semFoto, i.semFoto ? 'alerta' : '')}${cart('Possíveis duplicados', i.duplicados, i.duplicados ? 'alerta' : '')}${cart('Sem turma reconhecida', i.semTurma, i.semTurma ? 'alerta' : '')}</div>`;
+    const i = d.indicadores, cart = (r, v, cls, filtro) => filtro ? `<button type="button" class="db-cartao ui-cartao cm-filtro ${cls || ''} ${CM.foto === filtro ? 'ativo' : ''}" data-ffoto="${filtro}" aria-pressed="${CM.foto === filtro}"><small>${r}</small><strong>${fmtN(v)}</strong></button>` : `<div class="db-cartao ui-cartao ${cls || ''}"><small>${r}</small><strong>${fmtN(v)}</strong></div>`;
+    $('#cmInd').innerHTML = `<div class="db-cartoes ui-seis">${cart('Alunos (ano ' + esc(d.anoLetivo) + ')', i.alunos)}${cart('Com foto', i.comFoto, 'ok', 'com')}${cart('Sem foto (pendentes)', i.semFoto, i.semFoto ? 'alerta' : '', 'sem')}${cart('Possíveis duplicados', i.duplicados, i.duplicados ? 'alerta' : '')}${cart('Sem turma reconhecida', i.semTurma, i.semTurma ? 'alerta' : '')}</div>`;
+    $$('#cmInd [data-ffoto]').forEach(b => { b.onclick = () => { CM.foto = CM.foto === b.dataset.ffoto ? '' : b.dataset.ffoto; $('#cmFotoF').value = CM.foto; muda(); }; });
     const rows = d.rows, visiveis = rows.slice(0, CM.mais * 120);
     const marc = a => CM.sel.has(a.id);
     const card = a => `<div class="cm-al ${marc(a) ? 'sel' : ''}"><label class="cm-ck"><input type="checkbox" data-sel="${a.id}" ${marc(a) ? 'checked' : ''} aria-label="Selecionar ${attr(a.nome)}"></label><button type="button" class="cm-abre" data-ficha="${a.id}" aria-label="Abrir ficha de ${attr(a.nome)}">${cmFoto(a)}<strong>${esc(a.nome)}</strong><small>${esc(a.matricula)} · ${esc(a.turma || 'sem turma')}</small></button>${cmSelo(a.autorizacao)}${a.duplicado ? '<span class="cm-selo warn">Nome repetido na turma</span>' : ''}</div>`;
@@ -57,6 +58,7 @@ PAGINAS.cmvisao = async function () {
   $('#cmSeg').onchange = e => { CM.segmento = e.target.value; CM.serie = ''; CM.turma = ''; muda(); };
   $('#cmSerie').onchange = e => { CM.serie = e.target.value; CM.turma = ''; muda(); };
   $('#cmTurma').onchange = e => { CM.turma = e.target.value; muda(); };
+  $('#cmFotoF').onchange = e => { CM.foto = e.target.value; muda(); };
   $('#cmAut').onchange = e => { CM.autorizacao = e.target.value; muda(); };
   $('#cmSalvarSel').onclick = () => cmSalvarSelecao([...CM.sel.keys()], () => { CM.sel.clear(); go('cmselecoes'); });
   $('#cmLimpar').onclick = () => { CM.sel.clear(); atualizaSel(); carrega(); };
@@ -70,7 +72,7 @@ PAGINAS.cmturmas = async function () {
   const d = await api('/carometro/turmas');
   $('#content').innerHTML = `<p class="kpi-note">Ano letivo ${esc(d.anoLetivo)} · ${fmtN(d.total)} aluno(s) ativos. Clique em uma turma para ver os alunos.</p><div class="cm-segs">${d.segmentos.map(s => `<section class="card"><div class="db-tit"><h2>${esc(s.nome)}</h2><span class="kpi-note">${esc(s.detalhe)} · ${fmtN(s.alunos)} aluno(s)</span></div>${s.series.length ? s.series.map(g => `<div class="cm-serie"><b>${esc(g.serie)}</b><div class="cm-turmas">${g.turmas.map(t => `<span class="cm-par"><button type="button" class="btn ghost" data-seg="${attr(s.k)}" data-turma="${attr(t.turma)}" data-serie="${attr(g.serie)}">${esc(t.turma)} <small>(${fmtN(t.alunos)})</small></button><button type="button" class="btn ghost cm-fotos" data-fotos="${attr(t.turma)}" title="Enviar as fotos da turma ${attr(t.turma)}" aria-label="Enviar as fotos da turma ${attr(t.turma)}">Fotos</button></span>`).join('')}</div></div>`).join('') : '<p class="kpi-note">Nenhuma turma com alunos.</p>'}</section>`).join('')}${d.semSegmento ? `<section class="card ui-atencao"><div class="db-tit"><h2>Sem segmento reconhecido</h2></div><p class="kpi-note">${fmtN(d.semSegmento)} aluno(s) com turma vazia ou fora do padrão (ex.: “3º Ano A”, “Infantil 2 B”). Corrija em Uso de Imagem › Alunos.</p></section>` : ''}</div>`;
   $$('#content [data-fotos]').forEach(b => { b.onclick = () => { CM_IMP.turma = b.dataset.fotos; go('cmimport'); }; });
-  $$('#content [data-turma]').forEach(b => { b.onclick = () => { CM.segmento = b.dataset.seg; CM.serie = b.dataset.serie; CM.turma = b.dataset.turma; CM.busca = ''; CM.autorizacao = ''; CM.mais = 1; go('cmvisao'); }; });
+  $$('#content [data-turma]').forEach(b => { b.onclick = () => { CM.segmento = b.dataset.seg; CM.serie = b.dataset.serie; CM.turma = b.dataset.turma; CM.busca = ''; CM.foto = ''; CM.autorizacao = ''; CM.mais = 1; go('cmvisao'); }; });
 };
 
 async function cmFicha(id) {
@@ -196,7 +198,7 @@ PAGINAS.cmselecoes = async function () {
   $('#content').innerHTML = `<div class="ig-barra"><button type="button" class="btn" id="cmNovaSel">+ Nova seleção</button><span class="kpi-note">Para criar: marque alunos (de uma ou várias turmas) na Visão geral e clique em “Salvar seleção”.</span></div>
     <section class="card">${d.rows.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Nome</th><th>Alunos</th><th>Turmas</th><th>Criada por</th><th>Atualizada</th><th></th></tr></thead><tbody>${d.rows.map(r => `<tr><td><b>${esc(r.nome)}</b>${r.compartilhada ? ' <span class="cm-selo mute">compartilhada</span>' : ''}</td><td>${fmtN(r.alunos)}</td><td>${fmtN(r.turmas)}</td><td>${esc(r.dono)}</td><td>${esc(fmtDateTime(r.atualizadoEm))}</td><td class="cm-acoes"><button type="button" class="btn ghost" data-abrir="${r.id}">Abrir</button>${r.podeEditar ? `<button type="button" class="btn ghost" data-edit="${r.id}">Editar</button>` : ''}<button type="button" class="btn ghost" data-dup="${r.id}">Duplicar</button>${r.podeEditar ? `<button type="button" class="btn ghost danger" data-del="${r.id}">Excluir</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>Nenhuma seleção salva.</b><br>Marque alunos na Visão geral e salve a lista para reutilizar.</div>'}</section>`;
   $('#cmNovaSel').onclick = () => go('cmvisao');
-  $$('#content [data-abrir]').forEach(b => { b.onclick = async () => { const x = await api('/carometro/selecao?id=' + b.dataset.abrir); CM.sel = new Map(x.alunos.map(a => [a.id, a])); CM.busca = ''; CM.segmento = ''; CM.serie = ''; CM.turma = ''; CM.autorizacao = ''; go('cmvisao'); toast(`${x.alunos.length} aluno(s) selecionados`); }; });
+  $$('#content [data-abrir]').forEach(b => { b.onclick = async () => { const x = await api('/carometro/selecao?id=' + b.dataset.abrir); CM.sel = new Map(x.alunos.map(a => [a.id, a])); CM.busca = ''; CM.segmento = ''; CM.serie = ''; CM.turma = ''; CM.foto = ''; CM.autorizacao = ''; go('cmvisao'); toast(`${x.alunos.length} aluno(s) selecionados`); }; });
   $$('#content [data-edit]').forEach(b => { b.onclick = async () => { const x = await api('/carometro/selecao?id=' + b.dataset.edit); cmEditarSelecao(x, () => PAGINAS.cmselecoes()); }; });
   $$('#content [data-dup]').forEach(b => { b.onclick = async () => { await post('/carometro/selecao/duplicar', { id: +b.dataset.dup }); toast('Seleção duplicada'); PAGINAS.cmselecoes(); }; });
   $$('#content [data-del]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Excluir a seleção?', texto: 'Só a lista é apagada; os alunos e as fotos não são afetados.', confirmar: 'Excluir', perigo: true })) { await post('/carometro/selecao/excluir', { id: +b.dataset.del }); toast('Seleção excluída'); PAGINAS.cmselecoes(); } }; });
