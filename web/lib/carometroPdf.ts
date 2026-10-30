@@ -48,7 +48,7 @@ export async function carometroPdf(alunos: AlunoPdf[], o: OpcoesPdf, lerFoto: (f
     if (y + ch > H - rodape) { doc.addPage(); y = m; col = 0; }
     const x = m + col * (cw + gap);
     const img = a.fotoId ? await lerFoto(a.fotoId) : null;
-    if (!img || !imagemNaCaixa(doc, img, x, y, cw, fh)) {
+    if (!img || !imagemNaCaixa(doc, img, x, y, cw, fh, '#F3F5F9', true)) {
       doc.save().roundedRect(x, y, cw, fh, 3).fill('#EEF1F6').restore();
       doc.font('Helvetica-Bold').fontSize(Math.min(26, cw / 3)).fillColor('#8A95A8').text(limpa(iniciais(a.nome)), x, y + fh / 2 - 14, { width: cw, align: 'center', lineBreak: false });
       doc.font('Helvetica').fontSize(7).fillColor('#8A95A8').text('Sem foto', x, y + fh / 2 + 14, { width: cw, align: 'center', lineBreak: false });
