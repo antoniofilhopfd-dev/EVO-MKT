@@ -1,13 +1,14 @@
 import { Ctx } from '../ctx';
 import { requireAdmin, requireInternal, requireManager } from '../auth';
 import { q, q1 } from '../db';
-import { fail, lower, now, Row } from '../util';
+import { fail, lower, now, Row, strv } from '../util';
 import { json } from './handlers';
 import { atualizarVencimentos } from '../imagemDados';
 import { auditar, guardarFoto, historicoFotos, lerArquivoFoto, prepararFoto, FOTO_MAX_BYTES } from '../carometroFoto';
 import { run } from '../db';
 import { carometroLoteRoute } from './carometroLote';
 import { carometroSelRoute } from './carometroSel';
+import { calcularPendencias, contagemPend, TIPOS_PEND } from '../carometroPend';
 import { carometroPdf, carregarAlunosPdf, fotoPadrao, ordenarAlunosPdf } from '../carometroPdf';
 import { autorizacaoDe, compararTurmaCm, normNome, segmentoCm, SEGMENTOS_CM, serieDe } from '../carometro';
 
@@ -95,6 +96,29 @@ export async function carometroRoute(c: Ctx): Promise<Response> {
     await run('DELETE FROM cm_fotos WHERE id=?', [f.id]);
     await auditar(ator, 'foto-excluida', Number(f.aluno_id), `versão ${f.versao} apagada definitivamente`);
     return json({ ok: true });
+  }
+  if (path === '/carometro/pendencias' && method === 'GET') {
+    const todas = await calcularPendencias(), tipo = c.qs('tipo'), est = c.qs('estado') === 'ignoradas' ? 'ignoradas' : 'abertas';
+    const rows = todas.filter((p) => (!tipo || p.tipo === tipo) && (est === 'ignoradas' ? p.ignorada : !p.ignorada));
+    return json({ tipos: TIPOS_PEND, contagem: contagemPend(todas), abertas: todas.filter((p) => !p.ignorada).length, ignoradas: todas.filter((p) => p.ignorada).length, total: rows.length, limite: 1000, rows: rows.slice(0, 1000) });
+  }
+  if (path === '/carometro/pendencias/ignorar' && method === 'POST') {
+    await requireManager(c);
+    const b = await c.body(), motivo = strv(b.motivo).replace(/\s+/g, ' ').trim().slice(0, 300), chaves = [...new Set((Array.isArray(b.chaves) ? b.chaves : []).map(String))].filter((k) => /^[a-z_]+:i?\d+$/.test(k)).slice(0, 500);
+    if (motivo.length < 3) fail(400, 'Explique em poucas palavras por que a pendência pode ficar como está.');
+    if (!chaves.length) fail(400, 'Escolha as pendências.');
+    const validas = new Set((await calcularPendencias()).map((p) => p.chave));
+    let n = 0;
+    for (const k of chaves) if (validas.has(k)) { await run('INSERT INTO cm_pendencias_ign(chave,motivo,por,em) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE motivo=VALUES(motivo),por=VALUES(por),em=VALUES(em)', [k, motivo, ator, now()]); n++; }
+    await auditar(ator, 'pendencias-ignoradas', null, `${n} pendência(s): ${motivo}`);
+    return json({ ok: true, ignoradas: n });
+  }
+  if (path === '/carometro/pendencias/reabrir' && method === 'POST') {
+    await requireManager(c);
+    const b = await c.body(), chaves = (Array.isArray(b.chaves) ? b.chaves : []).map(String).filter((k) => /^[a-z_]+:i?\d+$/.test(k)).slice(0, 500);
+    let n = 0; for (const k of chaves) n += await run('DELETE FROM cm_pendencias_ign WHERE chave=?', [k]);
+    await auditar(ator, 'pendencias-reabertas', null, `${n} pendência(s)`);
+    return json({ ok: true, reabertas: n });
   }
   if (path === '/carometro/pdf' && method === 'GET') {
     const origem = c.qs('origem'), orient = c.qs('orientacao') === 'paisagem' ? 'paisagem' : 'retrato', por = [4, 5, 6].includes(Number(c.qs('porlinha'))) ? (Number(c.qs('porlinha')) as 4 | 5 | 6) : 5;

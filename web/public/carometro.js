@@ -244,3 +244,32 @@ PAGINAS.cmpdf = async function () {
   };
   atualizaVis(); previa();
 };
+
+/* ---- Pendências e qualidade ---- */
+const CM_PEND = { tipo: '', estado: 'abertas', sel: new Set() };
+PAGINAS.cmpendencias = async function () {
+  $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
+  const d = await api('/carometro/pendencias?' + new URLSearchParams({ tipo: CM_PEND.tipo, estado: CM_PEND.estado }));
+  const abertas = CM_PEND.estado === 'abertas';
+  const cart = ([k, rot]) => `<button type="button" class="db-cartao ui-cartao cm-filtro ${CM_PEND.tipo === k ? 'ativo' : ''} ${d.contagem[k] ? 'alerta' : ''}" data-tipo="${k}" aria-pressed="${CM_PEND.tipo === k}"><small>${esc(rot)}</small><strong>${fmtN(d.contagem[k])}</strong></button>`;
+  const acaoLinha = p => p.alunoId ? `<button type="button" class="btn ghost" data-ficha="${p.alunoId}">${p.tipo === 'sem_foto' || p.tipo === 'imagem_baixa' ? 'Enviar foto…' : 'Abrir ficha'}</button>` : '<button type="button" class="btn ghost" data-lote>Abrir lote</button>';
+  $('#content').innerHTML = `<div class="db-cartoes ui-seis">${Object.entries(d.tipos).map(cart).join('')}</div>
+    <div class="ig-barra"><select id="pdTipo" class="control" aria-label="Tipo de pendência"><option value="">Todos os tipos</option>${Object.entries(d.tipos).map(([k, v]) => `<option value="${k}" ${CM_PEND.tipo === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select><select id="pdEstado" class="control" aria-label="Situação"><option value="abertas" ${abertas ? 'selected' : ''}>Abertas (${fmtN(d.abertas)})</option><option value="ignoradas" ${abertas ? '' : 'selected'}>Deixadas como estão (${fmtN(d.ignoradas)})</option></select><span style="flex:1"></span><span class="kpi-note" id="pdSelTxt"></span><button type="button" class="btn" id="pdLote" disabled>${abertas ? 'Deixar como está…' : 'Reabrir selecionadas'}</button></div>
+    <section class="card">${d.rows.length ? `<p class="kpi-note">${fmtN(d.total)} pendência(s)${d.total > d.limite ? ` (mostrando as ${d.limite} primeiras)` : ''}. Cada decisão em lote fica registrada com motivo, autor e data.</p><div class="tablewrap"><table class="datatable"><thead><tr><th><input type="checkbox" id="pdTodos" aria-label="Marcar todas"></th><th>Tipo</th><th>Aluno / arquivo</th><th>Turma</th><th>Detalhe</th><th></th></tr></thead><tbody>${d.rows.map(p => `<tr><td><input type="checkbox" data-k="${attr(p.chave)}" ${CM_PEND.sel.has(p.chave) ? 'checked' : ''} aria-label="Selecionar"></td><td><span class="cm-selo ${p.tipo === 'duplicado' || p.tipo === 'arquivo_orfao' ? 'bad' : 'warn'}">${esc(d.tipos[p.tipo])}</span></td><td><b>${esc(p.aluno)}</b>${p.matricula ? `<br><small>${esc(p.matricula)}</small>` : ''}</td><td>${esc(p.turma || '—')}</td><td>${esc(p.detalhe)}${p.ignorada ? `<br><small class="cm-aviso">Deixada como está por ${esc(p.por)}: ${esc(p.motivo)}</small>` : ''}</td><td class="cm-acoes">${acaoLinha(p)}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty"><b>${abertas ? 'Nenhuma pendência aberta.' : 'Nada foi deixado como está.'}</b></div>`}</section>`;
+  $$('#content [data-tipo]').forEach(b => { b.onclick = () => { CM_PEND.tipo = CM_PEND.tipo === b.dataset.tipo ? '' : b.dataset.tipo; CM_PEND.sel.clear(); PAGINAS.cmpendencias(); }; });
+  $('#pdTipo').onchange = e => { CM_PEND.tipo = e.target.value; CM_PEND.sel.clear(); PAGINAS.cmpendencias(); };
+  $('#pdEstado').onchange = e => { CM_PEND.estado = e.target.value; CM_PEND.sel.clear(); PAGINAS.cmpendencias(); };
+  const atual = () => { const n = CM_PEND.sel.size; $('#pdSelTxt').textContent = n ? `${n} selecionada(s)` : ''; $('#pdLote').disabled = !n; };
+  $$('#content [data-k]').forEach(b => { b.onchange = () => { if (b.checked) CM_PEND.sel.add(b.dataset.k); else CM_PEND.sel.delete(b.dataset.k); atual(); }; });
+  $('#pdTodos') && ($('#pdTodos').onchange = e => { $$('#content [data-k]').forEach(b => { b.checked = e.target.checked; if (b.checked) CM_PEND.sel.add(b.dataset.k); else CM_PEND.sel.delete(b.dataset.k); }); atual(); });
+  $$('#content [data-ficha]').forEach(b => { b.onclick = () => cmFicha(+b.dataset.ficha); });
+  $$('#content [data-lote]').forEach(b => { b.onclick = () => go('cmimport'); });
+  $('#pdLote').onclick = async () => {
+    const chaves = [...CM_PEND.sel];
+    if (!abertas) { await post('/carometro/pendencias/reabrir', { chaves }); CM_PEND.sel.clear(); toast('Pendências reabertas'); PAGINAS.cmpendencias(); return; }
+    const dl = dialogo(`<h3>Deixar como está</h3><p class="kpi-note">${chaves.length} pendência(s). Explique o motivo; fica registrado com seu nome e a data.</p><label class="ui-campo">Motivo<input id="pdMotivo" class="control" maxlength="300" placeholder="Ex.: são irmãos gêmeos, nomes parecidos"></label><p class="cm-erro" id="pdErro" role="alert"></p><div class="actions dlg-acoes"><button type="button" class="btn soft" data-close>Cancelar</button><button type="button" class="btn" id="pdOk">Confirmar</button></div>`);
+    $('#pdMotivo', dl.el).focus();
+    $('#pdOk', dl.el).onclick = async () => { try { await post('/carometro/pendencias/ignorar', { chaves, motivo: $('#pdMotivo', dl.el).value }); dl.close(); CM_PEND.sel.clear(); toast('Registrado'); PAGINAS.cmpendencias(); } catch (e) { $('#pdErro', dl.el).textContent = e.message; } };
+  };
+  atual();
+};
