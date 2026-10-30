@@ -42,6 +42,8 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   ui_arquivos: { cols: ['id', 'solicitacao_id', 'tipo', 'caminho', 'nome', 'sha256', 'tamanho', 'info', 'ativo', 'criado_em', 'ip'], restore: 'replace', opt: true },
   cm_fotos: { cols: ['id', 'aluno_id', 'versao', 'caminho_original', 'caminho_padrao', 'caminho_mini', 'nome_original', 'mime', 'largura', 'altura', 'tamanho', 'sha256', 'origem', 'aviso', 'ativa', 'enviado_por', 'enviado_em', 'desativada_em'], restore: 'replace', opt: true },
   cm_auditoria: { cols: ['id', 'quando', 'ator', 'acao', 'aluno_id', 'detalhe'], restore: 'replace', opt: true },
+  cm_lotes: { cols: ['id', 'codigo', 'estado', 'criado_por', 'criado_em', 'aplicado_em', 'aplicado_por', 'desfeito_em', 'manifesto', 'resumo'], restore: 'replace', opt: true },
+  cm_lote_itens: { cols: ['id', 'lote_id', 'nome_arquivo', 'estado', 'regra', 'confianca', 'aluno_id', 'motivo', 'caminho_original', 'caminho_padrao', 'caminho_mini', 'mime', 'largura', 'altura', 'tamanho', 'aviso', 'foto_id', 'anterior_id'], restore: 'replace', opt: true },
   user_prefs: { cols: ['codigo', 'chave', 'valor', 'atualizado'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };

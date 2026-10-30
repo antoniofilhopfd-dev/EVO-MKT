@@ -6,6 +6,7 @@ import { json } from './handlers';
 import { atualizarVencimentos } from '../imagemDados';
 import { auditar, guardarFoto, historicoFotos, lerArquivoFoto, prepararFoto, FOTO_MAX_BYTES } from '../carometroFoto';
 import { run } from '../db';
+import { carometroLoteRoute } from './carometroLote';
 import { autorizacaoDe, compararTurmaCm, normNome, segmentoCm, SEGMENTOS_CM, serieDe } from '../carometro';
 
 /**
@@ -39,6 +40,9 @@ export async function carometroRoute(c: Ctx): Promise<Response> {
   const { path, method } = c;
   const u = await requireInternal(c);
   const ator = String(u.nome ?? u.codigo ?? '');
+
+  const lote = await carometroLoteRoute(c, ator);
+  if (lote) return lote;
 
   // ---- fotos ----
   if (path === '/carometro/foto' && method === 'GET') {

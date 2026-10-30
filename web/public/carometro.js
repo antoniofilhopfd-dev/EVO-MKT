@@ -81,3 +81,66 @@ async function cmFicha(id) {
   el.querySelectorAll('[data-exc]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Excluir esta versão?', texto: 'Original, foto padrão e miniatura serão apagados definitivamente e não há como desfazer.', confirmar: 'Excluir', perigo: true })) { await post('/carometro/foto/excluir', { id: +b.dataset.exc }); toast('Versão excluída'); recarrega(); } }; });
 }
 const SEGMENTOS_ROT = { MATERNAL: 'Maternais', INFANTIL: 'Infantil 1, 2 e 3', JARDINS: 'Jardins', INICIAIS: 'Anos Iniciais', FINAIS: 'Anos Finais', MEDIO: 'Ensino Médio' };
+
+/* ---- Importação e associação (fotos em lote com simulação) ---- */
+const CM_EST = { ok: ['Pronta', 'ok'], sugerida: ['Confirmar', 'warn'], ambigua: ['Escolher aluno', 'warn'], orfa: ['Sem aluno', 'bad'], invalida: ['Inválida', 'bad'], ignorada: ['Ignorada', 'mute'] };
+const CM_LOTE = { simulado: 'Em simulação', aplicado: 'Aplicado', cancelado: 'Cancelado', desfeito: 'Desfeito' };
+PAGINAS.cmimport = async function () {
+  $('#content').innerHTML = `<section class="card"><div class="db-tit"><h2>1. Lista de alunos</h2></div><p class="kpi-note">O cadastro de alunos é o mesmo do Uso de Imagem. A importação mostra uma prévia antes de gravar, atualiza pela matrícula e nunca apaga ninguém.</p><div class="ig-barra"><button type="button" class="btn" id="cmImpAlunos">Importar lista de alunos…</button></div></section>
+    <section class="card"><div class="db-tit"><h2>2. Fotos em lote</h2></div><p class="kpi-note">Nome do arquivo = matrícula (ex.: <b>2026001.jpg</b>). Dá para enviar também um manifesto (<b>matricula;nome_arquivo;origem</b>). Nada vira foto de aluno antes de você conferir e aplicar. Nomes só são sugeridos, nunca associados sozinhos.</p>
+      <div class="ig-barra"><input type="file" id="cmFotos" accept="image/jpeg,image/png,image/webp" multiple aria-label="Fotos dos alunos"><input type="file" id="cmManifesto" accept=".csv,.txt,text/csv,text/plain" aria-label="Manifesto opcional (CSV)"><button type="button" class="btn" id="cmSimular">Simular importação</button></div><div id="cmProg" class="kpi-note"></div></section>
+    <div id="cmLote"></div><section class="card"><div class="db-tit"><h2>Lotes recentes</h2></div><div id="cmLotes"></div></section>`;
+  $('#cmImpAlunos').onclick = () => uiImportar(() => toast('Lista de alunos atualizada'));
+  const desenhaLotes = async () => {
+    const d = await api('/carometro/lotes');
+    $('#cmLotes').innerHTML = d.rows.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Lote</th><th>Situação</th><th>Criado</th><th>Resultado</th><th></th></tr></thead><tbody>${d.rows.map(l => `<tr><td>#${l.id}</td><td>${esc(CM_LOTE[l.estado] || l.estado)}</td><td>${esc(fmtDateTime(l.criadoEm))} · ${esc(l.criadoPor)}</td><td>${esc(l.resumo || '—')}</td><td>${l.estado === 'simulado' ? `<button type="button" class="btn ghost" data-abre="${l.id}">Abrir</button>` : l.estado === 'aplicado' ? `<button type="button" class="btn ghost danger" data-desf="${l.id}">Desfazer</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="kpi-note">Nenhum lote ainda.</p>';
+    $$('#cmLotes [data-abre]').forEach(b => { b.onclick = () => desenhaLote(+b.dataset.abre); });
+    $$('#cmLotes [data-desf]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Desfazer este lote?', texto: 'As fotos aplicadas por ele são retiradas e a foto anterior volta a ser a atual. Fotos já alteradas depois ficam como estão.', confirmar: 'Desfazer', perigo: true })) { const r = await post('/carometro/lote/desfazer', { lote_id: +b.dataset.desf }); toast(`${r.desfeitas} foto(s) desfeita(s)`); desenhaLotes(); } }; });
+  };
+  const desenhaLote = async id => {
+    const d = await api('/carometro/lote?id=' + id), r = d.resumo, aberto = d.lote.estado === 'simulado';
+    const cart = (t, v, cls) => `<div class="db-cartao ui-cartao ${cls || ''}"><small>${t}</small><strong>${fmtN(v)}</strong></div>`;
+    const acao = i => {
+      if (!aberto || i.estado === 'invalida') return '';
+      const ign = `<button type="button" class="btn ghost" data-ign="${i.id}">Ignorar</button>`;
+      if (i.estado === 'ignorada') return `<button type="button" class="btn ghost" data-res="${i.id}">Reativar</button>`;
+      if (i.estado === 'sugerida') return `<button type="button" class="btn" data-conf="${i.id}">Confirmar</button>${ign}`;
+      if (i.estado === 'ambigua' || i.estado === 'orfa') return `<input class="control cm-mat" data-mat="${i.id}" placeholder="Matrícula do aluno" aria-label="Matrícula do aluno para ${attr(i.arquivo)}"><button type="button" class="btn" data-vinc="${i.id}">Vincular</button>${ign}`;
+      return ign;
+    };
+    $('#cmLote').innerHTML = `<section class="card" id="cmLoteCard"><div class="db-tit"><h2>Lote #${d.lote.id} · ${esc(CM_LOTE[d.lote.estado] || d.lote.estado)}</h2></div><div class="db-cartoes ui-seis">${cart('Prontas', r.prontos, 'ok')}${cart('Substituem foto', r.substituem)}${cart('Para confirmar', r.sugeridas, r.sugeridas ? 'alerta' : '')}${cart('Sem aluno', r.orfas + r.ambiguas, r.orfas + r.ambiguas ? 'alerta' : '')}${cart('Em conflito', r.conflitos, r.conflitos ? 'alerta' : '')}${cart('Inválidas', r.invalidas)}</div>
+      <p class="kpi-note">${aberto ? 'Simulação: nada foi gravado nas fichas dos alunos. Decida os itens pendentes e aplique.' : esc(d.lote.resumo || '')}</p>
+      <div class="tablewrap"><table class="datatable cm-lote"><thead><tr><th>Foto</th><th>Arquivo</th><th>Aluno</th><th>Regra</th><th>Situação</th><th></th></tr></thead><tbody>${d.itens.map(i => { const [t, c] = i.conflito ? ['Conflito', 'bad'] : CM_EST[i.estado] || [i.estado, 'mute']; return `<tr><td>${i.estado === 'invalida' ? '—' : `<img class="cm-mini" src="${API}/carometro/lote/foto?item=${i.id}&tam=mini" alt="Prévia de ${attr(i.arquivo)}" loading="lazy">`}</td><td>${esc(i.arquivo)}<br><small>${i.largura ? esc(i.largura + '×' + i.altura) : ''}${i.aviso ? ' · ' + esc(i.aviso) : ''}</small></td><td>${i.aluno ? `<b>${esc(i.aluno)}</b><br><small>${esc(i.matricula)} · ${esc(i.turma)}</small>${i.substitui ? '<br><small class="cm-aviso">substitui a foto atual</small>' : ''}` : '—'}</td><td>${esc(i.regra || '—')}${i.confianca ? `<br><small>confiança ${esc(i.confianca)}</small>` : ''}</td><td><span class="cm-selo ${c}">${esc(t)}</span>${i.motivo ? `<br><small>${esc(i.motivo)}</small>` : ''}</td><td class="cm-acoes">${acao(i)}</td></tr>`; }).join('')}</tbody></table></div>
+      ${aberto ? `<div class="ig-barra"><button type="button" class="btn" id="cmAplicar" ${d.pendencias || !r.prontos ? 'disabled' : ''}>Aplicar lote (${fmtN(r.prontos)} foto(s))</button><button type="button" class="btn ghost" id="cmCancelarLote">Cancelar lote (nada é gravado)</button>${d.pendencias ? `<span class="kpi-note">Resolva ${fmtN(d.pendencias)} item(ns) pendente(s) para aplicar.</span>` : ''}</div>` : ''}</section>`;
+    const tudo = async (caminho, corpo) => { await post(caminho, { lote_id: id, ...corpo }); desenhaLote(id); };
+    $$('#cmLote [data-ign]').forEach(b => { b.onclick = () => tudo('/carometro/lote/resolver', { item_id: +b.dataset.ign, acao: 'ignorar' }); });
+    $$('#cmLote [data-res]').forEach(b => { b.onclick = () => tudo('/carometro/lote/resolver', { item_id: +b.dataset.res, acao: 'restaurar' }); });
+    $$('#cmLote [data-conf]').forEach(b => { b.onclick = () => tudo('/carometro/lote/resolver', { item_id: +b.dataset.conf, acao: 'confirmar' }); });
+    $$('#cmLote [data-vinc]').forEach(b => {
+      b.onclick = async () => {
+        const mat = ($(`[data-mat="${b.dataset.vinc}"]`).value || '').trim(); if (!mat) { toast('Digite a matrícula do aluno.', 'warn'); return; }
+        const achou = (await api('/carometro/alunos?busca=' + encodeURIComponent(mat))).rows.filter(a => a.matricula.toLowerCase() === mat.toLowerCase());
+        if (achou.length !== 1) { toast('Nenhum aluno com esta matrícula.', 'warn'); return; }
+        tudo('/carometro/lote/resolver', { item_id: +b.dataset.vinc, acao: 'vincular', aluno_id: achou[0].id });
+      };
+    });
+    $('#cmAplicar') && ($('#cmAplicar').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Aplicar o lote?', texto: `${r.prontos} foto(s) passam a ser a foto atual dos alunos${r.substituem ? `; ${r.substituem} substituem uma foto anterior (que fica no histórico)` : ''}. Dá para desfazer depois.`, confirmar: 'Aplicar' })) { const x = await post('/carometro/lote/aplicar', { lote_id: id }); toast(`${x.aplicadas} foto(s) aplicada(s)`); desenhaLote(id); desenhaLotes(); } });
+    $('#cmCancelarLote') && ($('#cmCancelarLote').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Cancelar o lote?', texto: 'As fotos enviadas para a simulação são descartadas. Nenhuma ficha é alterada.', confirmar: 'Cancelar lote', perigo: true })) { await post('/carometro/lote/cancelar', { lote_id: id }); $('#cmLote').innerHTML = ''; desenhaLotes(); } });
+  };
+  $('#cmSimular').onclick = async () => {
+    const arqs = [...$('#cmFotos').files]; if (!arqs.length) { toast('Escolha as fotos.', 'warn'); return; }
+    const man = $('#cmManifesto').files[0] ? await $('#cmManifesto').files[0].text() : '';
+    $('#cmSimular').disabled = true; let loteId = 0;
+    try {
+      for (let i = 0; i < arqs.length; i += 3) {
+        $('#cmProg').textContent = `Enviando ${Math.min(i + 3, arqs.length)} de ${arqs.length}…`;
+        const fd = new FormData(); if (loteId) fd.append('lote_id', loteId); else fd.append('manifesto', man);
+        arqs.slice(i, i + 3).forEach(f => fd.append('arquivo', f));
+        loteId = (await api('/carometro/lote/fotos', { method: 'POST', body: fd })).loteId;
+      }
+      $('#cmProg').textContent = ''; $('#cmFotos').value = ''; await desenhaLote(loteId); desenhaLotes();
+    } catch (e) { toast(e.message, 'warn'); $('#cmProg').textContent = e.message; } finally { $('#cmSimular').disabled = false; }
+  };
+  await desenhaLotes();
+  const aberto = (await api('/carometro/lotes')).rows.find(l => l.estado === 'simulado'); if (aberto) desenhaLote(aberto.id);
+};
