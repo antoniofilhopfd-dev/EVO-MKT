@@ -104,7 +104,7 @@ async function cmFicha(id) {
   el.querySelectorAll('[data-rest]').forEach(b => { b.onclick = async () => { await post('/carometro/foto/restaurar', { id: +b.dataset.rest }); toast('Versão restaurada'); recarrega(); }; });
   el.querySelectorAll('[data-exc]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Excluir esta versão?', texto: 'Original, foto padrão e miniatura serão apagados definitivamente e não há como desfazer.', confirmar: 'Excluir', perigo: true })) { await post('/carometro/foto/excluir', { id: +b.dataset.exc }); toast('Versão excluída'); recarrega(); } }; });
 }
-const SEGMENTOS_ROT = { MATERNAL: 'Maternais', INFANTIL: 'Infantil 1, 2 e 3', JARDINS: 'Jardins', INICIAIS: 'Anos Iniciais', FINAIS: 'Anos Finais', MEDIO: 'Ensino Médio' };
+const SEGMENTOS_ROT = { INFANTIL: 'Maternais (Infantil 1, 2 e 3)', JARDINS: 'Jardins', INICIAIS: 'Anos Iniciais', FINAIS: 'Anos Finais', MEDIO: 'Ensino Médio' };
 
 /* ---- Importação e associação (fotos em lote com simulação) ---- */
 const CM_EST = { ok: ['Pronta', 'ok'], sugerida: ['Confirmar', 'warn'], ambigua: ['Escolher aluno', 'warn'], orfa: ['Sem aluno', 'bad'], invalida: ['Inválida', 'bad'], ignorada: ['Ignorada', 'mute'] };

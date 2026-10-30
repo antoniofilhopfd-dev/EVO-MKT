@@ -5,8 +5,7 @@ import { compararTurma } from './imagemTurma';
  * Nada aqui grava dados: o cadastro de alunos é o do módulo Uso de Imagem (ui_alunos).
  */
 export const SEGMENTOS_CM: { k: string; nome: string; detalhe: string }[] = [
-  { k: 'MATERNAL', nome: 'Maternais', detalhe: 'Maternal' },
-  { k: 'INFANTIL', nome: 'Infantil 1, 2 e 3', detalhe: 'Infantil 1 a 3' },
+  { k: 'INFANTIL', nome: 'Maternais', detalhe: 'Infantil 1, 2 e 3 (são os maternais)' },
   { k: 'JARDINS', nome: 'Jardins', detalhe: 'Infantil 4, 5 e 1º ano' },
   { k: 'INICIAIS', nome: 'Anos Iniciais', detalhe: '2º ao 5º ano' },
   { k: 'FINAIS', nome: 'Anos Finais', detalhe: '6º ao 9º ano' },
@@ -18,7 +17,7 @@ const semAcento = (s: string) => String(s ?? '').normalize('NFD').replace(/[̀-�
 export function segmentoCm(turma: string): string {
   const t = semAcento(turma);
   if (!t) return '';
-  if (/maternal/.test(t)) return 'MATERNAL';
+  if (/maternal/.test(t)) return 'INFANTIL';
   let m = /infantil\s*(\d)/.exec(t) ?? /(\d)\s*infantil/.exec(t);
   if (m) return +m[1] <= 3 ? 'INFANTIL' : +m[1] <= 5 ? 'JARDINS' : '';
   m = /(\d{1,2})\s*(?:o\s*)?serie\b/.exec(t) ?? /\bserie\s*(\d{1,2})/.exec(t);

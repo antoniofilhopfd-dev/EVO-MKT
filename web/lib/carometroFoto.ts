@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { q, q1, run } from './db';
 import { now } from './util';
 
-/** Regras das fotos do Carômetro: JPG, PNG ou WebP, até 5 MB. O original é guardado como veio; a versão padrão (600×800, 3:4) é a que aparece nas telas e no PDF. */
+/** Regras das fotos do Carômetro: JPG, PNG ou WebP, até 5 MB (fotos pequenas, a partir de 100×100, são aceitas e não são ampliadas). O original é guardado como veio; a versão padrão (600×800, 3:4) é a que aparece nas telas e no PDF. */
 export const FOTO_MAX_BYTES = 5 * 1048576;
 export const FOTO_PADRAO = { w: 600, h: 800 }, FOTO_MINI = { w: 240, h: 320 };
 const MIME: Record<string, string> = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -24,13 +24,12 @@ export async function prepararFoto(bruto: Buffer): Promise<FotoPronta | { erro: 
     // dimensões já com a rotação do EXIF aplicada (foto de celular costuma vir girada)
     const girada = [5, 6, 7, 8].includes(meta.orientation ?? 1);
     const largura = girada ? meta.height ?? 0 : meta.width ?? 0, altura = girada ? meta.width ?? 0 : meta.height ?? 0;
-    if (largura < 200 || altura < 200) return { erro: 'A foto é pequena demais (mínimo 200 × 200 pixels).' };
+    if (largura < 100 || altura < 100) return { erro: 'A foto é pequena demais (mínimo 100 × 100 pixels).' };
     // recorte centralizado, sem distorcer; rotate() aplica o EXIF e a conversão remove metadados (inclusive localização)
     const base = () => sharp(bruto, { limitInputPixels: 60_000_000 }).rotate().flatten({ background: '#ffffff' });
-    const padrao = await base().resize(FOTO_PADRAO.w, FOTO_PADRAO.h, { fit: 'cover', position: 'attention' }).jpeg({ quality: 86, mozjpeg: true }).toBuffer();
-    const mini = await base().resize(FOTO_MINI.w, FOTO_MINI.h, { fit: 'cover', position: 'attention' }).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
+    const padrao = await base().resize(FOTO_PADRAO.w, FOTO_PADRAO.h, { fit: 'cover', position: 'attention', withoutEnlargement: true }).jpeg({ quality: 86, mozjpeg: true }).toBuffer();
+    const mini = await base().resize(FOTO_MINI.w, FOTO_MINI.h, { fit: 'cover', position: 'attention', withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
     const avisos: string[] = [];
-    if (largura < FOTO_PADRAO.w || altura < FOTO_PADRAO.h) avisos.push(`Resolução baixa (${largura}×${altura}); o recomendado é ${FOTO_PADRAO.w}×${FOTO_PADRAO.h}.`);
     const prop = largura / altura;
     if (prop > 1.05) avisos.push('Foto na horizontal: foi recortada no centro. Confira o enquadramento.');
     return { original: bruto, padrao, mini, mime, largura, altura, sha256: sha(bruto), aviso: avisos.join(' ').slice(0, 200) };

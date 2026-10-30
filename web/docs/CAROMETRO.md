@@ -14,10 +14,10 @@ Módulo do EVO MKT para localizar alunos por foto, organizar por segmento/série
 | Google Drive | Só referência das pastas (sem sincronização, sem credenciais) |
 | Importação | Importa a lista de alunos (prévia) e fotos em lote (simulação, conciliação, aplicar, desfazer) |
 
-Segmentos: Maternais; Infantil 1, 2 e 3; Jardins (Infantil 4, 5 e 1º ano); Anos Iniciais (2º–5º); Anos Finais (6º–9º); Ensino Médio (1ª–3ª série). O segmento é deduzido do nome da turma (`lib/carometro.ts`); turma fora do padrão aparece em "Turma não reconhecida" (nunca é adivinhada).
+Segmentos: Maternais (= Infantil 1, 2 e 3); Jardins (Infantil 4, 5 e 1º ano); Anos Iniciais (2º–5º); Anos Finais (6º–9º); Ensino Médio (1ª–3ª série). O segmento é deduzido do nome da turma (`lib/carometro.ts`); turma fora do padrão aparece em "Turma não reconhecida" (nunca é adivinhada).
 
 ## Fotos
-- JPG, PNG ou WebP até 5 MB; o conteúdo é conferido de verdade (não a extensão). Mínimo 200×200; abaixo de 600×800 gera aviso.
+- JPG, PNG ou WebP até 5 MB; o conteúdo é conferido de verdade (não a extensão). Mínimo 100×100. Fotos pequenas (como as 150×150 da escola) são aceitas e **não são ampliadas**.
 - Guardadas na tabela `arquivos` (nunca em URL pública): **original** (como enviado), **padrão** 600×800 e **miniatura** 240×320 (3:4, recorte centralizado, sem distorção, sem metadados/EXIF).
 - Cada envio cria uma versão; a anterior fica no histórico e pode ser restaurada. "Retirar" só desativa. Exclusão definitiva: só o Administrador.
 - Servidas por `/api/carometro/foto` com login, `Cache-Control: private, no-store`. Original só para a Gerência.

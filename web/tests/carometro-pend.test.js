@@ -16,13 +16,13 @@ const { t, fim } = U.contador();
     { matricula: 'Q-4', nome: 'Davi Igual', turma: '4º Ano A', segmento: '' }, { matricula: 'Q-5', nome: 'Davi Igual', turma: '4º Ano A', segmento: '' },
     { matricula: 'Q-6', nome: 'Eva Troca', turma: '5º Ano A', segmento: '' }, { matricula: 'Q-7', nome: 'Eva Troca', turma: '5º Ano B', segmento: '' },
     { matricula: 'Q-8', nome: 'Fabi Sem Turma', turma: '', segmento: 'Anos Finais' }, { matricula: 'Q-9', nome: 'Gabi Esquisita', turma: 'Turma Zeta', segmento: 'Anos Finais' }] });
-  await foto('Q-1', 600, 800); await foto('Q-3', 300, 400);
+  await foto('Q-1', 600, 800); await foto('Q-3', 150, 150);
   const fd = new FormData(); fd.append('arquivo', new Blob([await jpg(600, 800)], { type: 'image/jpeg' }), 'xyz.jpg');
   await raw(G, '/carometro/lote/fotos', { method: 'POST', body: fd });
   d = await G.get('/carometro/pendencias');
-  t('contagem por tipo', d.contagem.sem_foto === 7 && d.contagem.imagem_baixa === 1 && d.contagem.duplicado === 2 && d.contagem.varias_turmas === 2 && d.contagem.sem_turma === 2 && d.contagem.arquivo_orfao === 1 && d.abertas === 15, d.contagem);
+  t('contagem por tipo', d.contagem.sem_foto === 7 && d.contagem.imagem_baixa === 0 && d.contagem.duplicado === 2 && d.contagem.varias_turmas === 2 && d.contagem.sem_turma === 2 && d.contagem.arquivo_orfao === 1 && d.abertas === 14, d.contagem);
   t('foto boa não gera pendência de imagem', !d.rows.some(r => r.matricula === 'Q-1' && r.tipo !== 'x'));
-  t('imagem baixa explica a resolução', /300×400/.test(d.rows.find(r => r.tipo === 'imagem_baixa').detalhe));
+  t('foto pequena (150×150) não gera pendência de qualidade', !d.rows.some(r => r.tipo === 'imagem_baixa'));
   t('turma fora do padrão e aluno sem turma são apontados', d.rows.filter(r => r.tipo === 'sem_turma').map(r => r.matricula).sort().join() === 'Q-8,Q-9');
   t('"mesmo nome em outra turma" cita a outra turma', /5º Ano B/.test(d.rows.find(r => r.tipo === 'varias_turmas' && r.matricula === 'Q-6').detalhe));
   t('arquivo sem aluno aparece com o nome e o lote', /xyz\.jpg/.test(d.rows.find(r => r.tipo === 'arquivo_orfao').detalhe));
@@ -34,7 +34,7 @@ const { t, fim } = U.contador();
   t('chaves inventadas não gravam nada', (await G.post('/carometro/pendencias/ignorar', { chaves: ['duplicado:99999', "x'; DROP TABLE ui_alunos;--"], motivo: 'teste' })).ignoradas === 0);
   const ig = await G.post('/carometro/pendencias/ignorar', { chaves: dup, motivo: 'São gêmeos' });
   d = await G.get('/carometro/pendencias');
-  t('deixar como está em lote: some das abertas, vai para as ignoradas com motivo e autor', ig.ignoradas === 2 && d.contagem.duplicado === 0 && d.abertas === 13 && d.ignoradas === 2, d);
+  t('deixar como está em lote: some das abertas, vai para as ignoradas com motivo e autor', ig.ignoradas === 2 && d.contagem.duplicado === 0 && d.abertas === 12 && d.ignoradas === 2, d);
   const lig = await G.get('/carometro/pendencias?estado=ignoradas');
   t('lista de ignoradas mostra motivo e quem decidiu', lig.rows.length === 2 && lig.rows.every(r => r.ignorada && r.motivo === 'São gêmeos' && r.por.length > 2), lig.rows[0]);
   await G.post('/carometro/pendencias/reabrir', { chaves: [dup[0]] });
