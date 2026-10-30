@@ -30,6 +30,7 @@ import { calendarioPublicoRoute } from './calendarioPublico';
 import { trafegoRoute } from './trafego';
 import { agendasRoute } from './agendas';
 import { imagemRoute } from './imagem';
+import { carometroRoute } from './carometro';
 import { imagemPortalRoute } from './imagemPortal';
 import { escolarRoute } from './escolar';
 import { datacomRoute } from './datacom';
@@ -61,6 +62,8 @@ export async function route(c: Ctx): Promise<Out> {
       return trafegoRoute(c);
     case path.startsWith('/public/imagem/'):
       return imagemPortalRoute(c);
+    case path.startsWith('/carometro/'):
+      return carometroRoute(c);
     case path.startsWith('/imagem/'):
       return imagemRoute(c);
     case path === '/agendas' || path.startsWith('/agendas/') || path === '/agenda/eventos' || path === '/agenda/evento' || path === '/agenda/evento/excluir':

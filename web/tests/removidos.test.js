@@ -26,7 +26,7 @@ const arquivos = (dir, ext, out = []) => { for (const f of fs.readdirSync(dir, {
   // menu e telas
   const b = await U.abrir(); const p = await U.pagina(b, 'NAT-3301', G.nova);
   const nav = await p.$$eval('#nav .navitem .navlabel', e => e.map(x => x.innerText.trim()));
-  t('o menu tem as cinco áreas do marketing mais Uso de Imagem', nav.join('|') === 'Dashboard|Calendário|Instagram|Tráfego Pago|Uso de Imagem|Configurações', nav);
+  t('o menu tem as áreas do marketing, Uso de Imagem e Carômetro', nav.join('|') === 'Dashboard|Calendário|Instagram|Tráfego Pago|Uso de Imagem|Carômetro|Configurações', nav);
   const caiu = [];
   for (const pg of ['arquivos', 'solicitacoes', 'planejamento', 'tarefas', 'projetos', 'eventos', 'agenda', 'equipe', 'relatorios', 'minhaarea', 'central', 'administracao', 'gerenciador']) { await p.evaluate(x => go(x), pg); await p.waitForTimeout(250); const ativo = await p.$eval('#nav .navitem.active', e => e.innerText.trim()).catch(() => ''); const titulo = await p.$eval('#pageTitle', e => e.innerText.trim()); if (/Arquivos|Solicita|Planejamento|Tarefas|Projetos|Eventos|Agenda$|Equipe|Relat|Minha|Central|Administra/.test(titulo)) caiu.push(pg + '→' + titulo); void ativo; }
   t('endereços antigos não abrem telas antigas (voltam para uma das cinco áreas)', caiu.length === 0, caiu);
