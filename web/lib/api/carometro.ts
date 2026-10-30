@@ -8,6 +8,7 @@ import { auditar, guardarFoto, historicoFotos, lerArquivoFoto, prepararFoto, FOT
 import { run } from '../db';
 import { carometroLoteRoute } from './carometroLote';
 import { carometroSelRoute } from './carometroSel';
+import { carometroPdf, carregarAlunosPdf, fotoPadrao, ordenarAlunosPdf } from '../carometroPdf';
 import { autorizacaoDe, compararTurmaCm, normNome, segmentoCm, SEGMENTOS_CM, serieDe } from '../carometro';
 
 /**
@@ -94,6 +95,34 @@ export async function carometroRoute(c: Ctx): Promise<Response> {
     await run('DELETE FROM cm_fotos WHERE id=?', [f.id]);
     await auditar(ator, 'foto-excluida', Number(f.aluno_id), `versão ${f.versao} apagada definitivamente`);
     return json({ ok: true });
+  }
+  if (path === '/carometro/pdf' && method === 'GET') {
+    const origem = c.qs('origem'), orient = c.qs('orientacao') === 'paisagem' ? 'paisagem' : 'retrato', por = [4, 5, 6].includes(Number(c.qs('porlinha'))) ? (Number(c.qs('porlinha')) as 4 | 5 | 6) : 5;
+    const soAut = c.qs('so_autorizados') === '1';
+    let ids: number[] = [], titulo = '', mostrarTurma = false;
+    if (origem === 'turma') {
+      const turma = c.qs('turma');
+      ids = (await q('SELECT id FROM ui_alunos WHERE ativo=1 AND turma=?', [turma])).map((r) => Number(r.id));
+      if (!turma || !ids.length) fail(404, 'Turma sem alunos ativos.');
+      titulo = turma;
+    } else if (origem === 'selecao') {
+      const s = await q1('SELECT * FROM cm_selecoes WHERE id=?', [Number(c.qs('selecao')) || 0]);
+      if (!s || (String(s.dono) !== String(u.codigo ?? '') && !Number(s.compartilhada) && !Number(u.admin))) fail(404, 'Seleção não encontrada.');
+      ids = (await q('SELECT aluno_id FROM cm_selecao_itens WHERE selecao_id=?', [s.id])).map((r) => Number(r.aluno_id));
+      titulo = `Seleção: ${s.nome}`; mostrarTurma = true;
+    } else fail(400, 'Escolha a turma ou uma seleção.');
+    if (ids.length > 600) fail(400, 'O PDF aceita até 600 alunos.');
+    let alunos = ordenarAlunosPdf(await carregarAlunosPdf(ids));
+    const total = alunos.length;
+    if (soAut) alunos = alunos.filter((a) => a.autorizacao === 'AUTORIZADO');
+    if (!alunos.length) fail(404, soAut ? 'Nenhum aluno com autorização de imagem vigente nesta lista.' : 'Nenhum aluno ativo nesta lista.');
+    if (origem === 'turma') alunos.sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
+    const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
+    const sub = `Ano letivo ${anoLetivo()}${soAut ? ` - somente com autorização de imagem (${alunos.length} de ${total})` : ''}`;
+    const r = await carometroPdf(alunos, { titulo, subtitulo: sub, orientacao: orient, porLinha: por, matricula: c.qs('matricula') === '1', mostrarTurma }, fotoPadrao, quando);
+    await auditar(ator, c.qs('baixar') === '1' ? 'pdf-baixado' : 'pdf-previa', null, `${titulo}: ${alunos.length} aluno(s), ${r.paginas} página(s)`);
+    const nome = `Carometro-${titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'lista'}.pdf`;
+    return new Response(new Uint8Array(r.buf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `${c.qs('baixar') === '1' ? 'attachment' : 'inline'}; filename="${nome}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'X-Carometro-Paginas': String(r.paginas), 'X-Carometro-Alunos': String(alunos.length) } });
   }
   if (method !== 'GET') fail(405, 'Método não permitido.');
   const todos = await carregar();
