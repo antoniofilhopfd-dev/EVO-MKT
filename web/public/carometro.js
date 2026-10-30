@@ -27,7 +27,7 @@ async function cmPrepararFoto(f) {
 PAGINAS.cmvisao = async function () {
   $('#content').innerHTML = `<div class="ig-barra"><input id="cmBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(CM.busca)}"><select id="cmSeg" class="control" aria-label="Segmento"></select><select id="cmSerie" class="control" aria-label="Série"></select><select id="cmTurma" class="control" aria-label="Turma"></select><select id="cmFotoF" class="control" aria-label="Situação da foto"><option value="">Com e sem foto</option><option value="sem">Pendentes (sem foto)</option><option value="com">Com foto</option></select><select id="cmAut" class="control" aria-label="Autorização de imagem"><option value="">Toda autorização</option><option value="AUTORIZADO">Autorizado</option><option value="NAO_AUTORIZADO">Não autorizado</option><option value="SEM_INFORMACAO">Sem informação</option></select></div>
     <div class="cm-nav" role="group" aria-label="Navegar entre as turmas"><button type="button" class="btn" id="cmPrev" aria-label="Turma anterior">◀</button><div class="cm-nav-txt" id="cmNavTxt" aria-live="polite"></div><button type="button" class="btn" id="cmNext" aria-label="Próxima turma">▶</button></div>
-    <div class="ig-barra" id="cmGestaoBar"></div><div id="cmInd"></div><div class="ig-barra"><div class="cm-vistas" role="group" aria-label="Forma de exibição"><button type="button" class="btn ghost" data-vista="grade">▦ Grade</button><button type="button" class="btn ghost" data-vista="lista">☰ Lista</button></div><span class="kpi-note" id="cmSelTxt"></span><button type="button" class="btn" id="cmFotosTurma" hidden>Enviar fotos desta turma</button><button type="button" class="btn" id="cmSalvarSel" hidden>Salvar seleção…</button><button type="button" class="btn ghost" id="cmLimpar" hidden>Limpar seleção</button></div>
+    <div class="ig-barra" id="cmGestaoBar"></div><div id="cmInd"></div><div class="ig-barra"><div class="cm-vistas" role="group" aria-label="Forma de exibição"><button type="button" class="btn ghost" data-vista="grade">▦ Grade</button><button type="button" class="btn ghost" data-vista="lista">☰ Lista</button></div><span class="kpi-note" id="cmSelTxt"></span><button type="button" class="btn" id="cmFotosTurma" hidden>Enviar fotos desta turma</button><button type="button" class="btn" id="cmSalvarSel" hidden>Salvar seleção…</button><button type="button" class="btn ghost" id="cmLimpar" hidden>Limpar seleção</button><button type="button" class="btn danger" id="cmExcluirAlunos" hidden>Excluir aluno</button></div>
     <div id="cmLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   const acesso = await api('/carometro/acesso');
   $('#cmGestaoBar').innerHTML = `${acesso.substituir ? '<button type="button" class="btn ghost" id="cmAnoBtn">Revisão por ano letivo</button>' : ''}${Number(acesso.usuario?.admin) ? '<button type="button" class="btn ghost" id="cmPermBtn">Permissões do carômetro</button>' : ''}`;
@@ -66,7 +66,7 @@ PAGINAS.cmvisao = async function () {
     $('#cmMais') && ($('#cmMais').onclick = () => { CM.mais++; carrega(); });
     $$('.cm-vistas [data-vista]').forEach(b => { b.classList.toggle('active', b.dataset.vista === CM.vista); b.setAttribute('aria-pressed', String(b.dataset.vista === CM.vista)); });
   };
-  const atualizaSel = () => { const n = CM.sel.size, turmas = new Set([...CM.sel.values()].map(a => a.turma)).size; $('#cmSelTxt').textContent = n ? `${n} selecionado(s) de ${turmas} turma(s)` : ''; $('#cmLimpar').hidden = !n; $('#cmSalvarSel').hidden = !n; };
+  const atualizaSel = () => { const n = CM.sel.size, turmas = new Set([...CM.sel.values()].map(a => a.turma)).size; $('#cmSelTxt').textContent = n ? `${n} selecionado(s) de ${turmas} turma(s)` : ''; $('#cmLimpar').hidden = !n; $('#cmSalvarSel').hidden = !n; $('#cmExcluirAlunos').hidden = !n || !Number(acesso.usuario?.admin); $('#cmExcluirAlunos').textContent = n > 1 ? `Excluir alunos (${n})` : 'Excluir aluno'; };
   const muda = () => { CM.mais = 1; carrega(); };
   $('#cmBusca').oninput = e => { clearTimeout(atraso); atraso = setTimeout(() => { CM.busca = e.target.value; muda(); }, 250); };
   $('#cmSeg').onchange = e => { CM.segmento = e.target.value; CM.serie = ''; CM.turma = ''; muda(); };
@@ -75,6 +75,20 @@ PAGINAS.cmvisao = async function () {
   $('#cmFotoF').onchange = e => { CM.foto = e.target.value; muda(); };
   $('#cmAut').onchange = e => { CM.autorizacao = e.target.value; muda(); };
   $('#cmSalvarSel').onclick = () => cmSalvarSelecao([...CM.sel.keys()], () => { CM.sel.clear(); go('cmselecoes'); });
+  $('#cmExcluirAlunos').onclick = async () => {
+    const alunos=[...CM.sel.values()].map(a=>({id:a.id,nome:a.nome,matricula:a.matricula}));
+    if(!alunos.length)return;
+    const dl=dialogo(`<h3>${alunos.length===1?'Excluir aluno?':'Excluir alunos selecionados?'}</h3><p>Confira o nome e a matrícula antes de excluir:</p><ul>${alunos.map(a=>`<li><b>${esc(a.nome)}</b> · matrícula ${esc(a.matricula)}</li>`).join('')}</ul><p>A exclusão é definitiva e remove o cadastro também de <b>Uso de Imagem</b>, além das fotos e vínculos do carômetro. Alunos com solicitações de autorização serão mantidos para preservar o histórico.</p><p id="cmExcluirErro" class="cm-erro" role="alert"></p><div class="actions dlg-acoes"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="button" class="btn danger" id="cmConfirmarExclusao">Excluir definitivamente</button></div>`,{larga:true});
+    $('#cmConfirmarExclusao',dl.el).onclick=async()=>{
+      const btn=$('#cmConfirmarExclusao',dl.el);btn.disabled=true;
+      try {
+        const r=await post('/carometro/alunos/excluir',{confirmar:true,alunos});
+        (r.excluidosIds||[]).forEach(id=>CM.sel.delete(id));dl.close();atualizaSel();await carrega();
+        if(r.excluidos)toast(`${r.excluidos} aluno(s) excluído(s)`);
+        if(r.mantidos?.length)dialogo(`<h3>Alunos mantidos</h3><ul>${r.mantidos.map(a=>`<li><b>${esc(a.aluno)}</b>: ${esc(a.motivo)}</li>`).join('')}</ul><button type="button" class="btn" data-close>Fechar</button>`);
+      } catch(e) { $('#cmExcluirErro',dl.el).textContent=e.message;btn.disabled=false; }
+    };
+  };
   $('#cmLimpar').onclick = () => { CM.sel.clear(); atualizaSel(); carrega(); };
   $$('.cm-vistas [data-vista]').forEach(b => { b.onclick = () => { CM.vista = b.dataset.vista; carrega(); }; });
   atualizaSel();

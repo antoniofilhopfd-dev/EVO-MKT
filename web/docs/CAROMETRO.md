@@ -58,3 +58,12 @@ O selo (Autorizado / Não autorizado / Sem informação) vem **só leitura** da 
 
 ## Testes
 `tests/carometro*.test.js` (consulta, lote, seleções/sessões, PDF, pendências, Drive, final com desempenho, acessibilidade, zoom, backup e proteção de arquivos). Rodar: `tests/run-web.sh carometro carometro-lote carometro-sel carometro-pdf carometro-pend carometro-drive carometro-final`.
+
+
+## Excluir alunos pelo carômetro
+
+O Administrador pode selecionar alunos na Visão geral e usar **Excluir aluno** (ou **Excluir alunos**, para seleção múltipla). A confirmação lista nome e matrícula e informa que o cadastro é compartilhado com Uso de Imagem. Cancelar mantém os dados.
+
+A API exige confirmação e verifica se nome/matrícula ainda correspondem ao cadastro selecionado. A exclusão transacional limpa fotos/arquivos, itens de lotes, seleções, sessões e revisões anuais, preservando auditoria da operação. Alunos com solicitações de autorização são mantidos; nesse caso, use a opção Inativar já existente em Uso de Imagem.
+
+O endpoint de exclusão de Uso de Imagem utiliza a mesma limpeza. Nenhum aluno real é excluído pela instalação desta mudança.

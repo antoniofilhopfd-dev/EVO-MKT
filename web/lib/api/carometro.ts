@@ -1,3 +1,4 @@
+import { excluirAlunos, AlunoConfirmado } from '../excluirAlunos';
 import { contextoCm, politicaCm, exigirCm, exigirAluno, exigirTurma, permiteTurma } from '../carometroAcesso';
 import { carometroGestaoRoute } from './carometroGestao';
 import { Ctx } from '../ctx';
@@ -59,6 +60,15 @@ async function executarCarometro(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   const ator = String(u.nome ?? u.codigo ?? '');
 
+  if(path==='/carometro/alunos/excluir' && method==='POST') {
+    await requireAdmin(c);
+    const b=await c.body();
+    if(b.confirmar!==true || !Array.isArray(b.alunos) || !b.alunos.length || b.alunos.length>500) fail(400,'Confirme os alunos selecionados antes de excluir.');
+    const alunos=b.alunos as AlunoConfirmado[];
+    if(alunos.some(a=>!Number.isSafeInteger(a.id)||a.id<=0||typeof a.nome!=='string'||typeof a.matricula!=='string') || new Set(alunos.map(a=>a.id)).size!==alunos.length)fail(400,'Seleção inválida. Atualize a lista.');
+    for(const a of alunos)await exigirAluno(a.id);
+    return json(await excluirAlunos(alunos.map(a=>a.id),ator,alunos));
+  }
   const gestao=await carometroGestaoRoute(c,ator); if(gestao)return gestao;
   const drv = await carometroDriveRoute(c, u, ator);
   if (drv) return drv;
