@@ -58,7 +58,7 @@ const { t, fim } = U.contador();
     await p.selectOption('#pdEstado', 'ignoradas'); await p.waitForFunction(() => /Turma especial de reforço/.test(document.querySelector('#content').innerText));
     t(`${nome}: ignoradas mostram o motivo e permitem reabrir`, /Reabrir selecionadas/.test(await p.innerText('#pdLote')));
     await cap('pendencias-ignoradas');
-    await p.check('#pdTodos'); await p.click('#pdLote'); await p.waitForFunction(() => document.querySelector('#pdEstado').value === 'ignoradas' && /Nada foi deixado/.test(document.querySelector('#content').innerText));
+    await p.check('#pdTodos'); await p.click('#pdLote'); await p.waitForFunction(() => document.querySelector('#pdEstado')?.value === 'ignoradas' && /Nada foi deixado/.test(document.querySelector('#content').innerText));
     t(`${nome}: reabrir devolve as pendências`, true);
     t(`${nome}: sem estouro horizontal`, await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth <= 2));
     t(`${nome}: sem erros de script`, p.errs.length === 0, p.errs);
