@@ -1,6 +1,7 @@
 /* Carômetro Escolar (etapa 1): consulta de alunos por segmento, série e turma, em grade ou lista, com ficha.
    Somente leitura sobre o cadastro do Uso de Imagem. Fotos entram na etapa 2; o selo de autorização é só informativo. */
 const CM = { vista: 'grade', busca: '', segmento: '', serie: '', turma: '', foto: '', autorizacao: '', sel: new Map(), mais: 1 };
+let cmNavVai = () => {};
 const CM_AUT = { AUTORIZADO: ['Autorizado', 'ok'], NAO_AUTORIZADO: ['Não autorizado', 'bad'], SEM_INFORMACAO: ['Sem informação', 'mute'] };
 const cmSelo = a => { const [t, c] = CM_AUT[a] || CM_AUT.SEM_INFORMACAO; return `<span class="cm-selo ${c}">${t}</span>`; };
 const cmIniciais = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
@@ -25,6 +26,7 @@ async function cmPrepararFoto(f) {
 
 PAGINAS.cmvisao = async function () {
   $('#content').innerHTML = `<div class="ig-barra"><input id="cmBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(CM.busca)}"><select id="cmSeg" class="control" aria-label="Segmento"></select><select id="cmSerie" class="control" aria-label="Série"></select><select id="cmTurma" class="control" aria-label="Turma"></select><select id="cmFotoF" class="control" aria-label="Situação da foto"><option value="">Com e sem foto</option><option value="sem">Pendentes (sem foto)</option><option value="com">Com foto</option></select><select id="cmAut" class="control" aria-label="Autorização de imagem"><option value="">Toda autorização</option><option value="AUTORIZADO">Autorizado</option><option value="NAO_AUTORIZADO">Não autorizado</option><option value="SEM_INFORMACAO">Sem informação</option></select></div>
+    <div class="cm-nav" role="group" aria-label="Navegar entre as turmas"><button type="button" class="btn" id="cmPrev" aria-label="Turma anterior">◀</button><div class="cm-nav-txt" id="cmNavTxt" aria-live="polite"></div><button type="button" class="btn" id="cmNext" aria-label="Próxima turma">▶</button></div>
     <div id="cmInd"></div><div class="ig-barra"><div class="cm-vistas" role="group" aria-label="Forma de exibição"><button type="button" class="btn ghost" data-vista="grade">▦ Grade</button><button type="button" class="btn ghost" data-vista="lista">☰ Lista</button></div><span class="kpi-note" id="cmSelTxt"></span><button type="button" class="btn" id="cmFotosTurma" hidden>Enviar fotos desta turma</button><button type="button" class="btn" id="cmSalvarSel" hidden>Salvar seleção…</button><button type="button" class="btn ghost" id="cmLimpar" hidden>Limpar seleção</button></div>
     <div id="cmLista"><div class="loading"><span></span><b>Carregando…</b></div></div>`;
   $('#cmAut').value = CM.autorizacao; $('#cmFotoF').value = CM.foto;
@@ -37,6 +39,14 @@ PAGINAS.cmvisao = async function () {
     $('#cmSerie').innerHTML = opt('', 'Todas as séries', !CM.serie) + d.series.map(s => opt(s, s, CM.serie === s)).join('');
     $('#cmTurma').innerHTML = opt('', 'Todas as turmas', !CM.turma) + d.turmas.map(s => opt(s, s, CM.turma === s)).join('');
     $('#cmFotosTurma').hidden = !CM.turma; $('#cmFotosTurma').onclick = () => { CM_IMP.turma = CM.turma; go('cmimport'); };
+    /* seletor ◀ ▶ entre as turmas (com "Pendentes", pula as turmas sem pendência) */
+    const lista = d.nav.filter(x => CM.foto !== 'sem' || x.semFoto > 0 || x.turma === CM.turma), pos = lista.findIndex(x => x.turma === CM.turma);
+    const vai = k => { const alvo = lista[k]; if (!alvo) return; CM.serie = ''; CM.turma = alvo.turma; CM.busca = ''; muda(); };
+    $('#cmPrev').disabled = !lista.length || pos <= 0; $('#cmNext').disabled = !lista.length || (pos >= 0 && pos >= lista.length - 1);
+    $('#cmPrev').onclick = () => vai(pos - 1); $('#cmNext').onclick = () => vai(pos + 1);
+    cmNavVai = dir => { if (dir < 0 && !$('#cmPrev').disabled) vai(pos - 1); if (dir > 0 && !$('#cmNext').disabled) vai(pos < 0 ? 0 : pos + 1); };
+    const atual = pos >= 0 ? lista[pos] : null;
+    $('#cmNavTxt').innerHTML = atual ? `<b>${esc(atual.turma)}</b><small>turma ${pos + 1} de ${lista.length} · ${fmtN(atual.alunos)} aluno(s) · ${fmtN(atual.semFoto)} sem foto</small>` : `<b>Todas as turmas</b><small>${CM.foto === 'sem' ? 'só as turmas com pendência · ' : ''}use ▶ (ou a seta →) para ver turma por turma</small>`;
     const i = d.indicadores, cart = (r, v, cls, filtro) => filtro ? `<button type="button" class="db-cartao ui-cartao cm-filtro ${cls || ''} ${CM.foto === filtro ? 'ativo' : ''}" data-ffoto="${filtro}" aria-pressed="${CM.foto === filtro}"><small>${r}</small><strong>${fmtN(v)}</strong></button>` : `<div class="db-cartao ui-cartao ${cls || ''}"><small>${r}</small><strong>${fmtN(v)}</strong></div>`;
     $('#cmInd').innerHTML = `<div class="db-cartoes ui-seis">${cart('Alunos (ano ' + esc(d.anoLetivo) + ')', i.alunos)}${cart('Com foto', i.comFoto, 'ok', 'com')}${cart('Sem foto (pendentes)', i.semFoto, i.semFoto ? 'alerta' : '', 'sem')}${cart('Possíveis duplicados', i.duplicados, i.duplicados ? 'alerta' : '')}${cart('Sem turma reconhecida', i.semTurma, i.semTurma ? 'alerta' : '')}</div>`;
     $$('#cmInd [data-ffoto]').forEach(b => { b.onclick = () => { CM.foto = CM.foto === b.dataset.ffoto ? '' : b.dataset.ffoto; $('#cmFotoF').value = CM.foto; muda(); }; });
@@ -328,3 +338,12 @@ PAGINAS.cmdrive = async function () {
   $$('#content [data-conf]').forEach(b => { b.onclick = async () => { await post('/carometro/drive/conferir', { id: +b.dataset.conf }); toast('Conferência registrada'); PAGINAS.cmdrive(); }; });
   $$('#content [data-rem]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Remover a pasta?', texto: 'Só a referência é removida; nada muda no Drive.', confirmar: 'Remover', perigo: true })) { await post('/carometro/drive/remover', { id: +b.dataset.rem }); toast('Pasta removida'); PAGINAS.cmdrive(); } }; });
 };
+
+/* setas ← → do teclado trocam de turma na Visão geral (fora de campos de texto e de diálogos) */
+document.addEventListener('keydown', e => {
+  if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  if (typeof state === 'undefined' || state.page !== 'cmvisao' || document.querySelector('.admin-overlay')) return;
+  const t = e.target, tag = (t && t.tagName) || '';
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(tag) && t.type !== 'checkbox') return;
+  e.preventDefault(); cmNavVai(e.key === 'ArrowLeft' ? -1 : 1);
+});
