@@ -54,7 +54,7 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };
 const FILES_TABLE = { name: 'arquivos', cols: ['caminho', 'mime', 'tamanho', 'conteudo', 'criado_em', 'nome', 'pasta'] };
-const MAX_FILES_BYTES = 60 * 1024 * 1024; // anexos no backup "completo": limite de segurança
+
 
 const sha = (o: unknown) => createHash('sha256').update(JSON.stringify(o)).digest('hex');
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -77,13 +77,10 @@ async function collect(motivo: string, completo: boolean): Promise<{ dump: Row; 
   }
   let anexosIncompletos = false;
   if (completo) {
-    const tot = Number((await q1('SELECT COALESCE(SUM(tamanho),0) s FROM arquivos'))?.s ?? 0);
-    if (tot > MAX_FILES_BYTES) {
-      anexosIncompletos = true;
-      tabelas[FILES_TABLE.name] = [];
-    } else {
-      tabelas[FILES_TABLE.name] = (await q(`SELECT ${FILES_TABLE.cols.join(',')} FROM arquivos`)).map((r) => ({ ...r, conteudo: (r.conteudo as Buffer).toString('base64') }));
-    }
+    // Nunca produzir um backup marcado como completo sem seus anexos.
+    // Se houver falta de memória ou falha de leitura, a operação falha explicitamente.
+    tabelas[FILES_TABLE.name] = (await q(`SELECT ${FILES_TABLE.cols.join(',')} FROM arquivos`)).map((r) => ({ ...r, conteudo: (r.conteudo as Buffer).toString('base64') }));
+
   }
   const manifesto: Record<string, { linhas: number; sha256: string }> = {};
   const resumo: Record<string, number> = {};
@@ -91,7 +88,9 @@ async function collect(motivo: string, completo: boolean): Promise<{ dump: Row; 
     manifesto[t] = { linhas: rows.length, sha256: sha(rows) };
     resumo[t] = rows.length;
   }
-  const dump = { versao: '5.x', formato: BACKUP_FORMAT, em: now(), motivo, completo, anexosIncompletos, tabelas, manifesto, sha256_total: sha(manifesto) };
+  const relatorioCarometro = conferirFotosBackup(tabelas, completo);
+  if (completo && relatorioCarometro.ausentes.length) throw new Error('Backup incompleto: há fotos do carômetro sem arquivo. Confira as pendências antes de repetir.');
+  const dump = { relatorioCarometro, versao: '5.x', formato: BACKUP_FORMAT, em: now(), motivo, completo, anexosIncompletos, tabelas, manifesto, sha256_total: sha(manifesto) };
   return { dump, resumo };
 }
 
@@ -128,6 +127,14 @@ export async function autoBackupIfDue(): Promise<void> {
   } catch (e: any) {
     await notifyMail('Falha no backup automático', `O backup diário do EVO MKT falhou: ${String(e?.message ?? e).slice(0, 300)}\nVerifique em Administração → Backups.`);
   }
+}
+
+export function conferirFotosBackup(tabelas: Record<string, Row[]>, completo: boolean) {
+  const arquivos = new Set((tabelas.arquivos ?? []).map((a) => String(a.caminho)));
+  const fotos = tabelas.cm_fotos ?? [], lotes = new Set((tabelas.cm_lotes ?? []).filter((l) => l.estado === 'simulado').map((l) => Number(l.id)));
+  const referencias = fotos.concat((tabelas.cm_lote_itens ?? []).filter((i) => lotes.has(Number(i.lote_id)) && i.estado !== 'invalida'));
+  const caminhos = new Set(referencias.flatMap((f) => [f.caminho_original,f.caminho_padrao,f.caminho_mini]).filter(Boolean).map(String));
+  return { alunos: (tabelas.ui_alunos ?? []).length, fotos: fotos.length, fotosAtivas: fotos.filter((f) => Number(f.ativa)).length, arquivosReferenciados: caminhos.size, arquivosIncluidos: [...caminhos].filter((c) => arquivos.has(c)).length, ausentes: completo ? [...caminhos].filter((c) => !arquivos.has(c)) : [], completo };
 }
 
 export interface Validation { ok: boolean; formato: number; erros: string[]; avisos: string[]; resumo: Record<string, number>; em: string }
@@ -168,6 +175,11 @@ export function validateBuffer(gz: Buffer): Validation {
   }
   if (!Array.isArray(tabelas.users) || !tabelas.users.some((u) => u.role === 'manager' && Number(u.ativo) === 1 && (u.admin === undefined || Number(u.admin) === 1))) out.erros.push('O backup não tem nenhum Administrador ativo; restaurar deixaria o sistema sem acesso.');
   if (dump.anexosIncompletos) out.avisos.push('Anexos acima do limite do backup: não foram incluídos (use o dump do banco para eles).');
+  if (dump.completo && !dump.anexosIncompletos) {
+    const r = conferirFotosBackup(tabelas, true);
+    if (r.ausentes.length) out.erros.push(`Carômetro: ${r.ausentes.length} arquivo(s) de foto ausente(s).`);
+    out.resumo.carometro_alunos = r.alunos; out.resumo.carometro_fotos = r.fotos; out.resumo.carometro_arquivos = r.arquivosIncluidos;
+  }
   if (!dump.completo) out.avisos.push('Backup sem anexos: arquivos enviados não são alterados na restauração.');
   out.ok = out.erros.length === 0;
   return out;

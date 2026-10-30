@@ -90,7 +90,7 @@ async function cmFicha(id) {
   const aut = a.autorizacao === 'SEM_INFORMACAO' ? 'Nenhuma autorização concluída no módulo Uso de Imagem.' : `Fonte: ${esc(a.autorizacaoFonte)}${a.autorizacaoDesde ? ' · desde ' + esc(fmtDate(a.autorizacaoDesde)) : ''}${a.autorizacaoValeAte ? ' · válida até ' + esc(fmtDate(a.autorizacaoValeAte)) : ''}`;
   const seg = SEGMENTOS_ROT[a.segmento] || 'Não reconhecido';
   const atual = fotos.find(f => Number(f.ativa));
-  const hist = fotos.length ? `<h4>Histórico da foto</h4><div class="tablewrap"><table class="datatable"><thead><tr><th>Versão</th><th>Enviada</th><th>Por</th><th>Tamanho</th><th></th></tr></thead><tbody>${fotos.map(f => `<tr><td>${f.versao}${Number(f.ativa) ? ' <span class="cm-selo ok">atual</span>' : ''}</td><td>${esc(fmtDateTime(f.enviado_em))}</td><td>${esc(f.enviado_por)}</td><td>${esc(f.largura)}×${esc(f.altura)}${f.aviso ? `<br><small class="cm-aviso">${esc(f.aviso)}</small>` : ''}</td><td class="cm-acoes">${d.podeEditar && !Number(f.ativa) ? `<button type="button" class="btn ghost" data-rest="${f.id}">Restaurar</button>` : ''}${d.podeEditar ? `<a class="btn ghost" href="${API}/carometro/foto?id=${f.id}&tam=original">Original</a>` : ''}${d.podeExcluir ? `<button type="button" class="btn ghost danger" data-exc="${f.id}">Excluir</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const hist = fotos.length ? `<h4>Histórico da foto</h4><div class="tablewrap"><table class="datatable"><thead><tr><th>Versão</th><th>Enviada</th><th>Por</th><th>Origem / tamanho</th><th></th></tr></thead><tbody>${fotos.map(f => `<tr><td>${f.versao}${Number(f.ativa) ? ' <span class="cm-selo ok">atual</span>' : ''}</td><td>${esc(fmtDateTime(f.enviado_em))}</td><td>${esc(f.enviado_por)}</td><td>${esc(f.origem || '—')}<br>${esc(f.largura)}×${esc(f.altura)}${f.aviso ? `<br><small class="cm-aviso">${esc(f.aviso)}</small>` : ''}</td><td class="cm-acoes">${d.podeEditar && !Number(f.ativa) ? `<button type="button" class="btn ghost" data-rest="${f.id}">Restaurar</button>` : ''}${d.podeEditar ? `<a class="btn ghost" href="${API}/carometro/foto?id=${f.id}&tam=original">Original</a>` : ''}${d.podeExcluir ? `<button type="button" class="btn ghost danger" data-exc="${f.id}">Excluir</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '';
   const dlg = dialogo(`<div class="cm-ficha"><div>${cmFoto(a, 'padrao')}${d.podeEditar ? `<input type="file" id="cmArq" accept="image/*" hidden><button type="button" class="btn" id="cmEnviar">${atual ? 'Substituir foto…' : 'Enviar foto…'}</button>${atual ? '<button type="button" class="btn ghost" id="cmRetirar">Retirar foto atual</button>' : ''}<p class="kpi-note">JPG, PNG ou WebP. Fotos grandes são reduzidas automaticamente antes do envio. A foto é recortada em 3:4 sem distorcer.</p><p class="cm-erro" id="cmFotoErro" role="alert"></p>` : '<p class="kpi-note">Só a Gerência envia ou troca fotos.</p>'}</div><div><h3>${esc(a.nome)}</h3><table class="datatable"><tbody><tr><th>Matrícula</th><td>${esc(a.matricula)}</td></tr><tr><th>Ano letivo</th><td>${esc(a.anoLetivo)}</td></tr><tr><th>Segmento</th><td>${esc(seg)}</td></tr><tr><th>Série</th><td>${esc(a.serie || '—')}</td></tr><tr><th>Turma</th><td>${esc(a.turma || '—')} <small>(${fmtN(a.colegasNaTurma)} aluno(s))</small></td></tr><tr><th>Autorização de imagem</th><td>${cmSelo(a.autorizacao)}<br><small>${aut}</small></td></tr></tbody></table><p class="kpi-note">Informativo. Ter foto cadastrada não significa autorização para publicar. Alterações no cadastro são feitas em Uso de Imagem › Alunos.</p>${hist}<div class="ig-barra"><button type="button" class="btn" data-close>Fechar</button></div></div></div>`, { larga: true, aoFechar: () => { if (state.page === 'cmvisao') go('cmvisao'); } });
   const recarrega = () => { dlg.close(); cmFicha(id); };
   const el = dlg.el;
@@ -116,7 +116,7 @@ async function cmFicha(id) {
   el.querySelectorAll('[data-rest]').forEach(b => { b.onclick = async () => { await post('/carometro/foto/restaurar', { id: +b.dataset.rest }); toast('Versão restaurada'); recarrega(); }; });
   el.querySelectorAll('[data-exc]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Excluir esta versão?', texto: 'Original, foto padrão e miniatura serão apagados definitivamente e não há como desfazer.', confirmar: 'Excluir', perigo: true })) { await post('/carometro/foto/excluir', { id: +b.dataset.exc }); toast('Versão excluída'); recarrega(); } }; });
 }
-const SEGMENTOS_ROT = { INFANTIL: 'Maternais (Infantil 1, 2 e 3)', JARDINS: 'Jardins', INICIAIS: 'Anos Iniciais', FINAIS: 'Anos Finais', MEDIO: 'Ensino Médio' };
+const SEGMENTOS_ROT = { MATERNAIS: 'Maternais', INFANTIL: 'Infantil 1–3', JARDINS: 'Jardins', INICIAIS: 'Anos Iniciais', FINAIS: 'Anos Finais', MEDIO: 'Ensino Médio' };
 
 /* ---- Importação e associação (fotos em lote com simulação) ---- */
 const CM_EST = { ok: ['Pronta', 'ok'], sugerida: ['Confirmar', 'warn'], ambigua: ['Escolher aluno', 'warn'], orfa: ['Sem aluno', 'bad'], invalida: ['Inválida', 'bad'], ignorada: ['Ignorada', 'mute'] };
@@ -126,15 +126,32 @@ PAGINAS.cmimport = async function () {
     <section class="card"><div class="db-tit"><h2>2. Fotos de uma turma (turma por turma)</h2></div><p class="kpi-note">Escolha a turma e envie <b>todas as fotos dela de uma vez</b>: selecione os arquivos (Ctrl+A na pasta) ou envie a pasta compactada em <b>ZIP</b> (até 60 MB). O arquivo pode se chamar pela <b>matrícula</b> (2026001.jpg) ou pelo <b>nome</b> (joao-silva.jpg); as fotos sem nome certo você liga ao aluno na lista da turma. Nada é gravado antes de você conferir e aplicar.</p>
       <div class="ig-barra"><select id="cmTurmaLote" class="control" aria-label="Turma das fotos"><option value="">Escolha a turma…</option></select><input type="file" id="cmFotosT" accept="image/*,.zip,application/zip" multiple aria-label="Fotos da turma (ou um ZIP com as fotos)"><button type="button" class="btn" id="cmSimularT">Simular turma</button></div><div id="cmProgT" class="kpi-note"></div></section>
     <section class="card"><div class="db-tit"><h2>3. Fotos de várias turmas (por matrícula)</h2></div><p class="kpi-note">Nome do arquivo = matrícula (ex.: <b>2026001.jpg</b>). Dá para enviar também um manifesto (<b>matricula;nome_arquivo;origem</b>). Nada vira foto de aluno antes de você conferir e aplicar. Nomes só são sugeridos, nunca associados sozinhos.</p>
-      <div class="ig-barra"><input type="file" id="cmFotos" accept="image/*" multiple aria-label="Fotos dos alunos"><input type="file" id="cmManifesto" accept=".csv,.txt,text/csv,text/plain" aria-label="Manifesto opcional (CSV)"><button type="button" class="btn" id="cmSimular">Simular importação</button></div><div id="cmProg" class="kpi-note"></div></section>
-    <div id="cmLote"></div><section class="card"><div class="db-tit"><h2>Lotes recentes</h2></div><div id="cmLotes"></div></section>`;
+      <div class="ig-barra"><input type="file" id="cmFotos" accept="image/*,.zip" multiple aria-label="Fotos dos alunos"><input type="file" id="cmManifesto" accept=".csv,.txt,text/csv,text/plain" aria-label="Manifesto opcional (CSV)"><button type="button" class="btn" id="cmSimular">Simular importação</button></div><div id="cmProg" class="kpi-note" aria-live="polite"></div><label class="ui-campo">Ou selecionar uma pasta com subpastas por turma<input id="cmPastas" type="file" webkitdirectory multiple></label><button type="button" class="btn" id="cmEnviarPastas">Adicionar pastas à fila</button></section>
+    <section class="card"><div class="db-tit"><h2>Fila de importação</h2></div><p class="kpi-note">Cada envio acrescenta um lote. Os rascunhos e as associações ficam salvos no servidor. Confira cada lote e selecione os que deseja aplicar juntos.</p><div id="cmFila"></div></section><div id="cmLote"></div><section class="card"><div class="db-tit"><h2>Lotes recentes</h2></div><div id="cmLotes"></div></section>`;
   $('#cmImpAlunos').onclick = () => uiImportar(() => toast('Lista de alunos atualizada'));
   const arvore = await api('/carometro/turmas');
   const listaTurmas = arvore.segmentos.flatMap(sg => sg.series.flatMap(g => g.turmas));
   $('#cmTurmaLote').innerHTML = '<option value="">Escolha a turma…</option>' + listaTurmas.map(t => `<option value="${attr(t.turma)}">${esc(t.turma)} (${fmtN(t.alunos)})</option>`).join('');
   if (CM_IMP.turma && listaTurmas.some(t => t.turma === CM_IMP.turma)) { $('#cmTurmaLote').value = CM_IMP.turma; setTimeout(() => $('#cmFotosT').focus(), 50); } CM_IMP.turma = '';
+  let ocupado = false;
   const desenhaLotes = async () => {
     const d = await api('/carometro/lotes');
+    const abertos = d.rows.filter(l => l.estado === 'simulado');
+    $('#cmFila').innerHTML = abertos.length ? abertos.map(l => `<label class="cm-chk"><input type="checkbox" data-fila="${l.id}"> Lote #${l.id} · ${esc(l.turma || 'Várias turmas')} · ${esc(fmtDateTime(l.criadoEm))}</label>`).join('') + '<button type="button" class="btn" id="cmAplicarFila">Conferir resumo e aplicar selecionados</button>' : '<p class="kpi-note">Adicione as fotos para começar.</p>';
+    $('#cmAplicarFila') && ($('#cmAplicarFila').onclick = async () => {
+      const ids = $$('#cmFila [data-fila]:checked').map(b => +b.dataset.fila);
+      if (!ids.length) return toast('Selecione os lotes da fila.', 'warn');
+      const lotes = await Promise.all(ids.map(id => api('/carometro/lote?id=' + id)));
+      if (lotes.some(l => l.pendencias || !l.resumo.prontos)) return toast('Confira os lotes e resolva as pendências antes de aplicar.', 'warn');
+      const alunos = lotes.flatMap(l => l.itens.filter(i => i.estado === 'ok').map(i => i.alunoId));
+      if (new Set(alunos).size !== alunos.length) return toast('Um aluno aparece em mais de um lote selecionado. Abra os lotes e ignore a foto que não deseja usar.', 'warn');
+      const total = lotes.reduce((n,l) => n+l.resumo.prontos,0), substituem = lotes.reduce((n,l) => n+l.resumo.substituem,0);
+      if (!await Dlg.confirmar({titulo:'Aplicar a fila conferida?',texto:`${ids.length} lote(s), ${total} foto(s), ${substituem} substituição(ões). Cada lote pode ser desfeito separadamente.`,confirmar:'Aplicar selecionados'})) return;
+      $('#cmAplicarFila').disabled = true;
+      try { await post('/carometro/lote/aplicar-fila',{ids}); toast('Lotes aplicados'); }
+      catch(e) { toast('A aplicação parou: ' + e.message + '. Confira os lotes antes de retomar.', 'warn'); }
+      await desenhaLotes();
+    });
     $('#cmLotes').innerHTML = d.rows.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Lote</th><th>Situação</th><th>Criado</th><th>Resultado</th><th></th></tr></thead><tbody>${d.rows.map(l => `<tr><td>#${l.id}${l.turma ? ' · ' + esc(l.turma) : ''}</td><td>${esc(CM_LOTE[l.estado] || l.estado)}</td><td>${esc(fmtDateTime(l.criadoEm))} · ${esc(l.criadoPor)}</td><td>${esc(l.resumo || '—')}</td><td>${l.estado === 'simulado' ? `<button type="button" class="btn ghost" data-abre="${l.id}">Abrir</button>` : l.estado === 'aplicado' ? `<button type="button" class="btn ghost danger" data-desf="${l.id}">Desfazer</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="kpi-note">Nenhum lote ainda.</p>';
     $$('#cmLotes [data-abre]').forEach(b => { b.onclick = () => desenhaLote(+b.dataset.abre); });
     $$('#cmLotes [data-desf]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Desfazer este lote?', texto: 'As fotos aplicadas por ele são retiradas e a foto anterior volta a ser a atual. Fotos já alteradas depois ficam como estão.', confirmar: 'Desfazer', perigo: true })) { const r = await post('/carometro/lote/desfazer', { lote_id: +b.dataset.desf }); toast(`${r.desfeitas} foto(s) desfeita(s)`); desenhaLotes(); } }; });
@@ -146,16 +163,26 @@ PAGINAS.cmimport = async function () {
       if (!aberto || i.estado === 'invalida') return '';
       const ign = `<button type="button" class="btn ghost" data-ign="${i.id}">Ignorar</button>`;
       if (i.estado === 'ignorada') return `<button type="button" class="btn ghost" data-res="${i.id}">Reativar</button>`;
-      if (i.estado === 'sugerida') return `<button type="button" class="btn" data-conf="${i.id}">Confirmar</button>${ign}`;
+      if (i.estado === 'sugerida') return `<button type="button" class="btn ghost" data-troca="${i.id}">Corrigir aluno</button><button type="button" class="btn" data-conf="${i.id}">Confirmar</button>${ign}`;
       if ((i.estado === 'ambigua' || i.estado === 'orfa') && d.lote.turma) return `<select class="control cm-mat" data-alu="${i.id}" aria-label="Aluno para ${attr(i.arquivo)}"><option value="">Escolher aluno…</option>${d.faltam.concat(i.alunoId ? [] : []).map(a => `<option value="${a.id}">${esc(a.nome)} (${esc(a.matricula)})</option>`).join('')}</select>${ign}`;
       if (i.estado === 'ambigua' || i.estado === 'orfa') return `<input class="control cm-mat" data-mat="${i.id}" placeholder="Matrícula do aluno" aria-label="Matrícula do aluno para ${attr(i.arquivo)}"><button type="button" class="btn" data-vinc="${i.id}">Vincular</button>${ign}`;
-      return ign;
+      return `<button type="button" class="btn ghost" data-troca="${i.id}">Corrigir aluno</button>${ign}`;
     };
     $('#cmLote').innerHTML = `<section class="card" id="cmLoteCard"><div class="db-tit"><h2>Lote #${d.lote.id}${d.lote.turma ? ' · ' + esc(d.lote.turma) : ''} · ${esc(CM_LOTE[d.lote.estado] || d.lote.estado)}</h2></div>${d.lote.turma && aberto ? `<p class="kpi-note">${d.faltam.length ? `Ainda sem foto neste lote (${fmtN(d.faltam.length)} de ${fmtN(d.alunosTurma.length)}): ${esc(d.faltam.slice(0, 12).map(a => a.nome).join(', '))}${d.faltam.length > 12 ? '…' : ''}.` : 'Todos os alunos da turma têm foto neste lote.'}</p>` : ''}<div class="db-cartoes ui-seis">${cart('Prontas', r.prontos, 'ok')}${cart('Substituem foto', r.substituem)}${cart('Para confirmar', r.sugeridas, r.sugeridas ? 'alerta' : '')}${cart('Sem aluno', r.orfas + r.ambiguas, r.orfas + r.ambiguas ? 'alerta' : '')}${cart('Em conflito', r.conflitos, r.conflitos ? 'alerta' : '')}${cart('Inválidas', r.invalidas)}</div>
       <p class="kpi-note">${aberto ? 'Simulação: nada foi gravado nas fichas dos alunos. Decida os itens pendentes e aplique.' : esc(d.lote.resumo || '')}</p>
-      <div class="tablewrap"><table class="datatable cm-lote"><thead><tr><th>Foto</th><th>Arquivo</th><th>Aluno</th><th>Regra</th><th>Situação</th><th></th></tr></thead><tbody>${d.itens.map(i => { const [t, c] = i.conflito ? ['Conflito', 'bad'] : CM_EST[i.estado] || [i.estado, 'mute']; return `<tr><td>${i.estado === 'invalida' || !aberto ? '—' : `<button type="button" class="cm-zoombtn" data-zoom="${i.id}" data-nome="${attr(i.arquivo)}" aria-label="Ampliar ${attr(i.arquivo)}"><img class="cm-mini ${d.lote.turma ? 'grande' : ''}" src="${API}/carometro/lote/foto?item=${i.id}&tam=mini" alt="Prévia de ${attr(i.arquivo)}" loading="lazy"></button>`}</td><td>${esc(i.arquivo)}<br><small>${i.largura ? esc(i.largura + '×' + i.altura) : ''}${i.aviso ? ' · ' + esc(i.aviso) : ''}</small></td><td>${i.aluno ? `<b>${esc(i.aluno)}</b><br><small>${esc(i.matricula)} · ${esc(i.turma)}</small>${i.substitui && aberto ? '<br><small class="cm-aviso">substitui a foto atual</small>' : ''}` : '—'}</td><td>${esc(i.regra || '—')}${i.confianca ? `<br><small>confiança ${esc(i.confianca)}</small>` : ''}</td><td><span class="cm-selo ${c}">${esc(t)}</span>${i.motivo ? `<br><small>${esc(i.motivo)}</small>` : ''}</td><td class="cm-acoes">${acao(i)}</td></tr>`; }).join('')}</tbody></table></div>
-      ${aberto ? `<div class="ig-barra"><button type="button" class="btn" id="cmAplicar" ${d.pendencias || !r.prontos ? 'disabled' : ''}>Aplicar lote (${fmtN(r.prontos)} foto(s))</button>${d.lote.turma && r.orfas + r.ambiguas > 0 && d.faltam.length ? '<button type="button" class="btn ghost" id="cmOrdem">Ligar pela ordem dos arquivos</button>' : ''}${r.sugeridas ? '<button type="button" class="btn ghost" id="cmConfTodas">Confirmar todas as sugestões</button>' : ''}<button type="button" class="btn ghost" id="cmCancelarLote">Cancelar lote (nada é gravado)</button>${d.pendencias ? `<span class="kpi-note">Resolva ${fmtN(d.pendencias)} item(ns) pendente(s) para aplicar.</span>` : ''}</div>` : ''}</section>`;
+      <div class="tablewrap"><table class="datatable cm-lote"><thead><tr><th>Foto</th><th>Arquivo</th><th>Aluno</th><th>Regra</th><th>Situação</th><th></th></tr></thead><tbody>${d.itens.map(i => { const [t, c] = i.conflito ? ['Conflito', 'bad'] : CM_EST[i.estado] || [i.estado, 'mute']; return `<tr><td>${i.estado === 'invalida' || !aberto ? '—' : `<button type="button" class="cm-zoombtn" data-zoom="${i.id}" data-nome="${attr(i.arquivo)}" aria-label="Ampliar ${attr(i.arquivo)}"><img class="cm-mini grande" src="${API}/carometro/lote/foto?item=${i.id}&tam=mini" alt="Prévia de ${attr(i.arquivo)}" loading="lazy"></button>`}</td><td>${esc(i.arquivo)}<br><small>${i.largura ? esc(i.largura + '×' + i.altura) : ''}${i.aviso ? ' · ' + esc(i.aviso) : ''}</small></td><td>${i.aluno ? `<b style="font-size:1.1rem">${esc(i.aluno)}</b><br><small>${esc(i.matricula)} · ${esc(i.turma)}</small>${i.substitui && aberto ? `<br><small class="cm-aviso">substitui a foto atual</small><br><img class="cm-mini grande" src="${API}/carometro/foto?id=${i.fotoAtual}&tam=mini" alt="Foto atual de ${attr(i.aluno)}" loading="lazy">` : ''}` : '—'}</td><td>${esc(i.regra || '—')}${i.confianca ? `<br><small>confiança ${esc(i.confianca)}</small>` : ''}</td><td><span class="cm-selo ${c}">${esc(t)}</span>${i.motivo ? `<br><small>${esc(i.motivo)}</small>` : ''}</td><td class="cm-acoes">${acao(i)}${aberto && i.estado !== 'invalida' ? `<button type="button" class="btn ghost" data-crop="${i.id}">Enquadrar / girar</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
+      ${aberto ? `<div class="ig-barra"><button type="button" class="btn" id="cmAplicar" ${d.pendencias || !r.prontos ? 'disabled' : ''}>Aplicar lote (${fmtN(r.prontos)} foto(s))</button>${d.lote.turma && r.orfas + r.ambiguas > 0 && d.faltam.length ? '<button type="button" class="btn ghost" id="cmOrdem">Ligar pela ordem dos arquivos</button>' : ''}${d.itens.some(i => i.estado === 'sugerida' && i.regra !== 'Ordem dos arquivos') ? '<button type="button" class="btn ghost" id="cmConfTodas">Confirmar todas as sugestões</button>' : ''}<button type="button" class="btn ghost" id="cmCancelarLote">Cancelar lote (nada é gravado)</button>${d.pendencias ? `<span class="kpi-note">Resolva ${fmtN(d.pendencias)} item(ns) pendente(s) para aplicar.</span>` : ''}</div>` : ''}</section>`;
     const tudo = async (caminho, corpo) => { await post(caminho, { lote_id: id, ...corpo }); desenhaLote(id); };
+    $$('#cmLote [data-crop]').forEach(b => { b.onclick = () => cmEnquadrar(id, +b.dataset.crop, () => desenhaLote(id)); });
+    $$('#cmLote [data-troca]').forEach(b => { b.onclick = () => {
+      const dl = dialogo('<h3>Corrigir aluno</h3><label class="ui-campo">Matrícula<input id="cmCorrMat" class="control"></label><p id="cmCorrErro" role="alert"></p><button class="btn" id="cmCorrOk">Vincular</button>');
+      $('#cmCorrOk',dl.el).onclick = async () => { try {
+        const mat=$('#cmCorrMat',dl.el).value.trim();
+        const candidatos=(await api('/carometro/alunos?busca='+encodeURIComponent(mat))).rows.filter(a=>a.matricula.toLowerCase()===mat.toLowerCase());
+        if(candidatos.length!==1) throw new Error('Matrícula não encontrada ou ambígua.');
+        await tudo('/carometro/lote/resolver',{item_id:+b.dataset.troca,acao:'vincular',aluno_id:candidatos[0].id}); dl.close();
+      } catch(e) { $('#cmCorrErro',dl.el).textContent=e.message; } };
+    }; });
     $$('#cmLote [data-ign]').forEach(b => { b.onclick = () => tudo('/carometro/lote/resolver', { item_id: +b.dataset.ign, acao: 'ignorar' }); });
     $$('#cmLote [data-res]').forEach(b => { b.onclick = () => tudo('/carometro/lote/resolver', { item_id: +b.dataset.res, acao: 'restaurar' }); });
     $$('#cmLote [data-conf]').forEach(b => { b.onclick = () => tudo('/carometro/lote/resolver', { item_id: +b.dataset.conf, acao: 'confirmar' }); });
@@ -176,16 +203,40 @@ PAGINAS.cmimport = async function () {
   };
   const simular = async (btn, prog, arqs, man, turma) => {
     if (!arqs.length) { toast('Escolha as fotos.', 'warn'); return; }
-    btn.disabled = true; let loteId = 0;
+    if (ocupado) { toast('Aguarde o envio em andamento.', 'warn'); return; }
+    ocupado = true; btn.disabled = true; let loteId = 0; const falhas=[];
     try {
-      for (let i = 0; i < arqs.length; i += 3) {
-        prog.textContent = `Enviando ${Math.min(i + 3, arqs.length)} de ${arqs.length}…`;
-        const fd = new FormData(); if (loteId) fd.append('lote_id', loteId); else { fd.append('manifesto', man); if (turma) fd.append('turma', turma); }
-        for (const f0 of arqs.slice(i, i + 3)) fd.append('arquivo', /\.zip$/i.test(f0.name) ? f0 : await cmPrepararFoto(f0));
-        loteId = (await api('/carometro/lote/fotos', { method: 'POST', body: fd })).loteId;
+      loteId = (await post('/carometro/lote/criar',{manifesto:man,turma})).loteId;
+      const enviar = async lista => {
+        for (let i=0;i<lista.length;i++) {
+          const f0=lista[i]; prog.textContent=`Lote #${loteId}: enviando ${i+1} de ${lista.length}…`;
+          try {
+            const fd=new FormData();fd.append('lote_id',loteId);fd.append('arquivo',/\.zip$/i.test(f0.name)?f0:await cmPrepararFoto(f0));
+            await api('/carometro/lote/fotos',{method:'POST',body:fd});
+          } catch(e) { falhas.push(f0); }
+        }
+      };
+      await enviar(arqs);
+      await desenhaLote(loteId); await desenhaLotes();
+      prog.textContent = falhas.length ? `${falhas.length} arquivo(s) falharam; os demais ficaram salvos no lote #${loteId}. ` : `Lote #${loteId} salvo para conferência. Adicione outra turma quando quiser.`;
+      if(falhas.length) {
+        const retry=document.createElement('button');retry.className='btn';retry.textContent='Tentar novamente só as falhas';prog.appendChild(retry);
+        retry.onclick=async()=>{retry.disabled=true;const pend=falhas.splice(0);await enviar(pend);await desenhaLote(loteId);await desenhaLotes();prog.textContent=falhas.length?`${falhas.length} arquivo(s) ainda falharam. Selecione-os para um novo envio.`:'Envio recuperado.';};
       }
-      prog.textContent = ''; await desenhaLote(loteId); desenhaLotes(); $('#cmLote').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (e) { toast(e.message, 'warn'); prog.textContent = e.message; } finally { btn.disabled = false; }
+    } catch(e) { toast(e.message,'warn');prog.textContent=`${e.message}${loteId?' · rascunho salvo: lote #'+loteId:''}`; }
+    finally { ocupado=false;btn.disabled=false; }
+  };
+  $('#cmEnviarPastas').onclick = async () => {
+    const grupos=new Map();
+    for(const f of $('#cmPastas').files) {
+      if(!/\.(jpe?g|png|webp)$/i.test(f.name)) continue;
+      const partes=f.webkitRelativePath.split('/'); const turma=partes[partes.length-2];
+      if(!listaTurmas.some(t=>t.turma===turma)) {toast(`Pasta “${turma}” não corresponde a uma turma. Renomeie a pasta para o nome cadastrado.`, 'warn');return;}
+      if(!grupos.has(turma)) grupos.set(turma,[]); grupos.get(turma).push(f);
+    }
+    if(!grupos.size) return toast('Escolha uma pasta com fotos em subpastas por turma.','warn');
+    if(!await Dlg.confirmar({titulo:'Adicionar pastas por turma?',texto:[...grupos].map(([t,fs])=>`${t}: ${fs.length} foto(s)`).join('; '),confirmar:'Adicionar à fila'})) return;
+    for(const [turma,arquivos] of grupos) await simular($('#cmEnviarPastas'),$('#cmProg'),arquivos,'',turma);
   };
   $('#cmSimular').onclick = async () => { const man = $('#cmManifesto').files[0] ? await $('#cmManifesto').files[0].text() : ''; await simular($('#cmSimular'), $('#cmProg'), [...$('#cmFotos').files], man, ''); $('#cmFotos').value = ''; };
   $('#cmSimularT').onclick = async () => { const turma = $('#cmTurmaLote').value; if (!turma) { toast('Escolha a turma.', 'warn'); return; } await simular($('#cmSimularT'), $('#cmProgT'), [...$('#cmFotosT').files], '', turma); $('#cmFotosT').value = ''; };
@@ -347,3 +398,21 @@ document.addEventListener('keydown', e => {
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(tag) && t.type !== 'checkbox') return;
   e.preventDefault(); cmNavVai(e.key === 'ArrowLeft' ? -1 : 1);
 });
+
+async function cmEnquadrar(loteId,itemId,aoSalvar) {
+  const dl=dialogo(`<h3>Enquadrar a foto</h3><p>Mova os controles para enquadrar o rosto. O original permanece guardado.</p><canvas id="cmCropCanvas" width="300" height="400" style="max-width:100%;background:#eee"></canvas><label class="ui-campo">Zoom<input id="cmCropZ" type="range" min="1" max="4" value="1" step="0.01"></label><label class="ui-campo">Horizontal<input id="cmCropX" type="range" min="0" max="1" value="0.5" step="0.01"></label><label class="ui-campo">Vertical<input id="cmCropY" type="range" min="0" max="1" value="0.5" step="0.01"></label><button class="btn ghost" id="cmCropGirar">Girar 90°</button><p id="cmCropErro" role="alert"></p><div class="actions dlg-acoes"><button class="btn ghost" data-close>Cancelar</button><button class="btn" id="cmCropSalvar" disabled>Salvar enquadramento</button></div>`,{larga:true});
+  try {
+    const r=await fetch(`${API}/carometro/lote/foto?item=${itemId}&tam=original`,{credentials:'same-origin'});if(!r.ok)throw new Error('Não foi possível abrir o original.');
+    const bmp=await createImageBitmap(await r.blob(),{imageOrientation:'from-image'});let giro=0,recorte;
+    const draw=()=>{
+      const src=document.createElement('canvas');src.width=giro%180?bmp.height:bmp.width;src.height=giro%180?bmp.width:bmp.height;
+      const sg=src.getContext('2d');sg.translate(src.width/2,src.height/2);sg.rotate(giro*Math.PI/180);sg.drawImage(bmp,-bmp.width/2,-bmp.height/2);
+      const z=+$('#cmCropZ',dl.el).value,w=Math.min(src.width,src.height*3/4)/z,h=w*4/3,x=(src.width-w)*+$('#cmCropX',dl.el).value,y=(src.height-h)*+$('#cmCropY',dl.el).value;
+      $('#cmCropCanvas',dl.el).getContext('2d').drawImage(src,x,y,w,h,0,0,300,400);
+      recorte={x:x/src.width,y:y/src.height,w:w/src.width,h:h/src.height,giro};
+    };
+    ['#cmCropZ','#cmCropX','#cmCropY'].forEach(id=>$(id,dl.el).oninput=draw);
+    $('#cmCropGirar',dl.el).onclick=()=>{giro=(giro+90)%360;draw();};draw();
+    const salvar=$('#cmCropSalvar',dl.el);salvar.disabled=false;salvar.onclick=async()=>{salvar.disabled=true;try{await post('/carometro/lote/enquadrar',{lote_id:loteId,item_id:itemId,recorte});bmp.close();dl.close();aoSalvar();}catch(e){$('#cmCropErro',dl.el).textContent=e.message;salvar.disabled=false;}};
+  } catch(e) {$('#cmCropErro',dl.el).textContent=e.message;}
+}
