@@ -402,3 +402,4 @@ a.btn,a.btn:hover{text-decoration:none}
 #cmSessaoCard td,#cmLotes td,#content td.cm-acoes{vertical-align:middle}
 .cm-pdf{display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr);gap:16px;align-items:start}.cm-pdf-quadro{min-height:360px}.cm-pdf-frame{width:100%;height:78vh;min-height:520px;border:1px solid #dde3ec;border-radius:8px;background:#fff}@media(max-width:900px){.cm-pdf{grid-template-columns:minmax(0,1fr)}.cm-pdf-frame{height:70vh}}
 button.cm-filtro{text-align:left;font:inherit;cursor:pointer;border:1px solid #dde3ec;background:#fff}button.cm-filtro.ativo{outline:3px solid #063996}
+.cm-lista{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}

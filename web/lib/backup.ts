@@ -49,6 +49,7 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   cm_sessoes: { cols: ['id', 'nome', 'data', 'turma', 'status', 'obs', 'criado_por', 'criado_em'], restore: 'replace', opt: true },
   cm_sessao_itens: { cols: ['sessao_id', 'aluno_id', 'situacao'], restore: 'replace', opt: true },
   cm_pendencias_ign: { cols: ['chave', 'motivo', 'por', 'em'], restore: 'replace', opt: true },
+  cm_drive_refs: { cols: ['id', 'nome', 'pasta_id', 'obs', 'estado', 'conferida_em', 'conferida_por', 'criado_por', 'criado_em', 'ativo'], restore: 'replace', opt: true },
   user_prefs: { cols: ['codigo', 'chave', 'valor', 'atualizado'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };

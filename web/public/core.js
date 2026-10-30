@@ -148,7 +148,7 @@ const ROTULOS = {
   igvisao: 'Visão geral', igconteudos: 'Publicações', igplan: 'Planejamento', igcalendario: 'Calendário', igdesempenho: 'Desempenho', igranking: 'Ranking',
   trafego: 'Visão Geral', tfdesempenho: 'Desempenho', tfrelatorios: 'Relatórios',
   uipainel: 'Painel', uialunos: 'Alunos', uimodelos: 'Modelos', uisolic: 'Solicitações', uirelat: 'Relatórios', uiconfig: 'Ajustes',
-  cmvisao: 'Visão geral', cmturmas: 'Segmentos e turmas', cmselecoes: 'Seleções salvas', cmsessoes: 'Sessões de fotos', cmimport: 'Importação', cmpdf: 'Impressão e PDF', cmpendencias: 'Pendências',
+  cmvisao: 'Visão geral', cmturmas: 'Segmentos e turmas', cmselecoes: 'Seleções salvas', cmsessoes: 'Sessões de fotos', cmimport: 'Importação', cmpdf: 'Impressão e PDF', cmpendencias: 'Pendências', cmdrive: 'Google Drive',
   configuracoes: 'Configurações',
 };
 const DESCRICOES = {
@@ -158,7 +158,7 @@ const DESCRICOES = {
   igplan: 'Pauta do mês, ideias, campanhas editoriais e modelos.', igcalendario: 'Publicações programadas e já postadas no Instagram, com status, horário e perfil.', igranking: 'As melhores publicações do período, por alcance, interações, engajamento e visualizações.', igdesempenho: 'O que funcionou, por perfil, segmento, formato, tema e horário.',
   trafego: 'Anúncios da Meta: somente consulta. Criar e editar anúncios continua no Gerenciador de Anúncios da Meta.', tfdesempenho: 'Campanhas, conjuntos e anúncios, com fotos dos criativos e filtros.', tfrelatorios: 'Relatórios por período, com pré-visualização antes de imprimir ou salvar em PDF.',
   uipainel: 'Autorizações de uso de imagem dos alunos: visão geral e atividade recente.', uialunos: 'Alunos do colégio: importação, busca e seleção manual de quem precisa de autorização.', uimodelos: 'Modelos do termo de autorização de uso de imagem, com prévia e versão.', uisolic: 'Solicitações de autorização por aluno, com situação e PDF do termo.', uirelat: 'Relatórios de uso de imagem por segmento, turma, período e situação, em tela, PDF e Excel.', uiconfig: 'Ajustes do módulo: prazos, lembretes, mensagens, retenção e permissões.',
-  cmvisao: 'Carômetro dos alunos: busca, filtros, grade e lista, com ficha. Somente consulta.', cmturmas: 'Segmentos, séries e turmas do colégio, com a quantidade de alunos.', cmselecoes: 'Listas de alunos de uma ou várias turmas, salvas para reutilizar.', cmsessoes: 'Acompanhe, por turma, quem já foi fotografado.', cmpendencias: 'Alunos sem foto, imagens de baixa qualidade, nomes repetidos e arquivos sem aluno.', cmpdf: 'Fotos por turma ou seleção em PDF A4, com prévia.', cmimport: 'Importar a lista de alunos e as fotos em lote, com simulação, conferência e desfazer.',
+  cmvisao: 'Carômetro dos alunos: busca, filtros, grade e lista, com ficha. Somente consulta.', cmturmas: 'Segmentos, séries e turmas do colégio, com a quantidade de alunos.', cmselecoes: 'Listas de alunos de uma ou várias turmas, salvas para reutilizar.', cmsessoes: 'Acompanhe, por turma, quem já foi fotografado.', cmdrive: 'Referências das pastas do Google Drive com fotos (sem sincronização por enquanto).', cmpendencias: 'Alunos sem foto, imagens de baixa qualidade, nomes repetidos e arquivos sem aluno.', cmpdf: 'Fotos por turma ou seleção em PDF A4, com prévia.', cmimport: 'Importar a lista de alunos e as fotos em lote, com simulação, conferência e desfazer.',
   configuracoes: 'Acessos, integrações, backup, auditoria e prontidão do sistema.',
 };
 const AREAS = [
@@ -167,7 +167,7 @@ const AREAS = [
   { k: 'instagramarea', label: 'Instagram', icon: '◎', pages: ['igvisao', 'igconteudos', 'igcalendario', 'igdesempenho', 'igranking'] },
   { k: 'trafego', label: 'Tráfego Pago', icon: '↗', pages: ['trafego', 'tfdesempenho', 'tfrelatorios'] },
   { k: 'imagem', label: 'Uso de Imagem', icon: '▣', pages: ['uipainel', 'uialunos', 'uimodelos', 'uisolic', 'uirelat', 'uiconfig'] },
-  { k: 'carometro', label: 'Carômetro', icon: '▦', pages: ['cmvisao', 'cmturmas', 'cmselecoes', 'cmsessoes', 'cmpdf', 'cmpendencias', 'cmimport'] },
+  { k: 'carometro', label: 'Carômetro', icon: '▦', pages: ['cmvisao', 'cmturmas', 'cmselecoes', 'cmsessoes', 'cmpdf', 'cmpendencias', 'cmdrive', 'cmimport'] },
   { k: 'configuracoes', label: 'Configurações', icon: '⚙', pages: ['configuracoes'] },
 ];
 const areaOf = p => AREAS.find(a => a.pages.includes(p));

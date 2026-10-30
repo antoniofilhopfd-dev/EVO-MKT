@@ -273,3 +273,20 @@ PAGINAS.cmpendencias = async function () {
   };
   atual();
 };
+
+/* ---- Pastas do Google Drive (só referência; a integração ainda não é operacional) ---- */
+PAGINAS.cmdrive = async function () {
+  $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
+  const d = await api('/carometro/drive');
+  const est = { nao_verificada: ['Não verificada', 'mute'], conferida_manual: ['Conferida manualmente', 'ok'] };
+  $('#content').innerHTML = `<section class="card ui-atencao"><b>Sincronização ainda não operacional.</b><p class="kpi-note">Aqui ficam só as referências das pastas. O sistema não acessa o Drive, não guarda senhas nem copia fotos. Para usar as fotos de uma pasta: baixe-as do Drive e envie em <b>Importação</b> (nome do arquivo = matrícula). Se o Drive estiver fora do ar, o Carômetro continua funcionando com os dados locais.</p></section>
+    ${d.podeEditar ? '<div class="ig-barra"><button type="button" class="btn" id="drvNova">+ Registrar pasta</button></div>' : '<p class="kpi-note">Só o Administrador registra ou altera pastas.</p>'}
+    <section class="card">${d.rows.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Pasta</th><th>Observação</th><th>Situação</th><th>Última conferência</th><th></th></tr></thead><tbody>${d.rows.map(r => `<tr><td><b>${esc(r.nome)}</b><br><a href="${attr(r.link)}" target="_blank" rel="noopener noreferrer">Abrir no Drive</a></td><td>${esc(r.obs || '—')}</td><td><span class="cm-selo ${(est[r.estado] || est.nao_verificada)[1]}">${esc((est[r.estado] || est.nao_verificada)[0])}</span></td><td>${r.conferidaEm ? `${esc(fmtDateTime(r.conferidaEm))}<br><small>${esc(r.conferidaPor)}</small>` : '—'}</td><td class="cm-acoes">${d.podeEditar ? `<button type="button" class="btn ghost" data-conf="${r.id}">Marcar como conferida</button><button type="button" class="btn ghost danger" data-rem="${r.id}">Remover</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>Nenhuma pasta registrada.</b></div>'}</section>
+    <section class="card"><div class="db-tit"><h2>Salvaguardas previstas para a integração futura</h2></div><ul class="cm-lista"><li>Somente o Administrador escolhe as pastas.</li><li>Credenciais só em variáveis seguras do servidor, nunca no banco nem no navegador.</li><li>Acesso somente leitura, com checagem de permissão antes de listar.</li><li>Fotos nunca vão para serviço externo nem para links públicos.</li><li>Cópia local das fotos só com aprovação.</li></ul></section>`;
+  $('#drvNova') && ($('#drvNova').onclick = () => {
+    const dl = dialogo(`<h3>Registrar pasta do Drive</h3><label class="ui-campo">Nome<input id="drvNome" class="control" maxlength="120" placeholder="Ex.: Fotos 2026 - Anos Iniciais"></label><label class="ui-campo">Link da pasta (ou identificador)<input id="drvPasta" class="control" placeholder="https://drive.google.com/drive/folders/…"></label><label class="ui-campo">Observação (opcional)<input id="drvObs" class="control" maxlength="300"></label><p class="cm-erro" id="drvErro" role="alert"></p><div class="actions dlg-acoes"><button type="button" class="btn soft" data-close>Cancelar</button><button type="button" class="btn" id="drvOk">Registrar</button></div>`);
+    $('#drvOk', dl.el).onclick = async () => { try { await post('/carometro/drive', { nome: $('#drvNome', dl.el).value, pasta: $('#drvPasta', dl.el).value, obs: $('#drvObs', dl.el).value }); dl.close(); toast('Pasta registrada'); PAGINAS.cmdrive(); } catch (e) { $('#drvErro', dl.el).textContent = e.message; } };
+  });
+  $$('#content [data-conf]').forEach(b => { b.onclick = async () => { await post('/carometro/drive/conferir', { id: +b.dataset.conf }); toast('Conferência registrada'); PAGINAS.cmdrive(); }; });
+  $$('#content [data-rem]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Remover a pasta?', texto: 'Só a referência é removida; nada muda no Drive.', confirmar: 'Remover', perigo: true })) { await post('/carometro/drive/remover', { id: +b.dataset.rem }); toast('Pasta removida'); PAGINAS.cmdrive(); } }; });
+};
