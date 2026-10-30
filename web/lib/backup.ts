@@ -40,6 +40,8 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   ui_solic_eventos: { cols: ['id', 'solicitacao_id', 'quando', 'ator', 'acao', 'detalhe'], restore: 'replace', opt: true },
   ui_acessos: { cols: ['id', 'solicitacao_id', 'token_hash', 'codigo_hash', 'expira_em', 'tentativas', 'ativo', 'criado_em', 'criado_por', 'ultimo_acesso'], restore: 'replace', opt: true },
   ui_arquivos: { cols: ['id', 'solicitacao_id', 'tipo', 'caminho', 'nome', 'sha256', 'tamanho', 'info', 'ativo', 'criado_em', 'ip'], restore: 'replace', opt: true },
+  cm_fotos: { cols: ['id', 'aluno_id', 'versao', 'caminho_original', 'caminho_padrao', 'caminho_mini', 'nome_original', 'mime', 'largura', 'altura', 'tamanho', 'sha256', 'origem', 'aviso', 'ativa', 'enviado_por', 'enviado_em', 'desativada_em'], restore: 'replace', opt: true },
+  cm_auditoria: { cols: ['id', 'quando', 'ator', 'acao', 'aluno_id', 'detalhe'], restore: 'replace', opt: true },
   user_prefs: { cols: ['codigo', 'chave', 'valor', 'atualizado'], restore: 'replace', opt: true },
   audit_log: { cols: ['id', 'quando', 'ator', 'acao', 'modulo', 'registro', 'ip'], restore: 'info' },
 };

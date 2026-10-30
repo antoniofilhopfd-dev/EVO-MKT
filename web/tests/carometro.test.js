@@ -1,6 +1,7 @@
 // Carômetro Escolar, etapa 1: consulta de alunos por segmento/série/turma, indicadores, ficha e telas. Dados 100% fictícios.
 const fs = require('fs');
 const U = require('./lib/ui');
+const sharp = require('sharp');
 const { t, fim } = U.contador();
 (async () => {
   const G = await U.entrar(process.argv[2]);
@@ -39,6 +40,53 @@ const { t, fim } = U.contador();
   t('ficha traz os dados mínimos e o ano letivo', f.aluno.matricula === 'C-1' && f.aluno.turma === 'Maternal A' && f.aluno.segmento === 'MATERNAL' && f.aluno.colegasNaTurma === 1 && /^\d{4}$/.test(f.aluno.anoLetivo), f);
   t('ficha de aluno inexistente: 404', (await G.req('GET', '/carometro/aluno?id=999999')).status === 404);
 
+  // ---- fotos (etapa 2) ----
+  const E = await U.entrar(process.argv[2], 'ANT-3302', 'Ant26ab');
+  const jpg = (w, h, cor = { r: 40, g: 90, b: 160 }, exif = true) => { let s = sharp({ create: { width: w, height: h, channels: 3, background: cor } }); if (exif) s = s.withExif({ IFD0: { Copyright: 'FOTO-PRIVADA-TESTE' } }); return s.jpeg({ quality: 90 }).toBuffer(); };
+  const envia = (H, alunoId, buf, nome = 'foto.jpg', tipo = 'image/jpeg') => { const fd = new FormData(); fd.append('aluno_id', String(alunoId)); fd.append('arquivo', new Blob([buf], { type: tipo }), nome); return fetch(U.B + '/carometro/foto', { method: 'POST', headers: { Cookie: H.H.Cookie, 'X-EVO': '1' }, body: fd }).then(async x => ({ status: x.status, j: await x.json().catch(() => ({})) })); };
+  const baixa = (H, u) => fetch(U.B + u, { headers: { Cookie: H.H.Cookie, 'X-EVO': '1' } });
+  const iara = (await G.get('/carometro/alunos?busca=C-10')).rows[0], bia = (await G.get('/carometro/alunos?busca=C-2')).rows[0];
+  t('Equipe não envia foto (403)', (await envia(E, iara.id, await jpg(600, 800))).status === 403);
+  t('sem login: envio e leitura recusados (401)', (await fetch(U.B + '/carometro/foto', { method: 'POST', headers: { 'X-EVO': '1' }, body: new FormData() })).status === 401 && (await fetch(U.B + '/carometro/foto?id=1')).status === 401);
+  t('arquivo que não é imagem (texto com nome .jpg) é recusado', (await envia(G, iara.id, Buffer.from('não sou uma foto'), 'x.jpg')).status === 400);
+  t('GIF é recusado (formato não aceito)', (await envia(G, iara.id, await sharp({ create: { width: 300, height: 400, channels: 3, background: '#fff' } }).gif().toBuffer(), 'x.gif', 'image/gif')).status === 400);
+  t('foto pequena demais (100×100) é recusada', (await envia(G, iara.id, await jpg(100, 100))).status === 400);
+  t('foto de mais de 5 MB é recusada (413)', (await envia(G, iara.id, Buffer.alloc(5 * 1048576 + 10, 1))).status === 413);
+  t('aluno inexistente: 404', (await envia(G, 999999, await jpg(600, 800))).status === 404);
+  let up = await envia(G, iara.id, await jpg(900, 1200));
+  t('Gerência envia a foto (200)', up.status === 200 && up.j.ok && up.j.id > 0, up);
+  r = await G.get('/carometro/alunos?busca=C-10');
+  t('lista passa a mostrar a foto e o indicador "com foto"', r.rows[0].fotoId === up.j.id && r.indicadores.comFoto === 1 && (await G.get('/carometro/alunos')).indicadores.semFoto === 9);
+  const mini = await baixa(G, `/carometro/foto?id=${up.j.id}&tam=mini`), pad = await baixa(G, `/carometro/foto?id=${up.j.id}&tam=padrao`);
+  const mm = await sharp(Buffer.from(await mini.arrayBuffer())).metadata(), pm = await sharp(Buffer.from(await pad.arrayBuffer())).metadata();
+  t('miniatura 240×320 e foto padrão 600×800, JPEG', mini.headers.get('content-type') === 'image/jpeg' && mm.width === 240 && mm.height === 320 && pm.width === 600 && pm.height === 800, [mm.width, mm.height, pm.width, pm.height]);
+  t('foto nunca é pública nem guardada em cache', /no-store/.test(pad.headers.get('cache-control')) && /private|no-store/.test(pad.headers.get('cache-control')) && pad.headers.get('x-content-type-options') === 'nosniff');
+  t('derivadas sem metadados (EXIF) do original', !pm.exif && !mm.exif);
+  t('Equipe vê a foto padrão, mas não baixa o original (403)', (await baixa(E, `/carometro/foto?id=${up.j.id}&tam=padrao`)).status === 200 && (await baixa(E, `/carometro/foto?id=${up.j.id}&tam=original`)).status === 403);
+  const orig = await baixa(G, `/carometro/foto?id=${up.j.id}&tam=original`), ob = Buffer.from(await orig.arrayBuffer());
+  t('Gerência baixa o original intacto (900×1200, com os metadados)', orig.status === 200 && /attachment/.test(orig.headers.get('content-disposition')) && (await sharp(ob).metadata()).width === 900 && !!(await sharp(ob).metadata()).exif);
+  t('foto id inexistente: 404', (await baixa(G, '/carometro/foto?id=999999')).status === 404);
+  const v2 = await envia(G, iara.id, await jpg(1200, 800, { r: 200, g: 100, b: 20 }), 'horizontal.jpg');
+  t('substituir cria a versão 2 e avisa da foto na horizontal', v2.status === 200 && /horizontal/i.test(v2.j.aviso), v2);
+  const fi = await G.get('/carometro/aluno?id=' + iara.id);
+  t('histórico guarda as 2 versões; só a nova é a atual', fi.fotos.length === 2 && fi.fotos[0].versao === 2 && fi.fotos[0].ativa === 1 && fi.fotos[1].ativa === 0 && fi.podeEditar === true, fi.fotos);
+  t('a versão antiga continua acessível', (await baixa(G, `/carometro/foto?id=${up.j.id}&tam=padrao`)).status === 200);
+  t('restaurar uma versão já atual: 409', (await G.req('POST', '/carometro/foto/restaurar', { id: v2.j.id })).status === 409);
+  r = await G.post('/carometro/foto/restaurar', { id: up.j.id });
+  t('restaurar a versão 1 a torna a atual (a 2 vai para o histórico)', r.ok && (await G.get('/carometro/alunos?busca=C-10')).rows[0].fotoId === up.j.id);
+  t('Equipe não restaura nem retira (403) e vê podeEditar=false', (await E.req('POST', '/carometro/foto/restaurar', { id: v2.j.id })).status === 403 && (await E.req('POST', '/carometro/foto/remover', { aluno_id: iara.id })).status === 403 && (await E.get('/carometro/aluno?id=' + iara.id)).podeEditar === false);
+  r = await G.post('/carometro/foto/remover', { aluno_id: iara.id });
+  t('retirar a foto atual: aluno volta a "sem foto", mas o histórico permanece', r.ok && (await G.get('/carometro/alunos?busca=C-10')).rows[0].fotoId === null && (await G.get('/carometro/aluno?id=' + iara.id)).fotos.length === 2);
+  t('retirar de novo sem foto atual: 404', (await G.req('POST', '/carometro/foto/remover', { aluno_id: iara.id })).status === 404);
+  t('Equipe não exclui definitivamente (403)', (await E.req('POST', '/carometro/foto/excluir', { id: v2.j.id })).status === 403 && (await E.get('/carometro/aluno?id=' + iara.id)).podeExcluir === false);
+  if ((await G.get('/carometro/aluno?id=' + iara.id)).podeExcluir) {
+    const x = await G.post('/carometro/foto/excluir', { id: v2.j.id });
+    const dep = [(await baixa(G, `/carometro/foto?id=${v2.j.id}&tam=padrao`)).status, (await G.get('/carometro/aluno?id=' + iara.id)).fotos.length];
+    t('Administrador exclui a versão definitivamente (arquivos incluídos)', x.ok && dep[0] === 404 && dep[1] === 1, [x, dep]);
+  } else t('Gerente comum não exclui definitivamente (403)', (await G.req('POST', '/carometro/foto/excluir', { id: v2.j.id })).status === 403);
+  await envia(G, iara.id, await jpg(600, 800), 'final.jpg');
+  await envia(G, bia.id, await jpg(500, 700, { r: 20, g: 140, b: 80 }), 'bia.jpg');
+
   // ---- telas reais ----
   const dir = process.env.CAPTURAS; if (dir) fs.mkdirSync(dir, { recursive: true });
   const b = await U.abrir();
@@ -47,7 +95,7 @@ const { t, fim } = U.contador();
     const foto = async n => { if (dir) await p.screenshot({ path: `${dir}/${n}-${nome}.png`, fullPage: true }); };
     await U.ir(p, 'cmvisao', 700); await p.waitForSelector('.cm-grade');
     t(`${nome}: menu tem a área Carômetro com Visão geral e Segmentos e turmas`, /Carômetro/.test(await p.innerText('#nav')) && /Segmentos e turmas/.test(await p.innerText('#subtabs')));
-    t(`${nome}: grade com os 10 alunos, sem foto e sem URL de imagem`, (await p.$$('.cm-al')).length === 10 && (await p.$$('.cm-al img')).length === 0);
+    t(`${nome}: grade com os 10 alunos; só quem tem foto mostra imagem, servida pela API autenticada (sem URL pública)`, (await p.$$('.cm-al')).length === 10 && (await p.$$eval('.cm-al img', e => e.map(i => i.getAttribute('src')))).filter(u => /^\/api\/carometro\/foto\?id=\d+&tam=mini$/.test(u)).length === (nome === 'desktop' ? 2 : 3) && new RegExp('Com foto\\s*' + (nome === 'desktop' ? 2 : 3)).test((await p.innerText('#cmInd')).replace(/\n/g, ' ')));
     t(`${nome}: cartões de indicadores`, /Sem foto/.test(await p.innerText('#cmInd')) && /Possíveis duplicados/.test(await p.innerText('#cmInd')));
     await foto('visao-grade');
     await p.selectOption('#cmSeg', 'INICIAIS'); await p.waitForFunction(() => document.querySelectorAll('.cm-al').length === 3);
@@ -59,6 +107,17 @@ const { t, fim } = U.contador();
     await p.click('[data-vista="lista"]'); await p.waitForSelector('.ui-tab');
     t(`${nome}: vista em lista mantém a seleção`, (await p.$$('.ui-tab [data-sel]:checked')).length === 2);
     await foto('visao-lista');
+    if (nome === 'desktop') {
+      await p.fill('#cmBusca', 'caio'); await p.waitForFunction(() => document.querySelectorAll('.ui-tab tbody tr').length === 1);
+      await p.click('.ui-lk'); await p.waitForSelector('#cmEnviar');
+      t(`${nome}: ficha sem foto oferece "Enviar foto…"`, /Enviar foto/.test(await p.innerText('#cmEnviar')));
+      await p.setInputFiles('#cmArq', { name: 'caio.jpg', mimeType: 'image/jpeg', buffer: await sharp({ create: { width: 750, height: 1000, channels: 3, background: '#2a6' } }).jpeg().toBuffer() });
+      await p.waitForSelector('.cm-ficha .cm-foto img');
+      t(`${nome}: foto enviada pela tela aparece na ficha e no histórico`, /Substituir foto/.test(await p.innerText('#cmEnviar')) && /Histórico da foto/.test(await p.innerText('.cm-ficha')) && (await p.$$('.cm-ficha tbody tr')).length >= 7 );
+      await foto('ficha-com-foto');
+      await p.click('.cm-ficha [data-close]'); await p.waitForFunction(() => !document.querySelector('.cm-ficha'));
+      await p.fill('#cmBusca', ''); await p.waitForFunction(() => document.querySelectorAll('.ui-tab tbody tr').length === 10);
+    }
     await p.fill('#cmBusca', 'iara'); await p.waitForFunction(() => document.querySelectorAll('.ui-tab tbody tr').length === 1);
     await p.click('.ui-lk'); await p.waitForSelector('.cm-ficha');
     t(`${nome}: ficha abre com dados e aviso de autorização`, /Iara Dez/.test(await p.innerText('.cm-ficha')) && /Sem informação/.test(await p.innerText('.cm-ficha')) && /não significa autorização/.test(await p.innerText('.cm-ficha')));

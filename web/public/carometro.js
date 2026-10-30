@@ -4,7 +4,9 @@ const CM = { vista: 'grade', busca: '', segmento: '', serie: '', turma: '', auto
 const CM_AUT = { AUTORIZADO: ['Autorizado', 'ok'], NAO_AUTORIZADO: ['Não autorizado', 'bad'], SEM_INFORMACAO: ['Sem informação', 'mute'] };
 const cmSelo = a => { const [t, c] = CM_AUT[a] || CM_AUT.SEM_INFORMACAO; return `<span class="cm-selo ${c}">${t}</span>`; };
 const cmIniciais = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-const cmFoto = a => `<div class="cm-foto sem" role="img" aria-label="${attr(a.nome)}, sem foto cadastrada"><b>${esc(cmIniciais(a.nome))}</b><small>Sem foto</small></div>`;
+const cmFoto = (a, tam = 'mini') => a.fotoId
+  ? `<div class="cm-foto"><img src="${API}/carometro/foto?id=${a.fotoId}&tam=${tam}" alt="Foto de ${attr(a.nome)}" loading="lazy" draggable="false"></div>`
+  : `<div class="cm-foto sem" role="img" aria-label="${attr(a.nome)}, sem foto cadastrada"><b>${esc(cmIniciais(a.nome))}</b><small>Sem foto</small></div>`;
 
 PAGINAS.cmvisao = async function () {
   $('#content').innerHTML = `<div class="ig-barra"><input id="cmBusca" class="control" type="search" placeholder="Buscar por nome ou matrícula" aria-label="Buscar aluno" value="${attr(CM.busca)}"><select id="cmSeg" class="control" aria-label="Segmento"></select><select id="cmSerie" class="control" aria-label="Série"></select><select id="cmTurma" class="control" aria-label="Turma"></select><select id="cmAut" class="control" aria-label="Autorização de imagem"><option value="">Toda autorização</option><option value="AUTORIZADO">Autorizado</option><option value="NAO_AUTORIZADO">Não autorizado</option><option value="SEM_INFORMACAO">Sem informação</option></select></div>
@@ -54,9 +56,28 @@ PAGINAS.cmturmas = async function () {
 };
 
 async function cmFicha(id) {
-  const { aluno: a } = await api('/carometro/aluno?id=' + id);
+  const d = await api('/carometro/aluno?id=' + id), a = d.aluno, fotos = d.fotos;
   const aut = a.autorizacao === 'SEM_INFORMACAO' ? 'Nenhuma autorização concluída no módulo Uso de Imagem.' : `Fonte: ${esc(a.autorizacaoFonte)}${a.autorizacaoDesde ? ' · desde ' + esc(fmtDate(a.autorizacaoDesde)) : ''}${a.autorizacaoValeAte ? ' · válida até ' + esc(fmtDate(a.autorizacaoValeAte)) : ''}`;
   const seg = SEGMENTOS_ROT[a.segmento] || 'Não reconhecido';
-  dialogo(`<div class="cm-ficha"><div>${cmFoto(a)}<p class="kpi-note">A foto e o histórico de versões chegam na próxima etapa.</p></div><div><h3>${esc(a.nome)}</h3><table class="datatable"><tbody><tr><th>Matrícula</th><td>${esc(a.matricula)}</td></tr><tr><th>Ano letivo</th><td>${esc(a.anoLetivo)}</td></tr><tr><th>Segmento</th><td>${esc(seg)}</td></tr><tr><th>Série</th><td>${esc(a.serie || '—')}</td></tr><tr><th>Turma</th><td>${esc(a.turma || '—')} <small>(${fmtN(a.colegasNaTurma)} aluno(s))</small></td></tr><tr><th>Autorização de imagem</th><td>${cmSelo(a.autorizacao)}<br><small>${aut}</small></td></tr></tbody></table><p class="kpi-note">Informativo. Ter foto cadastrada não significa autorização para publicar. Alterações no cadastro são feitas em Uso de Imagem › Alunos.</p><div class="ig-barra"><button type="button" class="btn" data-close>Fechar</button></div></div></div>`, { larga: true });
+  const atual = fotos.find(f => Number(f.ativa));
+  const hist = fotos.length ? `<h4>Histórico da foto</h4><div class="tablewrap"><table class="datatable"><thead><tr><th>Versão</th><th>Enviada</th><th>Por</th><th>Tamanho</th><th></th></tr></thead><tbody>${fotos.map(f => `<tr><td>${f.versao}${Number(f.ativa) ? ' <span class="cm-selo ok">atual</span>' : ''}</td><td>${esc(fmtDateTime(f.enviado_em))}</td><td>${esc(f.enviado_por)}</td><td>${esc(f.largura)}×${esc(f.altura)}${f.aviso ? `<br><small class="cm-aviso">${esc(f.aviso)}</small>` : ''}</td><td class="cm-acoes">${d.podeEditar && !Number(f.ativa) ? `<button type="button" class="btn ghost" data-rest="${f.id}">Restaurar</button>` : ''}${d.podeEditar ? `<a class="btn ghost" href="${API}/carometro/foto?id=${f.id}&tam=original">Original</a>` : ''}${d.podeExcluir ? `<button type="button" class="btn ghost danger" data-exc="${f.id}">Excluir</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const dlg = dialogo(`<div class="cm-ficha"><div>${cmFoto(a, 'padrao')}${d.podeEditar ? `<input type="file" id="cmArq" accept="image/jpeg,image/png,image/webp" hidden><button type="button" class="btn" id="cmEnviar">${atual ? 'Substituir foto…' : 'Enviar foto…'}</button>${atual ? '<button type="button" class="btn ghost" id="cmRetirar">Retirar foto atual</button>' : ''}<p class="kpi-note">JPG, PNG ou WebP, até 5 MB. A foto é recortada em 3:4 sem distorcer; o original fica guardado.</p>` : '<p class="kpi-note">Só a Gerência envia ou troca fotos.</p>'}</div><div><h3>${esc(a.nome)}</h3><table class="datatable"><tbody><tr><th>Matrícula</th><td>${esc(a.matricula)}</td></tr><tr><th>Ano letivo</th><td>${esc(a.anoLetivo)}</td></tr><tr><th>Segmento</th><td>${esc(seg)}</td></tr><tr><th>Série</th><td>${esc(a.serie || '—')}</td></tr><tr><th>Turma</th><td>${esc(a.turma || '—')} <small>(${fmtN(a.colegasNaTurma)} aluno(s))</small></td></tr><tr><th>Autorização de imagem</th><td>${cmSelo(a.autorizacao)}<br><small>${aut}</small></td></tr></tbody></table><p class="kpi-note">Informativo. Ter foto cadastrada não significa autorização para publicar. Alterações no cadastro são feitas em Uso de Imagem › Alunos.</p>${hist}<div class="ig-barra"><button type="button" class="btn" data-close>Fechar</button></div></div></div>`, { larga: true, aoFechar: () => { if (state.page === 'cmvisao') go('cmvisao'); } });
+  const recarrega = () => { dlg.close(); cmFicha(id); };
+  const el = dlg.el;
+  const enviar = el.querySelector('#cmEnviar');
+  if (enviar) {
+    enviar.onclick = () => el.querySelector('#cmArq').click();
+    el.querySelector('#cmArq').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      if (f.size > 5 * 1048576) { toast('A foto passa de 5 MB.', 'warn'); return; }
+      const fd = new FormData(); fd.append('aluno_id', id); fd.append('arquivo', f);
+      enviar.disabled = true; enviar.textContent = 'Enviando…';
+      try { const r = await api('/carometro/foto', { method: 'POST', body: fd }); toast(r.aviso ? 'Foto salva. ' + r.aviso : 'Foto salva', r.aviso ? 'warn' : undefined); recarrega(); } catch (err) { toast(err.message, 'warn'); enviar.disabled = false; enviar.textContent = 'Enviar foto…'; }
+    };
+  }
+  const retirar = el.querySelector('#cmRetirar');
+  if (retirar) retirar.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Retirar a foto atual?', texto: 'Ela continua no histórico e pode ser restaurada.', confirmar: 'Retirar' })) { await post('/carometro/foto/remover', { aluno_id: id }); toast('Foto retirada'); recarrega(); } };
+  el.querySelectorAll('[data-rest]').forEach(b => { b.onclick = async () => { await post('/carometro/foto/restaurar', { id: +b.dataset.rest }); toast('Versão restaurada'); recarrega(); }; });
+  el.querySelectorAll('[data-exc]').forEach(b => { b.onclick = async () => { if (await Dlg.confirmar({ titulo: 'Excluir esta versão?', texto: 'Original, foto padrão e miniatura serão apagados definitivamente e não há como desfazer.', confirmar: 'Excluir', perigo: true })) { await post('/carometro/foto/excluir', { id: +b.dataset.exc }); toast('Versão excluída'); recarrega(); } }; });
 }
 const SEGMENTOS_ROT = { MATERNAL: 'Maternais', INFANTIL: 'Infantil 1, 2 e 3', JARDINS: 'Jardins', INICIAIS: 'Anos Iniciais', FINAIS: 'Anos Finais', MEDIO: 'Ensino Médio' };
