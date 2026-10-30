@@ -7,6 +7,12 @@ const assert=require('node:assert/strict'),sharp=require('sharp'),U=require('./l
  await G.post('/carometro/lote/resolver',{lote_id:l.loteId,item_id:original,acao:'ignorar'});
  const b=await U.abrir();try{const p=await U.pagina(b,'NAT-3301',G.nova);await U.ir(p,'cmimport');await p.waitForSelector('#cmAdicionarFotos');
  ok('lote em simulação oferece adicionar fotos',await p.innerText('#cmAdicionarFotos')==='Adicionar mais fotos a este lote');
+ await p.evaluate(()=>toast(undefined,'warn'));ok('aviso vazio recebe mensagem alternativa',(await p.innerText('#toast')).includes('Não foi possível'));
+ await p.route('**/api/carometro/lote/fotos',r=>r.fulfill({status:413,contentType:'application/json',body:JSON.stringify({error:'Arquivo excede o limite do servidor.'})}));
+ await p.setInputFiles('#cmMaisFotos',[{name:'ADD2.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');
+ await p.waitForFunction(()=>document.querySelector('#cmImportacaoAviso')?.innerText.includes('Arquivo excede'));
+ ok('upload mostra arquivo e motivo persistente',(await p.innerText('#cmImportacaoAviso')).includes('ADD2.jpg'));
+ await p.unroute('**/api/carometro/lote/fotos');
  await p.setInputFiles('#cmMaisFotos',[{name:'ADD2.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');await p.waitForFunction(()=>document.querySelectorAll('.cm-lote tbody tr').length===2);
  d=await G.get('/carometro/lote?id='+l.loteId);ok('acrescenta ao mesmo lote',d.itens.length===2 && (await G.get('/carometro/lotes')).rows.length===1);
  ok('preserva associação e decisão anterior',d.itens.find(i=>i.id===original).estado==='ignorada');
@@ -15,6 +21,12 @@ const assert=require('node:assert/strict'),sharp=require('sharp'),U=require('./l
  await p.setInputFiles('#cmMaisFotos',[{name:'ADD2.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');await p.waitForFunction(()=>document.querySelector('#cmProgMais')?.innerText.includes('salvo'));
  ok('reenviar não duplica foto',(await G.get('/carometro/lote?id='+l.loteId)).itens.length===3);
  await p.screenshot({path:'test-results/carometro-adicionar-ao-lote.png'});
+ await p.route('**/api/carometro/lote/aplicar',r=>r.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'Lote alterado. Confira novamente.'})}));
+ await p.click('#cmAplicar');await p.click('#dlgOk');await p.waitForFunction(()=>document.querySelector('#cmImportacaoAviso')?.innerText.includes('Lote alterado'));
+ ok('aplicação mostra motivo e libera nova tentativa',await p.isEnabled('#cmAplicar'));
+ ok('aviso mantém texto branco apesar da regra genérica warn',await p.locator('#toast').evaluate(el=>getComputedStyle(el).color)==='rgb(255, 255, 255)');
+ await p.locator('#cmImportacaoAviso').scrollIntoViewIfNeeded();await p.screenshot({path:'test-results/carometro-erro-importacao.png'});
+ await p.unroute('**/api/carometro/lote/aplicar');
  await G.post('/carometro/lote/aplicar',{lote_id:l.loteId});await U.ir(p,'cmimport');ok('ação do topo fica oculta sem lote aberto',await p.isHidden('#cmAdicionarSelecionadas'));
  // Um lote encerrado é recusado também pela API de upload.
  const encerrado=new FormData();encerrado.append('lote_id',l.loteId);encerrado.append('arquivo',new Blob([jpg]),'ADD3.jpg');const resp=await fetch(U.B+'/carometro/lote/fotos',{method:'POST',headers:{Cookie:G.H.Cookie,'X-EVO':'1'},body:encerrado});ok('não acrescenta a lote encerrado',resp.status===409);

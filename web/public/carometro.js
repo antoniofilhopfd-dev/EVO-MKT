@@ -153,6 +153,13 @@ PAGINAS.cmimport = async function () {
   const listaTurmas = arvore.segmentos.flatMap(sg => sg.series.flatMap(g => g.turmas));
   $('#cmTurmaLote').innerHTML = '<option value="">Escolha a turma…</option>' + listaTurmas.map(t => `<option value="${attr(t.turma)}">${esc(t.turma)} (${fmtN(t.alunos)})</option>`).join('');
   if (CM_IMP.turma && listaTurmas.some(t => t.turma === CM_IMP.turma)) { $('#cmTurmaLote').value = CM_IMP.turma; setTimeout(() => $('#cmFotosT').focus(), 50); } CM_IMP.turma = '';
+  const avisoImportacao = (texto, erro = true) => {
+    let el = $('#cmImportacaoAviso');
+    if (!el) { el = document.createElement('div'); el.id = 'cmImportacaoAviso'; $('#cmLote').before(el); }
+    el.className = 'cm-importacao-aviso'; el.setAttribute('role', erro ? 'alert' : 'status');
+    el.textContent = texto; el.hidden = !texto;
+    if (texto) { toast(texto, erro ? 'warn' : 'ok'); el.scrollIntoView({block:'nearest'}); }
+  };
   let ocupado = false;
   const desenhaLotes = async () => {
     const d = await api('/carometro/lotes');
@@ -161,6 +168,7 @@ PAGINAS.cmimport = async function () {
     $('#cmAplicarFila') && ($('#cmAplicarFila').onclick = async () => {
       const ids = $$('#cmFila [data-fila]:checked').map(b => +b.dataset.fila);
       if (!ids.length) return toast('Selecione os lotes da fila.', 'warn');
+      try {
       const lotes = await Promise.all(ids.map(id => api('/carometro/lote?id=' + id)));
       if (lotes.some(l => l.pendencias || !l.resumo.prontos)) return toast('Confira os lotes e resolva as pendências antes de aplicar.', 'warn');
       const alunos = lotes.flatMap(l => l.itens.filter(i => i.estado === 'ok').map(i => i.alunoId));
@@ -169,8 +177,10 @@ PAGINAS.cmimport = async function () {
       if (!await Dlg.confirmar({titulo:'Aplicar a fila conferida?',texto:`${ids.length} lote(s), ${total} foto(s), ${substituem} substituição(ões). Cada lote pode ser desfeito separadamente.`,confirmar:'Aplicar selecionados'})) return;
       $('#cmAplicarFila').disabled = true;
       try { await post('/carometro/lote/aplicar-fila',{ids}); toast('Lotes aplicados'); }
-      catch(e) { toast('A fila não foi aplicada: ' + e.message + '. As alterações foram desfeitas.', 'warn'); }
+      catch(e) { avisoImportacao('Não foi possível confirmar a aplicação da fila. Confira o estado dos lotes antes de tentar novamente. ' + mensagemErro(e)); }
       await desenhaLotes();
+      } catch(e) { avisoImportacao('Não foi possível conferir a fila. ' + mensagemErro(e)); }
+      finally { const btn = $('#cmAplicarFila'); if(btn) btn.disabled=false; }
     });
     $('#cmLotes').innerHTML = d.rows.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Lote</th><th>Situação</th><th>Criado</th><th>Resultado</th><th></th></tr></thead><tbody>${d.rows.map(l => `<tr><td>#${l.id}${l.turma ? ' · ' + esc(l.turma) : ''}</td><td>${esc(CM_LOTE[l.estado] || l.estado)}</td><td>${esc(fmtDateTime(l.criadoEm))} · ${esc(l.criadoPor)}</td><td>${esc(l.resumo || '—')}</td><td>${l.estado === 'simulado' ? `<button type="button" class="btn ghost" data-abre="${l.id}">Abrir</button>` : l.estado === 'aplicado' ? `<button type="button" class="btn ghost danger" data-desf="${l.id}">Desfazer</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="kpi-note">Nenhum lote ainda.</p>';
     $$('#cmLotes [data-abre]').forEach(b => { b.onclick = () => desenhaLote(+b.dataset.abre); });
@@ -223,13 +233,26 @@ PAGINAS.cmimport = async function () {
     $$('#cmLote [data-zoom]').forEach(b => { b.onclick = () => dialogo(`<h3>${esc(b.dataset.nome)}</h3><img class="cm-zoom" src="${API}/carometro/lote/foto?item=${b.dataset.zoom}&tam=padrao" alt="Foto ${attr(b.dataset.nome)}"><div class="actions dlg-acoes"><button type="button" class="btn" data-close>Fechar</button></div>`); });
     $('#cmOrdem') && ($('#cmOrdem').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Ligar pela ordem dos arquivos?', texto: 'As fotos sem aluno são ligadas aos alunos que faltam, na ordem dos nomes dos arquivos e na ordem alfabética da turma. Servem como sugestão: confira o rosto de cada uma antes de aplicar.', confirmar: 'Ligar pela ordem' })) { try { const x = await post('/carometro/lote/preencher-ordem', { lote_id: id }); toast(`${x.ligadas} foto(s) ligadas${x.sobraram ? `; ${x.sobraram} sobraram sem aluno` : ''}`); desenhaLote(id); } catch (e) { toast(e.message, 'warn'); } } });
     $('#cmConfTodas') && ($('#cmConfTodas').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Confirmar todas as sugestões?', texto: 'Confirme só depois de conferir o rosto de cada foto com o nome do aluno.', confirmar: 'Confirmar todas' })) { const x = await post('/carometro/lote/confirmar-todas', { lote_id: id }); toast(`${x.confirmadas} sugestão(ões) confirmadas`); desenhaLote(id); } });
-    $('#cmAplicar') && ($('#cmAplicar').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Aplicar o lote?', texto: `${r.prontos} foto(s) passam a ser a foto atual dos alunos${r.substituem ? `; ${r.substituem} substituem uma foto anterior (que fica no histórico)` : ''}. Dá para desfazer depois.`, confirmar: 'Aplicar' })) { const x = await post('/carometro/lote/aplicar', { lote_id: id }); toast(`${x.aplicadas} foto(s) aplicada(s)`); desenhaLote(id); desenhaLotes(); if (d.lote.turma) { const k = listaTurmas.findIndex(t => t.turma === d.lote.turma); if (k >= 0 && listaTurmas[k + 1]) $('#cmTurmaLote').value = listaTurmas[k + 1].turma; } } });
+    $('#cmAplicar') && ($('#cmAplicar').onclick = async () => {
+      if (ocupado) return;
+      if (!await Dlg.confirmar({ titulo: 'Aplicar o lote?', texto: `${r.prontos} foto(s) passam a ser a foto atual dos alunos${r.substituem ? `; ${r.substituem} substituem uma foto anterior (que fica no histórico)` : ''}. Dá para desfazer depois.`, confirmar: 'Aplicar' })) return;
+      const btn = $('#cmAplicar'); ocupado = true; btn.disabled = true; avisoImportacao('');
+      let aplicado = false;
+      try {
+        const x = await post('/carometro/lote/aplicar', { lote_id: id }); aplicado = true;
+        avisoImportacao(`${x.aplicadas} foto(s) aplicada(s) no lote #${id}.`, false);
+        await desenhaLote(id); await desenhaLotes();
+        if (d.lote.turma) { const k = listaTurmas.findIndex(t => t.turma === d.lote.turma); if (k >= 0 && listaTurmas[k + 1]) $('#cmTurmaLote').value = listaTurmas[k + 1].turma; }
+      } catch (e) {
+        avisoImportacao((aplicado ? `Lote #${id} aplicado, mas não foi possível atualizar a tela. Reabra o lote para conferir. ` : `Não foi possível confirmar a aplicação do lote #${id}. Confira o estado do lote antes de tentar novamente. `) + mensagemErro(e));
+      } finally { ocupado = false; if (!aplicado && btn.isConnected) btn.disabled = false; }
+    });
     $('#cmCancelarLote') && ($('#cmCancelarLote').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Cancelar o lote?', texto: 'As fotos enviadas para a simulação são descartadas. Nenhuma ficha é alterada.', confirmar: 'Cancelar lote', perigo: true })) { await post('/carometro/lote/cancelar', { lote_id: id }); $('#cmLote').innerHTML = ''; $('#cmAdicionarSelecionadas').hidden=true; desenhaLotes(); } });
   };
   const simular = async (btn, prog, arqs, man, turma, existente = 0) => {
-    if (!arqs.length) { toast('Escolha as fotos.', 'warn'); return; }
+    if (!arqs.length) { avisoImportacao('Escolha as fotos antes de adicionar ao lote.'); return; }
     if (ocupado) { toast('Aguarde o envio em andamento.', 'warn'); return; }
-    ocupado = true; btn.disabled = true; let loteId = existente; const falhas=[];
+    ocupado = true; btn.disabled = true; let loteId = existente; const falhas=[]; let ultimoErro = ''; avisoImportacao('');
     try {
       if (!loteId) loteId = (await post('/carometro/lote/criar',{manifesto:man,turma})).loteId;
       const enviar = async lista => {
@@ -238,7 +261,7 @@ PAGINAS.cmimport = async function () {
           try {
             const fd=new FormData();fd.append('lote_id',loteId);fd.append('arquivo',/\.zip$/i.test(f0.name)?f0:await cmPrepararFoto(f0));
             await api('/carometro/lote/fotos',{method:'POST',body:fd});
-          } catch(e) { falhas.push(f0); }
+          } catch(e) { falhas.push(f0); ultimoErro = `${f0.name}: ${mensagemErro(e)}`; }
         }
       };
       await enviar(arqs);
@@ -246,10 +269,11 @@ PAGINAS.cmimport = async function () {
       prog=document.getElementById(prog.id)||prog;
       prog.textContent = falhas.length ? `${falhas.length} arquivo(s) falharam; os demais ficaram salvos no lote #${loteId}. ` : `Lote #${loteId} salvo para conferência. Adicione outra turma quando quiser.`;
       if(falhas.length) {
+        avisoImportacao(`${falhas.length} arquivo(s) não foram enviados ao lote #${loteId}. ${ultimoErro}`);
         const retry=document.createElement('button');retry.className='btn';retry.textContent='Tentar novamente só as falhas';prog.appendChild(retry);
-        retry.onclick=async()=>{retry.disabled=true;const pend=falhas.splice(0);await enviar(pend);await desenhaLote(loteId);await desenhaLotes();prog=document.getElementById(prog.id)||prog;prog.textContent=falhas.length?`${falhas.length} arquivo(s) ainda falharam. Selecione-os para um novo envio.`:'Envio recuperado.';};
+        retry.onclick=async()=>{if(ocupado)return;ocupado=true;retry.disabled=true;try{const pend=falhas.splice(0);await enviar(pend);await desenhaLote(loteId);await desenhaLotes();prog=document.getElementById(prog.id)||prog;prog.textContent=falhas.length?`${falhas.length} arquivo(s) ainda falharam. Selecione-os para um novo envio.`:'Envio recuperado.';avisoImportacao(falhas.length ? ultimoErro : 'Envio recuperado.', !!falhas.length);}catch(e){avisoImportacao('Não foi possível atualizar o lote #'+loteId+'. '+mensagemErro(e));}finally{ocupado=false;if(retry.isConnected)retry.disabled=false;}};
       }
-    } catch(e) { toast(e.message,'warn');prog.textContent=`${e.message}${loteId?' · rascunho salvo: lote #'+loteId:''}`; }
+    } catch(e) { const texto = mensagemErro(e) + (loteId ? ' · Confira o rascunho salvo: lote #'+loteId : ''); avisoImportacao(texto); prog=document.getElementById(prog.id)||prog;prog.textContent=texto; }
     finally { ocupado=false;btn.disabled=false; }
   };
   $('#cmEnviarPastas').onclick = async () => {
