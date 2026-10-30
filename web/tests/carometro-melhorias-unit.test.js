@@ -41,3 +41,23 @@ test('backup identifica foto ausente e rascunho incompleto',()=>{
  const T={cm_lotes:[{id:1,estado:'simulado'}],cm_lote_itens:[{lote_id:1,estado:'ok',caminho_original:'o',caminho_padrao:'p',caminho_mini:'m'}],arquivos:[{caminho:'o'}]};assert.deepEqual(backup.conferirFotosBackup(T,true).ausentes,['p','m']);assert.deepEqual(backup.conferirFotosBackup(T,false).ausentes,[]);
 });
 test('lotes cancelados não exigem staging que já foi descartado',()=>{assert.deepEqual(backup.conferirFotosBackup({cm_lotes:[{id:1,estado:'cancelado'}],cm_lote_itens:[{lote_id:1,caminho_original:'o'}]},true).ausentes,[]);});
+const acesso=load('carometroAcesso');
+test('política restringe turma por segmento inclusive Maternais separado',()=>{
+ acesso.contextoCm.run({segmentos:['INICIAIS']},()=>{assert.equal(acesso.permiteTurma('2º Ano A'),true);assert.equal(acesso.permiteTurma('7º Ano A'),false);assert.throws(()=>acesso.exigirTurma('Maternal A'));});
+ acesso.contextoCm.run({segmentos:['MATERNAIS']},()=>{assert.equal(acesso.permiteTurma('Maternal A'),true);assert.equal(acesso.permiteTurma('Infantil 1 A'),false);});
+});
+test('ações negadas não são liberadas por papel de gerente',async()=>{
+ await acesso.contextoCm.run({usuario:{role:'manager'},segmentos:[],consultar:true,importar:true,substituir:false},async()=>{await assert.rejects(acesso.exigirCm({},'substituir'));assert.equal((await acesso.exigirCm({},'importar')).role,'manager');});
+});
+test('desfoque gera somente aviso; foto continua válida',async()=>{
+ const b=await sharp({create:{width:600,height:800,channels:3,background:'#789'}}).jpeg().toBuffer();assert.equal(await foto.possivelDesfoque(b),true);const r=await foto.prepararFoto(b);assert.ok(!r.erro);assert.match(r.aviso,/Possível desfoque/);
+});
+test('transação compartilha conexão com q/run e reverte falhas',async()=>{
+ const calls=[];const conn={query:async(sql)=>{calls.push(sql);return [[{ok:1}]];},beginTransaction:async()=>calls.push('begin'),commit:async()=>calls.push('commit'),rollback:async()=>calls.push('rollback'),release:()=>calls.push('release')};
+ const pool={query:async()=>{throw new Error('Consulta escapou da transação');},getConnection:async()=>conn};
+ const mod={exports:{}};const src=ts.transpileModule(fs.readFileSync(path.resolve(__dirname,'../lib/db.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
+ const req=n=>n==='mysql2/promise'?{createPool:()=>pool}:n==='./util'?{env:()=> 'teste',envInt:(_,v)=>v}:require(n);
+ new Function('require','module','exports',src)(req,mod,mod.exports);const db=mod.exports;
+ await db.withTx(async()=>{await db.q('um');await db.withTx(async()=>db.q('dois'));});assert.deepEqual(calls,['begin','um','dois','commit','release']);calls.length=0;
+ await assert.rejects(db.withTx(async()=>{await db.q('erro');throw new Error('falha');}));assert.deepEqual(calls,['begin','erro','rollback','release']);
+});

@@ -1,3 +1,4 @@
+import { contextoCm, exigirCm, exigirAluno, exigirTurma, permiteTurma } from '../carometroAcesso';
 import { createHash } from 'node:crypto';
 import { normNome } from '../carometro';
 import { Ctx } from '../ctx';
@@ -13,10 +14,11 @@ import { adicionarArquivo, aplicarLote, AlunoLote, cancelarLote, desfazerLote, i
 export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response | null> {
   const { path, method } = c;
   if (!path.startsWith('/carometro/lote')) return null;
-  await requireManager(c);
-  const abrir = async (id: number) => (await q1('SELECT * FROM cm_lotes WHERE id=?', [id])) ?? fail(404, 'Lote não encontrado.');
+  await exigirCm(c,'importar');
+  const abrir = async (id: number) => {const l=(await q1('SELECT * FROM cm_lotes WHERE id=?',[id]))??fail(404,'Lote não encontrado.'); if(contextoCm.getStore()?.segmentos.length && !l.turma)fail(403,'Lote sem segmento definido.');exigirTurma(String(l.turma??''));return l;};
   const detalhe = async (id: number) => {
     const l = await abrir(id), itens = await itensDoLote(id), resumo = resumoItens(itens);
+    for(const it of itens)if(it.alunoId)await exigirAluno(Number(it.alunoId));
     const turma = String(l.turma ?? '');
     const alunosTurma = turma ? (await q('SELECT id,matricula,nome FROM ui_alunos WHERE ativo=1 AND turma=? ORDER BY nome', [turma])).map((a) => ({ id: Number(a.id), matricula: String(a.matricula), nome: String(a.nome) })) : [];
     const usados = new Set(itens.filter((i) => ['ok', 'sugerida'].includes(String(i.estado)) && i.alunoId).map((i) => i.alunoId));
@@ -25,12 +27,13 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
   };
 
   if (path === '/carometro/lotes' && method === 'GET') {
-    return json({ rows: (await q("SELECT id,turma,estado,criado_por,criado_em,aplicado_em,desfeito_em,resumo FROM cm_lotes ORDER BY (estado='simulado') DESC,id DESC LIMIT 200")).map((l) => ({ id: Number(l.id), turma: String(l.turma ?? ''), estado: l.estado, criadoPor: l.criado_por, criadoEm: l.criado_em, aplicadoEm: l.aplicado_em, desfeitoEm: l.desfeito_em, resumo: l.resumo })) });
+    return json({ rows: (await q("SELECT id,turma,estado,criado_por,criado_em,aplicado_em,desfeito_em,resumo FROM cm_lotes ORDER BY (estado='simulado') DESC,id DESC LIMIT 200")).filter(l=>contextoCm.getStore()?.segmentos.length ? !!l.turma && permiteTurma(String(l.turma)):true).map((l) => ({ id: Number(l.id), turma: String(l.turma ?? ''), estado: l.estado, criadoPor: l.criado_por, criadoEm: l.criado_em, aplicadoEm: l.aplicado_em, desfeitoEm: l.desfeito_em, resumo: l.resumo })) });
   }
   if (path === '/carometro/lote' && method === 'GET') return json(await detalhe(Number(c.qs('id')) || 0));
 
   if (path === '/carometro/lote/foto' && method === 'GET') {
-    const it = await q1('SELECT caminho_original,caminho_padrao,caminho_mini FROM cm_lote_itens WHERE id=?', [Number(c.qs('item')) || 0]) ?? fail(404, 'Foto não encontrada.');
+    const it = await q1('SELECT aluno_id,lote_id,caminho_original,caminho_padrao,caminho_mini FROM cm_lote_itens WHERE id=?', [Number(c.qs('item')) || 0]) ?? fail(404, 'Foto não encontrada.');
+    await abrir(Number(it.lote_id));if(it.aluno_id)await exigirAluno(Number(it.aluno_id));
     const a = await q1('SELECT mime,conteudo FROM arquivos WHERE caminho=?', [c.qs('tam') === 'original' ? it.caminho_original : c.qs('tam') === 'padrao' ? it.caminho_padrao : it.caminho_mini]) ?? fail(404, 'Foto não encontrada.');
     return new Response(new Uint8Array(Buffer.from(a.conteudo)), { headers: { 'Content-Type': String(a.mime), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
   }
@@ -43,6 +46,7 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     const manifesto = String(form.get('manifesto') ?? ''), turmaForm = String(form.get('turma') ?? '').trim().slice(0, 60);
     if (id) { const l = await abrir(id); if (l.estado !== 'simulado') fail(409, 'Este lote já foi encerrado.'); }
     else {
+      if(contextoCm.getStore()?.segmentos.length && !turmaForm)fail(403,'Escolha uma turma do seu segmento.');exigirTurma(turmaForm);
       if (turmaForm && !(await q1('SELECT id FROM ui_alunos WHERE ativo=1 AND turma=? LIMIT 1', [turmaForm]))) fail(404, 'Turma sem alunos ativos.');
       id = await novoLote(ator, manifesto, turmaForm);
     }
@@ -52,18 +56,19 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     const arqs = form.getAll('arquivo').filter((f): f is File => f instanceof File && f.size > 0);
     if (!arqs.length) fail(400, 'Escolha as fotos.');
     const ja = Number((await q1('SELECT COUNT(*) n FROM cm_lote_itens WHERE lote_id=?', [id]))?.n ?? 0);
-    if (ja + arqs.length > MAX_ITENS_LOTE) fail(400, `Cada lote aceita até ${MAX_ITENS_LOTE} fotos. Divida em lotes menores.`);
+
     for (const f of arqs) {
       if (/\.zip$/i.test(f.name) || f.type === 'application/zip' || f.type === 'application/x-zip-compressed') {
         // pasta compactada: cada imagem dentro vira uma foto do lote (sem subpastas do sistema, no máximo 400 e 5 MB cada)
         if (f.size > 60 * 1048576) fail(413, 'O ZIP passa de 60 MB. Divida a turma em dois arquivos.');
-        let entradas: Record<string, Uint8Array>;
-        try { entradas = unzipSync(new Uint8Array(await f.arrayBuffer()), { filter: (e) => e.originalSize <= FOTO_MAX_BYTES && !/(^|\/)(__MACOSX|\.)/.test(e.name) && /\.(jpe?g|png|webp)$/i.test(e.name) }); }
+        let entradas: Record<string, Uint8Array>; const rejeitadas: string[]=[];let totalZip=0,quantZip=0;
+        try { entradas = unzipSync(new Uint8Array(await f.arrayBuffer()), { filter: (e) => {if(/(^|\/)(__MACOSX|\.)/.test(e.name)||! /\.(jpe?g|png|webp)$/i.test(e.name))return false;quantZip++;totalZip+=e.originalSize;if(quantZip>MAX_ITENS_LOTE||totalZip>120*1048576)throw new Error('ZIP excede o limite de 400 fotos ou 120 MB descompactados.');if(e.originalSize>FOTO_MAX_BYTES){rejeitadas.push(e.name);return false;}return true;} }); }
         catch { fail(400, 'Não foi possível abrir o ZIP. Envie um ZIP comum com as fotos.'); }
         const nomes = Object.keys(entradas).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
-        if (!nomes.length) fail(400, 'O ZIP não tem fotos JPG, PNG ou WebP.');
+        for(const nome of rejeitadas) await run("INSERT INTO cm_lote_itens(lote_id,nome_arquivo,estado,motivo) VALUES(?,?,'invalida','Foto do ZIP maior que 5 MB. Reduza e envie novamente.')",[id,nome.slice(0,190)]);
+        if (!nomes.length && !rejeitadas.length) fail(400, 'O ZIP não tem fotos JPG, PNG ou WebP.');
         const ja2 = Number((await q1('SELECT COUNT(*) n FROM cm_lote_itens WHERE lote_id=?', [id]))?.n ?? 0);
-        if (ja2 + nomes.length > MAX_ITENS_LOTE) fail(400, `Cada lote aceita até ${MAX_ITENS_LOTE} fotos. Divida em lotes menores.`);
+
         for (const n of nomes) {
           const partes = n.split('/'), pasta = partes.length > 1 ? partes[partes.length-2] : '';
           const turmaPasta = pasta && [...new Set(alunos.map((a) => a.turma))].find((t) => normNome(t) === normNome(pasta));
@@ -93,6 +98,7 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     const alunos = new Set<number>();
     for (const loteId of ids) {
       const d = await detalhe(loteId);
+      if(d.resumo.substituem)await exigirCm(c,'substituir');
       if (d.lote.estado !== 'simulado' || d.pendencias || !d.resumo.prontos) fail(409,`Confira as pendências do lote #${loteId}.`);
       for (const it of d.itens.filter((i) => i.estado === 'ok')) {
         if (alunos.has(Number(it.alunoId))) fail(409,'O mesmo aluno aparece em mais de um lote selecionado. Resolva a duplicidade antes de aplicar.');
@@ -105,6 +111,7 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
   }
   if (path === '/carometro/lote/criar') {
     const turma = String(b.turma ?? '').trim().slice(0,60);
+    if(contextoCm.getStore()?.segmentos.length && !turma)fail(403,'Escolha uma turma do seu segmento.');exigirTurma(turma);
     if (turma && !(await q1('SELECT id FROM ui_alunos WHERE ativo=1 AND turma=? LIMIT 1',[turma]))) fail(404,'Turma sem alunos ativos.');
     return json({loteId: await novoLote(ator,String(b.manifesto ?? ''),turma)});
   }
@@ -122,6 +129,8 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     const it = await q1('SELECT * FROM cm_lote_itens WHERE id=? AND lote_id=?', [Number(b.item_id) || 0, id]) ?? fail(404, 'Foto do lote não encontrada.');
     if (it.estado === 'invalida') fail(409, 'Esta foto é inválida e não pode ser aplicada.');
     const acao = String(b.acao);
+    if(acao==='confirmar' || acao==='vincular'){const aluno=await exigirAluno(Number(acao==='vincular'?b.aluno_id:it.aluno_id));await run('UPDATE cm_lote_itens SET turma_origem=? WHERE id=?',[aluno.turma,it.id]);}
+    if(acao==='pendente'){await run("UPDATE cm_lote_itens SET estado=?,motivo='Aguardando conferência individual.' WHERE id=?",[it.aluno_id?'sugerida':'orfa',it.id]);return json(await detalhe(id));}
     if (acao === 'ignorar') await run("UPDATE cm_lote_itens SET estado='ignorada', motivo='Ignorada por decisão da Gerência.' WHERE id=?", [it.id]);
     else if (acao === 'confirmar') {
       if (!it.aluno_id) fail(400, 'Escolha o aluno.');
@@ -139,6 +148,7 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     const d = await detalhe(id);
     if (d.pendencias) fail(409, `Ainda há ${d.pendencias} foto(s) para decidir (sugestões, sem aluno ou em conflito).`);
     if (!d.resumo.prontos) fail(409, 'Nenhuma foto pronta para aplicar.');
+    if(d.resumo.substituem)await exigirCm(c,'substituir');
     const r = await aplicarLote(id, ator);
     return json({ ok: true, ...r });
   }
@@ -153,7 +163,7 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
     if (!livres.length) fail(409, 'Todos os alunos da turma já têm foto neste lote.');
     let n = 0;
     for (let k = 0; k < Math.min(soltas.length, livres.length); k++) {
-      await run("UPDATE cm_lote_itens SET estado='sugerida', aluno_id=?, regra='Ordem dos arquivos', confianca='baixa', motivo='Ligada pela ordem do arquivo e pela ordem alfabética da turma; confira o rosto.' WHERE id=?", [livres[k].id, soltas[k].id]);
+      await run("UPDATE cm_lote_itens SET estado='sugerida', aluno_id=?, regra='Ordem dos arquivos', confianca='baixa', turma_origem=(SELECT a.turma FROM ui_alunos a WHERE a.id=cm_lote_itens.aluno_id), motivo='Ligada pela ordem do arquivo e pela ordem alfabética da turma; confira o rosto.' WHERE id=?", [livres[k].id, soltas[k].id]);
       n++;
     }
     await auditar(ator, 'lote-ordem', null, `lote ${id}: ${n} foto(s) ligadas pela ordem`);
@@ -172,6 +182,7 @@ export async function carometroLoteRoute(c: Ctx, ator: string): Promise<Response
   }
   if (path === '/carometro/lote/desfazer') {
     const l = await abrir(id); if (l.estado !== 'aplicado') fail(409, 'Só dá para desfazer um lote aplicado.');
+    await exigirCm(c,'substituir');await detalhe(id);
     return json({ ok: true, ...(await desfazerLote(id, ator)) });
   }
   return fail(404, 'Rota não encontrada.');

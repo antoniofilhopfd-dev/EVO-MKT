@@ -118,7 +118,8 @@ const { t, fim } = U.contador();
   t('ligar pela ordem: arquivo 1 → 1º aluno (ordem alfabética), como sugestão de baixa confiança', po.ligadas === 4 && po.sobraram === 0 && itZ.map(i => i.aluno).join() === 'Ana Z,Bia Z,Caio Z,Davi Z' && itZ.every(i => i.estado === 'sugerida' && i.regra === 'Ordem dos arquivos' && i.confianca === 'baixa'), itZ.map(i => [i.arquivo, i.aluno, i.estado]));
   t('sugestões ainda bloqueiam o aplicar (409)', (await G.req('POST', '/carometro/lote/aplicar', { lote_id: LZ })).status === 409);
   const ct = await G.post('/carometro/lote/confirmar-todas', { lote_id: LZ });
-  t('confirmar todas as sugestões libera o lote', ct.confirmadas === 4 && ct.pendencias === 0 && ct.resumo.prontos === 4, ct.resumo);
+  t('sugestões por ordem exigem confirmação individual', ct.confirmadas === 0 && ct.pendencias === 4, ct.resumo);
+  for(const i of itZ) await G.post('/carometro/lote/resolver',{lote_id:LZ,item_id:i.id,acao:'confirmar'});
   t('ligar pela ordem de novo: 409 (nada solto)', (await G.req('POST', '/carometro/lote/preencher-ordem', { lote_id: LZ })).status === 409);
   t('aplica a turma inteira de uma vez', (await G.post('/carometro/lote/aplicar', { lote_id: LZ })).aplicadas === 4 && (await G.get('/carometro/alunos?turma=' + encodeURIComponent(TZ))).rows.every(a => a.fotoId));
   // menos fotos que alunos: sobram alunos; mais fotos que alunos: sobram fotos
@@ -138,7 +139,7 @@ const { t, fim } = U.contador();
     const nomes = nome === 'desktop' ? ['M-003.jpg', 'M-004.jpg', 'sem-dono.jpg'] : ['M-001.jpg'];
     await p.setInputFiles('#cmFotos', await Promise.all(nomes.map(async n => ({ name: n, mimeType: 'image/jpeg', buffer: await jpg() }))));
     await p.click('#cmSimular'); await p.waitForSelector('.cm-lote tbody tr');
-    t(`${nome}: simulação mostra uma linha por foto, com prévia`, (await p.$$('.cm-lote tbody tr')).length === nomes.length && (await p.$$('.cm-lote .cm-mini')).length === nomes.length);
+    t(`${nome}: simulação mostra uma linha por foto, com prévia`, (await p.$$('.cm-lote tbody tr')).length === nomes.length && (await p.$$('.cm-lote .cm-zoombtn .cm-mini')).length === nomes.length);
     await foto('importacao-simulacao');
     if (nome === 'desktop') {
       t(`${nome}: foto sem aluno bloqueia o "Aplicar lote"`, await p.isDisabled('#cmAplicar') && /Sem aluno/.test(await p.innerText('#cmLoteCard')));

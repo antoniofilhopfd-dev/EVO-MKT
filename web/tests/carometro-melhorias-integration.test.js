@@ -1,0 +1,68 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),mysql=require('mysql2/promise'),sharp=require('sharp'),{zipSync}=require('fflate'),{gunzipSync}=require('node:zlib');
+const U=require('./lib/ui');
+(async()=>{
+ const G=await U.entrar(process.argv[2]),E=await U.entrar(process.argv[2],'ANT-3302','Ant26ab');
+ let checks=0;function ok(name,value){assert.ok(value,name);console.log('OK',name);checks++;}
+ const db=await mysql.createConnection({host:process.env.DB_HOST,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME});
+ const raw=async(H,url,opts={})=>{const headers={...H.H,...opts.headers};if(opts.body instanceof FormData)delete headers['Content-Type'];const r=await fetch(U.B+url,{...opts,headers});return{s:r.status,j:await r.json().catch(()=>({}))};};
+ const post=(url,b,H=G)=>raw(H,url,{method:'POST',body:JSON.stringify(b)});
+ const upload=async(id,files,H=G)=>{const fd=new FormData();fd.append('lote_id',id);for(const[n,b]of files)fd.append('arquivo',new Blob([b]),n);return raw(H,'/carometro/lote/fotos',{method:'POST',headers:{Cookie:H.H.Cookie,'X-EVO':'1'},body:fd});};
+ const create=async(turma='')=>{const r=await post('/carometro/lote/criar',{turma});assert.equal(r.s,200);return r.j.loteId;};
+ const jpg=await sharp({create:{width:800,height:1000,channels:3,background:'#789'}}).jpeg().toBuffer();
+ ok('sem sessão não acessa fotos',(await fetch(U.B+'/carometro/alunos')).status===401);
+ let r=await G.post('/imagem/alunos/importar',{linhas:[{matricula:'CM1',nome:'Ana Teste',turma:'2º Ano A'},{matricula:'CM2',nome:'Bia Teste',turma:'3º Ano B'},{matricula:'CM3',nome:'Caio Teste',turma:'7º Ano A'},{matricula:'CM4',nome:'Dora Teste',turma:'Maternal A'},{matricula:'CM5',nome:'Eva Teste',turma:'Infantil 1 A'}]});ok('cadastro de cinco alunos',r.http===200);
+ const alunos=(await G.get('/carometro/alunos')).rows,al=m=>alunos.find(a=>a.matricula===m);
+ ok('seis segmentos disponíveis',(await G.get('/carometro/turmas')).segmentos.length===6);
+ const l1=await create('2º Ano A'),l2=await create('3º Ano B');
+ ok('upload da primeira turma',(await upload(l1,[['CM1.jpg',jpg]])).s===200);ok('upload da segunda turma',(await upload(l2,[['CM2.jpg',jpg]])).s===200);
+ ok('reenvio não duplica item',(await upload(l1,[['CM1.jpg',jpg]])).s===200 && (await G.get('/carometro/lote?id='+l1)).itens.length===1);
+ let d=await G.get('/carometro/lote?id='+l1);const item=d.itens[0].id;
+ ok('nome e matrícula associados',d.itens[0].alunoId===al('CM1').id && d.itens[0].estado==='ok');
+ ok('enquadramento salvo',(await post('/carometro/lote/enquadrar',{lote_id:l1,item_id:item,recorte:{x:0,y:0,w:.75,h:.8,giro:90}})).s===200);
+ const [staged]=await db.query('SELECT caminho_padrao FROM cm_lote_itens WHERE lote_id=?',[l2]);const caminho=staged[0].caminho_padrao;
+ const [saved]=await db.query('SELECT * FROM arquivos WHERE caminho=?',[caminho]);await db.query('DELETE FROM arquivos WHERE caminho=?',[caminho]);
+ ok('falha em um lote impede aplicar a fila',(await post('/carometro/lote/aplicar-fila',{ids:[l1,l2]})).s>=400);
+ ok('transação não deixa fotos parciais',(await G.get('/carometro/alunos')).indicadores.comFoto===0 && (await G.get('/carometro/lote?id='+l1)).lote.estado==='simulado');
+ await db.query('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)',[caminho,saved[0].mime,saved[0].tamanho,saved[0].conteudo,saved[0].criado_em]);
+ ok('fila com duas turmas aplica completa',(await post('/carometro/lote/aplicar-fila',{ids:[l1,l2]})).s===200);
+ ok('duas fichas com foto',(await G.get('/carometro/alunos')).indicadores.comFoto===2);
+ let f=await G.get('/carometro/aluno?id='+al('CM1').id);const originalId=f.aluno.fotoId;
+ ok('histórico registra origem e data',f.fotos[0].origem===`lote-${l1}` && !!f.fotos[0].enviado_em);
+ ok('enquadramento individual cria nova versão',(await post('/carometro/foto/enquadrar',{foto_id:originalId,recorte:{x:0,y:0,w:.75,h:.8,giro:0}})).s===200);
+ f=await G.get('/carometro/aluno?id='+al('CM1').id);ok('histórico preserva original',f.fotos.length===2);
+ ok('restaurar versão anterior',(await post('/carometro/foto/restaurar',{id:originalId})).s===200);
+ const l3=await create('2º Ano A'),l4=await create('2º Ano A');await upload(l3,[['CM1.jpg',jpg]]);await upload(l4,[['CM1.jpg',jpg]]);
+ d=await G.get('/carometro/lote?id='+l3);ok('duplicidades entre lotes são avisadas',d.itens[0].outrosLotes.includes(l4) && d.itens[0].fotoAtual===originalId);
+ ok('fila com aluno repetido é recusada',(await post('/carometro/lote/aplicar-fila',{ids:[l3,l4]})).s===409);
+ await post('/carometro/lote/cancelar',{lote_id:l3});await post('/carometro/lote/cancelar',{lote_id:l4});
+ const zip=zipSync({'7º Ano A/CM3.jpg':jpg});const l5=await create();await upload(l5,[['turmas.zip',zip]]);await upload(l5,[['turmas.zip',zip]]);
+ d=await G.get('/carometro/lote?id='+l5);ok('ZIP com subpasta e reenvio sem duplicar',d.itens.length===1 && d.itens[0].alunoId===al('CM3').id);
+ ok('aplicar e desfazer lote',(await post('/carometro/lote/aplicar',{lote_id:l5})).s===200 && (await post('/carometro/lote/desfazer',{lote_id:l5})).s===200);
+ const lc=await create('Infantil 1 A');await upload(lc,[['CM5.jpg',jpg]]);const concorrentes=await Promise.all([post('/carometro/lote/aplicar',{lote_id:lc}),post('/carometro/lote/aplicar',{lote_id:lc})]);ok('aplicações simultâneas não duplicam fotos',concorrentes.map(r=>r.s).sort().join(',')==='200,409');
+ const l6=await create('Maternal A');await upload(l6,[['001.jpg',jpg]]);await post('/carometro/lote/preencher-ordem',{lote_id:l6});await post('/carometro/lote/confirmar-todas',{lote_id:l6});
+ d=await G.get('/carometro/lote?id='+l6);ok('associação por ordem exige conferência individual',d.itens[0].estado==='sugerida');await post('/carometro/lote/resolver',{lote_id:l6,item_id:d.itens[0].id,acao:'confirmar'});ok('confirmação individual aplica',(await post('/carometro/lote/aplicar',{lote_id:l6})).s===200);
+ const permissao={codigo:'ANT-3302',segmentos:['INICIAIS'],consultar:true,importar:true,substituir:false,baixar:false,imprimir:false};
+ ok('admin define ações e segmentos',(await post('/carometro/permissoes',permissao)).s===200);
+ d=await E.get('/carometro/alunos');ok('consulta filtrada por segmento',d.rows.length===2 && d.rows.every(a=>a.segmento==='INICIAIS'));
+ ok('ficha fora do segmento é bloqueada',(await raw(E,'/carometro/aluno?id='+al('CM3').id)).s===404);
+ ok('original sem permissão é bloqueado',(await fetch(U.B+`/carometro/foto?id=${originalId}&tam=original`,{headers:E.H})).status===403);
+ ok('PDF sem permissão é bloqueado',(await fetch(U.B+'/carometro/pdf?origem=turma&turma=2%C2%BA%20Ano%20A',{headers:E.H})).status===403);
+ ok('importação em outro segmento é bloqueada',(await post('/carometro/lote/criar',{turma:'7º Ano A'},E)).s===403);
+ const l7=await create('2º Ano A');await upload(l7,[['CM1.jpg',jpg]]);ok('substituir sem permissão é bloqueado',(await post('/carometro/lote/aplicar',{lote_id:l7},E)).s===403);await post('/carometro/lote/cancelar',{lote_id:l7});
+ const ano=new Date().getFullYear()+1;
+ ok('revisão anual preserva foto',(await post('/carometro/ano',{ano,linhas:[{id:al('CM1').id,anterior:'2º Ano A',turma:'3º Ano A'}]})).s===200 && (await G.get('/carometro/aluno?id='+al('CM1').id)).aluno.fotoId===originalId);
+ const [anos]=await db.query('SELECT ano,turma FROM cm_anos WHERE aluno_id=? ORDER BY ano',[al('CM1').id]);ok('turma anterior preservada no histórico anual',anos.length===2 && anos[0].turma==='2º Ano A');
+ ok('revisão com cadastro desatualizado é recusada',(await post('/carometro/ano',{ano,linhas:[{id:al('CM1').id,anterior:'2º Ano A',turma:'4º Ano A'}]})).s===409);
+ const pdf=await fetch(U.B+'/carometro/pdf?origem=turma&turma=3%C2%BA%20Ano%20A',{headers:G.H});ok('PDF gera com foto após revisão',pdf.status===200 && pdf.headers.get('content-type').includes('pdf'));
+ // Mais de 60 MB de anexos, divididos em linhas abaixo do max_allowed_packet do banco.
+ const grande=Buffer.alloc(8*1024*1024,65);for(let i=0;i<8;i++)await db.query('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)',[`TESTE-GRANDE/${i}`,'application/octet-stream',grande.length,grande,'2026-10-30']);
+ r=await post('/backup',{completo:true});ok('backup completo acima de 60 MB é criado',r.s===200 && !!r.j.file);
+ const nome=r.j.file;d=await G.get('/backup/validate?file='+encodeURIComponent(nome));ok('relatório do backup confere fotos e arquivos',d.ok && d.carometro.fotos>=3 && d.carometro.arquivosIncluidos===d.carometro.arquivosReferenciados);
+ const res=await fetch(U.B+'/backup/download?file='+encodeURIComponent(nome),{headers:G.H});const dump=JSON.parse(gunzipSync(Buffer.from(await res.arrayBuffer())));ok('backup inclui os oito anexos grandes',dump.tabelas.arquivos.filter(a=>a.caminho.startsWith('TESTE-GRANDE/')).length===8 && !dump.anexosIncompletos);
+ // Simula perda de uma imagem e restaura com verificação no banco.
+ const foto=dump.tabelas.cm_fotos.find(f=>f.id===originalId);await db.query('DELETE FROM arquivos WHERE caminho=?',[foto.caminho_mini]);
+ r=await post('/backup/restore',{file:nome});ok('restauração completa conclui com conferência',r.s===200);
+ const [rest]=await db.query('SELECT aluno_id FROM cm_fotos WHERE id=?',[originalId]);ok('vínculo foto-aluno preservado após restaurar',Number(rest[0].aluno_id)===al('CM1').id);
+ const browser=await U.abrir();try{const p=await U.pagina(browser,'NAT-3301','Nat26ab');await U.ir(p,'cmimport');await p.screenshot({path:'test-results/carometro-importacao.png',fullPage:true});ok('tela da fila abre sem erro',await p.locator('#cmFila').count()===1 && p.errs.length===0);await U.ir(p,'cmvisao');await p.click('#cmAnoBtn');await p.screenshot({path:'test-results/carometro-revisao-anual.png',fullPage:true});ok('revisão anual disponível',await p.locator('#cmAnoDestino').count()===1);}finally{await browser.close();}
+ await db.end();console.log(`${checks} verificações de integração passaram.`);
+})().catch(e=>{console.error(e);process.exit(1);});

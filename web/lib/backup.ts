@@ -41,9 +41,11 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   ui_acessos: { cols: ['id', 'solicitacao_id', 'token_hash', 'codigo_hash', 'expira_em', 'tentativas', 'ativo', 'criado_em', 'criado_por', 'ultimo_acesso'], restore: 'replace', opt: true },
   ui_arquivos: { cols: ['id', 'solicitacao_id', 'tipo', 'caminho', 'nome', 'sha256', 'tamanho', 'info', 'ativo', 'criado_em', 'ip'], restore: 'replace', opt: true },
   cm_fotos: { cols: ['id', 'aluno_id', 'versao', 'caminho_original', 'caminho_padrao', 'caminho_mini', 'nome_original', 'mime', 'largura', 'altura', 'tamanho', 'sha256', 'origem', 'aviso', 'ativa', 'enviado_por', 'enviado_em', 'desativada_em'], restore: 'replace', opt: true },
+  cm_permissoes: {cols:['codigo','segmentos','consultar','importar','substituir','baixar','imprimir'],restore:'replace',opt:true},
+  cm_anos: {cols:['ano','aluno_id','turma','segmento','revisado_por','revisado_em'],restore:'replace',opt:true},
   cm_auditoria: { cols: ['id', 'quando', 'ator', 'acao', 'aluno_id', 'detalhe'], restore: 'replace', opt: true },
   cm_lotes: { cols: ['id', 'codigo', 'estado', 'criado_por', 'criado_em', 'aplicado_em', 'aplicado_por', 'desfeito_em', 'manifesto', 'resumo', 'turma'], restore: 'replace', opt: true },
-  cm_lote_itens: { cols: ['id', 'lote_id', 'nome_arquivo', 'estado', 'regra', 'confianca', 'aluno_id', 'motivo', 'caminho_original', 'caminho_padrao', 'caminho_mini', 'mime', 'largura', 'altura', 'tamanho', 'aviso', 'foto_id', 'anterior_id'], restore: 'replace', opt: true },
+  cm_lote_itens: { cols: ['id', 'lote_id', 'nome_arquivo', 'estado', 'regra', 'confianca', 'aluno_id', 'motivo', 'caminho_original', 'caminho_padrao', 'caminho_mini', 'mime', 'largura', 'altura', 'tamanho', 'aviso', 'foto_id', 'anterior_id', 'turma_origem', 'arquivo_hash'], restore: 'replace', opt: true },
   cm_selecoes: { cols: ['id', 'nome', 'dono', 'dono_nome', 'compartilhada', 'criado_em', 'atualizado_em'], restore: 'replace', opt: true },
   cm_selecao_itens: { cols: ['selecao_id', 'aluno_id'], restore: 'replace', opt: true },
   cm_sessoes: { cols: ['id', 'nome', 'data', 'turma', 'status', 'obs', 'criado_por', 'criado_em'], restore: 'replace', opt: true },
@@ -69,7 +71,7 @@ async function logBackup(acao: string, nome: string, status: 'OK' | 'ERRO', deta
 }
 
 /** Monta o conteúdo do backup (sem gravar). */
-async function collect(motivo: string, completo: boolean): Promise<{ dump: Row; resumo: Record<string, number> }> {
+async function collect(motivo: string, completo: boolean, permitirAusentes = false): Promise<{ dump: Row; resumo: Record<string, number> }> {
   const tabelas: Record<string, Row[]> = {};
   for (const [t, spec] of Object.entries(TABLES)) {
     const extra = t === 'audit_log' ? ' ORDER BY id DESC LIMIT 20000' : '';
@@ -89,16 +91,17 @@ async function collect(motivo: string, completo: boolean): Promise<{ dump: Row; 
     resumo[t] = rows.length;
   }
   const relatorioCarometro = conferirFotosBackup(tabelas, completo);
-  if (completo && relatorioCarometro.ausentes.length) throw new Error('Backup incompleto: há fotos do carômetro sem arquivo. Confira as pendências antes de repetir.');
+  if (completo && relatorioCarometro.ausentes.length && !permitirAusentes) throw new Error('Backup incompleto: há fotos do carômetro sem arquivo. Confira as pendências antes de repetir.');
+  if(permitirAusentes && relatorioCarometro.ausentes.length) anexosIncompletos=true;
   const dump = { relatorioCarometro, versao: '5.x', formato: BACKUP_FORMAT, em: now(), motivo, completo, anexosIncompletos, tabelas, manifesto, sha256_total: sha(manifesto) };
   return { dump, resumo };
 }
 
-export async function makeBackup(motivo = 'manual', opts: { completo?: boolean } = {}): Promise<string> {
+export async function makeBackup(motivo = 'manual', opts: { completo?: boolean; permitirAusentes?: boolean } = {}): Promise<string> {
   const d = new Date();
   const nome = `evo_backup_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${motivo.replace(/[^a-z0-9]/gi, '') || 'x'}.json.gz`;
   try {
-    const { dump, resumo } = await collect(motivo, !!opts.completo);
+    const { dump, resumo } = await withTx(() => collect(motivo, !!opts.completo, !!opts.permitirAusentes));
     const gz = gzipSync(Buffer.from(JSON.stringify(dump)), { level: 6 });
     // confere o que acabou de ser gerado ANTES de considerar o backup válido
     const check = validateBuffer(gz);
@@ -107,7 +110,7 @@ export async function makeBackup(motivo = 'manual', opts: { completo?: boolean }
     const keep = envInt('BACKUP_KEEP', 30);
     const old = await q<{ nome: string }>("SELECT nome FROM backups WHERE nome NOT LIKE '%legadov6%' AND nome NOT LIKE '%prereestruturacao%' ORDER BY nome DESC LIMIT 1000 OFFSET ?", [keep]); // os backups da reestruturação ficam guardados
     for (const o of old) await run('DELETE FROM backups WHERE nome=?', [o.nome]);
-    await logBackup('criar', nome, 'OK', `${Object.entries(resumo).map(([k, v]) => `${k}:${v}`).join(' ')} · ${(gz.length / 1024).toFixed(0)} KB${dump.anexosIncompletos ? ' · anexos acima do limite: não incluídos' : ''}`);
+    await logBackup('criar', nome, 'OK', `${Object.entries(resumo).map(([k, v]) => `${k}:${v}`).join(' ')} · ${(gz.length / 1024).toFixed(0)} KB${dump.anexosIncompletos ? ' · atenção: referências a arquivos já ausentes na origem' : ''}`);
     return nome;
   } catch (e: any) {
     await logBackup('criar', nome, 'ERRO', String(e?.message ?? e));
@@ -137,7 +140,7 @@ export function conferirFotosBackup(tabelas: Record<string, Row[]>, completo: bo
   return { alunos: (tabelas.ui_alunos ?? []).length, fotos: fotos.length, fotosAtivas: fotos.filter((f) => Number(f.ativa)).length, arquivosReferenciados: caminhos.size, arquivosIncluidos: [...caminhos].filter((c) => arquivos.has(c)).length, ausentes: completo ? [...caminhos].filter((c) => !arquivos.has(c)) : [], completo };
 }
 
-export interface Validation { ok: boolean; formato: number; erros: string[]; avisos: string[]; resumo: Record<string, number>; em: string }
+export interface Validation { ok: boolean; formato: number; erros: string[]; avisos: string[]; resumo: Record<string, number>; em: string; carometro?: ReturnType<typeof conferirFotosBackup> }
 
 /** Verifica estrutura, contagens e hashes. Backups antigos (formato 1) passam com aviso, sem verificação de integridade. */
 export function validateBuffer(gz: Buffer): Validation {
@@ -174,9 +177,9 @@ export function validateBuffer(gz: Buffer): Validation {
     else if (man[t].sha256 !== sha(rows)) out.erros.push(`Tabela "${t}": conteúdo não confere (hash).`);
   }
   if (!Array.isArray(tabelas.users) || !tabelas.users.some((u) => u.role === 'manager' && Number(u.ativo) === 1 && (u.admin === undefined || Number(u.admin) === 1))) out.erros.push('O backup não tem nenhum Administrador ativo; restaurar deixaria o sistema sem acesso.');
-  if (dump.anexosIncompletos) out.avisos.push('Anexos acima do limite do backup: não foram incluídos (use o dump do banco para eles).');
+  if (dump.anexosIncompletos) out.avisos.push('Backup com anexos incompletos: confira o relatório antes de restaurar. Backups antigos podem ter omitido anexos acima de 60 MB.');
   if (dump.completo && !dump.anexosIncompletos) {
-    const r = conferirFotosBackup(tabelas, true);
+    const r = conferirFotosBackup(tabelas, true);out.carometro=r;
     if (r.ausentes.length) out.erros.push(`Carômetro: ${r.ausentes.length} arquivo(s) de foto ausente(s).`);
     out.resumo.carometro_alunos = r.alunos; out.resumo.carometro_fotos = r.fotos; out.resumo.carometro_arquivos = r.arquivosIncluidos;
   }
@@ -219,10 +222,11 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
     await logBackup('restaurar', nome, 'ERRO', 'recusado: arquivo só de consulta');
     fail(400, 'Este arquivo guarda apenas os dados dos módulos removidos (consulta) e não pode ser restaurado.');
   }
-  const seguranca = await makeBackup('prerestauracao', { completo: false });
+  const seguranca = await makeBackup('prerestauracao', { completo: true, permitirAusentes: true });
   const restaurado: Record<string, number> = {};
   try {
     await withTx(async (c) => {
+      await q1('SELECT id FROM cm_guard WHERE id=1 FOR UPDATE');
       const legado = !dump.tabelas;
       const T: Record<string, Row[]> = legado
         ? { records: dump.records, module_headers: dump.headers, id_counters: dump.counters, used_ids: dump.used_ids }
@@ -234,7 +238,7 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
         const rows = T[t];
         if (!Array.isArray(rows) || spec.restore === 'info') continue;
         // backups anteriores à separação Administrador × Gerente não têm "admin": toda Gerente daquela época vira Administradora
-        const data = rows.map((r) => spec.cols.map((k) => (k === 'admin' && t === 'users' && r.admin === undefined ? (r.role === 'manager' ? 1 : 0) : r[k] === undefined ? (k === 'email' ? '' : t.startsWith('ui_') && !['id', 'aluno_id', 'solicitacao_id'].includes(k) ? (['pede_cpf', 'lembretes', 'modelo_id', 'modelo_versao', 'tentativas', 'ativo', 'versao', 'tamanho'].includes(k) ? 0 : '') : null) : r[k])));
+        const data = rows.map((r) => spec.cols.map((k) => (k === 'admin' && t === 'users' && r.admin === undefined ? (r.role === 'manager' ? 1 : 0) : r[k] === undefined ? (k === 'email' ? '' : (t.startsWith('ui_') || ['turma_origem','arquivo_hash'].includes(k)) && !['id', 'aluno_id', 'solicitacao_id'].includes(k) ? (['pede_cpf', 'lembretes', 'modelo_id', 'modelo_versao', 'tentativas', 'ativo', 'versao', 'tamanho'].includes(k) ? 0 : '') : null) : r[k])));
         if (spec.restore === 'replace') {
           await c.query(`DELETE FROM ${t}`);
           await insertChunks(c, t, spec.cols, data);
@@ -253,6 +257,16 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
           await c.query('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em,nome,pasta) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE mime=VALUES(mime),tamanho=VALUES(tamanho),conteudo=VALUES(conteudo),nome=VALUES(nome),pasta=VALUES(pasta)', [r.caminho, r.mime, r.tamanho, Buffer.from(r.conteudo, 'base64'), r.criado_em, r.nome ?? null, r.pasta ?? '']);
         }
         restaurado[FILES_TABLE.name] = T[FILES_TABLE.name].length;
+      }
+      if (dump.completo && !dump.anexosIncompletos) {
+        const [rows] = await c.query(`SELECT f.id FROM cm_fotos f LEFT JOIN ui_alunos a ON a.id=f.aluno_id
+          LEFT JOIN arquivos o ON o.caminho=f.caminho_original LEFT JOIN arquivos p ON p.caminho=f.caminho_padrao LEFT JOIN arquivos m ON m.caminho=f.caminho_mini
+          WHERE a.id IS NULL OR o.caminho IS NULL OR p.caminho IS NULL OR m.caminho IS NULL LIMIT 1`);
+        if ((rows as Row[]).length) throw new Error('Conferência após restauração: foto ou vínculo de aluno ausente. Restauração desfeita.');
+        for(const f of T.cm_fotos ?? []) {
+          const [rest] = await c.query('SELECT aluno_id FROM cm_fotos WHERE id=?',[f.id]);
+          if(Number((rest as Row[])[0]?.aluno_id)!==Number(f.aluno_id))throw new Error('Associação de foto divergente após restauração.');
+        }
       }
       if (!legado) {
         // sessões: só a de quem restaurou continua, e apenas se a ficha existir no backup restaurado

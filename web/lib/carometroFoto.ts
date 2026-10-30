@@ -30,6 +30,7 @@ export async function prepararFoto(bruto: Buffer): Promise<FotoPronta | { erro: 
     const padrao = await base().resize(FOTO_PADRAO.w, FOTO_PADRAO.h, { fit: 'cover', position: 'attention', withoutEnlargement: true }).jpeg({ quality: 86, mozjpeg: true }).toBuffer();
     const mini = await base().resize(FOTO_MINI.w, FOTO_MINI.h, { fit: 'cover', position: 'attention', withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
     const avisos: string[] = [];
+    if(await possivelDesfoque(bruto)) avisos.push('Possível desfoque: confira a nitidez.');
     const prop = largura / altura;
     if (largura < 600 || altura < 800) avisos.push('Resolução baixa: confira a nitidez antes de imprimir.');
     if (prop > 1.05) avisos.push('Foto na horizontal: foi recortada no centro. Confira o enquadramento.');
@@ -85,4 +86,14 @@ export async function enquadrarFoto(bruto: Buffer, dados: unknown): Promise<{ pa
   const crop = { left, top, width: Math.max(1, Math.min(info.width-left, Math.round(w*info.width))), height: Math.max(1, Math.min(info.height-top, Math.round(h*info.height))) };
   const versao = (width: number, height: number) => sharp(data).extract(crop).resize(width,height,{fit:'cover'}).jpeg({quality:86}).toBuffer();
   return {padrao:await versao(600,800),mini:await versao(240,320)};
+}
+
+/** Variância do Laplaciano: apenas um alerta de conferência, nunca bloqueia uma foto. */
+export async function possivelDesfoque(buf: Buffer): Promise<boolean> {
+ const {data,info}=await sharp(buf).rotate().resize(192,192,{fit:'inside'}).greyscale().raw().toBuffer({resolveWithObject:true});
+ let sum=0,squares=0,n=0;
+ for(let y=1;y<info.height-1;y++)for(let x=1;x<info.width-1;x++){
+  const i=y*info.width+x,v=4*data[i]-data[i-1]-data[i+1]-data[i-info.width]-data[i+info.width];sum+=v;squares+=v*v;n++;
+ }
+ return n>0 && squares/n-(sum/n)**2<20;
 }
