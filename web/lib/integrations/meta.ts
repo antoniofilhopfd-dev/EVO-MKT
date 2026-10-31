@@ -124,17 +124,23 @@ export async function metaRefreshIfNeeded(): Promise<void> {
 }
 /** Métricas da conta num intervalo de datas (AAAA-MM-DD), lidas ao vivo da Meta em janelas de até 30 dias (alcance de janelas diferentes se soma). */
 export async function igMetricasJanela(ig: string, de: string, ate: string): Promise<Record<string, number>> {
+  return igMetricasIntervalo(ig, Math.floor(parseLocal(de + 'T00:00:00').getTime()/1000), Math.floor(parseLocal(ate + 'T23:59:59').getTime()/1000));
+}
+/** Intervalo inclusivo em segundos, compartilhado com a sincronização mensal. */
+export async function igMetricasIntervalo(ig: string, since: number, until: number): Promise<Record<string, number>> {
   const soma: Record<string, number> = {};
-  let ini = parseLocal(de + 'T00:00:00');
-  const fim = Math.min(parseLocal(ate + 'T23:59:59').getTime(), Date.now());
-  while (ini.getTime() <= fim) {
-    const fimJ = Math.min(ini.getTime() + 30 * 86400000 - 1000, fim);
-    const r = await metaInsightTotal(ig, ['reach', 'views', 'profile_views', 'total_interactions', 'likes', 'comments', 'shares', 'saves'], Math.floor(ini.getTime() / 1000), Math.floor(fimJ / 1000));
-    for (const [k, v] of Object.entries(r)) soma[k] = (soma[k] ?? 0) + v;
-    ini = new Date(fimJ + 1000);
+  const fim = Math.min(Math.floor(until), Math.floor(Date.now()/1000));
+  let ini = Math.floor(since);
+  if (!Number.isFinite(ini) || !Number.isFinite(fim)) throw new Error('Intervalo de métricas inválido.');
+  while(ini <= fim) {
+    const fimJ = Math.min(ini + 30*86400 - 1, fim);
+    const r = await metaInsightTotal(ig, ['reach', 'views', 'profile_views', 'total_interactions', 'likes', 'comments', 'shares', 'saves'], ini, fimJ);
+    for(const [k,v] of Object.entries(r)) soma[k]=(soma[k]??0)+v;
+    ini=fimJ+1;
   }
   return soma;
 }
+
 async function metaInsightTotal(ig: string, metrics: string[], since: number, until: number): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
   const pede = async (ms: string[]) => {
@@ -324,7 +330,10 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
     const per = `${y}-${String(m).padStart(2, '0')}`;
     const since = Math.floor(first.getTime() / 1000);
     const until = Math.min(Math.floor(last.getTime() / 1000), Math.floor(Date.now() / 1000));
-    const ins = await metaInsightTotal(ig, ['reach', 'views', 'profile_views', 'total_interactions', 'likes', 'comments', 'shares', 'saves'], since, until);
+    const ins = await igMetricasIntervalo(ig, since, until - 1);
+    // Alcance é único por janela: não publicar a soma como alcance único mensal.
+    const alcanceMensal = until - since <= 30*86400 ? String(ins.reach ?? 0) : '';
+    if (!alcanceMensal) await intLog('instagram', 'aviso', `@${usuario}: alcance único de ${per} indisponível para o mês completo (limite de 30 dias da API). Demais métricas sincronizadas por janelas.`);
     let posts = 0, reels = 0;
     const best: [number, Row][] = [];
     for (const md of media) {
@@ -337,7 +346,7 @@ async function igSyncConta(ig: string, usuario: string, months: number, varias: 
     const row: Row = {
       titulo: `${MESES[m - 1][0].toUpperCase()}${MESES[m - 1].slice(1)} de ${y}${varias ? ' · @' + usuario : ''}`,
       periodo: per, dataInicio: fmtDate(first), origem: 'INSTAGRAM_API', idExterno: ig, status: 'ATIVO', ultimaSincronizacao: now(),
-      seguidores: i === 0 ? String(profile.followers_count ?? 0) : String((await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [ig, per + '%']))?.seguidores ?? (listRowsSeg.find((r) => r.periodo === per)?.seguidores ?? '')), alcance: String(ins.reach ?? 0), impressoes: String(ins.views ?? 0),
+      seguidores: i === 0 ? String(profile.followers_count ?? 0) : String((await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [ig, per + '%']))?.seguidores ?? (listRowsSeg.find((r) => r.periodo === per)?.seguidores ?? '')), alcance: alcanceMensal, impressoes: String(ins.views ?? 0),
       visitasPerfil: String(ins.profile_views ?? 0), interacoes: String(ins.total_interactions ?? 0), curtidas: String(ins.likes ?? 0),
       comentarios: String(ins.comments ?? 0), compartilhamentos: String(ins.shares ?? 0), salvamentos: String(ins.saves ?? 0),
       posts: String(posts), reels: String(reels), melhoresConteudos: top.join('\n'),
