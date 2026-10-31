@@ -16,8 +16,8 @@ const assert=require('node:assert/strict'),sharp=require('sharp'),U=require('./l
  await p.setInputFiles('#cmMaisFotos',[{name:'ADD2.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');await p.waitForFunction(()=>document.querySelectorAll('.cm-lote tbody tr').length===2);
  d=await G.get('/carometro/lote?id='+l.loteId);ok('acrescenta ao mesmo lote',d.itens.length===2 && (await G.get('/carometro/lotes')).rows.length===1);
  ok('preserva associação e decisão anterior',d.itens.find(i=>i.id===original).estado==='ignorada');
- await p.setInputFiles('#cmFotos',[{name:'ADD3.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarSelecionadas');await p.waitForFunction(()=>document.querySelectorAll('.cm-lote tbody tr').length===3);
- ok('arquivos escolhidos no topo podem entrar no lote aberto',(await G.get('/carometro/lote?id='+l.loteId)).itens.length===3 && (await G.get('/carometro/lotes')).rows.length===1);
+ await p.setInputFiles('#cmMaisFotos',[{name:'ADD3.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');await p.waitForFunction(()=>document.querySelectorAll('.cm-lote tbody tr').length===3);
+ ok('novos arquivos podem entrar no lote aberto',(await G.get('/carometro/lote?id='+l.loteId)).itens.length===3 && (await G.get('/carometro/lotes')).rows.length===1);
  await p.setInputFiles('#cmMaisFotos',[{name:'ADD2.jpg',mimeType:'image/jpeg',buffer:jpg}]);await p.click('#cmAdicionarFotos');await p.waitForFunction(()=>document.querySelector('#cmProgMais')?.innerText.includes('salvo'));
  ok('reenviar não duplica foto',(await G.get('/carometro/lote?id='+l.loteId)).itens.length===3);
  await p.screenshot({path:'test-results/carometro-adicionar-ao-lote.png'});
