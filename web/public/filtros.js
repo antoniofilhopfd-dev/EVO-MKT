@@ -110,8 +110,8 @@ const FILTROS_PAGINA = {
   tfrelatorios: { aplica: [] },
   configuracoes: null,
 };
-const PERIODOS_TRAFEGO = [['semana', 'Esta semana'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano']];
-const PERIODOS_RAPIDOS = [['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['semana', 'Esta semana'], ['mes', 'Este mês']];
+const PERIODOS_TRAFEGO = [['semana', 'Esta semana'], ['semana_ant', 'Semana anterior'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano']];
+const PERIODOS_RAPIDOS = [['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana anterior'], ['mes', 'Este mês']];
 
 async function montarFiltros() {
   const box = $('#filtros'); if (!box) return;
