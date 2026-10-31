@@ -3,14 +3,14 @@ import { Row } from './util';
 import { compararTurmaCm, normNome, segmentoCm } from './carometro';
 
 export const TIPOS_PEND: Record<string, string> = {
-  sem_foto: 'Sem foto', imagem_baixa: 'Qualidade da foto a conferir', duplicado: 'Nome repetido na turma',
+  sem_foto: 'Sem foto', duplicado: 'Nome repetido na turma',
   varias_turmas: 'Mesmo nome em mais de uma turma', sem_turma: 'Turma não reconhecida', arquivo_orfao: 'Arquivo sem aluno (lote aberto)',
 };
 export interface Pend { chave: string; tipo: string; alunoId: number | null; aluno: string; matricula: string; turma: string; detalhe: string; ignorada: boolean; motivo: string; por: string }
 
 /** Tudo o que atrapalha um carômetro confiável. Calculado na hora a partir dos dados; só as decisões de "deixar como está" ficam guardadas. */
 export async function calcularPendencias(): Promise<Pend[]> {
-  const alunos = await q(`SELECT a.id,a.matricula,a.nome,a.turma,f.largura,f.altura,f.aviso,f.id foto_id
+  const alunos = await q(`SELECT a.id,a.matricula,a.nome,a.turma,f.id foto_id
     FROM ui_alunos a LEFT JOIN cm_fotos f ON f.aluno_id=a.id AND f.ativa=1 WHERE a.ativo=1`);
   const ign = new Map((await q('SELECT chave,motivo,por FROM cm_pendencias_ign')).map((r) => [String(r.chave), r]));
   const out: Pend[] = [];
@@ -26,7 +26,6 @@ export async function calcularPendencias(): Promise<Pend[]> {
   }
   for (const a of alunos) {
     if (!a.foto_id) add('sem_foto', a, a.id, 'Nenhuma foto vinculada.');
-    else if (Number(a.largura) < 600 || Number(a.altura) < 800 || /desfoque/i.test(String(a.aviso))) add('imagem_baixa', a, `i${a.foto_id}`,  String(a.aviso || `Resolução baixa (${a.largura}×${a.altura}).`));
     if ((porNomeTurma.get(`${a.turma}|${normNome(String(a.nome))}`) ?? []).length > 1) add('duplicado', a, a.id, 'Há outro aluno com o mesmo nome nesta turma (confira se não é cadastro repetido).');
     const outras = (porNome.get(normNome(String(a.nome))) ?? []).filter((x) => x.turma !== a.turma);
     if (outras.length && String(a.turma)) add('varias_turmas', a, a.id, `Também aparece em: ${[...new Set(outras.map((x) => String(x.turma)))].slice(0, 3).join(', ')}. Pode ser troca de turma não atualizada.`);
