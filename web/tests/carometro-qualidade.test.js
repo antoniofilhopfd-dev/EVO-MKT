@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),sharp=require('sharp'),U=require('./lib/ui');
+(async()=>{const G=await U.entrar(process.argv[2]);let checks=0;const ok=(n,v)=>{assert.ok(v,n);console.log('OK',n);checks++;};
+ await G.post('/imagem/alunos/importar',{linhas:[{matricula:'QUAL1',nome:'Aluno Qualidade',turma:'7º Ano A'}]});const a=(await G.get('/carometro/alunos?busca=QUAL1')).rows[0];
+ const upload=async cor=>{const fd=new FormData();fd.append('aluno_id',a.id);fd.append('arquivo',new Blob([await sharp({create:{width:150,height:150,channels:3,background:cor}}).jpeg().toBuffer()]),'QUAL1.jpg');const r=await fetch(U.B+'/carometro/foto',{method:'POST',headers:{Cookie:G.H.Cookie,'X-EVO':'1'},body:fd});assert.equal(r.status,200);};
+ const pend=async estado=>(await G.get('/carometro/pendencias?estado='+estado)).rows.filter(p=>p.alunoId===a.id&&p.tipo==='imagem_baixa');
+ await upload('#789');
+ const abertas=await G.get('/carometro/pendencias?estado=abertas');
+ ok('baixa qualidade não aparece nos tipos',!Object.hasOwn(abertas.tipos,'imagem_baixa'));
+ ok('baixa qualidade não entra no contador',!Object.hasOwn(abertas.contagem,'imagem_baixa'));
+ ok('foto escolhida não gera pendência',!abertas.rows.some(p=>p.alunoId===a.id));
+ const ignoradas=await G.get('/carometro/pendencias?estado=ignoradas');ok('baixa qualidade também não aparece nas ignoradas',!ignoradas.rows.some(p=>p.tipo==='imagem_baixa'));
+ await upload('#abc');ok('substituir foto mantém qualidade fora das pendências',(await pend('abertas')).length===0);
+ const d=await G.get('/carometro/alunos?busca=QUAL1');ok('foto permanece cadastrada',!!d.rows[0].fotoId);
+ const l=await G.post('/carometro/lote/criar',{turma:'7º Ano A'});const fd=new FormData();fd.append('lote_id',l.loteId);fd.append('arquivo',new Blob([await sharp({create:{width:150,height:150,channels:3,background:'#789'}}).jpeg().toBuffer()]),'QUAL1.jpg');await fetch(U.B+'/carometro/lote/fotos',{method:'POST',headers:{Cookie:G.H.Cookie,'X-EVO':'1'},body:fd});
+ const lote=await G.get('/carometro/lote?id='+l.loteId);ok('aviso técnico continua na conferência',lote.itens.some(i=>/baixa|desfoque/i.test(i.aviso)));
+ console.log(checks+' verificações passaram.');
+})().catch(e=>{console.error(e);process.exit(1)});

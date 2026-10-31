@@ -20,7 +20,7 @@ const { t, fim } = U.contador();
   const fd = new FormData(); fd.append('arquivo', new Blob([await jpg(600, 800)], { type: 'image/jpeg' }), 'xyz.jpg');
   await raw(G, '/carometro/lote/fotos', { method: 'POST', body: fd });
   d = await G.get('/carometro/pendencias');
-  t('contagem por tipo', d.contagem.sem_foto === 7 && d.contagem.imagem_baixa === 0 && d.contagem.duplicado === 2 && d.contagem.varias_turmas === 2 && d.contagem.sem_turma === 2 && d.contagem.arquivo_orfao === 1 && d.abertas === 14, d.contagem);
+  t('contagem por tipo', d.contagem.sem_foto === 7 && !Object.hasOwn(d.contagem, 'imagem_baixa') && d.contagem.duplicado === 2 && d.contagem.varias_turmas === 2 && d.contagem.sem_turma === 2 && d.contagem.arquivo_orfao === 1 && d.abertas === 14, d.contagem);
   t('foto boa não gera pendência de imagem', !d.rows.some(r => r.matricula === 'Q-1' && r.tipo !== 'x'));
   t('foto pequena (150×150) não gera pendência de qualidade', !d.rows.some(r => r.tipo === 'imagem_baixa'));
   t('turma fora do padrão e aluno sem turma são apontados', d.rows.filter(r => r.tipo === 'sem_turma').map(r => r.matricula).sort().join() === 'Q-8,Q-9');
