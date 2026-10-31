@@ -233,6 +233,7 @@ export async function igSyncSeguidores(): Promise<{ atualizados: number; falhas:
 }
 
 export async function igSync(months = 2): Promise<number> {
+  await setSetting('ig_last_attempt', now());
   if (!(await metaConnected())) throw new Error('Instagram não conectado.');
   const principal = await setting('ig_user_id');
   await run("UPDATE ig_posts SET conta=? WHERE conta=''", [principal]);

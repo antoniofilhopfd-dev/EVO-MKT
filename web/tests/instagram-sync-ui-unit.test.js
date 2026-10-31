@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const nodes=Object.fromEntries(['#metaForm','#igSync','#igSyncResultado','#igTentativa'].map(k=>[k,{disabled:false,textContent:'',hidden:true,setAttribute(k,v){this[k]=v;}}]));
+let response,posts=0,navigations=0;const st={instagram:{conectado:true,configurado:false,contas:[],monitoradas:[],ultimaTentativa:'2026-10-31T08:40:00',avisoSync:'Erro anterior'},redirectUris:{meta:'https://example.test/callback'}};
+const c={PAGINAS:{},$:id=>nodes[id]||null,$$:()=>[],esc:x=>String(x??''),attr:x=>String(x??''),fmtDateTime:x=>String(x),fmtDate:x=>String(x),api:async p=>p.includes('status')?st:[],post:async()=>{posts++;if(response instanceof Error)throw response;return response;},toast:()=>{},mensagemErro:e=>e.message||'Falha',go:()=>{navigations++;},console};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../public/configuracoes.js'),'utf8')+'\nthis.renderInstagram=cfgInstagram;',c);
+(async()=>{const body={innerHTML:''};await c.renderInstagram(body);assert.ok(body.innerHTML.includes('Erro anterior')&&body.innerHTML.includes('Última tentativa'));console.log('OK resultado anterior permanece visível');
+ response=new Error('HTTP 400: intervalo inválido');await nodes['#igSync'].onclick();assert.ok(nodes['#igSyncResultado'].textContent.includes('intervalo inválido'));assert.equal(nodes['#igSyncResultado'].hidden,false);assert.equal(nodes['#igSync'].disabled,false);console.log('OK falha fica visível e botão volta a funcionar');
+ response={periodos:2,aviso:'Um perfil falhou'};await nodes['#igSync'].onclick();assert.ok(nodes['#igSyncResultado'].textContent.includes('parcial'));console.log('OK sucesso parcial não se apresenta como completo');
+ response={periodos:4,aviso:'',ultimaSync:'2026-10-31T08:45:00'};await nodes['#igSync'].onclick();assert.ok(nodes['#igSyncResultado'].textContent.includes('4 período(s)')&&nodes['#igSyncResultado'].textContent.includes('08:45'));assert.equal(navigations,0);console.log('OK sucesso mostra contagem e horário sem apagar resultado');
+ nodes['#igSync'].disabled=true;await nodes['#igSync'].onclick();assert.equal(posts,3);console.log('OK impede cliques repetidos durante envio');console.log('5 verificações passaram.');
+})().catch(e=>{console.error(e);process.exit(1)});

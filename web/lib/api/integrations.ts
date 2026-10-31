@@ -51,7 +51,7 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
         instagram: {
           configurado: (await setting('meta_app_id')) !== '' && (await setting('meta_app_secret')) !== '',
           appId: await setting('meta_app_id'), conectado: await metaConnected(), usuario: await setting('ig_username'), pagina: await setting('meta_page_name'),
-          expiraEm: exp ? now(new Date(exp * 1000)) : '', ultimaSync: await setting('ig_last_sync'),
+          expiraEm: exp ? now(new Date(exp * 1000)) : '', ultimaSync: await setting('ig_last_sync'), ultimaTentativa: await setting('ig_last_attempt'), avisoSync: await setting('ig_sync_warning'),
           contas: JSON.parse((await setting('meta_contas')) || '[]'), ocultas: await contasOcultas(), igUserId: await setting('ig_user_id'), monitoradas: (await contasMonitoradas()).map((x) => x.ig), tokenInvalido: (await setting('meta_token_invalido')) === '1',
           permissoesFaltando: (await setting('meta_perm_faltando')).split(',').filter(Boolean),
         },
@@ -213,7 +213,8 @@ export async function integrationsRoute(c: Ctx): Promise<Response> {
     }
     case path === '/integrations/instagram/sync' && method === 'POST': {
       await requireInternal(c);
-      try { await metaRefreshIfNeeded(); const meses = Math.min(24, Math.max(2, Math.floor(Number(((await c.body().catch(() => ({}))) as Row).meses) || 2))); return json({ periodos: await igSync(meses) }); } catch (e: any) { return bad('instagram', e); }
+      await setSetting('ig_last_attempt', now());
+      try { await metaRefreshIfNeeded(); const meses = Math.min(24, Math.max(2, Math.floor(Number(((await c.body().catch(() => ({}))) as Row).meses) || 2))); const periodos = await igSync(meses); return json({ periodos, aviso: await setting('ig_sync_warning'), ultimaSync: await setting('ig_last_sync') }); } catch (e: any) { await setSetting('ig_sync_warning', String(e?.message || 'Não foi possível sincronizar o Instagram.').slice(0, 500)); return bad('instagram', e); }
     }
     case path === '/integrations/instagram/queue': {
       await requireInternal(c);
