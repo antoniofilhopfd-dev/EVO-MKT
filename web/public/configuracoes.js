@@ -89,12 +89,22 @@ async function cfgInstagram(corpo) {
     ${ig.tokenInvalido ? '<p class="int-warn">⚠ O acesso à Meta expirou ou foi revogado. Clique em Reconectar.</p>' : ''}${ig.permissoesFaltando?.length ? `<p class="int-warn">⚠ Permissões não aceitas: ${esc(ig.permissoesFaltando.join(', '))}. Reconecte e deixe todas marcadas.</p>` : ''}
     ${ig.conectado ? `<p class="kpi-note">Página: ${esc(ig.pagina || '—')} · token válido até ${ig.expiraEm ? esc(fmtDate(ig.expiraEm)) : '—'} (renovado sozinho) · última sincronização: ${ig.ultimaSync ? esc(fmtDateTime(ig.ultimaSync)) : 'nunca'}</p>
     <h3>Perfis acompanhados</h3>${(ig.contas || []).map(c => `<label class="setting-row"><div><b>@${esc(c.usuario)}</b><small>${esc(c.pagina || '')}</small></div><input type="checkbox" data-mon="${attr(c.ig)}" ${(ig.monitoradas || []).includes(c.ig) ? 'checked' : ''} ${c.ig === ig.igUserId ? 'disabled title="Perfil principal"' : ''}></label>`).join('') || '<div class="empty compact">Nenhum perfil encontrado nas Páginas desta conexão.</div>'}
-    <div class="actions"><button class="btn" id="igSync">Sincronizar agora</button></div>` : ''}</section>
+    <p id="igTentativa" class="kpi-note">${ig.ultimaTentativa ? `Última tentativa: ${esc(fmtDateTime(ig.ultimaTentativa))}` : ''}</p><div id="igSyncResultado" class="int-warn" role="status" aria-live="polite" ${ig.avisoSync ? '' : 'hidden'}>${esc(ig.avisoSync || '')}</div><div class="actions"><button type="button" class="btn" id="igSync">Sincronizar Instagram agora</button></div>` : ''}</section>
     <section class="card"><div class="db-tit"><h2>Fila de publicação automática</h2></div>${fila.length ? `<div class="tablewrap"><table class="datatable"><thead><tr><th>Publicação</th><th>Quando</th><th>Estado</th><th></th></tr></thead><tbody>${fila.map(c => `<tr><td class="titlecell">${esc(c.titulo)}<br><small>${esc(c.id)}</small></td><td>${esc(fmtDateTime(c.publicacaoEm))}</td><td>${esc(c.estado || (c.publicado ? 'Publicado' : 'Aguardando'))}${c.erro ? `<br><small class="bad">${esc(c.erro)}</small>` : ''}</td><td>${c.estado === 'ERRO' ? `<button class="btn soft" data-retry="${attr(c.id)}">Tentar de novo</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty compact">Nenhuma publicação agendada para sair sozinha.</div>'}</section>`;
   $('#metaForm').onsubmit = e => { e.preventDefault(); salvaCred('#metaForm'); };
   const d = $('#metaDesc'); if (d) d.onclick = async () => { if (!await Dlg.confirmar({ titulo: 'Desconectar a Meta', texto: 'O sistema deixa de ler o Instagram e os anúncios até reconectar. Nada é apagado na Meta.', confirmar: 'Desconectar', perigo: true })) return; try { await post('/integrations/meta/disconnect', {}); cfgIr(); } catch (er) { toast(er.message, 'warn'); } };
   $$('[data-mon]', corpo).forEach(cb => { cb.onchange = async () => { const ids = $$('[data-mon]', corpo).filter(x => x.checked).map(x => x.dataset.mon); try { await post('/integrations/meta/account', { monitorar: ids }); toast('Perfis acompanhados atualizados'); } catch (e) { toast(e.message, 'warn'); } }; });
-  const s = $('#igSync'); if (s) s.onclick = async () => { s.disabled = true; try { await post('/integrations/instagram/sync', {}); toast('Instagram sincronizado'); cfgIr(); } catch (e) { toast(e.message, 'warn'); s.disabled = false; } };
+  const s = $('#igSync'); if (s) s.onclick = async () => {
+    if(s.disabled)return;
+    const resultado=$('#igSyncResultado');s.disabled=true;s.textContent='Sincronizando Instagram…';resultado.hidden=false;resultado.textContent='Consultando os perfis acompanhados. Aguarde o resultado.';
+    $('#igTentativa').textContent='Tentativa iniciada: '+fmtDateTime(new Date().toISOString());
+    try {
+      const r=await post('/integrations/instagram/sync',{});
+      resultado.textContent=r.aviso ? 'Sincronização parcial: '+r.aviso : `Instagram sincronizado: ${r.periodos} período(s) atualizado(s).${r.ultimaSync?' Última sincronização completa: '+fmtDateTime(r.ultimaSync):''}`;
+      resultado.setAttribute('role',r.aviso?'alert':'status');toast(r.aviso?'Sincronização parcial. Confira o resultado abaixo.':'Instagram sincronizado',r.aviso?'warn':'ok');
+    } catch(e) {resultado.setAttribute('role','alert');resultado.textContent='A sincronização do Instagram falhou: '+mensagemErro(e);toast('Falha na sincronização. Confira a mensagem abaixo.','warn');}
+    finally{s.disabled=false;s.textContent='Sincronizar Instagram agora';}
+  };
   $$('[data-retry]', corpo).forEach(b => { b.onclick = async () => { try { await post('/integrations/instagram/retry', { id: b.dataset.retry }); toast('Nova tentativa na próxima rodada'); cfgIr(); } catch (e) { toast(e.message, 'warn'); } }; });
 }
 
