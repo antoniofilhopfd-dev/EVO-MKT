@@ -3,7 +3,7 @@ import { Row } from './util';
 import { compararTurmaCm, normNome, segmentoCm } from './carometro';
 
 export const TIPOS_PEND: Record<string, string> = {
-  sem_foto: 'Sem foto', imagem_baixa: 'Imagem de baixa qualidade', duplicado: 'Nome repetido na turma',
+  sem_foto: 'Sem foto', imagem_baixa: 'Qualidade da foto a conferir', duplicado: 'Nome repetido na turma',
   varias_turmas: 'Mesmo nome em mais de uma turma', sem_turma: 'Turma não reconhecida', arquivo_orfao: 'Arquivo sem aluno (lote aberto)',
 };
 export interface Pend { chave: string; tipo: string; alunoId: number | null; aluno: string; matricula: string; turma: string; detalhe: string; ignorada: boolean; motivo: string; por: string }
@@ -26,7 +26,7 @@ export async function calcularPendencias(): Promise<Pend[]> {
   }
   for (const a of alunos) {
     if (!a.foto_id) add('sem_foto', a, a.id, 'Nenhuma foto vinculada.');
-    else if (Number(a.largura) < 600 || Number(a.altura) < 800 || /desfoque/i.test(String(a.aviso))) add('imagem_baixa', a, a.id, String(a.aviso || `Resolução baixa (${a.largura}×${a.altura}).`));
+    else if (Number(a.largura) < 600 || Number(a.altura) < 800 || /desfoque/i.test(String(a.aviso))) add('imagem_baixa', a, `i${a.foto_id}`,  String(a.aviso || `Resolução baixa (${a.largura}×${a.altura}).`));
     if ((porNomeTurma.get(`${a.turma}|${normNome(String(a.nome))}`) ?? []).length > 1) add('duplicado', a, a.id, 'Há outro aluno com o mesmo nome nesta turma (confira se não é cadastro repetido).');
     const outras = (porNome.get(normNome(String(a.nome))) ?? []).filter((x) => x.turma !== a.turma);
     if (outras.length && String(a.turma)) add('varias_turmas', a, a.id, `Também aparece em: ${[...new Set(outras.map((x) => String(x.turma)))].slice(0, 3).join(', ')}. Pode ser troca de turma não atualizada.`);
