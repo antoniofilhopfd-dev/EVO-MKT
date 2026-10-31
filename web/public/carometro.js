@@ -143,10 +143,20 @@ const CM_EST = { ok: ['Pronta', 'ok'], sugerida: ['Confirmar', 'warn'], ambigua:
 const CM_LOTE = { simulado: 'Em simulação', aplicado: 'Aplicado', cancelado: 'Cancelado', desfeito: 'Desfeito' };
 PAGINAS.cmimport = async function () {
   $('#content').innerHTML = `<section class="card"><div class="db-tit"><h2>1. Lista de alunos</h2></div><p class="kpi-note">O cadastro de alunos é o mesmo do Uso de Imagem. A importação mostra uma prévia antes de gravar, atualiza pela matrícula e nunca apaga ninguém.</p><div class="ig-barra"><button type="button" class="btn" id="cmImpAlunos">Importar lista de alunos…</button></div></section>
-    <section class="card"><div class="db-tit"><h2>2. Fotos de uma turma (turma por turma)</h2></div><p class="kpi-note">Escolha a turma e envie <b>todas as fotos dela de uma vez</b>: selecione os arquivos (Ctrl+A na pasta) ou envie a pasta compactada em <b>ZIP</b> (até 60 MB). O arquivo pode se chamar pela <b>matrícula</b> (2026001.jpg) ou pelo <b>nome</b> (joao-silva.jpg); as fotos sem nome certo você liga ao aluno na lista da turma. Nada é gravado antes de você conferir e aplicar.</p>
-      <div class="ig-barra"><select id="cmTurmaLote" class="control" aria-label="Turma das fotos"><option value="">Escolha a turma…</option></select><input type="file" id="cmFotosT" accept="image/*,.zip,application/zip" multiple aria-label="Fotos da turma (ou um ZIP com as fotos)"><button type="button" class="btn" id="cmSimularT">Simular turma</button></div><div id="cmProgT" class="kpi-note"></div></section>
-    <section class="card"><div class="db-tit"><h2>3. Fotos de várias turmas (por matrícula)</h2></div><p class="kpi-note">Nome do arquivo = matrícula (ex.: <b>2026001.jpg</b>). Dá para enviar também um manifesto (<b>matricula;nome_arquivo;origem</b>). Nada vira foto de aluno antes de você conferir e aplicar. Nomes só são sugeridos, nunca associados sozinhos.</p>
-      <div class="ig-barra"><input type="file" id="cmFotos" accept="image/*,.zip" multiple aria-label="Fotos dos alunos"><input type="file" id="cmManifesto" accept=".csv,.txt,text/csv,text/plain" aria-label="Manifesto opcional (CSV)"><button type="button" class="btn" id="cmSimular">Simular importação (novo lote)</button><button type="button" class="btn" id="cmAdicionarSelecionadas" hidden>Adicionar ao lote aberto</button></div><div id="cmProg" class="kpi-note" aria-live="polite"></div><label class="ui-campo">Ou selecionar uma pasta com subpastas por turma<input id="cmPastas" type="file" webkitdirectory multiple></label><button type="button" class="btn" id="cmEnviarPastas">Adicionar pastas à fila</button></section>
+    <section class="card"><div class="db-tit"><h2>2. Selecionar fotos de várias turmas</h2></div>
+      <p class="kpi-note">Selecione as fotos de uma pasta e depois selecione mais, quantas vezes precisar. Cada arquivo deve ter a matrícula do aluno no nome. Nada é enviado enquanto você não clicar em “Enviar e conferir tudo”.</p>
+      <input type="file" id="cmFotos" accept="image/jpeg,image/png,image/webp,.zip" multiple hidden aria-label="Selecionar fotos">
+      <div class="ig-barra"><button type="button" class="btn" id="cmSelecionarMais">Selecionar fotos</button><button type="button" class="btn ghost" id="cmLimparArquivos" hidden>Limpar seleção</button></div>
+      <div id="cmArquivosResumo" aria-live="polite"></div>
+      <p class="kpi-note">Até 400 fotos por conferência, incluindo as fotos de ZIPs. Os arquivos selecionados ficam neste navegador até o envio. Recarregar ou fechar a página descarta a seleção ainda não enviada.</p>
+      <details><summary>Manifesto opcional</summary><input type="file" id="cmManifesto" accept=".csv,.txt,text/csv,text/plain" aria-label="Manifesto opcional (CSV)"></details>
+      <button type="button" class="btn" id="cmSimular" disabled>Enviar e conferir tudo</button><button type="button" id="cmAdicionarSelecionadas" hidden></button><div id="cmProg" class="kpi-note" aria-live="polite"></div>
+    </section>
+    <details class="card"><summary>Outras formas de importar: turma por nome ou pastas organizadas</summary>
+      <p class="kpi-note">Para arquivos identificados pelo nome do aluno, escolha uma turma. Nomes exigem conferência.</p>
+      <div class="ig-barra"><select id="cmTurmaLote" class="control" aria-label="Turma das fotos"><option value="">Escolha a turma…</option></select><input type="file" id="cmFotosT" accept="image/*,.zip,application/zip" multiple aria-label="Fotos da turma (ou um ZIP com as fotos)"><button type="button" class="btn" id="cmSimularT">Enviar turma para conferência</button></div><div id="cmProgT" class="kpi-note"></div>
+      <label class="ui-campo">Pasta com subpastas por turma<input id="cmPastas" type="file" webkitdirectory multiple></label><button type="button" class="btn" id="cmEnviarPastas">Enviar pastas para conferência</button>
+    </details>
     <section class="card"><div class="db-tit"><h2>Fila de importação</h2></div><p class="kpi-note">Cada envio acrescenta um lote. Os rascunhos e as associações ficam salvos no servidor. Confira cada lote e selecione os que deseja aplicar juntos.</p><div id="cmFila"></div></section><div id="cmLote"></div><section class="card"><div class="db-tit"><h2>Lotes recentes</h2></div><div id="cmLotes"></div></section>`;
   $('#cmImpAlunos').onclick = () => uiImportar(() => toast('Lista de alunos atualizada'));
   const arvore = await api('/carometro/turmas');
@@ -188,7 +198,7 @@ PAGINAS.cmimport = async function () {
   };
   const desenhaLote = async id => {
     const d = await api('/carometro/lote?id=' + id), r = d.resumo, aberto = d.lote.estado === 'simulado';
-    $('#cmAdicionarSelecionadas').hidden=!aberto;
+    $('#cmAdicionarSelecionadas').hidden=true;
     $('#cmAdicionarSelecionadas').textContent=`Adicionar ao lote #${id}`;
     $('#cmAdicionarSelecionadas').onclick=()=>simular($('#cmAdicionarSelecionadas'),$('#cmProg'),[...$('#cmFotos').files],'',d.lote.turma,id);
     const cart = (t, v, cls) => `<div class="db-cartao ui-cartao ${cls || ''}"><small>${t}</small><strong>${fmtN(v)}</strong></div>`;
@@ -249,12 +259,13 @@ PAGINAS.cmimport = async function () {
     });
     $('#cmCancelarLote') && ($('#cmCancelarLote').onclick = async () => { if (await Dlg.confirmar({ titulo: 'Cancelar o lote?', texto: 'As fotos enviadas para a simulação são descartadas. Nenhuma ficha é alterada.', confirmar: 'Cancelar lote', perigo: true })) { await post('/carometro/lote/cancelar', { lote_id: id }); $('#cmLote').innerHTML = ''; $('#cmAdicionarSelecionadas').hidden=true; desenhaLotes(); } });
   };
-  const simular = async (btn, prog, arqs, man, turma, existente = 0) => {
+  const simular = async (btn, prog, arqs, man, turma, existente = 0, selecao = false) => {
     if (!arqs.length) { avisoImportacao('Escolha as fotos antes de adicionar ao lote.'); return; }
     if (ocupado) { toast('Aguarde o envio em andamento.', 'warn'); return; }
     ocupado = true; btn.disabled = true; let loteId = existente; const falhas=[]; let ultimoErro = ''; avisoImportacao('');
     try {
       if (!loteId) loteId = (await post('/carometro/lote/criar',{manifesto:man,turma})).loteId;
+      if(selecao) CM_IMP.loteSelecao=loteId;
       const enviar = async lista => {
         for (let i=0;i<lista.length;i++) {
           const f0=lista[i]; prog.textContent=`Lote #${loteId}: enviando ${i+1} de ${lista.length}…`;
@@ -265,11 +276,13 @@ PAGINAS.cmimport = async function () {
         }
       };
       await enviar(arqs);
+      if(selecao){CM_IMP.grupos=falhas.length?[{nome:'Arquivos não enviados',arquivos:[...falhas]}]:[];if(!falhas.length)CM_IMP.loteSelecao=0;}
       await desenhaLote(loteId); await desenhaLotes();
       prog=document.getElementById(prog.id)||prog;
       prog.textContent = falhas.length ? `${falhas.length} arquivo(s) falharam; os demais ficaram salvos no lote #${loteId}. ` : `Lote #${loteId} salvo para conferência. Adicione outra turma quando quiser.`;
       if(falhas.length) {
         avisoImportacao(`${falhas.length} arquivo(s) não foram enviados ao lote #${loteId}. ${ultimoErro}`);
+        if(selecao) return;
         const retry=document.createElement('button');retry.className='btn';retry.textContent='Tentar novamente só as falhas';prog.appendChild(retry);
         retry.onclick=async()=>{if(ocupado)return;ocupado=true;retry.disabled=true;try{const pend=falhas.splice(0);await enviar(pend);await desenhaLote(loteId);await desenhaLotes();prog=document.getElementById(prog.id)||prog;prog.textContent=falhas.length?`${falhas.length} arquivo(s) ainda falharam. Selecione-os para um novo envio.`:'Envio recuperado.';avisoImportacao(falhas.length ? ultimoErro : 'Envio recuperado.', !!falhas.length);}catch(e){avisoImportacao('Não foi possível atualizar o lote #'+loteId+'. '+mensagemErro(e));}finally{ocupado=false;if(retry.isConnected)retry.disabled=false;}};
       }
@@ -288,10 +301,40 @@ PAGINAS.cmimport = async function () {
     if(!await Dlg.confirmar({titulo:'Adicionar pastas por turma?',texto:[...grupos].map(([t,fs])=>`${t}: ${fs.length} foto(s)`).join('; '),confirmar:'Adicionar à fila'})) return;
     for(const [turma,arquivos] of grupos) await simular($('#cmEnviarPastas'),$('#cmProg'),arquivos,'',turma);
   };
-  $('#cmSimular').onclick = async () => { const man = $('#cmManifesto').files[0] ? await $('#cmManifesto').files[0].text() : ''; await simular($('#cmSimular'), $('#cmProg'), [...$('#cmFotos').files], man, ''); $('#cmFotos').value = ''; };
+  const renderSelecao = () => {
+    const total = CM_IMP.grupos.reduce((n,g)=>n+g.arquivos.length,0);
+    $('#cmSelecionarMais').textContent=total?'Selecionar mais fotos':'Selecionar fotos';
+    $('#cmSimular').disabled=!total||ocupado;
+    $('#cmLimparArquivos').hidden=!total;
+    $('#cmArquivosResumo').innerHTML=`<p><b>${CM_IMP.grupos.length} grupo(s) selecionado(s) · ${total} arquivo(s) · ainda não enviados</b></p>`+CM_IMP.grupos.map((g,i)=>`<div class="ig-barra"><span>Grupo ${i+1} · ${esc(g.nome)} · ${g.arquivos.length} arquivo(s)</span><button type="button" class="btn ghost" data-rem-grupo="${i}">Remover grupo</button></div>`).join('');
+    $$('#cmArquivosResumo [data-rem-grupo]').forEach(b=>{b.disabled=ocupado;b.onclick=()=>{if(ocupado)return;CM_IMP.grupos.splice(+b.dataset.remGrupo,1);renderSelecao();};});
+    $('#cmSelecionarMais').disabled=ocupado;$('#cmLimparArquivos').disabled=ocupado;
+  };
+  $('#cmSelecionarMais').onclick=()=>$('#cmFotos').click();
+  $('#cmFotos').onchange=()=>{
+    if(ocupado)return;
+    const arquivos=[...$('#cmFotos').files];$('#cmFotos').value='';
+    if(!arquivos.length)return;
+    $('#cmLote').innerHTML='';
+    CM_IMP.grupos.push({nome:`${arquivos[0].name}${arquivos.length>1?'…':''}`,arquivos});
+    renderSelecao();
+  };
+  $('#cmLimparArquivos').onclick=async()=>{if(!ocupado&&await Dlg.confirmar({titulo:'Limpar arquivos selecionados?',texto:'Somente os arquivos ainda não enviados saem da seleção.',confirmar:'Limpar seleção'})){CM_IMP.grupos=[];renderSelecao();}};
+  $('#cmSimular').onclick=async()=>{
+    if(ocupado)return;
+    const arquivos=CM_IMP.grupos.flatMap(g=>g.arquivos);if(!arquivos.length)return;
+    if(arquivos.length>400){avisoImportacao('Cada conferência aceita até 400 fotos. Remova alguns grupos e envie-os depois.');return;}
+    try{
+      const man=$('#cmManifesto').files[0]?await $('#cmManifesto').files[0].text():'';
+      // Usa o mesmo rascunho para recuperar falhas sem multiplicar lotes.
+      const envio=simular($('#cmSimular'),$('#cmProg'),arquivos,man,'',CM_IMP.loteSelecao,true);
+      renderSelecao();await envio;
+    }catch(e){avisoImportacao(mensagemErro(e));}finally{renderSelecao();}
+  };
+  renderSelecao();
   $('#cmSimularT').onclick = async () => { const turma = $('#cmTurmaLote').value; if (!turma) { toast('Escolha a turma.', 'warn'); return; } await simular($('#cmSimularT'), $('#cmProgT'), [...$('#cmFotosT').files], '', turma); $('#cmFotosT').value = ''; };
   await desenhaLotes();
-  const aberto = (await api('/carometro/lotes')).rows.find(l => l.estado === 'simulado'); if (aberto) desenhaLote(aberto.id);
+  const aberto = (await api('/carometro/lotes')).rows.find(l => l.estado === 'simulado'); if (aberto && !CM_IMP.grupos.length) desenhaLote(aberto.id);
 };
 
 /* ---- Seleções salvas ---- */
@@ -394,7 +437,7 @@ PAGINAS.cmpdf = async function () {
 };
 
 /* ---- Pendências e qualidade ---- */
-const CM_IMP = { turma: '' };
+const CM_IMP = { turma: '', grupos: [], loteSelecao: 0 };
 const CM_PEND = { tipo: '', estado: 'abertas', sel: new Set() };
 PAGINAS.cmpendencias = async function () {
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
