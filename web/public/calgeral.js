@@ -18,7 +18,8 @@ const CG_SEG_PREF = pref('cgSegmentosVisiveis', CG_GRUPOS.map(g => g[0]));
 const CG = { ref: hojeBR(), modo: ['mes', 'semana', 'dia'].includes(pref('cgModo', 'mes')) ? pref('cgModo', 'mes') : 'mes', segs: new Set(Array.isArray(CG_SEG_PREF) ? CG_SEG_PREF.filter(k => CG_GRUPOS.some(g => g[0] === k)) : CG_GRUPOS.map(g => g[0])), busca: '', dados: null, sel: hojeBR() };
 const CG_AGENDAS_OCULTAS = new Set(Array.isArray(pref('cgAgendasOcultas', [])) ? pref('cgAgendasOcultas', []) : []);
 const cgAgendaId = a => String(a?.calendarId || a?.id || '');
-const cgAgendaVisivel = e => !CG_AGENDAS_OCULTAS.has(String(e.calendarId || ''));
+// Se a API não fornecer identificador, mantenha o evento visível em vez de ocultá-lo por engano.
+const cgAgendaVisivel = e => !e.calendarId || !CG_AGENDAS_OCULTAS.has(String(e.calendarId));
 function cgFiltroAgendas(agendas) {
   return `<details class="cg-segs"><summary class="btn soft">Agendas visíveis: ${agendas.filter(a => !CG_AGENDAS_OCULTAS.has(cgAgendaId(a))).length}/${agendas.length} ▾</summary><div>${agendas.map(a => `<label><input type="checkbox" data-cg-agenda="${attr(cgAgendaId(a))}" ${!CG_AGENDAS_OCULTAS.has(cgAgendaId(a)) ? 'checked' : ''}>${esc(a.nome || a.name || a.titulo || a.calendarId || a.id || 'Agenda')}</label>`).join('')}<button type="button" class="btn soft" data-cg-agendas-todas>Mostrar todas</button><button type="button" class="btn soft" data-cg-agendas-nenhuma>Ocultar todas</button><small>Mostrar ou ocultar não altera a conexão com o Google Agenda.</small></div></details>`;
 }
