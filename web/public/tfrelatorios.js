@@ -1,7 +1,7 @@
 /* Tráfego Pago › Relatórios: só o Relatório Geral. Período (com datas editáveis), recorte semanal, filtros, PRÉ-VISUALIZAÇÃO e download direto do PDF
    (gerado no servidor; não abre diálogo de impressão). Somente leitura. */
 const TF_REL = { status: 'todos', segmento: '', campanha: '', semanal: false };
-const TF_REL_PERIODOS = [['semana', 'Esta semana'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano']];
+const TF_REL_PERIODOS = [['semana', 'Esta semana'], ['semana_ant', 'Semana anterior'], ['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['ano', 'Este ano']];
 const tfBR = iso => iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '';
 /** "dd/mm/aaaa" → "aaaa-mm-dd" (ou '' se não for uma data real). */
 function tfDataBR(txt) {
