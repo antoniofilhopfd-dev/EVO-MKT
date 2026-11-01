@@ -72,17 +72,48 @@ const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+($('#perfil').valu
 
 let contasRelatorio=[];
 function comparativoHtml(dados) {
- const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance por conta','Visualizações','Interações','Publicações'];
- const valores=d=>{const s=num(d.seguidores),a=num(d.seguidoresAnterior),m=d.atual||{};return [s,s!==null&&a!==null?s-a:null,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length]};
- const v=dados.map(valores),somaveis=new Set([1,3,4,5]);
- return `<article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Relatório mensal — comparação de contas</h1><p>${esc($('#mes').value)}</p></div></header><section class="card"><h3>Comparativo das contas</h3><table><thead><tr><th>Indicador</th>${dados.map(d=>`<th>@${esc(d.conta||'Instagram')}</th>`).join('')}<th>Consolidado</th></tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}<td>${somaveis.has(i)&&v.every(a=>a[i]!==null)?N0(v.reduce((s,a)=>s+a[i],0)):'—'}</td></tr>`).join('')}</tbody></table><p class="nota">Alcance e seguidores não são somados entre contas, pois pode haver pessoas em comum. Indicadores indisponíveis aparecem como —.</p></section></article>`;
+  // Um único relatório das contas, com resultados consolidados no corpo e comparação apenas no encerramento.
+  const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance por conta','Visualizações','Interações','Publicações'];
+  const valores=d=>{const s=num(d.seguidores),a=num(d.seguidoresAnterior),m=d.atual||{};return [s,s!==null&&a!==null?s-a:null,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length]};
+  const v=dados.map(valores),somaveis=new Set([1,3,4,5]);
+  const total=i=>v.every(a=>a[i]!==null)?v.reduce((s,a)=>s+a[i],0):null;
+  const mes=$('#mes').value;
+  const [ano,mm]=mes.split('-').map(Number),mesNome=MESES[mm-1][0].toUpperCase()+MESES[mm-1].slice(1)+' de '+ano;
+  const contas=dados.map(d=>'@'+String(d.conta||'Instagram').replace(/^@/,'')).join(' + ');
+  const posts=dados.flatMap(d=>(d.posts||[]).map(p=>({...p,perfil:d.conta||'Instagram'})));
+  const top=[...posts].sort((a,b)=>(num(b.alcance)||0)-(num(a.alcance)||0)).slice(0,5);
+  const formatos={};
+  posts.forEach(p=>{const tipo=FMT(p.tipo),x=formatos[tipo]||(formatos[tipo]={n:0,interacoes:0});x.n++;x.interacoes+=num(p.interacoes)||0});
+  const semanas=new Map();
+  dados.forEach(d=>(d.semanas||[]).forEach(w=>{const k=w.inicio;if(!k)return;const x=semanas.get(k)||{inicio:k,alcance:0,visualizacoes:0,temAlcance:false,temVisualizacoes:false};if(num(w.alcance)!==null){x.alcance+=num(w.alcance);x.temAlcance=true}if(num(w.visualizacoes)!==null){x.visualizacoes+=num(w.visualizacoes);x.temVisualizacoes=true}semanas.set(k,x)}));
+  const sem=[...semanas.values()].sort((a,b)=>a.inicio.localeCompare(b.inicio));
+  const completos=sem.length&&sem.every(w=>w.temAlcance&&w.temVisualizacoes);
+  const fat=Object.keys(formatos).map(nome=>({nome,v:formatos[nome].interacoes,cor:COR_FMT[nome]||COR_FMT.Outros}));
+  const totalInteracoes=fat.reduce((s,x)=>s+x.v,0);
+  const cards=[
+    '<div class="k"><small>Contas incluídas</small><b>'+N0(dados.length)+'</b><span class="v">relatório conjunto</span></div>',
+    '<div class="k"><small>Novos seguidores (soma)</small><b>'+N0(total(1))+'</b><span class="v">variação líquida das contas</span></div>',
+    '<div class="k"><small>Visualizações (soma)</small><b>'+N0(total(3))+'</b><span class="v">não representa pessoas únicas</span></div>',
+    '<div class="k"><small>Interações (soma)</small><b>'+N0(total(4))+'</b></div>',
+    '<div class="k"><small>Publicações</small><b>'+N0(posts.length)+'</b><span class="v">somadas entre perfis</span></div>'
+  ];
+  const comparacao=`<section class="card"><h3>Comparação entre as contas</h3><p class="sub">Detalhamento por perfil ao final do relatório</p><table><thead><tr><th>Indicador</th>${dados.map(d=>`<th>@${esc(String(d.conta||'Instagram').replace(/^@/,''))}</th>`).join('')}<th>Total</th></tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}<td>${somaveis.has(i)?N0(total(i)):'—'}</td></tr>`).join('')}</tbody></table><p class="nota">Seguidores e alcance não são somados entre perfis: as audiências podem se sobrepor. O total de visualizações e interações representa a soma das métricas das contas, não usuários únicos. Dados indisponíveis não são estimados.</p></section>`;
+  return `<article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Relatório mensal conjunto — Instagram</h1><p>${esc(mesNome)}</p></div><div class="conta"><b>${esc(contas)}</b>Perfis institucionais</div></header>
+  <div class="corpo"><div class="resumo"><div><h2>Visão geral das contas</h2><p>Relatório compartilhado do Instagram orgânico, reunindo os resultados dos perfis em um só documento.</p></div></div>
+  <div class="kpis">${cards.join('')}</div>
+  <p class="nota">Alcance total único e seguidores totais não são apresentados porque podem incluir as mesmas pessoas nas duas contas. Os valores exibidos são exclusivamente os fornecidos pela Meta.</p>
+  <div class="duas"><section class="card"><h3>Visualizações por semana</h3><p class="sub">Soma das visualizações semanais dos perfis</p>${completos?svgBarras(sem.map(w=>DM(w.inicio)),[{nome:'Visualizações',cor:'#063996',v:sem.map(w=>w.visualizacoes)}],'Visualizações semanais somadas'):'<div class="vazio">Histórico semanal completo não disponível para todas as contas.</div>'}</section>
+  <section class="card"><h3>Interações por formato</h3><p class="sub">Publicações das contas reunidas</p><div class="rosca">${rosca(fat,N0(totalInteracoes))}<ul>${fat.map(x=>`<li><i style="background:${x.cor}"></i>${esc(x.nome)} <b>${N0(x.v)}</b></li>`).join('')}</ul></div></section></div>
+  <section class="card"><h3>Conteúdos de maior alcance</h3><p class="sub">Publicações dos perfis reunidas em um único ranking</p>${top.length?`<div class="top">${top.map((p,i)=>`<div class="t"><span class="n">${i+1}</span><div class="im">${url(p.miniatura)?`<img src="${esc(url(p.miniatura))}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'Sem imagem'}</div><div class="tx"><b>${esc((p.legenda||'Sem legenda').slice(0,80))}</b><small>@${esc(String(p.perfil).replace(/^@/,''))} · ${FMT(p.tipo)}</small><div class="m"><span>Alcance <b>${N0(num(p.alcance))}</b></span><span>Interações <b>${N0(num(p.interacoes))}</b></span></div></div></div>`).join('')}</div>`:'<div class="vazio">Sem publicações sincronizadas.</div>'}</section>
+  ${comparacao}
+  <p class="nota">Fonte: dados sincronizados da Meta para ${esc(mesNome)}. Não inclui resultados de anúncios pagos.</p></div></article>`;
 }
 let pedido=0;
 async function carregar(){
   const meu=++pedido;$('#rel').innerHTML='<div class="msg">Carregando…</div>';$('#baixar').disabled=true;
   try{
     if ($('#modo').value==='comparativo') {
-      if(contasRelatorio.length<2)throw new Error('São necessárias duas contas conectadas para comparar.');
+      if(contasRelatorio.length<2)throw new Error('São necessárias duas contas conectadas para o relatório conjunto.');
       const ds=await Promise.all(contasRelatorio.map(async conta=>{const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+'&conta='+encodeURIComponent(conta.ig),{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha ao consultar uma das contas.');return d;}));
       if(meu!==pedido)return;
       $('#rel').innerHTML=comparativoHtml(ds);$('#baixar').disabled=false;return;
