@@ -72,17 +72,26 @@ const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+($('#perfil').valu
 
 let contasRelatorio=[];
 function comparativoHtml(dados) {
- const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance por conta','Visualizações','Interações','Publicações'];
- const valores=d=>{const s=num(d.seguidores),a=num(d.seguidoresAnterior),m=d.atual||{};return [s,s!==null&&a!==null?s-a:null,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length]};
- const v=dados.map(valores),somaveis=new Set([1,3,4,5]);
- return `<article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Relatório mensal — comparação de contas</h1><p>${esc($('#mes').value)}</p></div></header><section class="card"><h3>Comparativo das contas</h3><table><thead><tr><th>Indicador</th>${dados.map(d=>`<th>@${esc(d.conta||'Instagram')}</th>`).join('')}<th>Consolidado</th></tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}<td>${somaveis.has(i)&&v.every(a=>a[i]!==null)?N0(v.reduce((s,a)=>s+a[i],0)):'—'}</td></tr>`).join('')}</tbody></table><p class="nota">Alcance e seguidores não são somados entre contas, pois pode haver pessoas em comum. Indicadores indisponíveis aparecem como —.</p></section></article>`;
+  // Cada perfil mantém o relatório completo. A comparação vem apenas depois dos dois.
+  const ordem=['evolucao.pb','geracao.evolucao'];
+  const normaliza=x=>String(x||'').replace(/^@/,'').toLowerCase();
+  const ordenados=[...dados].sort((a,b)=>{
+    const ia=ordem.indexOf(normaliza(a.conta)),ib=ordem.indexOf(normaliza(b.conta));
+    return (ia<0?ordem.length:ia)-(ib<0?ordem.length:ib);
+  });
+  const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance','Visualizações','Interações','Publicações'];
+  const valores=d=>{const s=num(d.seguidores),a=num(d.seguidoresAnterior),m=d.atual||{};return [s,s!==null&&a!==null?s-a:null,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length]};
+  const v=ordenados.map(valores);
+  const blocos=ordenados.map((d,i)=>`<section class="relatorio-conta" aria-label="Relatório ${i+1}: ${esc(d.conta||'Instagram')}"><div class="relatorio-secao"><span>Relatório ${i+1} de ${ordenados.length}</span> · @${esc(String(d.conta||'Instagram').replace(/^@/,''))}</div>${html(d)}</section>`).join('');
+  const tabela=`<section class="relatorio-comparacao"><article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Comparativo final — Instagram</h1><p>${esc($('#mes').value)}</p></div></header><div class="corpo"><div class="resumo"><div><h2>Comparação entre os perfis</h2><p>Resultados individuais no mesmo mês, sem consolidação ou soma de audiências.</p></div></div><section class="card"><h3>Indicadores lado a lado</h3><table><thead><tr><th>Indicador</th>${ordenados.map(d=>`<th>@${esc(String(d.conta||'Instagram').replace(/^@/,''))}</th>`).join('')}</tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></section><p class="nota">Alcance e seguidores são exclusivos de cada perfil; não devem ser somados por possível sobreposição de audiência. Dados indisponíveis aparecem como —. Fonte: Meta, Instagram orgânico.</p></div></article></section>`;
+  return blocos+tabela;
 }
 let pedido=0;
 async function carregar(){
   const meu=++pedido;$('#rel').innerHTML='<div class="msg">Carregando…</div>';$('#baixar').disabled=true;
   try{
     if ($('#modo').value==='comparativo') {
-      if(contasRelatorio.length<2)throw new Error('São necessárias duas contas conectadas para comparar.');
+      if(contasRelatorio.length<2)throw new Error('São necessárias duas contas conectadas para o relatório conjunto.');
       const ds=await Promise.all(contasRelatorio.map(async conta=>{const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+'&conta='+encodeURIComponent(conta.ig),{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha ao consultar uma das contas.');return d;}));
       if(meu!==pedido)return;
       $('#rel').innerHTML=comparativoHtml(ds);$('#baixar').disabled=false;return;

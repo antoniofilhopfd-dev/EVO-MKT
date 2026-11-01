@@ -35,3 +35,12 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{background:#F1F4FA;t
   thead { display: table-header-group; }
   tr { break-inside: avoid; }
 }
+
+/* Relatórios individuais em sequência e comparação final. */
+.relatorio-secao{max-width:1100px;margin:18px auto 8px;padding:10px 16px;border-left:4px solid #FF7800;background:#F1F4FA;color:#00275F;font-weight:700}
+.relatorio-conta+.relatorio-conta,.relatorio-comparacao{margin-top:28px}
+@media print{
+ .relatorio-secao{margin:0 0 12px;padding:8px 0;background:none;border-left:0}
+ .relatorio-conta+.relatorio-conta,.relatorio-comparacao{break-before:page;page-break-before:always;margin-top:0}
+ .relatorio-conta .rel,.relatorio-comparacao .rel{break-inside:auto;page-break-inside:auto}
+}
