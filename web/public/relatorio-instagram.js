@@ -72,41 +72,19 @@ const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+($('#perfil').valu
 
 let contasRelatorio=[];
 function comparativoHtml(dados) {
-  // Um único relatório das contas, com resultados consolidados no corpo e comparação apenas no encerramento.
-  const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance por conta','Visualizações','Interações','Publicações'];
+  // Cada perfil mantém o relatório completo. A comparação vem apenas depois dos dois.
+  const ordem=['evolucao.pb','geracao.evolucao'];
+  const normaliza=x=>String(x||'').replace(/^@/,'').toLowerCase();
+  const ordenados=[...dados].sort((a,b)=>{
+    const ia=ordem.indexOf(normaliza(a.conta)),ib=ordem.indexOf(normaliza(b.conta));
+    return (ia<0?ordem.length:ia)-(ib<0?ordem.length:ib);
+  });
+  const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance','Visualizações','Interações','Publicações'];
   const valores=d=>{const s=num(d.seguidores),a=num(d.seguidoresAnterior),m=d.atual||{};return [s,s!==null&&a!==null?s-a:null,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length]};
-  const v=dados.map(valores),somaveis=new Set([1,3,4,5]);
-  const total=i=>v.every(a=>a[i]!==null)?v.reduce((s,a)=>s+a[i],0):null;
-  const mes=$('#mes').value;
-  const [ano,mm]=mes.split('-').map(Number),mesNome=MESES[mm-1][0].toUpperCase()+MESES[mm-1].slice(1)+' de '+ano;
-  const contas=dados.map(d=>'@'+String(d.conta||'Instagram').replace(/^@/,'')).join(' + ');
-  const posts=dados.flatMap(d=>(d.posts||[]).map(p=>({...p,perfil:d.conta||'Instagram'})));
-  const top=[...posts].sort((a,b)=>(num(b.alcance)||0)-(num(a.alcance)||0)).slice(0,5);
-  const formatos={};
-  posts.forEach(p=>{const tipo=FMT(p.tipo),x=formatos[tipo]||(formatos[tipo]={n:0,interacoes:0});x.n++;x.interacoes+=num(p.interacoes)||0});
-  const semanas=new Map();
-  dados.forEach(d=>(d.semanas||[]).forEach(w=>{const k=w.inicio;if(!k)return;const x=semanas.get(k)||{inicio:k,alcance:0,visualizacoes:0,temAlcance:false,temVisualizacoes:false};if(num(w.alcance)!==null){x.alcance+=num(w.alcance);x.temAlcance=true}if(num(w.visualizacoes)!==null){x.visualizacoes+=num(w.visualizacoes);x.temVisualizacoes=true}semanas.set(k,x)}));
-  const sem=[...semanas.values()].sort((a,b)=>a.inicio.localeCompare(b.inicio));
-  const completos=sem.length&&dados.every(d=>sem.every(w=>(d.semanas||[]).some(x=>x.inicio===w.inicio&&num(x.visualizacoes)!==null)));
-  const fat=Object.keys(formatos).map(nome=>({nome,v:formatos[nome].interacoes,cor:COR_FMT[nome]||COR_FMT.Outros}));
-  const totalInteracoes=fat.reduce((s,x)=>s+x.v,0);
-  const cards=[
-    '<div class="k"><small>Contas incluídas</small><b>'+N0(dados.length)+'</b><span class="v">relatório conjunto</span></div>',
-    '<div class="k"><small>Novos seguidores (soma)</small><b>'+N0(total(1))+'</b><span class="v">variação líquida das contas</span></div>',
-    '<div class="k"><small>Visualizações (soma)</small><b>'+N0(total(3))+'</b><span class="v">não representa pessoas únicas</span></div>',
-    '<div class="k"><small>Interações (soma)</small><b>'+N0(total(4))+'</b></div>',
-    '<div class="k"><small>Publicações</small><b>'+N0(posts.length)+'</b><span class="v">somadas entre perfis</span></div>'
-  ];
-  const comparacao=`<section class="card"><h3>Comparação entre as contas</h3><p class="sub">Detalhamento por perfil ao final do relatório</p><table><thead><tr><th>Indicador</th>${dados.map(d=>`<th>@${esc(String(d.conta||'Instagram').replace(/^@/,''))}</th>`).join('')}<th>Total</th></tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}<td>${somaveis.has(i)?N0(total(i)):'—'}</td></tr>`).join('')}</tbody></table><p class="nota">Seguidores e alcance não são somados entre perfis: as audiências podem se sobrepor. O total de visualizações e interações representa a soma das métricas das contas, não usuários únicos. Dados indisponíveis não são estimados.</p></section>`;
-  return `<article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Relatório mensal conjunto — Instagram</h1><p>${esc(mesNome)}</p></div><div class="conta"><b>${esc(contas)}</b>Perfis institucionais</div></header>
-  <div class="corpo"><div class="resumo"><div><h2>Visão geral das contas</h2><p>Relatório compartilhado do Instagram orgânico, reunindo os resultados dos perfis em um só documento.</p></div></div>
-  <div class="kpis">${cards.join('')}</div>
-  <p class="nota">Alcance total único e seguidores totais não são apresentados porque podem incluir as mesmas pessoas nas duas contas. Os valores exibidos são exclusivamente os fornecidos pela Meta.</p>
-  <div class="duas"><section class="card"><h3>Visualizações por semana</h3><p class="sub">Soma das visualizações semanais dos perfis</p>${completos?svgBarras(sem.map(w=>DM(w.inicio)),[{nome:'Visualizações',cor:'#063996',v:sem.map(w=>w.visualizacoes)}],'Visualizações semanais somadas'):'<div class="vazio">Histórico semanal completo não disponível para todas as contas.</div>'}</section>
-  <section class="card"><h3>Interações por formato</h3><p class="sub">Publicações das contas reunidas</p><div class="rosca">${rosca(fat,N0(totalInteracoes))}<ul>${fat.map(x=>`<li><i style="background:${x.cor}"></i>${esc(x.nome)} <b>${N0(x.v)}</b></li>`).join('')}</ul></div></section></div>
-  <section class="card"><h3>Conteúdos de maior alcance</h3><p class="sub">Publicações dos perfis reunidas em um único ranking</p>${top.length?`<div class="top">${top.map((p,i)=>`<div class="t"><span class="n">${i+1}</span><div class="im">${url(p.miniatura)?`<img src="${esc(url(p.miniatura))}" alt="" loading="lazy" referrerpolicy="no-referrer">`:'Sem imagem'}</div><div class="tx"><b>${esc((p.legenda||'Sem legenda').slice(0,80))}</b><small>@${esc(String(p.perfil).replace(/^@/,''))} · ${FMT(p.tipo)}</small><div class="m"><span>Alcance <b>${N0(num(p.alcance))}</b></span><span>Interações <b>${N0(num(p.interacoes))}</b></span></div></div></div>`).join('')}</div>`:'<div class="vazio">Sem publicações sincronizadas.</div>'}</section>
-  ${comparacao}
-  <p class="nota">Fonte: dados sincronizados da Meta para ${esc(mesNome)}. Não inclui resultados de anúncios pagos.</p></div></article>`;
+  const v=ordenados.map(valores);
+  const blocos=ordenados.map((d,i)=>`<section class="relatorio-conta" aria-label="Relatório ${i+1}: ${esc(d.conta||'Instagram')}"><div class="relatorio-secao"><span>Relatório ${i+1} de ${ordenados.length}</span> · @${esc(String(d.conta||'Instagram').replace(/^@/,''))}</div>${html(d)}</section>`).join('');
+  const tabela=`<section class="relatorio-comparacao"><article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Comparativo final — Instagram</h1><p>${esc($('#mes').value)}</p></div></header><div class="corpo"><div class="resumo"><div><h2>Comparação entre os perfis</h2><p>Resultados individuais no mesmo mês, sem consolidação ou soma de audiências.</p></div></div><section class="card"><h3>Indicadores lado a lado</h3><table><thead><tr><th>Indicador</th>${ordenados.map(d=>`<th>@${esc(String(d.conta||'Instagram').replace(/^@/,''))}</th>`).join('')}</tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></section><p class="nota">Alcance e seguidores são exclusivos de cada perfil; não devem ser somados por possível sobreposição de audiência. Dados indisponíveis aparecem como —. Fonte: Meta, Instagram orgânico.</p></div></article></section>`;
+  return blocos+tabela;
 }
 let pedido=0;
 async function carregar(){
