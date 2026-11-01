@@ -69,10 +69,24 @@ function html(d){
   <footer class="rodape"><img src="/api/public/logo" alt="Colégio Evolução"><span>Relatório Mensal — Instagram · Período: ${DMA(per.de)} a ${DMA(per.ate)} · Gerado em ${esc(agora)}</span></footer></article>`;
 }
 const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+($('#perfil').value?'&conta='+encodeURIComponent($('#perfil').value):'');
+
+let contasRelatorio=[];
+function comparativoHtml(dados) {
+ const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance por conta','Visualizações','Interações','Publicações'];
+ const valores=d=>{const s=num(d.seguidores),a=num(d.seguidoresAnterior),m=d.atual||{};return [s,s!==null&&a!==null?s-a:null,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length]};
+ const v=dados.map(valores),somaveis=new Set([1,3,4,5]);
+ return `<article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Relatório mensal — comparação de contas</h1><p>${esc($('#mes').value)}</p></div></header><section class="card"><h3>Comparativo das contas</h3><table><thead><tr><th>Indicador</th>${dados.map(d=>`<th>@${esc(d.conta||'Instagram')}</th>`).join('')}<th>Consolidado</th></tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}<td>${somaveis.has(i)&&v.every(a=>a[i]!==null)?N0(v.reduce((s,a)=>s+a[i],0)):'—'}</td></tr>`).join('')}</tbody></table><p class="nota">Alcance e seguidores não são somados entre contas, pois pode haver pessoas em comum. Indicadores indisponíveis aparecem como —.</p></section></article>`;
+}
 let pedido=0;
 async function carregar(){
   const meu=++pedido;$('#rel').innerHTML='<div class="msg">Carregando…</div>';$('#baixar').disabled=true;
   try{
+    if ($('#modo').value==='comparativo') {
+      if(contasRelatorio.length<2)throw new Error('São necessárias duas contas conectadas para comparar.');
+      const ds=await Promise.all(contasRelatorio.map(async conta=>{const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+'&conta='+encodeURIComponent(conta.ig),{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha ao consultar uma das contas.');return d;}));
+      if(meu!==pedido)return;
+      $('#rel').innerHTML=comparativoHtml(ds);$('#baixar').disabled=false;return;
+    }
     const r=await fetch('/api/instagram/relatorio?'+consulta(),{credentials:'same-origin',headers:{'X-EVO':'1'}});let d={};try{d=await r.json()}catch{}
     if(meu!==pedido)return; // resposta antiga de outro mês: descartada
     if(r.status===401||r.status===403){$('#rel').innerHTML='<div class="msg">Entre no EVO MKT e abra este relatório de novo.</div>';return}
@@ -82,6 +96,7 @@ async function carregar(){
   }catch(e){if(meu===pedido){$('#rel').textContent='';const m=document.createElement('div');m.className='msg';m.textContent=e.message;$('#rel').appendChild(m)}}
 }
 async function baixar(){
+  if($('#modo').value==='comparativo'){window.print();return;}
   const b=$('#baixar'),rot=b.textContent;b.disabled=true;b.textContent='Gerando PDF…';$('#msg').textContent='';
   try{
     const r=await fetch('/api/instagram/relatorio.pdf?'+consulta(),{credentials:'same-origin',headers:{'X-EVO':'1'}});
@@ -95,11 +110,12 @@ async function baixar(){
   const h=new Date(),q=new URLSearchParams(location.search);
   $('#mes').value=/^\d{4}-\d\d$/.test(q.get('mes')||'')?q.get('mes'):`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}`;
   $('#atualiza').onclick=carregar;$('#mes').onchange=carregar;$('#perfil').onchange=carregar;$('#baixar').onclick=baixar;
+  $('#modo').onchange=()=>{const comp=$('#modo').value==='comparativo';$('#perfilWrap').hidden=comp;$('#baixar').textContent=comp?'Imprimir / salvar PDF':'Baixar PDF';carregar();};
   // perfis monitorados (só consulta): escolhe pelo ?conta= (id), ?perfil= (@usuário) ou o perfil principal
   (async()=>{
     try{
       const r=await fetch('/api/instagram/contas',{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'');
-      const cs=d.contas||[],norm=x=>String(x||'').replace(/^@/,'').replace(/[._]/g,'').toLowerCase();
+      const cs=d.contas||[];contasRelatorio=cs;const norm=x=>String(x||'').replace(/^@/,'').replace(/[._]/g,'').toLowerCase();
       const alvo=q.get('conta')||(cs.find(c=>norm(c.usuario)===norm(q.get('perfil')))||{}).ig||d.principal||(cs[0]||{}).ig||'';
       $('#perfil').innerHTML=cs.length?cs.map(c=>`<option value="${esc(c.ig)}" ${c.ig===alvo?'selected':''}>@${esc(String(c.usuario).replace(/^@/,''))}</option>`).join(''):'<option value="">Nenhum perfil conectado</option>';
     }catch{$('#perfil').innerHTML='<option value="">Perfil principal</option>'}
