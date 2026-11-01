@@ -80,10 +80,18 @@ function comparativoHtml(dados) {
     return (ia<0?ordem.length:ia)-(ib<0?ordem.length:ib);
   });
   const nomes=['Seguidores ao fim do mês','Novos seguidores','Alcance','Visualizações','Interações','Publicações'];
-  const valores=d=>{const s=num(d.seguidores),a=num(d.seguidoresAnterior),m=d.atual||{};return [s,s!==null&&a!==null?s-a:null,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length]};
+  const valores=d=>{
+    const serie=[...(d.serieSeguidores||[])].filter(x=>num(x.seguidores)!==null&&x.dia).sort((a,b)=>String(a.dia).localeCompare(String(b.dia)));
+    const s=num(d.seguidores),a=num(d.seguidoresAnterior),base=serie.length?num(serie[0].seguidores):null;
+    const final=s!==null?s:(serie.length?num(serie[serie.length-1].seguidores):null);
+    const novos=final!==null&&a!==null?final-a:final!==null&&base!==null?final-base:null;
+    const m=d.atual||{};
+    return [final,novos,num(m.alcance),num(m.impressoes),num(m.interacoes),(d.posts||[]).length];
+  };
   const v=ordenados.map(valores);
+  const bases=ordenados.map(d=>{const serie=[...(d.serieSeguidores||[])].filter(x=>num(x.seguidores)!==null&&x.dia).sort((a,b)=>String(a.dia).localeCompare(String(b.dia)));return num(d.seguidoresAnterior)!==null?'fechamento anterior':serie.length?'primeiro registro '+DMA(serie[0].dia):'sem referência';});
   const blocos=ordenados.map((d,i)=>`<section class="relatorio-conta" aria-label="Relatório ${i+1}: ${esc(d.conta||'Instagram')}"><div class="relatorio-secao"><span>Relatório ${i+1} de ${ordenados.length}</span> · @${esc(String(d.conta||'Instagram').replace(/^@/,''))}</div>${html(d)}</section>`).join('');
-  const tabela=`<section class="relatorio-comparacao"><article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Comparativo final — Instagram</h1><p>${esc($('#mes').value)}</p></div></header><div class="corpo"><div class="resumo"><div><h2>Comparação entre os perfis</h2><p>Resultados individuais no mesmo mês, sem consolidação ou soma de audiências.</p></div></div><section class="card"><h3>Indicadores lado a lado</h3><table><thead><tr><th>Indicador</th>${ordenados.map(d=>`<th>@${esc(String(d.conta||'Instagram').replace(/^@/,''))}</th>`).join('')}</tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></section><p class="nota">Alcance e seguidores são exclusivos de cada perfil; não devem ser somados por possível sobreposição de audiência. Dados indisponíveis aparecem como —. Fonte: Meta, Instagram orgânico.</p></div></article></section>`;
+  const tabela=`<section class="relatorio-comparacao"><article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Comparativo final — Instagram</h1><p>${esc($('#mes').value)}</p></div></header><div class="corpo"><div class="resumo"><div><h2>Comparação entre os perfis</h2><p>Resultados individuais no mesmo mês, sem consolidação ou soma de audiências.</p></div></div><section class="card"><h3>Indicadores lado a lado</h3><table><thead><tr><th>Indicador</th>${ordenados.map(d=>`<th>@${esc(String(d.conta||'Instagram').replace(/^@/,''))}</th>`).join('')}</tr></thead><tbody>${nomes.map((nome,i)=>`<tr><td>${nome}</td>${v.map(a=>`<td>${N0(a[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></section><p class="nota">Novos seguidores: referência por perfil — ${ordenados.map((d,i)=>'@'+esc(String(d.conta||'Instagram').replace(/^@/,''))+': '+esc(bases[i])).join('; ')}. Quando não existe fechamento anterior, a variação é calculada desde o primeiro registro disponível, não necessariamente desde o início do mês. Alcance é o valor do período informado pela Meta, sem estimativas ou soma entre perfis. Dados indisponíveis aparecem como —.</p></div></article></section>`;
   return blocos+tabela;
 }
 let pedido=0;
