@@ -125,18 +125,25 @@ export async function operacaoRoute(c: Ctx) {
     // Consulta somente leitura: não altera histórico nem fabrica alcance somando posts.
     let atualRelatorio = pega(mes);
     let origemAlcance = atualRelatorio?.alcance == null ? 'indisponivel' : 'historico';
+    let periodoAlcance: { de: string; ate: string; parcial: boolean } | null = null;
     if (atualRelatorio?.alcance == null && iniMes <= hojeDia) {
       try {
-        const metricas = await igMetricasJanela(conta, iniMes, parcial ? hojeDia : fimMes);
+        // A primeira leitura de seguidores é uma referência observável para o início
+        // do monitoramento; não pressupõe alcance anterior à data registrada.
+        const primeiraLeitura = serieSeguidores.map((r) => String(r.dia).slice(0, 10)).filter((d) => /^\\d{4}-\\d{2}-\\d{2}$/.test(d)).sort()[0];
+        const inicioConsulta = primeiraLeitura && primeiraLeitura > iniMes ? primeiraLeitura : iniMes;
+        const fimConsulta = parcial ? hojeDia : fimMes;
+        const metricas = await igMetricasJanela(conta, inicioConsulta, fimConsulta);
         if (metricas.reach !== undefined && Number.isFinite(Number(metricas.reach))) {
           atualRelatorio = { ...(atualRelatorio ?? {}), alcance: Number(metricas.reach) };
           origemAlcance = 'meta_consulta';
+          periodoAlcance = { de: inicioConsulta, ate: fimConsulta, parcial: inicioConsulta !== iniMes || fimConsulta !== fimMes };
         }
       } catch (e) {
         console.warn('[instagram/relatorio] alcance histórico não recuperado da Meta:', e instanceof Error ? e.message : String(e));
       }
     }
-    const dados = { mes, anterior: ant, origemAlcance, periodo: { de: iniMes, ate: parcial ? hojeDia : fimMes, parcial, futuro: hojeDia < iniMes }, atual: atualRelatorio, anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), serieSeguidores, semanas, posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' };
+    const dados = { mes, anterior: ant, origemAlcance, periodoAlcance, periodo: { de: iniMes, ate: parcial ? hojeDia : fimMes, parcial, futuro: hojeDia < iniMes }, atual: atualRelatorio, anteriorMetricas: pega(ant), seguidores: await seg(mes), seguidoresAnterior: await seg(ant), serieSeguidores, semanas, posts: posts.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' };
     if (path === '/instagram/relatorio.pdf') {
       const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
       return respostaPdf(await relatorioInstagramPdf(dados, quando), `Relatorio-Mensal-Instagram${dados.conta ? '_' + String(dados.conta).replace(/^@/, '') : ''}_${mes}.pdf`);
