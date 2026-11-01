@@ -16,6 +16,12 @@ const CG_LEMBRETES = [[10, '10 minutos antes'], [30, '30 minutos antes'], [60, '
 const CG_REPETE = [['', 'Não repete'], ['DIARIA', 'Todos os dias'], ['SEMANAL', 'Toda semana'], ['MENSAL', 'Todo mês'], ['ANUAL', 'Todo ano']];
 const CG_SEG_PREF = pref('cgSegmentosVisiveis', CG_GRUPOS.map(g => g[0]));
 const CG = { ref: hojeBR(), modo: ['mes', 'semana', 'dia'].includes(pref('cgModo', 'mes')) ? pref('cgModo', 'mes') : 'mes', segs: new Set(Array.isArray(CG_SEG_PREF) ? CG_SEG_PREF.filter(k => CG_GRUPOS.some(g => g[0] === k)) : CG_GRUPOS.map(g => g[0])), busca: '', dados: null, sel: hojeBR() };
+const CG_AGENDAS_OCULTAS = new Set(Array.isArray(pref('cgAgendasOcultas', [])) ? pref('cgAgendasOcultas', []) : []);
+const cgAgendaId = a => String(a?.calendarId || a?.id || '');
+const cgAgendaVisivel = e => !CG_AGENDAS_OCULTAS.has(String(e.calendarId || ''));
+function cgFiltroAgendas(agendas) {
+  return `<details class="cg-segs"><summary class="btn soft">Agendas visíveis: ${agendas.filter(a => !CG_AGENDAS_OCULTAS.has(cgAgendaId(a))).length}/${agendas.length} ▾</summary><div>${agendas.map(a => `<label><input type="checkbox" data-cg-agenda="${attr(cgAgendaId(a))}" ${!CG_AGENDAS_OCULTAS.has(cgAgendaId(a)) ? 'checked' : ''}>${esc(a.nome || a.name || a.titulo || a.calendarId || a.id || 'Agenda')}</label>`).join('')}<button type="button" class="btn soft" data-cg-agendas-todas>Mostrar todas</button><button type="button" class="btn soft" data-cg-agendas-nenhuma>Ocultar todas</button><small>Mostrar ou ocultar não altera a conexão com o Google Agenda.</small></div></details>`;
+}
 const CG_DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const CG_DIAS_LONGO = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const cgMesNome = ym => { const t = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(ym + '-01T12:00:00Z')); return t.charAt(0).toUpperCase() + t.slice(1); };
@@ -37,7 +43,7 @@ async function cgCarregar() {
 function cgFiltrados() {
   const b = CG.busca.trim().toLowerCase(), todos = CG.segs.size === CG_GRUPOS.length;
   if (!CG.segs.size) return [];
-  return (CG.dados?.itens || []).filter(e => (todos || e.segmentos.some(s => CG.segs.has(s))) && (!b || `${e.titulo} ${e.local} ${e.descricao} ${e.agenda}`.toLowerCase().includes(b)));
+  return (CG.dados?.itens || []).filter(e => cgAgendaVisivel(e) && (todos || e.segmentos.some(s => CG.segs.has(s))) && (!b || `${e.titulo} ${e.local} ${e.descricao} ${e.agenda}`.toLowerCase().includes(b)));
 }
 const cgNoDia = (itens, d) => itens.filter(e => e.dia <= d && e.diaFim >= d);
 const cgFundo = cor => cor + '26';
@@ -108,6 +114,7 @@ PAGINAS.calendario = async function () {
         <span class="cg-nav"><button type="button" class="btn soft" data-nav="-1" aria-label="Anterior">‹</button><b class="cg-rot">${esc(rot)}</b><button type="button" class="btn soft" data-nav="1" aria-label="Próximo">›</button><button type="button" class="btn soft" data-nav="hoje">Hoje</button></span>
         <span class="cg-modos" role="group" aria-label="Visão">${[['mes', 'Mês'], ['semana', 'Semana'], ['dia', 'Dia']].map(([k, n]) => `<button type="button" class="btn ${CG.modo === k ? '' : 'soft'}" data-modo="${k}" aria-pressed="${CG.modo === k}">${n}</button>`).join('')}</span>
         <details class="cg-segs"><summary class="btn soft">${todos ? 'Todas as categorias' : `${CG.segs.size} categoria(s)`} ▾</summary><div>${CG_GRUPOS.map(([k, n, c]) => `<label><input type="checkbox" data-seg="${k}" ${CG.segs.has(k) ? 'checked' : ''}><i style="background:${c}"></i>${n}</label>`).join('')}<button type="button" class="btn soft" data-seg-todos>Mostrar todos</button></div></details>
+        ${cgFiltroAgendas(dados.agendas)}
         <input type="search" class="control cg-busca" id="cgBusca" placeholder="Buscar eventos, locais, responsáveis…" aria-label="Buscar eventos escolares" value="${attr(CG.busca)}">
         <button type="button" class="btn" id="cgNovo" ${dados.pode ? '' : 'disabled title="Nenhuma agenda liberada para edição. O Administrador liga “Editar no EVO MKT” na agenda do Marketing em Configurações › Integrações › Google Agenda › Agendas Google."'}>+ Novo evento</button>
       </div>
@@ -120,7 +127,10 @@ PAGINAS.calendario = async function () {
   const ligar = () => {
     $$('[data-nav]').forEach(b => { b.onclick = () => { const v = b.dataset.nav; if (v === 'hoje') CG.ref = hojeBR(); else if (CG.modo === 'dia') CG.ref = somaDias(CG.ref, +v); else if (CG.modo === 'semana') CG.ref = somaDias(CG.ref, 7 * +v); else CG.ref = somaMes(CG.ref.slice(0, 7), +v) + '-01'; CG.sel = CG.ref; recarrega(); }; });
     $$('[data-modo]').forEach(b => { b.onclick = () => { CG.modo = b.dataset.modo; setPref('cgModo', CG.modo); recarrega(); }; });
-    $$('[data-seg]').forEach(c => { c.onchange = () => { c.checked ? CG.segs.add(c.dataset.seg) : CG.segs.delete(c.dataset.seg); setPref('cgSegmentosVisiveis', [...CG.segs]); const aberto = true; desenha(); const d = $('.cg-segs'); if (d && aberto) d.open = true; }; });
+    $('[data-cg-agenda]').forEach(input => { input.onchange = () => { input.checked ? CG_AGENDAS_OCULTAS.delete(input.dataset.cgAgenda) : CG_AGENDAS_OCULTAS.add(input.dataset.cgAgenda); setPref('cgAgendasOcultas', [...CG_AGENDAS_OCULTAS]); desenha(); }; });
+    const mostrarAgendas = $('[data-cg-agendas-todas]'); if (mostrarAgendas) mostrarAgendas.onclick = () => { CG_AGENDAS_OCULTAS.clear(); setPref('cgAgendasOcultas', []); desenha(); };
+    const ocultarAgendas = $('[data-cg-agendas-nenhuma]'); if (ocultarAgendas) ocultarAgendas.onclick = () => { (CG.dados?.agendas || []).forEach(a => { if (cgAgendaId(a)) CG_AGENDAS_OCULTAS.add(cgAgendaId(a)); }); setPref('cgAgendasOcultas', [...CG_AGENDAS_OCULTAS]); desenha(); };
+    $('[data-seg]').forEach(c => { c.onchange = () => { c.checked ? CG.segs.add(c.dataset.seg) : CG.segs.delete(c.dataset.seg); setPref('cgSegmentosVisiveis', [...CG.segs]); const aberto = true; desenha(); const d = $('.cg-segs'); if (d && aberto) d.open = true; }; });
     const todos = $('[data-seg-todos]'); if (todos) todos.onclick = () => { CG_GRUPOS.forEach(g => CG.segs.add(g[0])); setPref('cgSegmentosVisiveis', [...CG.segs]); desenha(); };
     $('#cgBusca').oninput = debounce(e => { CG.busca = e.target.value; desenha(); const i = $('#cgBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250);
     $('#cgNovo').onclick = () => cgForm(null, { dia: CG.sel }, recarrega);
