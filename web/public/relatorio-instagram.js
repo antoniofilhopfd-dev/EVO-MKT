@@ -87,7 +87,7 @@ function comparativoHtml(dados) {
   const semanas=new Map();
   dados.forEach(d=>(d.semanas||[]).forEach(w=>{const k=w.inicio;if(!k)return;const x=semanas.get(k)||{inicio:k,alcance:0,visualizacoes:0,temAlcance:false,temVisualizacoes:false};if(num(w.alcance)!==null){x.alcance+=num(w.alcance);x.temAlcance=true}if(num(w.visualizacoes)!==null){x.visualizacoes+=num(w.visualizacoes);x.temVisualizacoes=true}semanas.set(k,x)}));
   const sem=[...semanas.values()].sort((a,b)=>a.inicio.localeCompare(b.inicio));
-  const completos=sem.length&&sem.every(w=>w.temAlcance&&w.temVisualizacoes);
+  const completos=sem.length&&dados.every(d=>sem.every(w=>(d.semanas||[]).some(x=>x.inicio===w.inicio&&num(x.visualizacoes)!==null)));
   const fat=Object.keys(formatos).map(nome=>({nome,v:formatos[nome].interacoes,cor:COR_FMT[nome]||COR_FMT.Outros}));
   const totalInteracoes=fat.reduce((s,x)=>s+x.v,0);
   const cards=[
