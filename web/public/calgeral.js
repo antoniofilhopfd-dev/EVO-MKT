@@ -17,11 +17,11 @@ const CG_REPETE = [['', 'Não repete'], ['DIARIA', 'Todos os dias'], ['SEMANAL',
 const CG_SEG_PREF = pref('cgSegmentosVisiveis', CG_GRUPOS.map(g => g[0]));
 const CG = { ref: hojeBR(), modo: ['mes', 'semana', 'dia'].includes(pref('cgModo', 'mes')) ? pref('cgModo', 'mes') : 'mes', segs: new Set(Array.isArray(CG_SEG_PREF) ? CG_SEG_PREF.filter(k => CG_GRUPOS.some(g => g[0] === k)) : CG_GRUPOS.map(g => g[0])), busca: '', dados: null, sel: hojeBR() };
 const CG_AGENDAS_OCULTAS = new Set(Array.isArray(pref('cgAgendasOcultas', [])) ? pref('cgAgendasOcultas', []) : []);
-const cgAgendaId = a => String(a?.calendarId || a?.id || '');
+const cgAgendaId = a => String(a?.calendarId || a?.googleId || a?.id || '');
 // Se a API não fornecer identificador, mantenha o evento visível em vez de ocultá-lo por engano.
 const cgAgendaVisivel = e => !e.calendarId || !CG_AGENDAS_OCULTAS.has(String(e.calendarId));
 function cgFiltroAgendas(agendas) {
-  return `<details class="cg-segs"><summary class="btn soft">Agendas visíveis: ${agendas.filter(a => !CG_AGENDAS_OCULTAS.has(cgAgendaId(a))).length}/${agendas.length} ▾</summary><div>${agendas.map(a => `<label><input type="checkbox" data-cg-agenda="${attr(cgAgendaId(a))}" ${!CG_AGENDAS_OCULTAS.has(cgAgendaId(a)) ? 'checked' : ''}>${esc(a.nome || a.name || a.titulo || a.calendarId || a.id || 'Agenda')}</label>`).join('')}<button type="button" class="btn soft" data-cg-agendas-todas>Mostrar todas</button><button type="button" class="btn soft" data-cg-agendas-nenhuma>Ocultar todas</button><small>Mostrar ou ocultar não altera a conexão com o Google Agenda.</small></div></details>`;
+  return `<details class="cg-agendas"><summary class="btn soft">Agendas visíveis: ${agendas.filter(a => !CG_AGENDAS_OCULTAS.has(cgAgendaId(a))).length}/${agendas.length} ▾</summary><div>${agendas.map(a => `<label><input type="checkbox" data-cg-agenda="${attr(cgAgendaId(a))}" ${!CG_AGENDAS_OCULTAS.has(cgAgendaId(a)) ? 'checked' : ''}>${esc(a.nome || a.name || a.titulo || a.calendarId || a.id || 'Agenda')}</label>`).join('')}<button type="button" class="btn soft" data-cg-agendas-todas>Mostrar todas</button><button type="button" class="btn soft" data-cg-agendas-nenhuma>Ocultar todas</button><small>Mostrar ou ocultar não altera a conexão com o Google Agenda.</small></div></details>`;
 }
 const CG_DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const CG_DIAS_LONGO = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -128,7 +128,7 @@ PAGINAS.calendario = async function () {
   const ligar = () => {
     $$('[data-nav]').forEach(b => { b.onclick = () => { const v = b.dataset.nav; if (v === 'hoje') CG.ref = hojeBR(); else if (CG.modo === 'dia') CG.ref = somaDias(CG.ref, +v); else if (CG.modo === 'semana') CG.ref = somaDias(CG.ref, 7 * +v); else CG.ref = somaMes(CG.ref.slice(0, 7), +v) + '-01'; CG.sel = CG.ref; recarrega(); }; });
     $$('[data-modo]').forEach(b => { b.onclick = () => { CG.modo = b.dataset.modo; setPref('cgModo', CG.modo); recarrega(); }; });
-    $('[data-cg-agenda]').forEach(input => { input.onchange = () => { input.checked ? CG_AGENDAS_OCULTAS.delete(input.dataset.cgAgenda) : CG_AGENDAS_OCULTAS.add(input.dataset.cgAgenda); setPref('cgAgendasOcultas', [...CG_AGENDAS_OCULTAS]); desenha(); }; });
+    $$('[data-cg-agenda]').forEach(input => { input.onchange = () => { input.checked ? CG_AGENDAS_OCULTAS.delete(input.dataset.cgAgenda) : CG_AGENDAS_OCULTAS.add(input.dataset.cgAgenda); setPref('cgAgendasOcultas', [...CG_AGENDAS_OCULTAS]); desenha(); }; });
     const mostrarAgendas = $('[data-cg-agendas-todas]'); if (mostrarAgendas) mostrarAgendas.onclick = () => { CG_AGENDAS_OCULTAS.clear(); setPref('cgAgendasOcultas', []); desenha(); };
     const ocultarAgendas = $('[data-cg-agendas-nenhuma]'); if (ocultarAgendas) ocultarAgendas.onclick = () => { (CG.dados?.agendas || []).forEach(a => { if (cgAgendaId(a)) CG_AGENDAS_OCULTAS.add(cgAgendaId(a)); }); setPref('cgAgendasOcultas', [...CG_AGENDAS_OCULTAS]); desenha(); };
     $('[data-seg]').forEach(c => { c.onchange = () => { c.checked ? CG.segs.add(c.dataset.seg) : CG.segs.delete(c.dataset.seg); setPref('cgSegmentosVisiveis', [...CG.segs]); const aberto = true; desenha(); const d = $('.cg-segs'); if (d && aberto) d.open = true; }; });
