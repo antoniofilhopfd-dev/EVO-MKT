@@ -14,7 +14,8 @@ const CG_MODELOS = [
 ];
 const CG_LEMBRETES = [[10, '10 minutos antes'], [30, '30 minutos antes'], [60, '1 hora antes'], [1440, '1 dia antes'], [2880, '2 dias antes']];
 const CG_REPETE = [['', 'Não repete'], ['DIARIA', 'Todos os dias'], ['SEMANAL', 'Toda semana'], ['MENSAL', 'Todo mês'], ['ANUAL', 'Todo ano']];
-const CG = { ref: hojeBR(), modo: ['mes', 'semana', 'dia'].includes(pref('cgModo', 'mes')) ? pref('cgModo', 'mes') : 'mes', segs: new Set(CG_GRUPOS.map(g => g[0])), busca: '', dados: null, sel: hojeBR() };
+const CG_SEG_PREF = pref('cgSegmentosVisiveis', CG_GRUPOS.map(g => g[0]));
+const CG = { ref: hojeBR(), modo: ['mes', 'semana', 'dia'].includes(pref('cgModo', 'mes')) ? pref('cgModo', 'mes') : 'mes', segs: new Set(Array.isArray(CG_SEG_PREF) ? CG_SEG_PREF.filter(k => CG_GRUPOS.some(g => g[0] === k)) : CG_GRUPOS.map(g => g[0])), busca: '', dados: null, sel: hojeBR() };
 const CG_DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const CG_DIAS_LONGO = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const cgMesNome = ym => { const t = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(ym + '-01T12:00:00Z')); return t.charAt(0).toUpperCase() + t.slice(1); };
@@ -35,6 +36,7 @@ async function cgCarregar() {
 }
 function cgFiltrados() {
   const b = CG.busca.trim().toLowerCase(), todos = CG.segs.size === CG_GRUPOS.length;
+  if (!CG.segs.size) return [];
   return (CG.dados?.itens || []).filter(e => (todos || e.segmentos.some(s => CG.segs.has(s))) && (!b || `${e.titulo} ${e.local} ${e.descricao} ${e.agenda}`.toLowerCase().includes(b)));
 }
 const cgNoDia = (itens, d) => itens.filter(e => e.dia <= d && e.diaFim >= d);
@@ -105,21 +107,21 @@ PAGINAS.calendario = async function () {
     $('#content').innerHTML = `<div class="cg-barra">
         <span class="cg-nav"><button type="button" class="btn soft" data-nav="-1" aria-label="Anterior">‹</button><b class="cg-rot">${esc(rot)}</b><button type="button" class="btn soft" data-nav="1" aria-label="Próximo">›</button><button type="button" class="btn soft" data-nav="hoje">Hoje</button></span>
         <span class="cg-modos" role="group" aria-label="Visão">${[['mes', 'Mês'], ['semana', 'Semana'], ['dia', 'Dia']].map(([k, n]) => `<button type="button" class="btn ${CG.modo === k ? '' : 'soft'}" data-modo="${k}" aria-pressed="${CG.modo === k}">${n}</button>`).join('')}</span>
-        <details class="cg-segs"><summary class="btn soft">${todos ? 'Todos os segmentos' : `${CG.segs.size} segmento(s)`} ▾</summary><div>${CG_GRUPOS.map(([k, n, c]) => `<label><input type="checkbox" data-seg="${k}" ${CG.segs.has(k) ? 'checked' : ''}><i style="background:${c}"></i>${n}</label>`).join('')}<button type="button" class="btn soft" data-seg-todos>Marcar todos</button></div></details>
+        <details class="cg-segs"><summary class="btn soft">${todos ? 'Todas as categorias' : `${CG.segs.size} categoria(s)`} ▾</summary><div>${CG_GRUPOS.map(([k, n, c]) => `<label><input type="checkbox" data-seg="${k}" ${CG.segs.has(k) ? 'checked' : ''}><i style="background:${c}"></i>${n}</label>`).join('')}<button type="button" class="btn soft" data-seg-todos>Mostrar todos</button></div></details>
         <input type="search" class="control cg-busca" id="cgBusca" placeholder="Buscar eventos, locais, responsáveis…" aria-label="Buscar eventos escolares" value="${attr(CG.busca)}">
         <button type="button" class="btn" id="cgNovo" ${dados.pode ? '' : 'disabled title="Nenhuma agenda liberada para edição. O Administrador liga “Editar no EVO MKT” na agenda do Marketing em Configurações › Integrações › Google Agenda › Agendas Google."'}>+ Novo evento</button>
       </div>
       ${dados.avisos.length ? `<div class="cg-avisos" role="alert">${dados.avisos.map(a => `<p><b>${esc(a.agenda || 'Google')}:</b> ${esc(a.mensagem)}</p>`).join('')}<small>Os eventos desta agenda podem estar incompletos até o problema ser resolvido.</small></div>` : ''}
       ${cgLegenda()}
-      <div class="cg-layout"><div class="cg-principal">${corpo}</div><aside class="cg-lado">${cgMini()}${cgDoDia()}<p class="kpi-note cg-sync">${dados.agendas.length ? `Agendas: ${dados.agendas.filter(a => a.ativa).length} ativa(s) · ${dados.agendas.some(a => a.permissao === 'edicao') ? 'edição só na agenda do Marketing' : 'todas somente leitura'}` : ''}</p></aside></div>`;
+      <div class="cg-layout"><div class="cg-principal">${corpo}</div><aside class="cg-lado">${cgMini()}${cgDoDia()}<p class="kpi-note cg-sync">${dados.agendas.length ? `Agendas conectadas: ${dados.agendas.filter(a => a.ativa).length} · ${dados.agendas.some(a => a.permissao === 'edicao') ? 'edição só na agenda do Marketing' : 'todas somente leitura'}` : ''}</p></aside></div>`;
     ligar();
   };
   const recarrega = async () => { const pr = $('.cg-principal'); if (pr) pr.classList.add('carregando'); try { await cgCarregar(); } catch (e) { CG.dados = { itens: [], avisos: [{ agenda: 'Calendário', mensagem: e.message }], agendas: CG.dados?.agendas || [], pode: false }; } if (state.page === 'calendario') { try { desenha(); } catch (err) { console.error('Calendário Geral:', err); toast('Não foi possível montar o calendário: ' + err.message, 'bad'); } } };
   const ligar = () => {
     $$('[data-nav]').forEach(b => { b.onclick = () => { const v = b.dataset.nav; if (v === 'hoje') CG.ref = hojeBR(); else if (CG.modo === 'dia') CG.ref = somaDias(CG.ref, +v); else if (CG.modo === 'semana') CG.ref = somaDias(CG.ref, 7 * +v); else CG.ref = somaMes(CG.ref.slice(0, 7), +v) + '-01'; CG.sel = CG.ref; recarrega(); }; });
     $$('[data-modo]').forEach(b => { b.onclick = () => { CG.modo = b.dataset.modo; setPref('cgModo', CG.modo); recarrega(); }; });
-    $$('[data-seg]').forEach(c => { c.onchange = () => { c.checked ? CG.segs.add(c.dataset.seg) : CG.segs.delete(c.dataset.seg); if (!CG.segs.size) CG.segs.add(c.dataset.seg); const aberto = true; desenha(); const d = $('.cg-segs'); if (d && aberto) d.open = true; }; });
-    const todos = $('[data-seg-todos]'); if (todos) todos.onclick = () => { CG_GRUPOS.forEach(g => CG.segs.add(g[0])); desenha(); };
+    $$('[data-seg]').forEach(c => { c.onchange = () => { c.checked ? CG.segs.add(c.dataset.seg) : CG.segs.delete(c.dataset.seg); setPref('cgSegmentosVisiveis', [...CG.segs]); const aberto = true; desenha(); const d = $('.cg-segs'); if (d && aberto) d.open = true; }; });
+    const todos = $('[data-seg-todos]'); if (todos) todos.onclick = () => { CG_GRUPOS.forEach(g => CG.segs.add(g[0])); setPref('cgSegmentosVisiveis', [...CG.segs]); desenha(); };
     $('#cgBusca').oninput = debounce(e => { CG.busca = e.target.value; desenha(); const i = $('#cgBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250);
     $('#cgNovo').onclick = () => cgForm(null, { dia: CG.sel }, recarrega);
     $$('[data-grupo]').forEach(b => { b.onclick = () => { const d = b.dataset.grupo; CG.sel = d; CG.ref = d; CG.modo = 'dia'; setPref('cgModo', 'dia'); recarrega(); }; });
