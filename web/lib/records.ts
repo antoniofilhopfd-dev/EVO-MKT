@@ -76,7 +76,7 @@ export async function validarVinculosGenericos(patch: Row): Promise<void> {
     if (v && !(await getRow(alvo, v))) fail(400, `Vínculo inválido: ${campo} "${v}" não existe.`);
   }
 }
-const CAMPOS_DAS_ROTAS = ['materiais', 'versoes', 'aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'versaoAprovada', 'instagramMediaId', 'instagramLink', 'publicadoConfirmadoEm', 'publicadoConfirmadoPor'];
+const CAMPOS_DAS_ROTAS = ['materiais', 'versoes', 'aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'versaoAprovada', 'agendamentoTikTokId', 'instagramMediaId', 'instagramLink', 'publicadoConfirmadoEm', 'publicadoConfirmadoPor'];
 /** `interno`: quem chama é o próprio sistema (duplicar, adaptar, importar) e pode trazer materiais e versões prontos; a criação comum pela API não pode. */
 export async function insertRow(mod: string, input: Row, ator: string, opts: { interno?: boolean } = {}): Promise<Row> {
   const clean = cleanInput(input);
