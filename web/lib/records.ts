@@ -2,7 +2,7 @@ import { registrarNotificacao } from './notificacoes';
 import { notifyMail } from './mail';
 import { q, q1, run, withTx } from './db';
 import { cleanInput, currentIp, fail, lower, now, Row, strv } from './util';
-import { registrarVersaoTexto, segmentoNormalizado, sincronizarMidia, statusAtual, validarStatusPorEdicao } from './conteudo';
+import { invalidarAprovacaoTikTok, registrarVersaoTexto, segmentoNormalizado, sincronizarMidia, statusAtual, validarStatusPorEdicao } from './conteudo';
 import { env, envInt } from './util';
 
 export const EVO_VERSION = '6.0.0-web';
@@ -148,7 +148,13 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
       if (patch[campo] !== undefined && strv(patch[campo]) !== strv(cur[campo]) && strv(cur[campo]) !== '') await logStatus(c, mod, id, strv(cur[campo]), strv(patch[campo]), ator, motivoInformado.trim(), campo);
     }
     const merged: Row = { ...cur, ...patch, atualizadoEm: now(), atualizadoPor: ator };
-    if (mod === 'conteudos') { if (patch.status !== undefined) merged.status = statusAtual(patch.status); registrarVersaoTexto(cur, merged, ator); }
+    if (mod === 'conteudos') {
+      if (patch.status !== undefined) merged.status = statusAtual(patch.status);
+      if (invalidarAprovacaoTikTok(cur, merged)) {
+        await logStatus(c, mod, id, strv(cur.status), 'EM REVISÃO', ator, 'TikTok: alteração relevante após aprovação; nova revisão obrigatória');
+      }
+      registrarVersaoTexto(cur, merged, ator);
+    }
     return merged;
   });
   await audit(ator, 'editar', mod, id);
