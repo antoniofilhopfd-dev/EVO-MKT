@@ -15,10 +15,16 @@ const HOOKS: Record<string, { antes?: () => Promise<void>; depois?: () => Promis
 /** Protege a migração aditiva 047 contra tabelas preexistentes incompatíveis. */
 async function validarEsquemaLembretesTikTok(conn: { query: (sql: string) => Promise<any> }): Promise<void> {
   const [colunas] = await conn.query('SHOW COLUMNS FROM tiktok_reminder_events');
-  const obrigatorias = ['chave', 'conteudo_id', 'tipo', 'destino', 'agendado_em', 'gerado_em'];
-  const nomes = new Set((colunas as { Field: string }[]).map((r) => r.Field));
-  if (obrigatorias.some((campo) => !nomes.has(campo)))
-    throw new Error('Migração 047: tabela de lembretes incompatível (colunas ausentes).');
+  const obrigatorias: Record<string, string> = {
+    chave: 'char(64)', conteudo_id: 'varchar(64)', tipo: 'varchar(20)',
+    destino: 'varchar(120)', agendado_em: 'varchar(40)', gerado_em: 'varchar(40)',
+  };
+  const campos = new Map((colunas as { Field: string; Type: string; Null: string }[])
+    .map((r) => [r.Field, r]));
+  if (Object.entries(obrigatorias).some(([nome, tipo]) => {
+    const atual = campos.get(nome);
+    return !atual || atual.Type.toLowerCase() !== tipo || atual.Null !== 'NO';
+  })) throw new Error('Migração 047: tabela de lembretes incompatível (colunas, tipos ou nulidade).');
   const [indices] = await conn.query('SHOW INDEX FROM tiktok_reminder_events');
   const primaria = (indices as { Key_name: string; Column_name: string; Non_unique: number }[])
     .filter((r) => r.Key_name === 'PRIMARY');
