@@ -20,9 +20,9 @@ const translated = ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true }
 );
 assert.equal(translated.diagnostics.filter(d => d.category === ts.DiagnosticCategory.Error).length, 0);
-const exports = {};
-vm.runInNewContext(translated.outputText, { exports });
-const { readTables } = exports;
+const exposed = {};
+vm.runInNewContext(translated.outputText, { exports: exposed });
+const { readTables } = exposed;
 const TABLES = { records: {cols:['id']}, tiktok_reminder_events: {cols:['chave']} };
 const missing = () => Object.assign(new Error('Table does not exist'), { errno: 1146 });
 const q = async sql => {
