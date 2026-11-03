@@ -34,9 +34,10 @@ export const materiaisAtivos = (r: Row, papel?: string) => materiaisDe(r).filter
  * Retorna true somente quando uma aprovação em vigor foi invalidada.
  */
 export function invalidarAprovacaoTikTok(antes: Row, depois: Row): boolean {
-  if (strv(antes.canal).trim().toLowerCase() !== 'tiktok') return false;
+  // Também cobre a troca de um conteúdo aprovado de outro canal para TikTok.
+  if (strv(antes.canal).trim().toLowerCase() !== 'tiktok' && strv(depois.canal).trim().toLowerCase() !== 'tiktok') return false;
   if (!['APROVADO', 'AGENDADO'].includes(statusAtual(antes.status))) return false;
-  const campos = ['titulo', 'legenda', 'hashtags', 'cta', 'perfil', 'formato', 'midiaInstagram', 'midiasInstagram'];
+  const campos = ['canal', 'titulo', 'legenda', 'hashtags', 'cta', 'perfil', 'formato', 'midiaInstagram', 'midiasInstagram'];
   const alterouTexto = campos.some((campo) => strv(antes[campo]) !== strv(depois[campo]));
   const arquivosRelevantes = (r: Row) => materiaisAtivos(r)
     .filter((m) => m.papel === 'final' || m.papel === 'miniatura')
