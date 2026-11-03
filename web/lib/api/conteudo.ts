@@ -126,6 +126,7 @@ export async function conteudoRoute(c: Ctx) {
     const falta = requisitosDeAgendamento(alvo);
     if (falta.length) fail(409, `Para agendar falta: ${falta.join(', ')}.`);
     await modifyRow('conteudos', id, async (r, conn) => {
+      if (statusAtual(r.status) !== 'APROVADO') fail(409, 'A aprovação foi alterada antes do agendamento; atualize a publicação.');
       await logStatus(conn, 'conteudos', id, strv(r.status), 'AGENDADO', String(u.codigo), `Agendado por ${u.nome} para ${strv(alvo.publicacaoEm).replace('T', ' ').slice(0, 16)}`);
       return { ...r, ...(quando ? { publicacaoEm: quando } : {}), status: 'AGENDADO', atualizadoEm: now(), atualizadoPor: String(u.codigo) };
     });
@@ -151,6 +152,7 @@ export async function conteudoRoute(c: Ctx) {
     const fmt = strv(alvo.formato).toLowerCase();
     if (fmt.includes('carrossel') && materiaisAtivos(alvo, 'final').length < 2) fail(409, 'O carrossel precisa de 2 a 20 fotos.');
     await modifyRow('conteudos', id, async (r, conn) => {
+      if (strv(r.canal).trim().toLowerCase() === 'tiktok') fail(409, 'O atalho de publicação do Instagram não pode ser usado para TikTok.');
       await logStatus(conn, 'conteudos', id, strv(r.status), 'AGENDADO', String(u.codigo), `${agora ? 'Publicação imediata' : 'Agendada'} por ${u.nome} para ${quando.replace('T', ' ')}`);
       const nova: Row = { ...r, publicacaoEm: quando, publicarInstagram: 'SIM', status: 'AGENDADO', aprovadoPor: String(u.nome), aprovadoEm: now(), atualizadoEm: now(), atualizadoPor: String(u.codigo) };
       sincronizarMidia(nova);
@@ -176,6 +178,8 @@ export async function conteudoRoute(c: Ctx) {
     const ig = (await q('SELECT status FROM ig_publish WHERE conteudo_id=?', [id]))[0];
     if (ig?.status === 'PROCESSANDO') fail(409, 'O Instagram ainda está processando esta publicação.');
     await modifyRow('conteudos', id, async (r, conn) => {
+      if (!['APROVADO', 'AGENDADO'].includes(statusAtual(r.status))) fail(409, 'A publicação mudou de etapa; atualize a tela antes de confirmar.');
+      if (strv(r.canal).trim().toLowerCase() === 'tiktok' && !/^https:\/\/(?:www\.|m\.)?tiktok\.com\//i.test(link)) fail(400, 'Informe um link público do TikTok para confirmar a publicação.');
       await logStatus(conn, 'conteudos', id, strv(r.status), 'PUBLICADO', String(u.codigo), `Publicação confirmada manualmente por ${u.nome}: ${link}`);
       return { ...r, status: 'PUBLICADO', linkPublicacao: link, publicadoConfirmadoEm: now(), publicadoConfirmadoPor: String(u.nome), atualizadoEm: now(), atualizadoPor: String(u.codigo) };
     });
