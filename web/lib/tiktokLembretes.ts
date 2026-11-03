@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { q1, withTx } from './db';
+import { withTx } from './db';
 import { listRows } from './records';
 import { fmtDateTimeLocal, now, parseLocal, Row, strv } from './util';
 
