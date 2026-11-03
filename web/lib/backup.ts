@@ -21,6 +21,7 @@ const TABLES: Record<string, { cols: string[]; restore: 'replace' | 'merge' | 'i
   // tabelas acrescentadas depois do formato 2 original: backups mais antigos não as trazem (opt = ausência não é erro)
   status_history: { cols: ['id', 'modulo', 'registro', 'campo', 'de', 'para', 'ator', 'quando', 'motivo'], restore: 'replace', opt: true },
   notifications: { cols: ['id', 'quando', 'tipo', 'modulo', 'registro', 'destino', 'titulo', 'texto', 'lida'], restore: 'replace', opt: true },
+  tiktok_reminder_events: { cols: ['chave', 'conteudo_id', 'tipo', 'destino', 'agendado_em', 'gerado_em'], restore: 'replace', opt: true },
   record_comments: { cols: ['id', 'modulo', 'registro', 'autor', 'autor_tipo', 'quando', 'texto', 'interno'], restore: 'replace', opt: true },
   record_checklist: { cols: ['id', 'modulo', 'registro', 'texto', 'feito', 'ordem', 'atualizado_em'], restore: 'replace', opt: true },
   ads_snapshots: { cols: ['id', 'conta', 'campanha_id', 'campanha', 'periodo', 'gasto', 'impressoes', 'alcance', 'cliques', 'resultados', 'conversas', 'inicio', 'moeda', 'status', 'objetivo', 'orcamento_diario', 'atualizado_em'], restore: 'replace', opt: true },
