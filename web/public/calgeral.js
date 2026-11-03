@@ -131,7 +131,7 @@ PAGINAS.calendario = async function () {
     $$('[data-cg-agenda]').forEach(input => { input.onchange = () => { input.checked ? CG_AGENDAS_OCULTAS.delete(input.dataset.cgAgenda) : CG_AGENDAS_OCULTAS.add(input.dataset.cgAgenda); setPref('cgAgendasOcultas', [...CG_AGENDAS_OCULTAS]); desenha(); }; });
     const mostrarAgendas = $('[data-cg-agendas-todas]'); if (mostrarAgendas) mostrarAgendas.onclick = () => { CG_AGENDAS_OCULTAS.clear(); setPref('cgAgendasOcultas', []); desenha(); };
     const ocultarAgendas = $('[data-cg-agendas-nenhuma]'); if (ocultarAgendas) ocultarAgendas.onclick = () => { (CG.dados?.agendas || []).forEach(a => { if (cgAgendaId(a)) CG_AGENDAS_OCULTAS.add(cgAgendaId(a)); }); setPref('cgAgendasOcultas', [...CG_AGENDAS_OCULTAS]); desenha(); };
-    $('[data-seg]').forEach(c => { c.onchange = () => { c.checked ? CG.segs.add(c.dataset.seg) : CG.segs.delete(c.dataset.seg); setPref('cgSegmentosVisiveis', [...CG.segs]); const aberto = true; desenha(); const d = $('.cg-segs'); if (d && aberto) d.open = true; }; });
+    $$('[data-seg]').forEach(c => { c.onchange = () => { c.checked ? CG.segs.add(c.dataset.seg) : CG.segs.delete(c.dataset.seg); setPref('cgSegmentosVisiveis', [...CG.segs]); const aberto = true; desenha(); const d = $('.cg-segs'); if (d && aberto) d.open = true; }; });
     const todos = $('[data-seg-todos]'); if (todos) todos.onclick = () => { CG_GRUPOS.forEach(g => CG.segs.add(g[0])); setPref('cgSegmentosVisiveis', [...CG.segs]); desenha(); };
     $('#cgBusca').oninput = debounce(e => { CG.busca = e.target.value; desenha(); const i = $('#cgBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250);
     $('#cgNovo').onclick = () => cgForm(null, { dia: CG.sel }, recarrega);
