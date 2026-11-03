@@ -67,7 +67,7 @@ export function pendencias(r: Row): Pendencia[] {
 /** Datas TikTok: formato local completo, calendário real e horário no fuso do sistema. */
 export function horarioTikTokValido(valor: unknown): boolean {
   const s = strv(valor).trim();
-  if (!/^\\d{4}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(s)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(s)) return false;
   const data = parseLocal(s);
   return Number.isFinite(data.getTime()) && fmtDateTimeLocal(data) === s;
 }
