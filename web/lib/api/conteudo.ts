@@ -7,7 +7,7 @@ import { requireInternal } from '../auth';
 import { audit, getRow, insertRow, listRows, logStatus, modifyRow } from '../records';
 import { registrarNotificacao } from '../notificacoes';
 import { adicionarComentario } from '../comentarios';
-import { adicionarMaterial, copiaParaNova, invalidarAprovacaoTikTok, materiaisAtivos, materiaisDe, pendencias, PAPEIS, requisitosDeAgendamento, sincronizarMidia, statusAtual, tipoDeLink, urlPermitida } from '../conteudo';
+import { adicionarMaterial, copiaParaNova, horarioTikTokValido, invalidarAprovacaoTikTok, materiaisAtivos, materiaisDe, pendencias, PAPEIS, requisitosDeAgendamento, sincronizarMidia, statusAtual, tipoDeLink, urlPermitida } from '../conteudo';
 import { conteudoCoerente } from '../files';
 import { envInt, fail, now, Row, safePart, strv } from '../util';
 import { igMarkError, igPublish } from '../integrations/meta';
@@ -116,18 +116,27 @@ export async function conteudoRoute(c: Ctx) {
       if (statusAtual(cur.status) !== 'AGENDADO') fail(409, 'Esta publicação não está agendada.');
       const ig = await q1('SELECT status FROM ig_publish WHERE conteudo_id=?', [id]);
       if (ig?.status === 'PROCESSANDO' || ig?.status === 'PUBLICADO') fail(409, 'O Instagram já recebeu esta publicação.');
-      await modifyRow('conteudos', id, async (r, conn) => { await logStatus(conn, 'conteudos', id, 'AGENDADO', 'APROVADO', String(u.codigo), `Agendamento desfeito por ${u.nome}`); return { ...r, status: 'APROVADO', atualizadoEm: now(), atualizadoPor: String(u.codigo) }; });
+      await modifyRow('conteudos', id, async (r, conn) => {
+        if (statusAtual(r.status) !== 'AGENDADO') fail(409, 'A publicação não está mais agendada. Atualize a tela.');
+        await logStatus(conn, 'conteudos', id, 'AGENDADO', 'APROVADO', String(u.codigo), `Agendamento desfeito por ${u.nome}`);
+        return { ...r, status: 'APROVADO', atualizadoEm: now(), atualizadoPor: String(u.codigo) };
+      });
       await audit(String(u.codigo), 'desagendar-conteudo', 'conteudos', id);
       return json({ ok: true, status: 'APROVADO' });
     }
     if (statusAtual(cur.status) !== 'APROVADO') fail(409, 'Só publicações APROVADAS podem ser agendadas.');
     const quando = strv(b.quando).trim();
-    if (quando && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(quando)) fail(400, 'Data e horário inválidos.');
+    if (quando && (strv(cur.canal).trim().toLowerCase() === 'tiktok' ? !horarioTikTokValido(quando) : !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(quando))) fail(400, 'Data e horário inválidos.');
     const alvo = { ...cur, ...(quando ? { publicacaoEm: quando } : {}) };
     const falta = requisitosDeAgendamento(alvo);
     if (falta.length) fail(409, `Para agendar falta: ${falta.join(', ')}.`);
     await modifyRow('conteudos', id, async (r, conn) => {
       if (statusAtual(r.status) !== 'APROVADO') fail(409, 'A aprovação foi alterada antes do agendamento; atualize a publicação.');
+      if (strv(r.canal).trim().toLowerCase() === 'tiktok') {
+        const atualizado = { ...r, ...(quando ? { publicacaoEm: quando } : {}) };
+        const faltando = requisitosDeAgendamento(atualizado);
+        if (faltando.length) fail(409, `O conteúdo TikTok mudou; para agendar falta: ${faltando.join(', ')}.`);
+      }
       await logStatus(conn, 'conteudos', id, strv(r.status), 'AGENDADO', String(u.codigo), `Agendado por ${u.nome} para ${strv(alvo.publicacaoEm).replace('T', ' ').slice(0, 16)}`);
       return { ...r, ...(quando ? { publicacaoEm: quando } : {}), ...(strv(r.canal).trim().toLowerCase() === 'tiktok' ? { agendamentoTikTokId: randomUUID() } : {}), status: 'AGENDADO', atualizadoEm: now(), atualizadoPor: String(u.codigo) };
     });
