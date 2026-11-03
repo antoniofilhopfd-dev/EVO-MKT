@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { lerFiltros } from '../filtros';
 import { rotuloSegmento } from '../segmentos';
 import { Ctx } from '../ctx';
@@ -128,7 +129,7 @@ export async function conteudoRoute(c: Ctx) {
     await modifyRow('conteudos', id, async (r, conn) => {
       if (statusAtual(r.status) !== 'APROVADO') fail(409, 'A aprovação foi alterada antes do agendamento; atualize a publicação.');
       await logStatus(conn, 'conteudos', id, strv(r.status), 'AGENDADO', String(u.codigo), `Agendado por ${u.nome} para ${strv(alvo.publicacaoEm).replace('T', ' ').slice(0, 16)}`);
-      return { ...r, ...(quando ? { publicacaoEm: quando } : {}), status: 'AGENDADO', atualizadoEm: now(), atualizadoPor: String(u.codigo) };
+      return { ...r, ...(quando ? { publicacaoEm: quando } : {}), ...(strv(r.canal).trim().toLowerCase() === 'tiktok' ? { agendamentoTikTokId: randomUUID() } : {}), status: 'AGENDADO', atualizadoEm: now(), atualizadoPor: String(u.codigo) };
     });
     await audit(String(u.codigo), 'agendar-conteudo', 'conteudos', id);
     return json({ ok: true, status: 'AGENDADO' });
