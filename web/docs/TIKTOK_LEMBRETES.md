@@ -21,11 +21,22 @@ Implementação isolada na branch de correção. **Não está ativa em produçã
 - Todo novo agendamento TikTok, inclusive para a **mesma data e responsável**, recebe `agendamentoTikTokId` único na transação. O campo não pode ser editado pela API genérica nem copiado ao duplicar um conteúdo. Avisos anteriores já entregues permanecem no histórico, mas qualquer status diferente de AGENDADO impede novos avisos.
 - A rotina **não** modifica o status editorial e **não** chama qualquer API do TikTok ou publicador Instagram.
 
+## Correções de segurança consolidadas da Etapa 03/04
+- Desagendamento verifica status AGENDADO e canal dentro da transação. Para Instagram, consulta o estado de `ig_publish` com bloqueio transacional; não publica conteúdo.
+- Agendamento recusa troca concorrente de canal. Para TikTok, compara a aprovação original, valida os requisitos na transação e impede mudar o horário diretamente após aprovação: primeiro editar e submeter a nova revisão.
+- A troca do responsável ou do horário em conteúdo TikTok aprovado/agendado invalida a aprovação editorial.
+- Horário TikTok é interpretado **sempre como America/Fortaleza (UTC-03)** pelo validador e pelo cron, independentemente da variável `TIMEZONE` da hospedagem. As outras plataformas mantêm seu comportamento de data e hora.
+- Migração 047 agora confere as seis colunas e a chave primária única `chave`, inclusive quando a migração já foi registrada; uma tabela incompatível interrompe o processo.
+- Ao restaurar um backup antigo que não contenha `tiktok_reminder_events`, o livro-razão atual de lembretes é limpo na transação de restauração (se a tabela existir), evitando bloqueio de ciclos restaurados. O backup de segurança anterior à restauração preserva o livro-razão original.
+- Limpeza de livro-razão na restauração pode permitir novos avisos associados a conteúdos novamente agendados. É efeito intencional da recuperação de consistência; exigir teste com banco descartável antes de produção.
+- Verificações de lógica com funções extraídas do código são úteis, mas não substituem TypeScript completo, testes de API, MySQL, migração, rollback e regressões de Instagram.
+
 ## Limitações conhecidas e bloqueios de liberação
 - A tabela não foi criada em banco real e não houve teste de MySQL, cron real, nem avaliação da disponibilidade da Hostinger.
 - Alertas usam a Central de Notificações interna; não são notificações push, WhatsApp ou e-mails garantidos.
 - O status visual "Atrasado" pode necessitar refinamento de interface.
 - Registros agendados anteriores à implantação podem não ter `agendamentoTikTokId`: usam a identidade `legado` até passarem por um novo agendamento. Confirmar a migração lógica desse cenário em testes isolados.
+- É necessário comprovar com MySQL descartável que a restauração limpa exclusivamente as chaves de lembretes omitidas pelo backup, sem comprometer notificações e demais dados.
 - A rotina não contabiliza separadamente avisos expirados após 24 horas; o acompanhamento de publicações antigas continua sendo uma pendência operacional.
 - O teste isolado usa mocks do banco e utilitários de horário. TypeScript completo, concorrência SQL e testes de cron real continuam pendentes.
 - A habilitação depende de verificação de autorização de uso de imagem, prevista na Etapa 04/04.
