@@ -87,6 +87,7 @@ export async function conteudoRoute(c: Ctx) {
     const b = await c.body();
     const id = strv(b.id);
     const cur = await conteudo(id);
+    if (strv(cur.canal).trim().toLowerCase() === 'tiktok' && u.role !== 'manager') fail(403, 'A aprovação de conteúdos TikTok é exclusiva da Gerente.');
     if (statusAtual(cur.status) !== 'EM REVISÃO') fail(409, 'A decisão só vale para publicações EM REVISÃO.');
     const decisao = strv(b.decisao).toUpperCase();
     const comentario = strv(b.comentario).trim();
@@ -96,6 +97,7 @@ export async function conteudoRoute(c: Ctx) {
     const para = alvo[decisao];
     const motivo = `${decisao === 'APROVADO' ? 'Aprovado' : decisao === 'REPROVADO' ? 'Reprovado' : 'Ajustes solicitados'} por ${u.nome}${comentario ? ': ' + comentario.slice(0, 300) : ''}`;
     await modifyRow('conteudos', id, async (r, conn) => {
+      if (strv(r.canal).trim().toLowerCase() === 'tiktok' && u.role !== 'manager') fail(403, 'A aprovação de conteúdos TikTok é exclusiva da Gerente.');
       if (statusAtual(r.status) !== 'EM REVISÃO') fail(409, 'A publicação mudou de etapa enquanto você decidia. Atualize a tela.');
       await logStatus(conn, 'conteudos', id, strv(r.status), para, String(u.codigo), motivo);
       return { ...r, status: para, aprovacaoDecisao: decisao, aprovadoPor: String(u.nome), aprovadoEm: now(), versaoAprovada: strv(b.versao).trim().slice(0, 60) || String((Array.isArray(r.versoes) ? (r.versoes as Row[]).at(-1)?.n : '') ?? ''), aprovacaoComentario: comentario, atualizadoEm: now(), atualizadoPor: String(u.codigo) };
@@ -135,6 +137,7 @@ export async function conteudoRoute(c: Ctx) {
     const b = await c.body();
     const id = strv(b.id);
     const cur = await conteudo(id);
+    if (strv(cur.canal).trim().toLowerCase() === 'tiktok') fail(409, 'O TikTok exige aprovação editorial e publicação manual; o atalho do Instagram não é permitido.');
     const agora = b.modo === 'agora';
     const st = statusAtual(cur.status);
     if (['PUBLICADO', 'ARQUIVADO'].includes(st)) fail(409, 'Esta publicação já foi publicada ou arquivada.');
