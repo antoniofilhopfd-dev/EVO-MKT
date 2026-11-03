@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { withTx } from './db';
 import { listRows } from './records';
-import { fmtDateTimeLocal, now, parseLocal, Row, strv } from './util';
+import { now, Row, strv } from './util';
+import { horarioTikTokData } from './conteudo';
 
 export type TipoLembreteTikTok = 'antecipado' | 'horario' | 'atrasado';
 export type LembreteTikTok = { tipo: TipoLembreteTikTok; destino: string; chave: string; agendadoEm: string; titulo: string; texto: string };
@@ -12,11 +13,9 @@ export function lembreteTikTokDe(r: Row, instante: Date): LembreteTikTok | null 
   if (strv(r.status).trim().toUpperCase() !== 'AGENDADO') return null;
   const responsavel = strv(r.responsavel).trim();
   const horario = strv(r.publicacaoEm).trim();
-  if (!responsavel || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?$/.test(horario)) return null;
-  const programado = parseLocal(horario);
-  if (!Number.isFinite(programado.getTime()) || !Number.isFinite(instante.getTime())) return null;
-  // Se não há offset explícito, rejeita datas locais inválidas que Date normalizaria.
-  if (!/(Z|[+-]\d{2}:?\d{2})$/.test(horario) && fmtDateTimeLocal(programado) !== horario.slice(0, 16)) return null;
+  if (!responsavel) return null;
+  const programado = horarioTikTokData(horario);
+  if (!programado || !Number.isFinite(instante.getTime())) return null;
   const minutos = (instante.getTime() - programado.getTime()) / 60000;
   // Recuperação: apenas o aviso correspondente à janela atual.
   // Atrasos superiores a 24 horas não geram alertas antigos indefinidamente.
