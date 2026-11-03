@@ -5,7 +5,7 @@ Implementação isolada na branch de correção. **Não está ativa em produçã
 
 ## Pré-requisitos de futura homologação (não executar sem autorização)
 1. Validar backup completo e restauração isolada.
-2. Em ambiente de homologação isolado, aplicar a migração aditiva `047_tiktok_lembretes.sql` antes de executar código que faz backup ou chama o cron. A lista do backup inclui a nova tabela; sem ela backups podem falhar.
+2. Em ambiente de homologação isolado, aplicar a migração aditiva `047_tiktok_lembretes.sql` antes de chamar o cron. Se a tabela ainda não existir **e** a migração não estiver registrada, o backup omite exclusivamente a tabela de lembretes e informa essa ausência na validação. Se a migração já estiver registrada mas a tabela estiver ausente, o backup falha explicitamente. Não mascarar outras falhas SQL.
 3. Executar `node tests/tiktok-lembretes-isolados.test.js` e `npm run typecheck` num checkout isolado com dependências disponíveis.
 4. Com MySQL **isolado**, validar transações de `records`, `notifications` e `tiktok_reminder_events`, concorrência, rollback e recuperação após falha.
 5. Conferir `TIMEZONE=America/Fortaleza` e o uso de `CRON_SECRET` com tamanho mínimo de 16 caracteres.
