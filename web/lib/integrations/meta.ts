@@ -377,6 +377,7 @@ export async function igPublish(id: string, ator: string): Promise<{ status: str
   if (!(await metaConnected())) throw new Error('Instagram não conectado.');
   const r = await getRow('conteudos', id);
   if (!r) throw new Error('Conteúdo não encontrado.');
+  if (String(r.canal ?? '').trim().toLowerCase() === 'tiktok') throw new Error('Conteúdo TikTok não pode ser enviado ao publicador do Instagram.');
   const rel = String(r.midiaInstagram ?? '');
   if (!rel) throw new Error('Anexe a mídia (JPEG ou vídeo) antes de publicar.');
   if (r.instagramMediaId) throw new Error('Este conteúdo já foi publicado.');
@@ -470,6 +471,7 @@ async function igPublishDueSemBloqueio(): Promise<number> {
   if (!(await metaConnected())) return 0;
   let n = 0;
   for (const r of await listRows('conteudos')) {
+    if (String(r.canal ?? '').trim().toLowerCase() === 'tiktok') continue;
     if (r.publicarInstagram !== 'SIM' || r.instagramMediaId || !r.midiaInstagram) continue;
     if (!/^AGENDADO$/i.test(String(r.status ?? ''))) continue;
     const prev = await q1('SELECT status FROM ig_publish WHERE conteudo_id=?', [r.id]);
