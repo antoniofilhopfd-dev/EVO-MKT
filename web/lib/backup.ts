@@ -245,6 +245,15 @@ export async function restoreBackup(nome: string, ator: string): Promise<{ resta
       const T: Record<string, Row[]> = legado
         ? { records: dump.records, module_headers: dump.headers, id_counters: dump.counters, used_ids: dump.used_ids }
         : dump.tabelas;
+      // Um backup anterior à migração 047 não possui livro-razão. Depois de restaurar
+      // publicações antigas, manter chaves de ciclos posteriores bloquearia lembretes
+      // legitimamente devidos. O backup de segurança acima preserva o estado anterior.
+      if (!Array.isArray(T.tiktok_reminder_events)) {
+        const [exists] = await c.query(
+          "SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='tiktok_reminder_events' LIMIT 1",
+        );
+        if ((exists as Row[]).length) await c.query('DELETE FROM tiktok_reminder_events');
+      }
       const [cur] = await c.query('SELECT modulo,n FROM id_counters');
       const maxCur: Record<string, number> = {};
       for (const r of cur as Row[]) maxCur[r.modulo] = Number(r.n);
