@@ -10,6 +10,7 @@ const { createHash } = require('node:crypto');
 const posts = new Map();
 const ledger = new Set();
 const notices = [];
+let falharNotificacao = false;
 const data = { id: 'CON-0001', canal: 'TikTok', status: 'AGENDADO', titulo: 'Vídeo da escola', responsavel: 'Marketing', publicacaoEm: '2026-11-04T18:00' };
 posts.set(data.id, { ...data });
 const util = {
@@ -31,7 +32,7 @@ const db = {
           ledger.add(params[0]);
           return [{ affectedRows: 1 }];
         }
-        if (sql.startsWith('INSERT INTO notifications')) { notices.push(params); return [{ affectedRows: 1 }]; }
+        if (sql.startsWith('INSERT INTO notifications')) { if (falharNotificacao) throw new Error('Falha simulada em notifications'); notices.push(params); return [{ affectedRows: 1 }]; }
         throw new Error('SQL não simulada: ' + sql);
       }});
     } catch (e) {
@@ -63,6 +64,9 @@ const at = iso => new Date(iso);
   assert.equal(exp.lembreteTikTokDe(data, at('2026-11-04T20:30:00Z')).tipo, 'antecipado');
   assert.equal(exp.lembreteTikTokDe(data, at('2026-11-04T21:00:00Z')).tipo, 'horario');
   assert.equal(exp.lembreteTikTokDe(data, at('2026-11-04T21:16:00Z')).tipo, 'atrasado');
+  assert.equal(exp.lembreteTikTokDe(data, at('2026-11-05T20:59:00Z')).tipo, 'atrasado', 'recupera antes de 24h');
+  assert.equal(exp.lembreteTikTokDe(data, at('2026-11-05T21:00:00Z')), null, 'não avisa após 24h');
+  assert.equal(exp.lembreteTikTokDe(data, at('2026-11-12T21:00:00Z')), null, 'não gera atraso indefinido');
   assert.equal(exp.lembreteTikTokDe({ ...data, canal: 'Instagram' }, at('2026-11-04T21:00:00Z')), null);
   assert.equal(exp.lembreteTikTokDe({ ...data, status: 'PUBLICADO' }, at('2026-11-04T21:00:00Z')), null);
   assert.equal(exp.lembreteTikTokDe({ ...data, publicacaoEm: '2026-02-30T18:00' }, at('2026-03-02T21:00:00Z')), null);
@@ -76,5 +80,22 @@ const at = iso => new Date(iso);
   posts.set(data.id, { ...data, status: 'PUBLICADO' });
   assert.equal((await exp.executarLembretesTikTok(at('2026-11-05T21:18:00Z'))).criados, 0);
   assert.equal(notices.length, 4);
-  console.log('OK: horários Fortaleza, idempotência, recuperação, reagendamento, cancelamento por publicação e isolamento do Instagram (simulados sem banco).');
+  // Novo ciclo com a MESMA data e o MESMO responsável deve avisar novamente.
+  posts.set(data.id, { ...data, agendamentoTikTokId: 'ciclo-1' });
+  assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T21:16:00Z'))).criados, 1);
+  assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T21:17:00Z'))).criados, 0);
+  posts.set(data.id, { ...data, agendamentoTikTokId: 'ciclo-2' });
+  assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T21:16:00Z'))).criados, 1, 'outro ciclo deve avisar');
+  assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T21:17:00Z'))).criados, 0);
+  assert.equal(notices.length, 6);
+  assert.notEqual(exp.lembreteTikTokDe({ ...data, agendamentoTikTokId: 'ciclo-1' }, at('2026-11-04T21:16:00Z')).chave, exp.lembreteTikTokDe({ ...data, agendamentoTikTokId: 'ciclo-2' }, at('2026-11-04T21:16:00Z')).chave);
+  // Falha na notificação reverte o livro-razão. A execução seguinte recupera.
+  posts.set(data.id, { ...data, agendamentoTikTokId: 'ciclo-falha' });
+  falharNotificacao = true;
+  await assert.rejects(exp.executarLembretesTikTok(at('2026-11-04T21:16:00Z')));
+  assert.equal(notices.length, 6);
+  falharNotificacao = false;
+  assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T21:17:00Z'))).criados, 1);
+  assert.equal(notices.length, 7);
+  console.log('OK: horários Fortaleza, idempotência por ciclo, janela máxima de atraso, recuperação, rollback simulado, reagendamento e isolamento do Instagram.');
 })().catch(e => { console.error(e); process.exitCode = 1; });
