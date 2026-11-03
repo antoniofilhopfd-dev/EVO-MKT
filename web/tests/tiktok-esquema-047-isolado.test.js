@@ -18,13 +18,15 @@ const exposed = {};
 vm.runInNewContext(js.outputText, { exports: exposed }, { filename: 'migrate047.compiled.js' });
 const validar = exposed.validarEsquemaLembretesTikTok;
 assert.equal(typeof validar, 'function');
-const fields = ['chave','conteudo_id','tipo','destino','agendado_em','gerado_em'].map(Field => ({Field}));
+const fields = Object.entries({chave:'char(64)',conteudo_id:'varchar(64)',tipo:'varchar(20)',destino:'varchar(120)',agendado_em:'varchar(40)',gerado_em:'varchar(40)'}).map(([Field,Type]) => ({Field,Type,Null:'NO'}));
 const pk = [{Key_name:'PRIMARY',Column_name:'chave',Non_unique:0}];
 const conn = (cols, indexes) => ({query: async sql => sql.startsWith('SHOW COLUMNS') ? [cols] : [indexes]});
 (async () => {
   let n = 0;
   await validar(conn(fields,pk)); n++;
-  await assert.rejects(validar(conn(fields.filter(x => x.Field !== 'tipo'),pk)),/colunas ausentes/);n++;
+  await assert.rejects(validar(conn(fields.filter(x => x.Field !== 'tipo'),pk)),/colunas, tipos ou nulidade/);n++;
+  await assert.rejects(validar(conn(fields.map(x => x.Field === 'chave' ? {...x,Type:'char(10)'} : x),pk)),/colunas, tipos ou nulidade/);n++;
+  await assert.rejects(validar(conn(fields.map(x => x.Field === 'destino' ? {...x,Null:'YES'} : x),pk)),/colunas, tipos ou nulidade/);n++;
   await assert.rejects(validar(conn(fields,[])),/chave primária/);n++;
   await assert.rejects(validar(conn(fields,[{Key_name:'PRIMARY',Column_name:'conteudo_id',Non_unique:0}])),/chave primária/);n++;
   await assert.rejects(validar(conn(fields,[...pk,...pk])),/chave primária/);n++;
