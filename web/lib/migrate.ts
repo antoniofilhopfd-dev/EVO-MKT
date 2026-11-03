@@ -12,6 +12,20 @@ const HOOKS: Record<string, { antes?: () => Promise<void>; depois?: () => Promis
   },
 };
 
+/** Protege a migração aditiva 047 contra tabelas preexistentes incompatíveis. */
+async function validarEsquemaLembretesTikTok(conn: { query: (sql: string) => Promise<any> }): Promise<void> {
+  const [colunas] = await conn.query('SHOW COLUMNS FROM tiktok_reminder_events');
+  const obrigatorias = ['chave', 'conteudo_id', 'tipo', 'destino', 'agendado_em', 'gerado_em'];
+  const nomes = new Set((colunas as { Field: string }[]).map((r) => r.Field));
+  if (obrigatorias.some((campo) => !nomes.has(campo)))
+    throw new Error('Migração 047: tabela de lembretes incompatível (colunas ausentes).');
+  const [indices] = await conn.query('SHOW INDEX FROM tiktok_reminder_events');
+  const primaria = (indices as { Key_name: string; Column_name: string; Non_unique: number }[])
+    .filter((r) => r.Key_name === 'PRIMARY');
+  if (primaria.length !== 1 || primaria[0].Column_name !== 'chave' || Number(primaria[0].Non_unique) !== 0)
+    throw new Error('Migração 047: chave primária de deduplicação inválida.');
+}
+
 let ready: Promise<number> | null = null;
 
 /** Aplica as migrações pendentes (uma vez por processo) e registra em schema_migrations. */
@@ -34,7 +48,10 @@ export async function applyMigrations(): Promise<number> {
   const have = new Set((done as { name: string }[]).map((r) => r.name));
   let n = 0;
   for (const m of MIGRATIONS) {
-    if (have.has(m.name)) continue;
+    if (have.has(m.name)) {
+      if (m.name === '047_tiktok_lembretes.sql') await validarEsquemaLembretesTikTok(pool);
+      continue;
+    }
     const hook = HOOKS[m.name];
     if (hook?.antes) {
       try { await hook.antes(); } catch (e: any) { throw new Error(`Migração ${m.name} interrompida antes de mexer nos dados (o backup falhou): ${e?.message}`); }
@@ -50,6 +67,7 @@ export async function applyMigrations(): Promise<number> {
           if (!TOLERATED.has(e?.errno)) throw new Error(`Migração ${m.name} falhou: ${e?.message}`);
         }
       }
+      if (m.name === '047_tiktok_lembretes.sql') await validarEsquemaLembretesTikTok(conn);
       await conn.query('INSERT INTO schema_migrations(name, applied_at) VALUES(?, ?)', [m.name, new Date().toISOString()]);
       n++;
       if (hook?.depois) { try { await hook.depois(); } catch (e: any) { console.error(`[migrate] pós-passo de ${m.name} falhou:`, e?.message); } }
