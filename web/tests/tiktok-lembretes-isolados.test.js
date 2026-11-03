@@ -42,6 +42,18 @@ const db = {
     }
   },
 };
+// O lembrete deve usar o conversor REAL do TikTok, e não um mock simplificado.
+const conteudoSource = fs.readFileSync(path.join(__dirname, '../lib/conteudo.ts'), 'utf8');
+const conteudoExp = {};
+vm.runInNewContext(ts.transpileModule(conteudoSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText, {
+  exports: conteudoExp, require: name => {
+    if (name === './util') return util;
+    if (name === './segmentos') return { chaveSegmento: s => s };
+    throw new Error('Importação inesperada no validador: ' + name);
+  }, Date, Buffer, console,
+}, { filename: 'conteudo.compiled.js' });
 const source = fs.readFileSync(path.join(__dirname, '../lib/tiktokLembretes.ts'), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true });
 assert.equal((compiled.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error).length, 0);
@@ -53,7 +65,7 @@ vm.runInNewContext(compiled.outputText, {
     if (name === './db') return db;
     if (name === './records') return { listRows: async () => [...posts.values()].map(p => ({ ...p })) };
     if (name === './util') return util;
-    if (name === './conteudo') return { horarioTikTokData: s => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? new Date(s + ':00-03:00') : null };
+    if (name === './conteudo') return conteudoExp;
     throw new Error('Importação inesperada: ' + name);
   },
   Date, Buffer, console,
@@ -71,6 +83,7 @@ const at = iso => new Date(iso);
   assert.equal(exp.lembreteTikTokDe({ ...data, canal: 'Instagram' }, at('2026-11-04T21:00:00Z')), null);
   assert.equal(exp.lembreteTikTokDe({ ...data, status: 'PUBLICADO' }, at('2026-11-04T21:00:00Z')), null);
   assert.equal(exp.lembreteTikTokDe({ ...data, publicacaoEm: '2026-02-30T18:00' }, at('2026-03-02T21:00:00Z')), null);
+  assert.equal(conteudoExp.horarioTikTokData('2026-11-04T18:00').toISOString(), '2026-11-04T21:00:00.000Z', 'fuso Fortaleza independente do servidor');
   assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T20:30:00Z'))).criados, 1);
   assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T20:31:00Z'))).criados, 0, 'não duplica');
   assert.equal((await exp.executarLembretesTikTok(at('2026-11-04T21:00:00Z'))).criados, 1);
