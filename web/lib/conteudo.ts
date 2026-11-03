@@ -37,7 +37,7 @@ export function invalidarAprovacaoTikTok(antes: Row, depois: Row): boolean {
   // Também cobre a troca de um conteúdo aprovado de outro canal para TikTok.
   if (strv(antes.canal).trim().toLowerCase() !== 'tiktok' && strv(depois.canal).trim().toLowerCase() !== 'tiktok') return false;
   if (!['APROVADO', 'AGENDADO'].includes(statusAtual(antes.status))) return false;
-  const campos = ['canal', 'titulo', 'legenda', 'hashtags', 'cta', 'perfil', 'formato', 'publicacaoEm', 'midiaInstagram', 'midiasInstagram'];
+  const campos = ['canal', 'titulo', 'legenda', 'hashtags', 'cta', 'perfil', 'formato', 'responsavel', 'publicacaoEm', 'midiaInstagram', 'midiasInstagram'];
   const alterouTexto = campos.some((campo) => strv(antes[campo]) !== strv(depois[campo]));
   const arquivosRelevantes = (r: Row) => materiaisAtivos(r)
     .filter((m) => m.papel === 'final' || m.papel === 'miniatura')
