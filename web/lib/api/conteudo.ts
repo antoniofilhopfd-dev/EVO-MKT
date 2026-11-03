@@ -114,10 +114,16 @@ export async function conteudoRoute(c: Ctx) {
     const cur = await conteudo(id);
     if (b.desagendar) {
       if (statusAtual(cur.status) !== 'AGENDADO') fail(409, 'Esta publicação não está agendada.');
-      const ig = await q1('SELECT status FROM ig_publish WHERE conteudo_id=?', [id]);
-      if (ig?.status === 'PROCESSANDO' || ig?.status === 'PUBLICADO') fail(409, 'O Instagram já recebeu esta publicação.');
       await modifyRow('conteudos', id, async (r, conn) => {
         if (statusAtual(r.status) !== 'AGENDADO') fail(409, 'A publicação não está mais agendada. Atualize a tela.');
+        if (strv(r.canal).trim().toLowerCase() !== strv(cur.canal).trim().toLowerCase())
+          fail(409, 'O canal mudou durante o desagendamento. Atualize a tela.');
+        if (strv(r.canal).trim().toLowerCase() !== 'tiktok') {
+          const [igRows] = await conn.query('SELECT status FROM ig_publish WHERE conteudo_id=? FOR UPDATE', [id]);
+          const ig = (igRows as Row[])[0];
+          if (ig?.status === 'PROCESSANDO' || ig?.status === 'PUBLICADO')
+            fail(409, 'O Instagram já recebeu esta publicação.');
+        }
         await logStatus(conn, 'conteudos', id, 'AGENDADO', 'APROVADO', String(u.codigo), `Agendamento desfeito por ${u.nome}`);
         return { ...r, status: 'APROVADO', atualizadoEm: now(), atualizadoPor: String(u.codigo) };
       });
@@ -132,7 +138,13 @@ export async function conteudoRoute(c: Ctx) {
     if (falta.length) fail(409, `Para agendar falta: ${falta.join(', ')}.`);
     await modifyRow('conteudos', id, async (r, conn) => {
       if (statusAtual(r.status) !== 'APROVADO') fail(409, 'A aprovação foi alterada antes do agendamento; atualize a publicação.');
+      if (strv(r.canal).trim().toLowerCase() !== strv(cur.canal).trim().toLowerCase())
+        fail(409, 'O canal mudou durante o agendamento. Atualize a tela.');
       if (strv(r.canal).trim().toLowerCase() === 'tiktok') {
+        if (quando && quando !== strv(r.publicacaoEm).trim())
+          fail(409, 'Alterar a data de um TikTok aprovado exige nova revisão editorial.');
+        if (strv(r.aprovadoEm) !== strv(cur.aprovadoEm) || strv(r.versaoAprovada) !== strv(cur.versaoAprovada))
+          fail(409, 'A aprovação do TikTok mudou. Atualize a tela.');
         const atualizado = { ...r, ...(quando ? { publicacaoEm: quando } : {}) };
         const faltando = requisitosDeAgendamento(atualizado);
         if (faltando.length) fail(409, `O conteúdo TikTok mudou; para agendar falta: ${faltando.join(', ')}.`);
