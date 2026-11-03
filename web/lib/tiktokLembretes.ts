@@ -18,12 +18,17 @@ export function lembreteTikTokDe(r: Row, instante: Date): LembreteTikTok | null 
   // Se não há offset explícito, rejeita datas locais inválidas que Date normalizaria.
   if (!/(Z|[+-]\d{2}:?\d{2})$/.test(horario) && fmtDateTimeLocal(programado) !== horario.slice(0, 16)) return null;
   const minutos = (instante.getTime() - programado.getTime()) / 60000;
-  if (minutos < -30) return null;
-  // Não envia aviso antecipado atrasado nem aviso de horário depois de 15 minutos.
+  // Recuperação: apenas o aviso correspondente à janela atual.
+  // Atrasos superiores a 24 horas não geram alertas antigos indefinidamente.
+  if (minutos < -30 || minutos >= 24 * 60) return null;
+  // Avisos antecipados e de horário não são reproduzidos fora de suas janelas.
   const tipo: TipoLembreteTikTok = minutos < 0 ? 'antecipado' : minutos < 15 ? 'horario' : 'atrasado';
   const id = strv(r.id);
   if (!id) return null;
-  const chave = createHash('sha256').update(JSON.stringify([id, programado.toISOString(), responsavel, tipo])).digest('hex');
+  // Em publicações legadas, a identidade estável mantém a deduplicação original.
+  // Cada NOVO agendamento gera seu próprio agendamentoTikTokId na rota de agendar.
+  const ciclo = strv(r.agendamentoTikTokId).trim() || 'legado';
+  const chave = createHash('sha256').update(JSON.stringify([id, ciclo, programado.toISOString(), responsavel, tipo])).digest('hex');
   const descricao = tipo === 'antecipado' ? 'será publicada manualmente em breve' : tipo === 'horario' ? 'está no horário da publicação manual' : 'está atrasada e aguarda publicação manual';
   return {
     tipo, destino: responsavel, chave, agendadoEm: horario,
