@@ -1,5 +1,5 @@
 import { chaveSegmento } from './segmentos';
-import { fmtDateTimeLocal, now, parseLocal, Row, strv } from './util';
+import { now, Row, strv } from './util';
 
 /**
  * Regras de uma publicação (módulo `conteudos`), em um lugar só:
@@ -64,12 +64,21 @@ export function pendencias(r: Row): Pendencia[] {
   return out;
 }
 
-/** Datas TikTok: formato local completo, calendário real e horário no fuso do sistema. */
-export function horarioTikTokValido(valor: unknown): boolean {
+/** TikTok usa exclusivamente America/Fortaleza (UTC-03), sem depender de TIMEZONE do servidor. */
+export function horarioTikTokData(valor: unknown): Date | null {
   const s = strv(valor).trim();
-  if (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(s)) return false;
-  const data = parseLocal(s);
-  return Number.isFinite(data.getTime()) && fmtDateTimeLocal(data) === s;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(s);
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]), h = Number(m[4]), mi = Number(m[5]);
+  if (y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  // Round-trip exato: evita que Date.normalize aceite 30 de fevereiro.
+  const localUtc = new Date(Date.UTC(y, mo - 1, d, h, mi));
+  if (localUtc.getUTCFullYear() !== y || localUtc.getUTCMonth() + 1 !== mo ||
+      localUtc.getUTCDate() !== d || localUtc.getUTCHours() !== h || localUtc.getUTCMinutes() !== mi) return null;
+  return new Date(localUtc.getTime() + 3 * 60 * 60 * 1000);
+}
+export function horarioTikTokValido(valor: unknown): boolean {
+  return horarioTikTokData(valor) !== null;
 }
 
 /** O que a publicação precisa para ser agendada (mais rígido que `pendencias`). */
