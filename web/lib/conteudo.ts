@@ -124,7 +124,7 @@ export const segmentoNormalizado = (v: unknown): string => {
 /** Copia uma publicação para uma nova (duplicar ou adaptar): zera o que é da publicação anterior. */
 export function copiaParaNova(r: Row, extra: Row): Row {
   const c: Row = { ...r };
-  for (const k of ['id', 'criadoEm', 'atualizadoEm', 'criadoPor', 'atualizadoPor', 'instagramMediaId', 'instagramLink', 'linkPublicacao', 'publicadoConfirmadoEm', 'publicadoConfirmadoPor', 'aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'versaoAprovada', 'aprovacaoComentario', 'versoes', 'publicacaoEm'])
+  for (const k of ['id', 'criadoEm', 'atualizadoEm', 'criadoPor', 'atualizadoPor', 'instagramMediaId', 'instagramLink', 'linkPublicacao', 'publicadoConfirmadoEm', 'publicadoConfirmadoPor', 'aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'versaoAprovada', 'aprovacaoComentario', 'agendamentoTikTokId', 'versoes', 'publicacaoEm'])
     delete c[k];
   c.status = 'RASCUNHO';
   c.materiais = materiaisDe(r).filter((m) => !m.substituido && m.papel !== 'final' && m.papel !== 'miniatura').map((m, i) => ({ ...m, id: 'M-' + String(i + 1).padStart(4, '0'), criadoEm: now() }));
