@@ -1,5 +1,5 @@
 import { chaveSegmento } from './segmentos';
-import { now, Row, strv } from './util';
+import { fmtDateTimeLocal, now, parseLocal, Row, strv } from './util';
 
 /**
  * Regras de uma publicação (módulo `conteudos`), em um lugar só:
@@ -37,7 +37,7 @@ export function invalidarAprovacaoTikTok(antes: Row, depois: Row): boolean {
   // Também cobre a troca de um conteúdo aprovado de outro canal para TikTok.
   if (strv(antes.canal).trim().toLowerCase() !== 'tiktok' && strv(depois.canal).trim().toLowerCase() !== 'tiktok') return false;
   if (!['APROVADO', 'AGENDADO'].includes(statusAtual(antes.status))) return false;
-  const campos = ['canal', 'titulo', 'legenda', 'hashtags', 'cta', 'perfil', 'formato', 'midiaInstagram', 'midiasInstagram'];
+  const campos = ['canal', 'titulo', 'legenda', 'hashtags', 'cta', 'perfil', 'formato', 'publicacaoEm', 'midiaInstagram', 'midiasInstagram'];
   const alterouTexto = campos.some((campo) => strv(antes[campo]) !== strv(depois[campo]));
   const arquivosRelevantes = (r: Row) => materiaisAtivos(r)
     .filter((m) => m.papel === 'final' || m.papel === 'miniatura')
@@ -64,12 +64,23 @@ export function pendencias(r: Row): Pendencia[] {
   return out;
 }
 
+/** Datas TikTok: formato local completo, calendário real e horário no fuso do sistema. */
+export function horarioTikTokValido(valor: unknown): boolean {
+  const s = strv(valor).trim();
+  if (!/^\\d{4}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(s)) return false;
+  const data = parseLocal(s);
+  return Number.isFinite(data.getTime()) && fmtDateTimeLocal(data) === s;
+}
+
 /** O que a publicação precisa para ser agendada (mais rígido que `pendencias`). */
 export function requisitosDeAgendamento(r: Row): string[] {
   const falta: string[] = [];
   if (!strv(r.titulo).trim()) falta.push('título');
   if (!strv(r.legenda).trim()) falta.push('legenda');
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(strv(r.publicacaoEm))) falta.push('data e horário de publicação');
+  if (strv(r.canal).trim().toLowerCase() === 'tiktok') {
+    if (!horarioTikTokValido(r.publicacaoEm)) falta.push('data e horário de publicação');
+    if (!strv(r.responsavel).trim()) falta.push('responsável');
+  } else if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(strv(r.publicacaoEm))) falta.push('data e horário de publicação');
   if (!materiaisAtivos(r, 'final').length && !strv(r.midiaInstagram).trim()) falta.push('arte final');
   if (!strv(r.perfil).trim()) falta.push('perfil');
   if (!strv(r.formato).trim()) falta.push('formato');
