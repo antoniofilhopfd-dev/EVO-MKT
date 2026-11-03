@@ -8,7 +8,7 @@ Implementação isolada na branch de correção. **Não está ativa em produçã
 2. Em ambiente de homologação isolado, aplicar a migração aditiva `047_tiktok_lembretes.sql` antes de chamar o cron. Se a tabela ainda não existir **e** a migração não estiver registrada, o backup omite exclusivamente a tabela de lembretes e informa essa ausência na validação. Se a migração já estiver registrada mas a tabela estiver ausente, o backup falha explicitamente. Não mascarar outras falhas SQL.
 3. Executar `node tests/tiktok-lembretes-isolados.test.js` e `npm run typecheck` num checkout isolado com dependências disponíveis.
 4. Com MySQL **isolado**, validar transações de `records`, `notifications` e `tiktok_reminder_events`, concorrência, rollback e recuperação após falha.
-5. Conferir `TIMEZONE=America/Fortaleza` e o uso de `CRON_SECRET` com tamanho mínimo de 16 caracteres.
+5. Conferir `TIMEZONE=America/Fortaleza` nas outras rotinas do sistema e o uso de `CRON_SECRET` com tamanho mínimo de 16 caracteres. Os horários do TikTok manual são convertidos explicitamente para UTC-03, independentemente dessa variável.
 6. Validar a frequência de execução na Hostinger. Recomenda-se a cada 5 minutos, sob autorização, chamando `/api/cron/tiktok-lembretes` com `Authorization: Bearer <CRON_SECRET>`.
 7. Acompanhar erros do cron e os indicadores de lembretes criados; um alerta atrasado é retomado na próxima chamada bem-sucedida **dentro das primeiras 24 horas**, enquanto a publicação estiver AGENDADA. Após esse prazo não há nova notificação automática.
 8. Confirmar segurança de uso de imagem antes de habilitar lembretes para publicações reais (Etapa 04/04).
