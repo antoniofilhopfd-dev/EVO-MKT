@@ -64,6 +64,21 @@ test('mudança de horário Instagram não invalida aprovação', () => {
   assert.equal(conteudo.invalidarAprovacaoTikTok(antigo,novo),false);
   assert.equal(novo.status,'APROVADO');
 });
+test('repassar TikTok aprovado para outro responsável invalida aprovação', () => {
+  const novo = { ...sample, responsavel:'Outra pessoa' };
+  assert.equal(conteudo.invalidarAprovacaoTikTok(sample, novo), true);
+  assert.equal(novo.status, 'EM REVISÃO');
+});
+test('horário TikTok é interpretado em Fortaleza independentemente de TIMEZONE', () => {
+  const antigo = process.env.TIMEZONE;
+  process.env.TIMEZONE = 'UTC';
+  try {
+    assert.equal(conteudo.horarioTikTokData('2026-11-04T18:00').toISOString(), '2026-11-04T21:00:00.000Z');
+  } finally {
+    if (antigo === undefined) delete process.env.TIMEZONE;
+    else process.env.TIMEZONE = antigo;
+  }
+});
 test('TikTok sem mudanças não invalida aprovação', () => {
   assert.equal(conteudo.invalidarAprovacaoTikTok(sample,{...sample}),false);
 });
