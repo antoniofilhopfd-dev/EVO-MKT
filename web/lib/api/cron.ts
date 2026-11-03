@@ -9,6 +9,7 @@ import { resumoOperacional } from '../insights';
 import { intLog, setting } from '../settings';
 import { igPublishDue, igSync, igSyncSeguidores, metaConnected, metaRefreshIfNeeded } from '../integrations/meta';
 import { gCalendarSync, gConnected } from '../integrations/google';
+import { executarLembretesTikTok } from '../tiktokLembretes';
 import { json } from './handlers';
 
 /** Autenticação dos endpoints de cron: Authorization: Bearer CRON_SECRET (comparação em tempo constante). */
@@ -24,6 +25,8 @@ export async function cronRoute(c: Ctx): Promise<Response> {
   cronAuth(c);
   if (c.path === '/cron/ping') return json({ ok: true, quando: now() });
   if (c.path === '/cron/alertas') return json(await alertas());
+  // Separado do cron de integrações Meta: nunca publica nem envia mídia.
+  if (c.path === '/cron/tiktok-lembretes') return json(await executarLembretesTikTok());
   if (c.path === '/cron/integracoes') return json(await integracoes(c.qs('tarefa') || 'tudo'));
   return fail(404, 'Rota não encontrada.');
 }
