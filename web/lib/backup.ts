@@ -76,7 +76,20 @@ async function collect(motivo: string, completo: boolean, permitirAusentes = fal
   const tabelas: Record<string, Row[]> = {};
   for (const [t, spec] of Object.entries(TABLES)) {
     const extra = t === 'audit_log' ? ' ORDER BY id DESC LIMIT 20000' : '';
-    tabelas[t] = await q(`SELECT ${spec.cols.join(',')} FROM ${t}${extra}`);
+    try {
+      tabelas[t] = await q(`SELECT ${spec.cols.join(',')} FROM ${t}${extra}`);
+    } catch (e: any) {
+      // Somente a tabela da migração 047 pode estar ausente antes da sua aplicação.
+      // Se a migração já foi registrada, a ausência é corrupção do esquema: abortar backup.
+      if (t !== 'tiktok_reminder_events' || Number(e?.errno) !== 1146) throw e;
+      const migrada = await q1<{ name: string }>(
+        'SELECT name FROM schema_migrations WHERE name=?',
+        ['047_tiktok_lembretes.sql'],
+      );
+      if (migrada) throw e;
+      // Não inventar linhas vazias nem um manifesto para uma tabela ainda inexistente.
+      // Backups anteriores à migração continuam válidos e a restauração mantém a tabela intacta.
+    }
   }
   let anexosIncompletos = false;
   if (completo) {
@@ -172,7 +185,7 @@ export function validateBuffer(gz: Buffer): Validation {
   if (sha(man) !== dump.sha256_total) out.erros.push('Manifesto adulterado ou incompleto.');
   for (const t of [...Object.keys(TABLES), ...(dump.completo ? [FILES_TABLE.name] : [])]) {
     const rows = tabelas[t];
-    if (!Array.isArray(rows)) { if (TABLES[t]?.opt) out.avisos.push(`Backup anterior à tabela "${t}": ela não será alterada na restauração.`); else out.erros.push(`Tabela "${t}" ausente.`); continue; }
+    if (!Array.isArray(rows)) { if (TABLES[t]?.opt) out.avisos.push(t === 'tiktok_reminder_events' ? 'Migração 047 ainda não aplicada na origem: lembretes TikTok não incluídos; restauração não alterará essa tabela.' : `Backup anterior à tabela "${t}": ela não será alterada na restauração.`); else out.erros.push(`Tabela "${t}" ausente.`); continue; }
     out.resumo[t] = rows.length;
     if (!man[t] || man[t].linhas !== rows.length) out.erros.push(`Tabela "${t}": contagem não confere.`);
     else if (man[t].sha256 !== sha(rows)) out.erros.push(`Tabela "${t}": conteúdo não confere (hash).`);
