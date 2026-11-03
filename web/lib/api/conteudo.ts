@@ -6,7 +6,7 @@ import { requireInternal } from '../auth';
 import { audit, getRow, insertRow, listRows, logStatus, modifyRow } from '../records';
 import { registrarNotificacao } from '../notificacoes';
 import { adicionarComentario } from '../comentarios';
-import { adicionarMaterial, copiaParaNova, materiaisAtivos, materiaisDe, pendencias, PAPEIS, requisitosDeAgendamento, sincronizarMidia, statusAtual, tipoDeLink, urlPermitida } from '../conteudo';
+import { adicionarMaterial, copiaParaNova, invalidarAprovacaoTikTok, materiaisAtivos, materiaisDe, pendencias, PAPEIS, requisitosDeAgendamento, sincronizarMidia, statusAtual, tipoDeLink, urlPermitida } from '../conteudo';
 import { conteudoCoerente } from '../files';
 import { envInt, fail, now, Row, safePart, strv } from '../util';
 import { igMarkError, igPublish } from '../integrations/meta';
@@ -240,10 +240,13 @@ export async function conteudoRoute(c: Ctx) {
       if (!conteudoCoerente(ext, buf)) fail(400, `O conteúdo de "${base}" não corresponde ao tipo .${ext}.`);
       const rel = `ANEXOS/CONTEUDOS/${safePart(id)}/${papel}_${Math.random().toString(16).slice(2, 10)}_${base}`;
       await run('INSERT INTO arquivos(caminho,mime,tamanho,conteudo,criado_em) VALUES(?,?,?,?,?)', [rel, MIME[ext] ?? 'application/octet-stream', f.size, buf, now()]);
-      await modifyRow('conteudos', id, (r) => {
+      await modifyRow('conteudos', id, async (r, conn) => {
+        const antes: Row = { ...r, materiais: materiaisDe(r).map(m => ({ ...m })) };
         const m = adicionarMaterial(r, { papel, tipo: 'arquivo', nome: base, caminho: rel, grupo: arqs.length === 1 ? grupo || undefined : undefined, mime: MIME[ext], tamanho: f.size }, String(u.codigo));
         novos.push(m);
-        return { ...r, atualizadoEm: now(), atualizadoPor: String(u.codigo) };
+        const depois: Row = { ...r, atualizadoEm: now(), atualizadoPor: String(u.codigo) };
+        if (invalidarAprovacaoTikTok(antes, depois)) await logStatus(conn, 'conteudos', id, strv(antes.status), 'EM REVISÃO', String(u.codigo), 'TikTok: material final alterado após aprovação');
+        return depois;
       });
     }
     await audit(String(u.codigo), 'material', 'conteudos', id);
@@ -256,9 +259,12 @@ export async function conteudoRoute(c: Ctx) {
     if (!urlPermitida(url)) fail(400, 'Informe um link https (por exemplo, do Google Drive).');
     await conteudo(id);
     let novo: Row = {};
-    await modifyRow('conteudos', id, (r) => {
+    await modifyRow('conteudos', id, async (r, conn) => {
+      const antes: Row = { ...r, materiais: materiaisDe(r).map(m => ({ ...m })) };
       novo = adicionarMaterial(r, { papel, tipo: tipoDeLink(url), nome: strv(b.nome).trim() || (tipoDeLink(url) === 'drive' ? 'Arquivo no Google Drive' : 'Link'), url, grupo: strv(b.grupo).trim() || undefined }, String(u.codigo));
-      return { ...r, atualizadoEm: now(), atualizadoPor: String(u.codigo) };
+      const depois: Row = { ...r, atualizadoEm: now(), atualizadoPor: String(u.codigo) };
+      if (invalidarAprovacaoTikTok(antes, depois)) await logStatus(conn, 'conteudos', id, strv(antes.status), 'EM REVISÃO', String(u.codigo), 'TikTok: material final alterado após aprovação');
+      return depois;
     });
     await audit(String(u.codigo), 'material', 'conteudos', id);
     return json({ ok: true, novo, ...sair(await conteudo(id)) }, 201);
@@ -268,13 +274,15 @@ export async function conteudoRoute(c: Ctx) {
     const id = strv(b.id), mid = strv(b.materialId);
     const cur = await conteudo(id);
     const alvo = materiaisDe(cur).find((m) => m.id === mid) ?? fail(404, 'Material não encontrado.');
-    await modifyRow('conteudos', id, (r) => {
+    await modifyRow('conteudos', id, async (r, conn) => {
+      const antes: Row = { ...r, materiais: materiaisDe(r).map(m => ({ ...m })) };
       const resto = materiaisDe(r).filter((m) => m.id !== mid);
       // se tirou a versão atual de um grupo, a anterior volta a valer
       const doGrupo = resto.filter((m) => m.grupo === alvo.grupo);
       if (doGrupo.length && !doGrupo.some((m) => !m.substituido)) { const ult = doGrupo.reduce((a, m) => ((Number(m.versao) || 0) > (Number(a.versao) || 0) ? m : a)); ult.substituido = false; }
       const nr = { ...r, materiais: resto, atualizadoEm: now(), atualizadoPor: String(u.codigo) };
       sincronizarMidia(nr);
+      if (invalidarAprovacaoTikTok(antes, nr)) await logStatus(conn, 'conteudos', id, strv(antes.status), 'EM REVISÃO', String(u.codigo), 'TikTok: material final removido após aprovação');
       return nr;
     });
     const cam = strv(alvo.caminho);
