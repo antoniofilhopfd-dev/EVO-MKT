@@ -28,6 +28,26 @@ export function validarStatusPorEdicao(de: string, para: string): string | null 
 export const materiaisDe = (r: Row): Row[] => (Array.isArray(r.materiais) ? (r.materiais as Row[]) : []);
 export const materiaisAtivos = (r: Row, papel?: string) => materiaisDe(r).filter((m) => !m.substituido && (!papel || m.papel === papel));
 
+/**
+ * TikTok manual: invalida uma aprovação se o conteúdo aprovado mudar.
+ * Não altera o fluxo de outros canais e não publica nada.
+ * Retorna true somente quando uma aprovação em vigor foi invalidada.
+ */
+export function invalidarAprovacaoTikTok(antes: Row, depois: Row): boolean {
+  if (strv(antes.canal).trim().toLowerCase() !== 'tiktok') return false;
+  if (!['APROVADO', 'AGENDADO'].includes(statusAtual(antes.status))) return false;
+  const campos = ['titulo', 'legenda', 'hashtags', 'cta', 'perfil', 'formato', 'midiaInstagram', 'midiasInstagram'];
+  const alterouTexto = campos.some((campo) => strv(antes[campo]) !== strv(depois[campo]));
+  const arquivosRelevantes = (r: Row) => materiaisAtivos(r)
+    .filter((m) => m.papel === 'final' || m.papel === 'miniatura')
+    .map((m) => [m.papel, m.tipo, m.caminho, m.url, m.grupo, m.versao, m.nome]);
+  if (!alterouTexto && JSON.stringify(arquivosRelevantes(antes)) === JSON.stringify(arquivosRelevantes(depois))) return false;
+  depois.status = 'EM REVISÃO';
+  for (const campo of ['aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'versaoAprovada', 'aprovacaoComentario']) delete depois[campo];
+  return true;
+}
+
+
 export interface Pendencia { chave: string; texto: string }
 /** O que ainda falta para a publicação poder sair (só para quem ainda não foi publicado). */
 export function pendencias(r: Row): Pendencia[] {
