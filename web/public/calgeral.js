@@ -74,7 +74,7 @@ function cgHoras(itens, dias) {
     return `<div class="cg-col ${d === hoje ? 'hoje' : ''}" data-dia="${d}" style="height:${(H1 - H0) * PX}px">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="cg-linha" style="top:${i * PX}px" ${CG.dados?.pode ? `data-novo="${d}" data-hora="${String(H0 + i).padStart(2, '0')}:00"` : ''}></div>`).join('')}${(() => {
     const bloco = e => {
       const ini = Math.max(cgHoraMin(e.horaInicio), H0 * 60), fim = Math.min(Math.max(cgHoraMin(e.horaFim), cgHoraMin(e.horaInicio) + 30), H1 * 60), top = (ini - H0 * 60) / 60 * PX, alt = Math.max(24, (fim - ini) / 60 * PX - 2), larg = 100 / e._n;
-      return `<button type="button" class="cg-bloco ${e._n >= 3 ? 'apert' : e._n === 2 ? 'dois' : ''}" data-ev="${attr(e.id)}" style="--c:${e.cor};background:${cgFundo(e.cor)};top:${top}px;height:${alt}px;left:${e._c * larg}%;width:calc(${larg}% - 3px)" title="${attr(`${e.titulo} · ${cgHora(e)}`)}"><b>${esc(e.horaInicio)} – ${esc(e.horaFim)}</b><span>${esc(e.titulo)}</span>${e.local ? `<small>${esc(e.local)}</small>` : ''}</button>`;
+      return `<button type="button" class="cg-bloco ${e._n >= 3 ? 'apert' : e._n === 2 ? 'dois' : ''}${alt < 44 ? ' curto' : ''}" data-ev="${attr(e.id)}" style="--c:${e.cor};background:${cgFundo(e.cor)};top:${top}px;height:${alt}px;left:${e._c * larg}%;width:calc(${larg}% - 3px)" title="${attr(`${e.titulo} · ${cgHora(e)}`)}"><b>${alt < 44 ? esc(e.horaInicio) : `${esc(e.horaInicio)} – ${esc(e.horaFim)}`}</b><span>${esc(e.titulo)}</span>${e.local ? `<small>${esc(e.local)}</small>` : ''}</button>`;
     };
     // na Semana, três ou mais eventos ao mesmo tempo viram UM bloco "N eventos" (a coluna é estreita); clicar abre o Dia, onde cada evento tem a largura toda
     const grupos = []; let cur = null;

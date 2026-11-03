@@ -414,3 +414,5 @@ button.cm-filtro{text-align:left;font:inherit;cursor:pointer;border:1px solid #d
 .cg-form .control,.cg-form input[type=date],.cg-form input[type=time]{min-width:0;width:100%;box-sizing:border-box}
 .cg-form-grade>div{min-width:0}
 .cg-form [hidden]{display:none!important}
+/* Evento curto (30 min): horário e título na mesma linha, para o título não ficar cortado */
+.cg-bloco.curto{flex-direction:row;align-items:center;gap:6px;padding-top:0;padding-bottom:0}.cg-bloco.curto b{flex:none;white-space:nowrap;font-size:10.5px}.cg-bloco.curto span{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal;font-size:11px;line-height:1.1}.cg-bloco.curto small{display:none}.cg-bloco.curto.dois b,.cg-bloco.curto.apert b{display:none}
