@@ -53,6 +53,7 @@ vm.runInNewContext(compiled.outputText, {
     if (name === './db') return db;
     if (name === './records') return { listRows: async () => [...posts.values()].map(p => ({ ...p })) };
     if (name === './util') return util;
+    if (name === './conteudo') return { horarioTikTokData: s => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? new Date(s + ':00-03:00') : null };
     throw new Error('Importação inesperada: ' + name);
   },
   Date, Buffer, console,
