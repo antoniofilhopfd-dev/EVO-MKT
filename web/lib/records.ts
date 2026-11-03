@@ -138,7 +138,7 @@ export async function updateRow(mod: string, id: string, patchIn: Row, ator: str
     if (mod === 'conteudos' && !opts.interno) {
       if (patch.status !== undefined) { const e = validarStatusPorEdicao(String(cur.status ?? ''), String(patch.status)); if (e) fail(409, e); patch.status = statusAtual(patch.status); }
       if (patch.segmento !== undefined) patch.segmento = segmentoNormalizado(patch.segmento);
-      for (const k of ['materiais', 'versoes', 'aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'versaoAprovada', 'aprovacaoComentario', 'instagramMediaId', 'instagramLink', 'publicadoConfirmadoEm', 'publicadoConfirmadoPor']) delete patch[k]; // só as rotas próprias mudam estes campos
+      for (const k of ['materiais', 'versoes', 'aprovacaoDecisao', 'aprovadoPor', 'aprovadoEm', 'versaoAprovada', 'aprovacaoComentario', 'agendamentoTikTokId', 'instagramMediaId', 'instagramLink', 'publicadoConfirmadoEm', 'publicadoConfirmadoPor']) delete patch[k]; // só as rotas próprias mudam estes campos
     }
     if (patch.status !== undefined && String(patch.status) !== String(cur.status ?? ''))
       await logStatus(c, mod, id, String(cur.status ?? ''), String(patch.status), ator, motivoInformado.trim());
