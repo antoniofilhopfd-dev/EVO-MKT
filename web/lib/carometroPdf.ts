@@ -15,6 +15,21 @@ export async function carregarAlunosPdf(ids: number[]): Promise<AlunoPdf[]> {
     FROM ui_alunos a WHERE a.ativo=1 AND a.id IN (${ids.map(() => '?').join(',')})`, ids);
   return rows.map((r) => ({ id: Number(r.id), nome: String(r.nome), matricula: String(r.matricula), turma: String(r.turma ?? ''), fotoId: r.foto_id ? Number(r.foto_id) : null, autorizacao: autorizacaoDe(r.situacao) }));
 }
+/** Usa a última solicitação não cancelada e verifica a vigência sem alterar registros. */
+export async function carregarAutorizadosPdf(turmas: string[], hoje: string): Promise<AlunoPdf[]> {
+  const filtro = turmas.length ? `AND a.turma IN (${turmas.map(() => '?').join(',')})` : '';
+  const rows = await q(`SELECT a.id,a.nome,a.matricula,a.turma,
+    (SELECT f.id FROM cm_fotos f WHERE f.aluno_id=a.id AND f.ativa=1 ORDER BY f.id DESC LIMIT 1) foto_id
+    FROM ui_alunos a JOIN ui_solicitacoes s ON s.id=(
+      SELECT ultima.id FROM ui_solicitacoes ultima
+      WHERE ultima.aluno_id=a.id AND ultima.status<>'CANCELADO' ORDER BY ultima.id DESC LIMIT 1
+    )
+    WHERE a.ativo=1 AND s.status='AUTORIZADO' AND (s.vence_em='' OR s.vence_em IS NULL OR s.vence_em>=?) ${filtro}`, [hoje, ...turmas]);
+  return rows.map((r) => ({
+    id: Number(r.id), nome: String(r.nome), matricula: String(r.matricula), turma: String(r.turma ?? ''),
+    fotoId: r.foto_id ? Number(r.foto_id) : null, autorizacao: 'AUTORIZADO',
+  }));
+}
 export const ordenarAlunosPdf = (a: AlunoPdf[]) => a.sort((x, y) => compararTurmaCm(x.turma, y.turma) || x.nome.localeCompare(y.nome, 'pt-BR'));
 
 const iniciais = (n: string) => n.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();

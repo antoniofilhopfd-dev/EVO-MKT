@@ -390,48 +390,83 @@ PAGINAS.cmsessoes = async function (abrirId) {
 };
 
 /* ---- Impressão e PDF (A4) ---- */
-const CM_PDF = { origem: 'turma', turma: '', selecao: '', orientacao: 'retrato', porlinha: '5', matricula: false, so_autorizados: false };
+const CM_PDF = { origem: 'turma', turma: '', selecao: '', turmas: [], todas: true, volume: 1, orientacao: 'retrato', porlinha: '5', matricula: false, so_autorizados: false };
 PAGINAS.cmpdf = async function () {
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
   const [tr, se] = await Promise.all([api('/carometro/turmas'), api('/carometro/selecoes')]);
   const turmas = tr.segmentos.flatMap(s => s.series.flatMap(g => g.turmas.map(t => t.turma)));
+  CM_PDF.turmas = CM_PDF.turmas.filter(t => turmas.includes(t));
   if (!CM_PDF.turma || !turmas.includes(CM_PDF.turma)) CM_PDF.turma = turmas[0] || '';
   if (!CM_PDF.selecao || !se.rows.some(r => String(r.id) === String(CM_PDF.selecao))) CM_PDF.selecao = se.rows[0] ? String(se.rows[0].id) : '';
   const opt = (v, t, sel) => `<option value="${attr(v)}" ${String(sel) === String(v) ? 'selected' : ''}>${esc(t)}</option>`;
   $('#content').innerHTML = `<div class="cm-pdf"><section class="card cm-pdf-form"><div class="db-tit"><h2>Opções do PDF</h2></div>
-    <label class="ui-campo">Origem<select id="pdfOrigem" class="control">${opt('turma', 'Uma turma', CM_PDF.origem)}${opt('selecao', 'Uma seleção salva', CM_PDF.origem)}</select></label>
+    <label class="ui-campo">Origem<select id="pdfOrigem" class="control">${opt('turma', 'Uma turma', CM_PDF.origem)}${opt('selecao', 'Uma seleção salva', CM_PDF.origem)}${opt('autorizados', 'Carômetro dos autorizados', CM_PDF.origem)}</select></label>
     <label class="ui-campo" id="pdfLTurma">Turma<select id="pdfTurma" class="control">${turmas.map(t => opt(t, t, CM_PDF.turma)).join('')}</select></label>
     <label class="ui-campo" id="pdfLSel">Seleção<select id="pdfSel" class="control">${se.rows.length ? se.rows.map(r => opt(r.id, `${r.nome} (${r.alunos})`, CM_PDF.selecao)).join('') : '<option value="">Nenhuma seleção salva</option>'}</select></label>
+    <div id="pdfLAut" hidden>
+      <label class="cm-chk"><input type="checkbox" id="pdfTodas" ${CM_PDF.todas ? 'checked' : ''}> Todas as turmas</label>
+      <fieldset id="pdfTurmas" class="cm-edlist"><legend>Turmas</legend>${turmas.map(t => `<label class="cm-chk"><input type="checkbox" value="${attr(t)}" ${CM_PDF.turmas.includes(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</fieldset>
+    </div>
+    <label class="ui-campo" id="pdfLVolume" hidden>Volume do PDF<select id="pdfVolume" class="control"></select></label>
     <label class="ui-campo">Orientação<select id="pdfOri" class="control">${opt('retrato', 'A4 retrato', CM_PDF.orientacao)}${opt('paisagem', 'A4 paisagem', CM_PDF.orientacao)}</select></label>
-    <label class="ui-campo">Fotos por linha<select id="pdfPor" class="control">${[4, 5, 6].map(n => opt(n, n + ' por linha', CM_PDF.porlinha)).join('')}</select></label>
-    <label class="cm-chk"><input type="checkbox" id="pdfMat" ${CM_PDF.matricula ? 'checked' : ''}> Mostrar a matrícula</label>
-    <label class="cm-chk"><input type="checkbox" id="pdfAut" ${CM_PDF.so_autorizados ? 'checked' : ''}> Só alunos com autorização de imagem vigente</label>
+    <label class="ui-campo" id="pdfLPor">Fotos por linha<select id="pdfPor" class="control">${[4, 5, 6].map(n => opt(n, n + ' por linha', CM_PDF.porlinha)).join('')}</select></label>
+    <label class="cm-chk" id="pdfLMat"><input type="checkbox" id="pdfMat" ${CM_PDF.matricula ? 'checked' : ''}> Mostrar a matrícula</label>
+    <label class="cm-chk" id="pdfLAutFiltro"><input type="checkbox" id="pdfAut" ${CM_PDF.so_autorizados ? 'checked' : ''}> Só alunos com autorização de imagem vigente</label>
     <p class="kpi-note">A matrícula fica oculta por padrão: imprima só o necessário. O PDF contém imagens de menores e é de uso interno.</p>
     <div class="ig-barra"><button type="button" class="btn" id="pdfBaixar">Gerar PDF</button></div></section>
     <section class="card cm-pdf-prev"><div class="db-tit"><h2>Prévia</h2><span class="kpi-note" id="pdfInfo"></span></div><div id="pdfPrev" class="cm-pdf-quadro"><div class="loading"><span></span><b>Montando a prévia…</b></div></div></section></div>`;
-  const query = baixar => new URLSearchParams({ origem: CM_PDF.origem, turma: CM_PDF.turma, selecao: CM_PDF.selecao, orientacao: CM_PDF.orientacao, porlinha: CM_PDF.porlinha, matricula: CM_PDF.matricula ? '1' : '0', so_autorizados: CM_PDF.so_autorizados ? '1' : '0', ...(baixar ? { baixar: '1' } : {}) });
+  const query = baixar => {
+    const params = new URLSearchParams({ origem: CM_PDF.origem, turma: CM_PDF.turma, selecao: CM_PDF.selecao, orientacao: CM_PDF.orientacao, porlinha: CM_PDF.porlinha, matricula: CM_PDF.matricula ? '1' : '0', so_autorizados: CM_PDF.so_autorizados ? '1' : '0', ...(baixar ? { baixar: '1' } : {}) });
+    if (CM_PDF.origem === 'autorizados') {
+      params.set('volume', CM_PDF.volume);
+      if (CM_PDF.todas) params.set('todas', '1');
+      else CM_PDF.turmas.forEach(t => params.append('turmas', t));
+    }
+    return params;
+  };
   const busca = async baixar => {
     const r = await fetch(API + '/carometro/pdf?' + query(baixar), { credentials: 'same-origin', headers: { 'X-EVO': '1' } });
     if (!r.ok) { let m = 'Não foi possível gerar o PDF.'; try { m = (await r.json()).error || m; } catch { /* sem corpo */ } throw new Error(m); }
-    return { blob: await r.blob(), paginas: r.headers.get('X-Carometro-Paginas'), alunos: r.headers.get('X-Carometro-Alunos'), nome: (/filename="([^"]+)"/.exec(r.headers.get('content-disposition') || '') || [])[1] || 'Carometro.pdf' };
+    return { blob: await r.blob(), paginas: r.headers.get('X-Carometro-Paginas'), alunos: r.headers.get('X-Carometro-Alunos'), volumes: Number(r.headers.get('X-Carometro-Volumes')) || 1, total: r.headers.get('X-Carometro-Total'), nome: (/filename="([^"]+)"/.exec(r.headers.get('content-disposition') || '') || [])[1] || 'Carometro.pdf' };
   };
   let url = '', seq = 0;
   const previa = async () => {
     const meu = ++seq; $('#pdfPrev').innerHTML = '<div class="loading"><span></span><b>Montando a prévia…</b></div>'; $('#pdfInfo').textContent = '';
+    $('#pdfBaixar').disabled = true;
+    $('#pdfLVolume').hidden = true;
+    if (CM_PDF.origem === 'autorizados' && !CM_PDF.todas && !CM_PDF.turmas.length) {
+      $('#pdfPrev').innerHTML = '<div class="empty"><b>Selecione pelo menos uma turma.</b></div>';
+      return;
+    }
     try {
       const r = await busca(false); if (meu !== seq) return;
       if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(r.blob);
       $('#pdfPrev').innerHTML = `<iframe class="cm-pdf-frame" title="Prévia do PDF" src="${url}#toolbar=0&view=FitH"></iframe><p class="kpi-note">Se a prévia não aparecer no seu navegador, use “Gerar PDF”.</p>`;
-      $('#pdfInfo').textContent = `${r.alunos} aluno(s) · ${r.paginas} página(s)`;
+      $('#pdfInfo').textContent = r.volumes > 1 ? `${r.total} autorizados · Volume ${CM_PDF.volume} de ${r.volumes} · ${r.alunos} aluno(s) · ${r.paginas} página(s)` : `${r.alunos} aluno(s) · ${r.paginas} página(s)`;
+      $('#pdfVolume').innerHTML = Array.from({ length: r.volumes }, (_, i) => opt(i + 1, `Volume ${i + 1}`, CM_PDF.volume)).join('');
+      $('#pdfLVolume').hidden = r.volumes < 2;
+      $('#pdfBaixar').disabled = false;
     } catch (e) { if (meu === seq) $('#pdfPrev').innerHTML = `<div class="empty"><b>${esc(e.message)}</b></div>`; }
   };
-  const atualizaVis = () => { $('#pdfLTurma').hidden = CM_PDF.origem !== 'turma'; $('#pdfLSel').hidden = CM_PDF.origem !== 'selecao'; };
-  const liga = (id, k, tipo) => { $(id).onchange = e => { CM_PDF[k] = tipo === 'chk' ? e.target.checked : e.target.value; atualizaVis(); previa(); }; };
+  const atualizaVis = () => {
+    const modoAut = CM_PDF.origem === 'autorizados';
+    $('#pdfLTurma').hidden = CM_PDF.origem !== 'turma';
+    $('#pdfLSel').hidden = CM_PDF.origem !== 'selecao';
+    $('#pdfLAut').hidden = !modoAut;
+    $('#pdfTurmas').hidden = CM_PDF.todas;
+    for (const id of ['#pdfLPor', '#pdfLMat', '#pdfLAutFiltro']) $(id).hidden = modoAut;
+  };
+  const refaz = () => { CM_PDF.volume = 1; atualizaVis(); previa(); };
+  const liga = (id, k, tipo) => { $(id).onchange = e => { CM_PDF[k] = tipo === 'chk' ? e.target.checked : e.target.value; refaz(); }; };
   liga('#pdfOrigem', 'origem'); liga('#pdfTurma', 'turma'); liga('#pdfSel', 'selecao'); liga('#pdfOri', 'orientacao'); liga('#pdfPor', 'porlinha'); liga('#pdfMat', 'matricula', 'chk'); liga('#pdfAut', 'so_autorizados', 'chk');
+  liga('#pdfTodas', 'todas', 'chk');
+  $('#pdfTurmas').onchange = () => { CM_PDF.turmas = $$('#pdfTurmas input:checked').map(el => el.value); refaz(); };
+  $('#pdfVolume').onchange = e => { CM_PDF.volume = Number(e.target.value); previa(); };
   $('#pdfBaixar').onclick = async () => {
+    const meu = seq;
     $('#pdfBaixar').disabled = true;
     try { const r = await busca(true), a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('PDF gerado'); }
-    catch (e) { toast(e.message, 'warn'); } finally { $('#pdfBaixar').disabled = false; }
+    catch (e) { toast(e.message, 'warn'); } finally { if (meu === seq) $('#pdfBaixar').disabled = false; }
   };
   atualizaVis(); previa();
 };
