@@ -1,6 +1,6 @@
 /* Uso de Imagem › Modelos e Solicitações. Modelos: só o Administrador edita. Cada solicitação guarda o texto, a versão e o hash do momento
    em que foi criada: mudar o modelo depois não altera o que já foi pedido. */
-const UI_STATUS = {
+const UI_STATUS = { PENDENTE: ['Pendente', 'warn'],
   AGUARDANDO_ENVIO: ['Aguardando envio', ''], ENVIADO: ['Enviado', 'info'], ABERTO: ['Aberto', 'info'], AGUARDANDO_ASSINATURA: ['Aguardando assinatura', 'warn'], AGUARDANDO_VALIDACAO: ['Aguardando validação', 'warn'],
   AUTORIZADO: ['Autorizado', 'ok'], NAO_AUTORIZADO: ['Não autorizado', 'bad'], VENCIDO: ['Vencido', 'bad'], REVOGADO: ['Revogado', 'bad'], ERRO: ['Erro', 'bad'], CANCELADO: ['Cancelado', 'mute'],
 };
@@ -199,9 +199,9 @@ function uiRevogar(s, aoFim) {
 /* ---- ficha do aluno ---- */
 async function uiFicha(id) {
   let f; try { f = await api('/imagem/alunos/ficha?id=' + id); } catch (e) { return toast(e.message, 'bad'); }
-  const a = f.aluno, atual = f.solicitacoes.find(s => s.status !== 'CANCELADO');
+  const a = f.aluno;
   const d = dialogo(`<h3>${esc(a.nome)}</h3><p class="kpi-note">Matrícula ${esc(a.matricula)} · ${esc(a.turma || 'sem turma')}${a.ativo ? '' : ' · inativo'}</p>
-    <p>Situação atual: ${uiBadge(atual ? atual.status : '')} ${atual && ['NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO'].includes(atual.status) ? '<b class="ui-ruim">Não usar a imagem deste aluno.</b>' : ''}</p>
+    <p>Situação atual: ${uiBadge(a.situacao)} ${a.anoLiberacaoManual ? `<small>Registro interno · ${esc(a.anoLiberacaoManual)}</small>` : ''} ${['NAO_AUTORIZADO', 'VENCIDO', 'REVOGADO'].includes(a.situacao) ? '<b class="ui-ruim">Não usar a imagem deste aluno.</b>' : ''}</p>
     ${f.solicitacoes.length ? f.solicitacoes.map(s => `<section class="card ui-ficha"><div class="db-tit"><h2>${esc(s.protocolo)}</h2>${uiBadge(s.status)}</div>
       <dl class="dc-dl"><dt>Modelo</dt><dd>${esc(s.modelo)} (v${s.versao})</dd><dt>Responsável</dt><dd>${esc(s.responsavel || '—')}${s.parentesco ? ' (' + esc(s.parentesco) + ')' : ''}</dd><dt>Decisão</dt><dd>${s.decisao === 'AUTORIZO' ? 'Autoriza' : s.decisao === 'NAO_AUTORIZO' ? 'Não autoriza' : '—'}${s.decisaoEm ? ' em ' + esc(fmtDateTime(s.decisaoEm)) : ''}</dd><dt>Assinatura</dt><dd>${s.modalidade === 'GOVBR' ? 'GOV.BR' : s.modalidade === 'DESENHADA' ? 'Desenhada na tela' : '—'}${s.validadoPor ? ' · validada por ' + esc(s.validadoPor) : ''}</dd><dt>Prazo</dt><dd>${s.venceEm ? 'até ' + esc(fmtDate(s.venceEm)) : 'indeterminado'}</dd>${s.status === 'REVOGADO' ? `<dt>Revogação</dt><dd>${esc(fmtDateTime(s.revogadoEm))} · ${esc(s.revogadoPor)} — ${esc(s.revogadoMotivo)}</dd>` : ''}<dt>Hash do termo</dt><dd><small>${esc(s.termoHash)}</small></dd></dl>
       ${s.arquivos.length ? `<ul class="ui-arqs">${s.arquivos.some(x => x.tipo === 'govbr') ? `<li><a href="${API}/imagem/solicitacoes/comprovante?id=${s.id}" download>Comprovante de recebimento (PDF)</a></li>` : ''}${s.arquivos.map(x => `<li><a href="${API}/imagem/solicitacoes/arquivo?id=${s.id}&tipo=${x.tipo}" download>${esc(UI_ARQ[x.tipo] || x.tipo)}</a> <small>SHA-256 ${esc(x.sha256.slice(0, 12))}…</small></li>`).join('')}</ul>` : ''}

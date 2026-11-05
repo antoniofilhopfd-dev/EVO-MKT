@@ -1,3 +1,4 @@
+import { anoLiberacao, joinsLiberacao, statusLiberacao, venceLiberacao } from '../imagemLiberacao';
 import { excluirAlunos, AlunoConfirmado } from '../excluirAlunos';
 import { contextoCm, politicaCm, exigirCm, exigirAluno, exigirTurma, permiteTurma } from '../carometroAcesso';
 import { carometroGestaoRoute } from './carometroGestao';
@@ -23,15 +24,14 @@ import { autorizacaoDe, compararTurmaCm, normNome, segmentoCm, SEGMENTOS_CM, ser
 const anoLetivo = () => String(new Date().getFullYear());
 
 const SQL_ALUNOS = `SELECT a.id, a.matricula, a.nome, a.turma,
-  (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao,
-  (SELECT s.vence_em FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) vence_em,
+  ${statusLiberacao} situacao, ${venceLiberacao} vence_em,
   (SELECT f.id FROM cm_fotos f WHERE f.aluno_id=a.id AND f.ativa=1 ORDER BY f.id DESC LIMIT 1) foto_id,
-  (SELECT s.atualizado_em FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao_em
-  FROM ui_alunos a WHERE a.ativo=1`;
+  COALESCE(m.atualizado_em, s.atualizado_em) situacao_em
+  FROM ui_alunos a ${joinsLiberacao} WHERE a.ativo=1`;
 
 async function carregar(): Promise<Row[]> {
   await atualizarVencimentos();
-  const rows = await q(SQL_ALUNOS);
+  const rows = await q(SQL_ALUNOS, [anoLiberacao()]);
   const nomes = new Map<string, number>();
   for (const r of rows) { const k = `${r.turma}|${normNome(String(r.nome))}`; nomes.set(k, (nomes.get(k) ?? 0) + 1); }
   return rows.map((r) => ({

@@ -63,6 +63,7 @@ export async function fichaPdf(ficha: { aluno: Row; solicitacoes: Row[] }, quand
   const logo = await carregarLogo(), a = ficha.aluno;
   return gerarPdf({ titulo: 'Ficha de uso de imagem' }, 'EVO MKT - Ficha de uso de imagem - dados de aluno: uso restrito ao Marketing', async (doc) => {
     let y = cabecalho(doc, logo, 'Ficha de uso de imagem', ['Colégio Evolução', `${a.nome} · Matrícula ${a.matricula} · ${a.turma || 'sem turma'} · ${SEG_ROTULO[a.segmento || '']}`], [quando]);
+    y = nota(doc, y, `Situação atual: ${a.situacao === 'PENDENTE' ? 'Pendente' : ROTULO_STATUS[a.situacao] ?? 'Sem solicitação'}${a.ano_liberacao_manual ? ` · Registro interno de ${a.ano_liberacao_manual}` : ''}`);
     y = titulo(doc, y, 'Histórico de autorizações');
     y = tabela(doc, y, [{ t: 'Protocolo', w: 70 }, { t: 'Modelo / versão', w: 120 }, { t: 'Situação', w: 70 }, { t: 'Responsável', w: 100 }, { t: 'Respondida', w: 52 }, { t: 'Vence', w: 52 }], ficha.solicitacoes.map((s) => [s.protocolo, `${s.modelo_nome} v${s.modelo_versao}`, ROTULO_STATUS[s.status] ?? s.status, s.resp_confirmado || s.responsavel_nome || '-', dataBR(s.decisao_em), s.vence_em ? dmy(s.vence_em) : '-']), { alturaLinha: 20 });
     for (const s of ficha.solicitacoes) {

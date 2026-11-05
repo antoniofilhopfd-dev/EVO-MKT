@@ -13,7 +13,7 @@ function uiChaveTurma(turma) {
 const uiCmpTurma = (a, b) => { const x = uiChaveTurma(a), y = uiChaveTurma(b); return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2], 'pt-BR') || String(a).localeCompare(String(b), 'pt-BR'); };
 const UI = { ordem: 'turma', sel: new Map(), busca: '', segmento: '', turma: '', situacao: '', inativos: false };
 const UI_ACOES = { 'aluno-criado': 'Aluno cadastrado', 'aluno-editado': 'Cadastro atualizado', 'aluno-inativado': 'Aluno inativado', 'aluno-reativado': 'Aluno reativado', importacao: 'Lista importada', 'solicitacoes-criadas': 'Solicitações criadas', 'alunos-excluidos': 'Alunos excluídos da lista' };
-const UI_SITU = [['', 'Todas as situações'], ['SEM', 'Sem solicitação'], ['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['AGUARDANDO_ENVIO', 'Aguardando envio'], ['ENVIADO', 'Enviado'], ['ABERTO', 'Aberto'], ['AGUARDANDO_ASSINATURA', 'Aguardando assinatura'], ['AGUARDANDO_VALIDACAO', 'Aguardando validação'], ['VENCIDO', 'Vencido'], ['REVOGADO', 'Revogado']];
+const UI_SITU = [['', 'Todas as situações'], ['SEM', 'Sem solicitação'], ['PENDENTE', 'Pendente'], ['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['AGUARDANDO_ENVIO', 'Aguardando envio'], ['ENVIADO', 'Enviado'], ['ABERTO', 'Aberto'], ['AGUARDANDO_ASSINATURA', 'Aguardando assinatura'], ['AGUARDANDO_VALIDACAO', 'Aguardando validação'], ['VENCIDO', 'Vencido'], ['REVOGADO', 'Revogado']];
 
 PAGINAS.uipainel = async function () {
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
@@ -81,11 +81,12 @@ PAGINAS.uialunos = async function () {
   const desenha = () => {
     barra();
     const rows = [...dados.rows].sort(UI.ordem === 'nome' ? (x, y) => String(x.nome).localeCompare(String(y.nome), 'pt-BR') : (x, y) => uiCmpTurma(x.turma, y.turma) || String(x.nome).localeCompare(String(y.nome), 'pt-BR')), todosMarcados = rows.length && rows.every(r => UI.sel.has(r.id));
-    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 3.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th><button type="button" class="ui-ord ${UI.ordem === 'nome' ? 'on' : ''}" data-ord="nome" title="Ordenar por nome">Aluno ${UI.ordem === 'nome' ? '▲' : ''}</button></th><th>Matrícula</th><th><button type="button" class="ui-ord ${UI.ordem === 'turma' ? 'on' : ''}" data-ord="turma" title="Ordenar pela ordem das turmas: Infantil 1 a 5, 1º ao 9º Ano, 1ª a 3ª Série">Turma ${UI.ordem === 'turma' ? '▲' : ''}</button></th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td>${uiBadge(r.situacao)}</td><td class="acoes-cel"><button type="button" class="btn soft" data-fi="${r.id}">Ficha</button><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
+    $('#uiLista').innerHTML = rows.length ? `<p class="kpi-note">${rows.length} aluno(s)${dados.limite ? ' (mostrando os 3.000 primeiros; refine a busca)' : ''} de ${fmtN(dados.total)} ativos.</p><div class="tablewrap"><table class="datatable ui-tab"><thead><tr><th class="ui-ck"><input type="checkbox" id="uiTodos" aria-label="Marcar todos os alunos desta lista" ${todosMarcados ? 'checked' : ''}></th><th><button type="button" class="ui-ord ${UI.ordem === 'nome' ? 'on' : ''}" data-ord="nome" title="Ordenar por nome">Aluno ${UI.ordem === 'nome' ? '▲' : ''}</button></th><th>Matrícula</th><th><button type="button" class="ui-ord ${UI.ordem === 'turma' ? 'on' : ''}" data-ord="turma" title="Ordenar pela ordem das turmas: Infantil 1 a 5, 1º ao 9º Ano, 1ª a 3ª Série">Turma ${UI.ordem === 'turma' ? '▲' : ''}</button></th><th>Segmento</th><th>Autorização</th><th></th></tr></thead><tbody>${rows.map(r => `<tr class="${r.ativo ? '' : 'ui-off'}"><td class="ui-ck"><input type="checkbox" data-sel="${r.id}" aria-label="Selecionar ${attr(r.nome)}" ${UI.sel.has(r.id) ? 'checked' : ''} ${r.ativo ? '' : 'disabled'}></td><td class="titlecell"><b>${esc(r.nome)}</b>${r.ativo ? '' : ' <small>(inativo)</small>'}</td><td>${esc(r.matricula)}</td><td>${esc(r.turma || '—')}</td><td>${esc(r.segmentoNome)}</td><td>${r.ativo ? `<button type="button" class="btn soft" data-lib="${r.id}" aria-label="Alterar autorização de ${attr(r.nome)}">${uiBadge(r.situacao)} <span aria-hidden="true">▾</span></button>` : uiBadge(r.situacao)}</td><td class="acoes-cel"><button type="button" class="btn soft" data-fi="${r.id}">Ficha</button><button type="button" class="btn soft" data-ed="${r.id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`
       : `<div class="empty-rich"><strong>${dados.total || UI.busca || UI.segmento || UI.turma || UI.situacao ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}</strong><p>${dados.total || UI.busca || UI.segmento || UI.turma || UI.situacao ? 'Mude a busca ou os filtros.' : 'Importe a lista (CSV ou planilha .xlsx) ou cadastre um aluno por vez.'}</p></div>`;
     $$('[data-sel]').forEach(c => { c.onchange = () => { const r = dados.rows.find(x => x.id === +c.dataset.sel); if (c.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); barra(); const t = $('#uiTodos'); if (t) t.checked = dados.rows.length && dados.rows.every(x => UI.sel.has(x.id)); }; });
     const t = $('#uiTodos'); if (t) t.onchange = () => { dados.rows.filter(r => r.ativo).forEach(r => { if (t.checked) UI.sel.set(r.id, r); else UI.sel.delete(r.id); }); desenha(); };
     $$('[data-ord]').forEach(b => { b.onclick = () => { UI.ordem = b.dataset.ord; desenha(); }; });
+    $$('[data-lib]').forEach(b => { b.onclick = () => uiLiberacao(dados.rows.find(x => x.id === +b.dataset.lib), carrega); });
     $$('[data-fi]').forEach(b => { b.onclick = () => uiFicha(+b.dataset.fi); });
     $$('[data-ed]').forEach(b => { b.onclick = () => uiAlunoForm(dados.rows.find(x => x.id === +b.dataset.ed), carrega, dados.segmentos); });
   };
@@ -98,6 +99,37 @@ PAGINAS.uialunos = async function () {
   $('#uiImp').onclick = () => uiImportar(carrega);
   await carrega();
 };
+
+function uiLiberacao(aluno, recarrega) {
+  const opcoes = [['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['PENDENTE', 'Pendente']];
+  const d = dialogo(`<form id="uiLib"><h3>Alterar autorização</h3>
+    <p><b>${esc(aluno.nome)}</b> · ${esc(aluno.turma || 'Sem turma')}</p>
+    <label class="ui-campo">Liberação de imagem<select class="control" id="uiLibStatus" required>
+      <option value="">Escolher situação</option>
+      ${opcoes.map(([v, t]) => `<option value="${v}" ${v === aluno.situacao ? 'selected' : ''}>${t}</option>`).join('')}
+    </select></label>
+    <p class="kpi-note">Registro interno para o ano letivo atual. Marque “Autorizado” quando a escola já tiver a autorização do responsável.</p>
+    <p id="uiLibErro" class="cm-erro" role="alert" hidden></p>
+    <div class="actions dlg-acoes"><button type="button" class="btn soft" data-close>Cancelar</button><button type="submit" class="btn">Salvar</button></div>
+  </form>`);
+  const f = $('#uiLib', d.el), salvar = $('button[type="submit"]', f);
+  f.onsubmit = async ev => {
+    ev.preventDefault();
+    salvar.disabled = true;
+    try {
+      await post('/imagem/alunos/liberacao', { id: aluno.id, status: $('#uiLibStatus', f).value });
+    } catch (e) {
+      const erro = $('#uiLibErro', f);
+      erro.textContent = e.message;
+      erro.hidden = false;
+      salvar.disabled = false;
+      return;
+    }
+    d.close();
+    toast('Autorização atualizada');
+    await recarrega();
+  };
+}
 
 function uiAlunoForm(a, aoSalvar, segmentos) {
   const segs = segmentos || [['INFANTIL', 'Educação Infantil'], ['FUND1', 'Anos Iniciais'], ['FUND2', 'Anos Finais'], ['MEDIO', 'Ensino Médio']].map(([k, nome]) => ({ k, nome }));

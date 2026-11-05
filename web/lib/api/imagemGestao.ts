@@ -1,3 +1,4 @@
+import { anoLiberacao, joinsLiberacao, statusLiberacao } from '../imagemLiberacao';
 import { Ctx } from '../ctx';
 import { requireAdmin } from '../auth';
 import { q, q1, run } from '../db';
@@ -15,7 +16,7 @@ const limpa = (v: unknown, n: number) => strv(v).replace(/[\u0000-\u001f]/g, ' '
 const LEMBRAVEIS = ['ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA'];
 
 async function fichaDados(id: number) {
-  const aluno = await q1('SELECT * FROM ui_alunos WHERE id=?', [id]) ?? fail(404, 'Aluno não encontrado.');
+  const aluno = await q1(`SELECT a.*, ${statusLiberacao} situacao, m.ano ano_liberacao_manual FROM ui_alunos a ${joinsLiberacao} WHERE a.id=?`, [anoLiberacao(), id]) ?? fail(404, 'Aluno não encontrado.');
   const sols = await q('SELECT s.* FROM ui_solicitacoes s WHERE s.aluno_id=? ORDER BY s.id DESC', [id]);
   for (const s of sols) {
     s.eventos = await q('SELECT quando,ator,acao,detalhe FROM ui_solic_eventos WHERE solicitacao_id=? ORDER BY id DESC LIMIT 60', [s.id]);
@@ -45,7 +46,7 @@ export async function imagemGestaoRoute(c: Ctx, u: Row): Promise<Response | null
   if (path === '/imagem/alunos/ficha' && method === 'GET') {
     const f = await fichaDados(Number(c.qs('id')) || 0);
     return json({
-      aluno: { id: f.aluno.id, nome: f.aluno.nome, matricula: f.aluno.matricula, turma: f.aluno.turma, segmento: f.aluno.segmento, ativo: !!Number(f.aluno.ativo) },
+      aluno: { id: f.aluno.id, nome: f.aluno.nome, matricula: f.aluno.matricula, turma: f.aluno.turma, segmento: f.aluno.segmento, ativo: !!Number(f.aluno.ativo), situacao: f.aluno.situacao, anoLiberacaoManual: f.aluno.ano_liberacao_manual },
       solicitacoes: f.solicitacoes.map((s) => ({ id: s.id, protocolo: s.protocolo, modelo: s.modelo_nome, versao: s.modelo_versao, status: s.status, responsavel: s.resp_confirmado || s.responsavel_nome, parentesco: s.parentesco, decisao: s.decisao, decisaoEm: s.decisao_em, modalidade: s.modalidade, venceEm: s.vence_em, criadoEm: s.criado_em, revogadoEm: s.revogado_em, revogadoPor: s.revogado_por, revogadoMotivo: s.revogado_motivo, validadoPor: s.validado_por, validadoEm: s.validado_em, termoHash: s.termo_hash, lembretes: s.lembretes, eventos: s.eventos, arquivos: s.arquivos })),
     });
   }

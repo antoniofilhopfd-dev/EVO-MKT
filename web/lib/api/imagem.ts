@@ -1,7 +1,8 @@
+import { anoLiberacao, joinsLiberacao, statusLiberacao, venceLiberacao } from '../imagemLiberacao';
 import { excluirAlunos } from '../excluirAlunos';
 import { Ctx } from '../ctx';
 import { requireAdmin, requireInternal } from '../auth';
-import { q, q1, run } from '../db';
+import { q, q1, run, withTx } from '../db';
 import { audit } from '../records';
 import { fail, lower, now, Row, strv } from '../util';
 import { lerXlsx } from '../xlsxLeitura';
@@ -55,6 +56,22 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
   const u = await requireInternal(c);
   const ator = String(u.nome ?? u.codigo ?? '');
 
+  if (path === '/imagem/alunos/liberacao' && method === 'POST') {
+    const b = await c.body();
+    const id = Number(b.id), status = strv(b.status);
+    if (!Number.isSafeInteger(id) || id < 1 || !['AUTORIZADO', 'NAO_AUTORIZADO', 'PENDENTE'].includes(status)) {
+      fail(400, 'Escolha uma liberação válida.');
+    }
+    await withTx(async () => {
+      await q1('SELECT id FROM ui_alunos WHERE id=? AND ativo=1 FOR UPDATE', [id]) ?? fail(404, 'Aluno ativo não encontrado.');
+      const momento = now();
+      await run(`INSERT INTO ui_liberacoes_manuais(aluno_id,ano,status,atualizado_em) VALUES(?,?,?,?)
+        ON DUPLICATE KEY UPDATE status=VALUES(status),atualizado_em=VALUES(atualizado_em)`, [id, Number(momento.slice(0, 4)), status, momento]);
+      await evento(ator, 'liberacao-manual', id, status);
+    });
+    return json({ ok: true, status });
+  }
+
   await atualizarVencimentos();
   const outra = await imagemSolicRoute(c, u);
   if (outra) return outra;
@@ -63,8 +80,8 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
     const busca = lower(c.qs('busca')).trim(), seg = c.qs('segmento'), turma = c.qs('turma'), inativos = c.qs('inativos') === '1', situ = c.qs('situacao').toUpperCase().replace(/[^A-Z_]/g, '');
     const like = `%${busca}%`;
     const rows = await q(
-      `SELECT a.*, (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao FROM ui_alunos a WHERE (a.ativo=1 OR ?=1) AND (?='' OR a.segmento=?) AND (?='' OR a.turma=?) AND (?='' OR LOWER(a.nome) LIKE ? OR a.matricula LIKE ?) HAVING (?='' OR (?='SEM' AND situacao IS NULL) OR situacao=?) ORDER BY a.nome LIMIT 3000`,
-      [inativos ? 1 : 0, seg, seg, turma, turma, busca, like, like, situ, situ, situ],
+      `SELECT a.*, ${statusLiberacao} situacao FROM ui_alunos a ${joinsLiberacao} WHERE (a.ativo=1 OR ?=1) AND (?='' OR a.segmento=?) AND (?='' OR a.turma=?) AND (?='' OR LOWER(a.nome) LIKE ? OR a.matricula LIKE ?) HAVING (?='' OR (?='SEM' AND situacao IS NULL) OR situacao=?) ORDER BY a.nome LIMIT 3000`,
+      [anoLiberacao(), inativos ? 1 : 0, seg, seg, turma, turma, busca, like, like, situ, situ, situ],
     );
     const turmas = (await q('SELECT DISTINCT turma FROM ui_alunos WHERE ativo=1 AND turma<>\'\'')).map((r) => String(r.turma)).sort(compararTurma);
     rows.sort((x, y) => compararTurma(String(x.turma), String(y.turma)) || String(x.nome).localeCompare(String(y.nome), 'pt-BR'));
@@ -172,15 +189,18 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
     const ativos = Number((await q1('SELECT COUNT(*) n FROM ui_alunos WHERE ativo=1'))?.n ?? 0);
     const porSeg = await q('SELECT segmento, COUNT(*) n FROM ui_alunos WHERE ativo=1 GROUP BY segmento');
     const porSit: Record<string, number> = {};
-    for (const r of await q("SELECT status, COUNT(*) n FROM (SELECT aluno_id, SUBSTRING_INDEX(GROUP_CONCAT(status ORDER BY id DESC), ',', 1) status FROM ui_solicitacoes WHERE status<>'CANCELADO' GROUP BY aluno_id) t GROUP BY status")) porSit[r.status] = Number(r.n);
+    for (const r of await q(`SELECT ${statusLiberacao} status, COUNT(*) n FROM ui_alunos a ${joinsLiberacao} WHERE a.ativo=1 AND ${statusLiberacao} IS NOT NULL GROUP BY ${statusLiberacao}`, [anoLiberacao()])) porSit[r.status] = Number(r.n);
     const cont = (...st: string[]) => st.reduce((a, k) => a + (porSit[k] ?? 0), 0);
-    const cfg = await lerConfig(), limite = new Date(Date.now() + cfg.avisoVencimentoDias * 86400_000).toISOString().slice(0, 10), hoje = new Date().toISOString().slice(0, 10);
-    const naoUsar = await q(`SELECT a.id, a.nome, a.turma, t.status, t.protocolo, t.vence_em FROM ui_alunos a JOIN ui_solicitacoes t ON t.id=(SELECT MAX(s.id) FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO') WHERE a.ativo=1 AND t.status IN ('NAO_AUTORIZADO','VENCIDO','REVOGADO') ORDER BY a.nome LIMIT 40`);
-    const vencemLogo = await q(`SELECT a.id, a.nome, a.turma, t.protocolo, t.vence_em FROM ui_alunos a JOIN ui_solicitacoes t ON t.id=(SELECT MAX(s.id) FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO') WHERE a.ativo=1 AND t.status='AUTORIZADO' AND t.vence_em<>'' AND t.vence_em<=? AND t.vence_em>=? ORDER BY t.vence_em LIMIT 40`, [limite, hoje]);
+    const cfg = await lerConfig(), limite = new Date(Date.now() + cfg.avisoVencimentoDias * 86400_000).toISOString().slice(0, 10), hoje = now().slice(0, 10);
+    const naoUsar = await q(`SELECT a.id, a.nome, a.turma, ${statusLiberacao} status, ${venceLiberacao} vence_em
+      FROM ui_alunos a ${joinsLiberacao} WHERE a.ativo=1 AND ${statusLiberacao} IN ('NAO_AUTORIZADO','VENCIDO','REVOGADO') ORDER BY a.nome LIMIT 40`, [anoLiberacao()]);
+    const vencemLogo = await q(`SELECT a.id, a.nome, a.turma, ${venceLiberacao} vence_em
+      FROM ui_alunos a ${joinsLiberacao} WHERE a.ativo=1 AND ${statusLiberacao}='AUTORIZADO'
+      AND ${venceLiberacao} BETWEEN ? AND ? ORDER BY vence_em LIMIT 40`, [anoLiberacao(), hoje, limite]);
     const recentes = await q('SELECT e.quando, e.ator, e.acao, e.detalhe, a.nome aluno FROM ui_eventos e LEFT JOIN ui_alunos a ON a.id=e.aluno_id ORDER BY e.id DESC LIMIT 8');
     return json({
       totalAlunos: ativos,
-      autorizados: cont('AUTORIZADO'), pendentes: cont('AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'), naoAutorizados: cont('NAO_AUTORIZADO'), vencidos: cont('VENCIDO'), revogados: cont('REVOGADO'), comSolicitacao: Object.values(porSit).reduce((a, n) => a + n, 0),
+      autorizados: cont('AUTORIZADO'), pendentes: cont('PENDENTE', 'AGUARDANDO_ENVIO', 'ENVIADO', 'ABERTO', 'AGUARDANDO_ASSINATURA', 'AGUARDANDO_VALIDACAO'), naoAutorizados: cont('NAO_AUTORIZADO'), vencidos: cont('VENCIDO'), revogados: cont('REVOGADO'), comSolicitacao: Object.values(porSit).reduce((a, n) => a + n, 0),
       segmentos: Object.entries(SEGMENTOS).map(([k, nome]) => ({ k, nome, n: Number(porSeg.find((r) => r.segmento === k)?.n ?? 0) })).concat([{ k: '', nome: 'Sem segmento', n: Number(porSeg.find((r) => !r.segmento)?.n ?? 0) }]),
       recentes, naoUsar, vencemLogo, avisoDias: cfg.avisoVencimentoDias,
     });

@@ -1,3 +1,4 @@
+import { anoLiberacao, joinsLiberacao, statusLiberacao, venceLiberacao } from './imagemLiberacao';
 import { q, q1 } from './db';
 import PDFDocument from 'pdfkit';
 import { cabecalho, carregarLogo, COR, Doc, imagemNaCaixa, limpa, PAGINA } from './pdf';
@@ -11,8 +12,8 @@ export async function carregarAlunosPdf(ids: number[]): Promise<AlunoPdf[]> {
   if (!ids.length) return [];
   const rows = await q(`SELECT a.id,a.nome,a.matricula,a.turma,
     (SELECT f.id FROM cm_fotos f WHERE f.aluno_id=a.id AND f.ativa=1 LIMIT 1) foto_id,
-    (SELECT s.status FROM ui_solicitacoes s WHERE s.aluno_id=a.id AND s.status<>'CANCELADO' ORDER BY s.id DESC LIMIT 1) situacao
-    FROM ui_alunos a WHERE a.ativo=1 AND a.id IN (${ids.map(() => '?').join(',')})`, ids);
+    ${statusLiberacao} situacao
+    FROM ui_alunos a ${joinsLiberacao} WHERE a.ativo=1 AND a.id IN (${ids.map(() => '?').join(',')})`, [anoLiberacao(), ...ids]);
   return rows.map((r) => ({ id: Number(r.id), nome: String(r.nome), matricula: String(r.matricula), turma: String(r.turma ?? ''), fotoId: r.foto_id ? Number(r.foto_id) : null, autorizacao: autorizacaoDe(r.situacao) }));
 }
 /** Usa a última solicitação não cancelada e verifica a vigência sem alterar registros. */
@@ -20,11 +21,9 @@ export async function carregarAutorizadosPdf(turmas: string[], hoje: string): Pr
   const filtro = turmas.length ? `AND a.turma IN (${turmas.map(() => '?').join(',')})` : '';
   const rows = await q(`SELECT a.id,a.nome,a.matricula,a.turma,
     (SELECT f.id FROM cm_fotos f WHERE f.aluno_id=a.id AND f.ativa=1 ORDER BY f.id DESC LIMIT 1) foto_id
-    FROM ui_alunos a JOIN ui_solicitacoes s ON s.id=(
-      SELECT ultima.id FROM ui_solicitacoes ultima
-      WHERE ultima.aluno_id=a.id AND ultima.status<>'CANCELADO' ORDER BY ultima.id DESC LIMIT 1
-    )
-    WHERE a.ativo=1 AND s.status='AUTORIZADO' AND (s.vence_em='' OR s.vence_em IS NULL OR s.vence_em>=?) ${filtro}`, [hoje, ...turmas]);
+    FROM ui_alunos a ${joinsLiberacao}
+    WHERE a.ativo=1 AND ${statusLiberacao}='AUTORIZADO'
+      AND (COALESCE(${venceLiberacao}, '')='' OR ${venceLiberacao}>=?) ${filtro}`, [Number(hoje.slice(0, 4)), hoje, ...turmas]);
   return rows.map((r) => ({
     id: Number(r.id), nome: String(r.nome), matricula: String(r.matricula), turma: String(r.turma ?? ''),
     fotoId: r.foto_id ? Number(r.foto_id) : null, autorizacao: 'AUTORIZADO',
