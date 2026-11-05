@@ -222,6 +222,14 @@ async function executarCarometro(c: Ctx): Promise<Response> {
     return new Response(new Uint8Array(r.buf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `${c.qs('baixar') === '1' ? 'attachment' : 'inline'}; filename="${nome}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'X-Carometro-Paginas': String(r.paginas), 'X-Carometro-Alunos': String(alunos.length), 'X-Carometro-Volumes': String(volumes), 'X-Carometro-Total': String(modoAut ? total : alunos.length) } });
   }
   if (method !== 'GET') fail(405, 'Método não permitido.');
+  if (path === '/carometro/autorizados') {
+    const rows = (await carregarAutorizadosPdf([], now().slice(0, 10)))
+      .filter(a => permiteTurma(a.turma))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id - b.id)
+      .map(({ id, nome, matricula, turma, fotoId }) => ({ id, nome, matricula, turma, fotoId }));
+    return json({ rows }, 200, { 'Cache-Control': 'private, no-store' });
+  }
+
   const todos = (await carregar()).filter(a=>permiteTurma(a.turma));
 
   if (path === '/carometro/alunos') {

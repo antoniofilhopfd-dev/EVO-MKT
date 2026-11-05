@@ -100,6 +100,46 @@ PAGINAS.uialunos = async function () {
   await carrega();
 };
 
+PAGINAS.uiautorizados = async function () {
+  const content = $('#content');
+  content.innerHTML = '<section id="uiAutorizados"><p class="kpi-note">Carregando alunos autorizados…</p></section>';
+  const painel = $('#uiAutorizados', content);
+  const { rows } = await api('/carometro/autorizados');
+  if (!painel.isConnected) return;
+  const turmas = [...new Set(rows.map(a => a.turma).filter(Boolean))].sort(uiCmpTurma);
+  painel.innerHTML = `<div class="card">
+    <div class="db-tit"><h2>Alunos autorizados</h2></div>
+    <label class="ui-campo">Buscar por nome ou matrícula<input class="control" type="search" id="uiAutBusca"></label>
+    <details><summary>Filtrar turmas</summary>
+      <div class="ui-chips">${turmas.map(t => `<label class="ui-chip"><input type="checkbox" value="${attr(t)}"> ${esc(t)}</label>`).join('')}</div>
+      <p class="kpi-note">Sem turma selecionada, a aba mostra todas.</p>
+    </details>
+  </div>
+  <p class="kpi-note" id="uiAutTotal" role="status"></p>
+  <div class="cm-grade" id="uiAutGrade"></div>
+  <button type="button" class="btn soft" id="uiAutMais" hidden>Mostrar mais alunos</button>`;
+  const busca = $('#uiAutBusca', painel), mais = $('#uiAutMais', painel);
+  const normaliza = v => String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const alunos = rows.map(a => ({ ...a, busca: normaliza(a.nome + ' ' + a.matricula) }));
+  const lote = 48;
+  let visiveis = lote;
+  const desenha = () => {
+    const texto = normaliza(busca.value);
+    const escolhidas = new Set($$('input[type="checkbox"]:checked', painel).map(input => input.value));
+    const resultado = alunos.filter(a => a.busca.includes(texto) && (!escolhidas.size || escolhidas.has(a.turma)));
+    $('#uiAutTotal', painel).textContent = resultado.length ? `${resultado.length} aluno(s) autorizado(s)` : 'Nenhum aluno autorizado encontrado.';
+    $('#uiAutGrade', painel).innerHTML = resultado.slice(0, visiveis).map(a => `<article class="cm-al">
+      ${cmFoto(a)}<strong>${esc(a.nome)}</strong><small>Matrícula ${esc(a.matricula)}</small><small>${esc(a.turma || 'Sem turma')}</small>
+    </article>`).join('');
+    mais.hidden = resultado.length <= visiveis;
+  };
+  const filtra = () => { visiveis = lote; desenha(); };
+  busca.oninput = filtra;
+  painel.onchange = ev => { if (ev.target.type === 'checkbox') filtra(); };
+  mais.onclick = () => { visiveis += lote; desenha(); };
+  desenha();
+};
+
 function uiLiberacao(aluno, recarrega) {
   const opcoes = [['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['PENDENTE', 'Pendente']];
   const d = dialogo(`<form id="uiLib"><h3>Alterar autorização</h3>
