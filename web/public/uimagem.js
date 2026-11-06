@@ -140,6 +140,52 @@ PAGINAS.uiautorizados = async function () {
   desenha();
 };
 
+/* Carômetro dos NÃO autorizados: quem não pode ter a imagem usada nos conteúdos (recusou, revogou, venceu e, se quiser, quem ainda não respondeu). */
+PAGINAS.uinaoautorizados = async function () {
+  const content = $('#content');
+  content.innerHTML = '<section id="uiNao"><p class="kpi-note">Carregando…</p></section>';
+  const painel = $('#uiNao', content);
+  const { rows } = await api('/carometro/nao-autorizados');
+  if (!painel.isConnected) return;
+  const turmas = [...new Set(rows.map(a => a.turma).filter(Boolean))].sort(uiCmpTurma);
+  const cont = m => rows.filter(a => a.motivo === m).length;
+  const COR = { Recusou: 'bad', Revogado: 'bad', Vencido: 'warn', 'Sem resposta': 'mute' };
+  painel.innerHTML = `<div class="card">
+    <div class="db-tit"><h2>Alunos NÃO autorizados</h2></div>
+    <p class="kpi-note"><b>Não use a imagem destes alunos</b> em posts, vídeos ou anúncios. Recusou: ${fmtN(cont('Recusou'))} · Revogado: ${fmtN(cont('Revogado'))} · Vencido: ${fmtN(cont('Vencido'))} · Sem resposta: ${fmtN(cont('Sem resposta'))}.</p>
+    <label class="ui-campo">Buscar por nome ou matrícula<input class="control" type="search" id="uiNaoBusca"></label>
+    <label class="cm-chk"><input type="checkbox" id="uiNaoPend"> Incluir quem ainda não respondeu (sem resposta)</label>
+    <details><summary>Filtrar turmas</summary>
+      <div class="ui-chips">${turmas.map(t => `<label class="ui-chip"><input type="checkbox" value="${attr(t)}"> ${esc(t)}</label>`).join('')}</div>
+      <p class="kpi-note">Sem turma selecionada, a aba mostra todas.</p>
+    </details>
+    <div class="ig-barra"><button type="button" class="btn" id="uiNaoPdf">Gerar PDF dos não autorizados</button></div>
+  </div>
+  <p class="kpi-note" id="uiNaoTotal" role="status"></p>
+  <div class="cm-grade" id="uiNaoGrade"></div>
+  <button type="button" class="btn soft" id="uiNaoMais" hidden>Mostrar mais alunos</button>`;
+  const busca = $('#uiNaoBusca', painel), mais = $('#uiNaoMais', painel), pend = $('#uiNaoPend', painel);
+  const normaliza = v => String(v).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const alunos = rows.map(a => ({ ...a, busca: normaliza(a.nome + ' ' + a.matricula) }));
+  const lote = 48; let visiveis = lote;
+  const desenha = () => {
+    const texto = normaliza(busca.value);
+    const escolhidas = new Set($$('details input[type="checkbox"]:checked', painel).map(i => i.value));
+    const resultado = alunos.filter(a => a.busca.includes(texto) && (!escolhidas.size || escolhidas.has(a.turma)) && (pend.checked || a.motivo !== 'Sem resposta'));
+    $('#uiNaoTotal', painel).textContent = resultado.length ? `${resultado.length} aluno(s) sem autorização para uso de imagem` : 'Nenhum aluno encontrado.';
+    $('#uiNaoGrade', painel).innerHTML = resultado.slice(0, visiveis).map(a => `<article class="cm-al">
+      ${cmFoto(a)}<strong>${esc(a.nome)}</strong><small>Matrícula ${esc(a.matricula)}</small><small>${esc(a.turma || 'Sem turma')}</small><span class="cm-selo ${COR[a.motivo] || 'mute'}">${esc(a.motivo)}</span>
+    </article>`).join('');
+    mais.hidden = resultado.length <= visiveis;
+  };
+  const filtra = () => { visiveis = lote; desenha(); };
+  busca.oninput = filtra; pend.onchange = filtra;
+  painel.onchange = ev => { if (ev.target.type === 'checkbox' && ev.target !== pend) filtra(); };
+  mais.onclick = () => { visiveis += lote; desenha(); };
+  $('#uiNaoPdf', painel).onclick = () => { CM_PDF.origem = 'nao-autorizados'; CM_PDF.pendentes = pend.checked; const t = $$('details input[type="checkbox"]:checked', painel).map(i => i.value); CM_PDF.todas = !t.length; CM_PDF.turmas = t; go('cmpdf'); };
+  desenha();
+};
+
 function uiLiberacao(aluno, recarrega) {
   const opcoes = [['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['PENDENTE', 'Pendente']];
   const d = dialogo(`<form id="uiLib"><h3>Alterar autorização</h3>

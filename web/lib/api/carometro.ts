@@ -14,7 +14,7 @@ import { carometroLoteRoute } from './carometroLote';
 import { carometroSelRoute } from './carometroSel';
 import { carometroDriveRoute } from './carometroDrive';
 import { calcularPendencias, contagemPend, TIPOS_PEND } from '../carometroPend';
-import { carometroPdf, carregarAlunosPdf, carregarAutorizadosPdf, fotoPadrao, ordenarAlunosPdf } from '../carometroPdf';
+import { carometroPdf, carregarAlunosPdf, carregarAutorizadosPdf, carregarNaoAutorizadosPdf, fotoPadrao, ordenarAlunosPdf } from '../carometroPdf';
 import { autorizacaoDe, compararTurmaCm, normNome, segmentoCm, SEGMENTOS_CM, serieDe } from '../carometro';
 
 /**
@@ -174,8 +174,9 @@ async function executarCarometro(c: Ctx): Promise<Response> {
   if (path === '/carometro/pdf' && method === 'GET') {
     await exigirCm(c,'imprimir');
     const origem = c.qs('origem'), orient = c.qs('orientacao') === 'paisagem' ? 'paisagem' : 'retrato', por = [4, 5, 6].includes(Number(c.qs('porlinha'))) ? (Number(c.qs('porlinha')) as 4 | 5 | 6) : 5;
-    const modoAut = origem === 'autorizados';
-    const soAut = modoAut || c.qs('so_autorizados') === '1';
+    const modoNao = origem === 'nao-autorizados';
+    const modoAut = origem === 'autorizados' || modoNao;
+    const soAut = origem === 'autorizados' || c.qs('so_autorizados') === '1';
     const limitePdf = 600;
     let ids: number[] = [], titulo = '', mostrarTurma = false;
     if (origem === 'turma') {
@@ -189,7 +190,7 @@ async function executarCarometro(c: Ctx): Promise<Response> {
       ids = (await q('SELECT aluno_id FROM cm_selecao_itens WHERE selecao_id=?', [s.id])).map((r) => Number(r.aluno_id));
       titulo = `Seleção: ${s.nome}`; mostrarTurma = true;
     } else if (modoAut) {
-      titulo = 'Alunos autorizados para uso de imagem';
+      titulo = modoNao ? 'NÃO autorizados - não usar a imagem' : 'Alunos autorizados para uso de imagem';
       mostrarTurma = true;
     } else fail(400, 'Escolha a turma ou uma seleção.');
     if (ids.length > limitePdf) fail(400, 'O PDF aceita até 600 alunos.');
@@ -199,13 +200,13 @@ async function executarCarometro(c: Ctx): Promise<Response> {
       if (turmas.some(t => !t || t.length > 120)) fail(400, 'Turmas inválidas.');
       if (!turmas.length && c.qs('todas') !== '1') fail(400, 'Selecione pelo menos uma turma.');
       for (const turma of turmas) exigirTurma(turma);
-      alunos = (await carregarAutorizadosPdf(turmas, now().slice(0, 10))).filter(a => permiteTurma(a.turma));
+      alunos = (modoNao ? await carregarNaoAutorizadosPdf(turmas, now().slice(0, 10), c.qs('pendentes') === '1') : await carregarAutorizadosPdf(turmas, now().slice(0, 10))).filter(a => permiteTurma(a.turma));
     } else {
       alunos = ordenarAlunosPdf((await carregarAlunosPdf(ids)).filter(a => permiteTurma(a.turma)));
     }
     const total = alunos.length;
     if (soAut) alunos = alunos.filter((a) => a.autorizacao === 'AUTORIZADO');
-    if (!alunos.length) fail(404, soAut ? 'Nenhum aluno com autorização de imagem vigente nesta lista.' : 'Nenhum aluno ativo nesta lista.');
+    if (!alunos.length) fail(404, modoNao ? 'Nenhum aluno não autorizado nesta seleção.' : soAut ? 'Nenhum aluno com autorização de imagem vigente nesta lista.' : 'Nenhum aluno ativo nesta lista.');
     if (modoAut || origem === 'turma') alunos.sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR') || x.id - y.id);
     const volumes = modoAut ? Math.ceil(alunos.length / limitePdf) : 1;
     const volume = modoAut ? Number(c.qs('volume') || '1') : 1;
@@ -215,10 +216,10 @@ async function executarCarometro(c: Ctx): Promise<Response> {
       alunos = alunos.slice((volume - 1) * limitePdf, volume * limitePdf);
     }
     const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
-    const sub = `Ano letivo ${anoLetivo()}${soAut && !modoAut ? ` - somente com autorização de imagem (${alunos.length} de ${total})` : ''}`;
+    const sub = `Ano letivo ${anoLetivo()}${modoNao ? (c.qs('pendentes') === '1' ? ' - recusaram, revogaram, vencidos e sem resposta' : ' - recusaram, revogaram ou vencidos') : ''}${soAut && !modoAut ? ` - somente com autorização de imagem (${alunos.length} de ${total})` : ''}`;
     const r = await carometroPdf(alunos, { titulo, subtitulo: sub, orientacao: orient, porLinha: modoAut ? 5 : por, matricula: !modoAut && c.qs('matricula') === '1', mostrarTurma }, fotoPadrao, quando);
     await auditar(ator, c.qs('baixar') === '1' ? 'pdf-baixado' : 'pdf-previa', null, `${titulo}: ${alunos.length} aluno(s), ${r.paginas} página(s)`);
-    const nome = modoAut ? `Carometro-Autorizados${volumes > 1 ? '-Volume-' + volume : ''}.pdf` : `Carometro-${titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'lista'}.pdf`;
+    const nome = modoAut ? `Carometro-${modoNao ? 'NaoAutorizados' : 'Autorizados'}${volumes > 1 ? '-Volume-' + volume : ''}.pdf` : `Carometro-${titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'lista'}.pdf`;
     return new Response(new Uint8Array(r.buf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `${c.qs('baixar') === '1' ? 'attachment' : 'inline'}; filename="${nome}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'X-Carometro-Paginas': String(r.paginas), 'X-Carometro-Alunos': String(alunos.length), 'X-Carometro-Volumes': String(volumes), 'X-Carometro-Total': String(modoAut ? total : alunos.length) } });
   }
   if (method !== 'GET') fail(405, 'Método não permitido.');
@@ -227,6 +228,14 @@ async function executarCarometro(c: Ctx): Promise<Response> {
       .filter(a => permiteTurma(a.turma))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id - b.id)
       .map(({ id, nome, matricula, turma, fotoId }) => ({ id, nome, matricula, turma, fotoId }));
+    return json({ rows }, 200, { 'Cache-Control': 'private, no-store' });
+  }
+
+  if (path === '/carometro/nao-autorizados') {
+    const rows = (await carregarNaoAutorizadosPdf([], now().slice(0, 10), true))
+      .filter(a => permiteTurma(a.turma))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id - b.id)
+      .map(({ id, nome, matricula, turma, fotoId, motivo }) => ({ id, nome, matricula, turma, fotoId, motivo }));
     return json({ rows }, 200, { 'Cache-Control': 'private, no-store' });
   }
 
