@@ -187,14 +187,14 @@ PAGINAS.uinaoautorizados = async function () {
 };
 
 function uiLiberacao(aluno, recarrega) {
-  const opcoes = [['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['PENDENTE', 'Pendente']];
+  const opcoes = [['SEM', 'Sem solicitação (ninguém respondeu ainda)'], ['AUTORIZADO', 'Autorizado'], ['NAO_AUTORIZADO', 'Não autorizado'], ['PENDENTE', 'Pendente']];
   const d = dialogo(`<form id="uiLib"><h3>Alterar autorização</h3>
     <p><b>${esc(aluno.nome)}</b> · ${esc(aluno.turma || 'Sem turma')}</p>
     <label class="ui-campo">Liberação de imagem<select class="control" id="uiLibStatus" required>
-      <option value="">Escolher situação</option>
-      ${opcoes.map(([v, t]) => `<option value="${v}" ${v === aluno.situacao ? 'selected' : ''}>${t}</option>`).join('')}
+      ${aluno.situacao && !opcoes.some(o => o[0] === aluno.situacao) ? `<option value="" selected disabled>Situação atual: ${esc(aluno.situacaoRotulo || aluno.situacao)}</option>` : ''}
+      ${opcoes.map(([v, t]) => `<option value="${v}" ${v === (aluno.situacao || 'SEM') ? 'selected' : ''}>${t}</option>`).join('')}
     </select></label>
-    <p class="kpi-note">Registro interno para o ano letivo atual. Marque “Autorizado” quando a escola já tiver a autorização do responsável.</p>
+    <p class="kpi-note">Registro interno para o ano letivo atual. Marque “Autorizado” quando a escola já tiver a autorização do responsável. “Sem solicitação” desfaz a marcação interna: volta a valer só a solicitação enviada à família, se houver.</p>
     <p id="uiLibErro" class="cm-erro" role="alert" hidden></p>
     <div class="actions dlg-acoes"><button type="button" class="btn soft" data-close>Cancelar</button><button type="submit" class="btn">Salvar</button></div>
   </form>`);

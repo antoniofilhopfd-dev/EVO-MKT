@@ -24,6 +24,10 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
   await G.post('/imagem/solicitacoes/criar', { modelo_id: mod.id, alunos: [{ id: id('X-5') }, { id: id('X-6') }, { id: id('X-7') }] });
   sql(`UPDATE ui_solicitacoes SET status='REVOGADO' WHERE aluno_id=${id('X-5')}; UPDATE ui_solicitacoes SET status='VENCIDO' WHERE aluno_id=${id('X-6')}; UPDATE ui_solicitacoes SET status='AUTORIZADO', vence_em='2020-01-01' WHERE aluno_id=${id('X-7')};`);
 
+  t('situação inválida na liberação manual: 400', (await G.req('POST', '/imagem/alunos/liberacao', { id: id('X-1'), status: 'QUALQUER' })).status === 400);
+  await G.post('/imagem/alunos/liberacao', { id: id('X-4'), status: 'NAO_AUTORIZADO' });
+  t('"Sem solicitação" desfaz a marcação manual: volta a "ninguém respondeu"', (await G.post('/imagem/alunos/liberacao', { id: id('X-4'), status: 'SEM' })).status === 'SEM' && (((await G.get('/imagem/alunos?busca=X-4')).rows[0].situacao || '') === ''));
+  t('desfazer sem marcação anterior também funciona (idempotente)', (await G.post('/imagem/alunos/liberacao', { id: id('X-4'), status: 'SEM' })).ok === true);
   const r = (await G.get('/carometro/nao-autorizados')).rows, motivo = m => (r.find(a => a.matricula === m) || {}).motivo;
   t('recusou, revogado, vencido (inclusive autorizado com prazo passado) e sem resposta', motivo('X-1') === 'Não autoriza' && motivo('X-5') === 'Revogado' && motivo('X-6') === 'Vencido' && motivo('X-7') === 'Vencido' && motivo('X-3') === 'Sem resposta' && motivo('X-4') === 'Sem resposta', r.map(a => [a.matricula, a.motivo]));
   t('quem está autorizado e vigente não aparece', !r.some(a => a.matricula === 'X-2') && r.length === 6);
@@ -58,6 +62,16 @@ const sql = q => execFileSync('mariadb', ['--default-character-set=utf8mb4', '-u
     t(`${nome}: "Gerar PDF" abre a impressão já no modo não autorizados, com a prévia`, await pg.inputValue('#pdfOrigem') === 'nao-autorizados' && await pg.isChecked('#pdfPend') && await pg.$('#pdfPrev iframe') !== null);
     t(`${nome}: sem estouro horizontal`, await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth <= 2));
     t(`${nome}: sem erros de script`, pg.errs.length === 0, pg.errs);
+    if (nome === 'desktop') {
+      await U.ir(pg, 'uialunos', 900); await pg.waitForSelector('[data-lib]');
+      await pg.fill('#uiBusca', 'X-4'); await pg.waitForFunction(() => document.querySelectorAll('.ui-tab tbody tr').length === 1 && /Sara Semresposta/.test(document.querySelector('.ui-tab tbody tr').innerText));
+      await pg.click('[data-lib]'); await pg.waitForSelector('#uiLibStatus');
+      t(`${nome}: o seletor de autorização tem "Sem solicitação" e vem marcado para quem ninguém respondeu`, (await pg.$$eval('#uiLibStatus option', o => o.map(x => x.textContent))).some(x => /Sem solicitação/.test(x)) && /Sem solicitação/.test(await pg.$eval('#uiLibStatus', e => e.selectedOptions[0].textContent)));
+      await pg.selectOption('#uiLibStatus', 'NAO_AUTORIZADO'); await pg.click('#uiLib button[type=submit]'); await pg.waitForFunction(() => !document.querySelector('#uiLibStatus'));
+      await pg.waitForTimeout(600); await pg.click('[data-lib]'); await pg.waitForSelector('#uiLibStatus');
+      await pg.selectOption('#uiLibStatus', 'SEM'); await pg.click('#uiLib button[type=submit]'); await pg.waitForFunction(() => !document.querySelector('#uiLibStatus'));
+      t(`${nome}: escolher "Sem solicitação" pelo seletor desfaz a marcação`, (((await G.get('/imagem/alunos?busca=X-4')).rows[0].situacao || '') === ''));
+    }
   }
   await b.close();
   fim();

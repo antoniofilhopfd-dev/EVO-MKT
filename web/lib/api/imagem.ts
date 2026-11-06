@@ -59,12 +59,17 @@ export async function imagemRoute(c: Ctx): Promise<Response> {
   if (path === '/imagem/alunos/liberacao' && method === 'POST') {
     const b = await c.body();
     const id = Number(b.id), status = strv(b.status);
-    if (!Number.isSafeInteger(id) || id < 1 || !['AUTORIZADO', 'NAO_AUTORIZADO', 'PENDENTE'].includes(status)) {
+    if (!Number.isSafeInteger(id) || id < 1 || !['AUTORIZADO', 'NAO_AUTORIZADO', 'PENDENTE', 'SEM'].includes(status)) {
       fail(400, 'Escolha uma liberação válida.');
     }
     await withTx(async () => {
       await q1('SELECT id FROM ui_alunos WHERE id=? AND ativo=1 FOR UPDATE', [id]) ?? fail(404, 'Aluno ativo não encontrado.');
       const momento = now();
+      if (status === 'SEM') { // volta a valer só a solicitação (ou "sem solicitação", se nunca houve)
+        await run('DELETE FROM ui_liberacoes_manuais WHERE aluno_id=? AND ano=?', [id, Number(momento.slice(0, 4))]);
+        await evento(ator, 'liberacao-manual', id, 'SEM');
+        return;
+      }
       await run(`INSERT INTO ui_liberacoes_manuais(aluno_id,ano,status,atualizado_em) VALUES(?,?,?,?)
         ON DUPLICATE KEY UPDATE status=VALUES(status),atualizado_em=VALUES(atualizado_em)`, [id, Number(momento.slice(0, 4)), status, momento]);
       await evento(ator, 'liberacao-manual', id, status);
