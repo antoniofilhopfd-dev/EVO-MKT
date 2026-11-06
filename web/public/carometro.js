@@ -390,7 +390,7 @@ PAGINAS.cmsessoes = async function (abrirId) {
 };
 
 /* ---- Impressão e PDF (A4) ---- */
-const CM_PDF = { origem: 'turma', turma: '', selecao: '', turmas: [], todas: true, volume: 1, orientacao: 'retrato', porlinha: '5', matricula: false, so_autorizados: false };
+const CM_PDF = { origem: 'turma', turma: '', selecao: '', turmas: [], todas: true, volume: 1, orientacao: 'retrato', porlinha: '5', matricula: false, so_autorizados: false, pendentes: false };
 PAGINAS.cmpdf = async function () {
   $('#content').innerHTML = '<div class="loading"><span></span><b>Carregando…</b></div>';
   const [tr, se] = await Promise.all([api('/carometro/turmas'), api('/carometro/selecoes')]);
@@ -400,9 +400,10 @@ PAGINAS.cmpdf = async function () {
   if (!CM_PDF.selecao || !se.rows.some(r => String(r.id) === String(CM_PDF.selecao))) CM_PDF.selecao = se.rows[0] ? String(se.rows[0].id) : '';
   const opt = (v, t, sel) => `<option value="${attr(v)}" ${String(sel) === String(v) ? 'selected' : ''}>${esc(t)}</option>`;
   $('#content').innerHTML = `<div class="cm-pdf"><section class="card cm-pdf-form"><div class="db-tit"><h2>Opções do PDF</h2></div>
-    <label class="ui-campo">Origem<select id="pdfOrigem" class="control">${opt('turma', 'Uma turma', CM_PDF.origem)}${opt('selecao', 'Uma seleção salva', CM_PDF.origem)}${opt('autorizados', 'Carômetro dos autorizados', CM_PDF.origem)}</select></label>
+    <label class="ui-campo">Origem<select id="pdfOrigem" class="control">${opt('turma', 'Uma turma', CM_PDF.origem)}${opt('selecao', 'Uma seleção salva', CM_PDF.origem)}${opt('autorizados', 'Carômetro dos autorizados', CM_PDF.origem)}${opt('nao-autorizados', 'Carômetro dos NÃO autorizados', CM_PDF.origem)}</select></label>
     <label class="ui-campo" id="pdfLTurma">Turma<select id="pdfTurma" class="control">${turmas.map(t => opt(t, t, CM_PDF.turma)).join('')}</select></label>
     <label class="ui-campo" id="pdfLSel">Seleção<select id="pdfSel" class="control">${se.rows.length ? se.rows.map(r => opt(r.id, `${r.nome} (${r.alunos})`, CM_PDF.selecao)).join('') : '<option value="">Nenhuma seleção salva</option>'}</select></label>
+    <label class="cm-chk" id="pdfLPend" hidden><input type="checkbox" id="pdfPend" ${CM_PDF.pendentes ? 'checked' : ''}> Incluir quem ainda não respondeu (sem autorização vigente)</label>
     <div id="pdfLAut" hidden>
       <label class="cm-chk"><input type="checkbox" id="pdfTodas" ${CM_PDF.todas ? 'checked' : ''}> Todas as turmas</label>
       <fieldset id="pdfTurmas" class="cm-edlist"><legend>Turmas</legend>${turmas.map(t => `<label class="cm-chk"><input type="checkbox" value="${attr(t)}" ${CM_PDF.turmas.includes(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</fieldset>
@@ -417,8 +418,8 @@ PAGINAS.cmpdf = async function () {
     <section class="card cm-pdf-prev"><div class="db-tit"><h2>Prévia</h2><span class="kpi-note" id="pdfInfo"></span></div><div id="pdfPrev" class="cm-pdf-quadro"><div class="loading"><span></span><b>Montando a prévia…</b></div></div></section></div>`;
   const query = baixar => {
     const params = new URLSearchParams({ origem: CM_PDF.origem, turma: CM_PDF.turma, selecao: CM_PDF.selecao, orientacao: CM_PDF.orientacao, porlinha: CM_PDF.porlinha, matricula: CM_PDF.matricula ? '1' : '0', so_autorizados: CM_PDF.so_autorizados ? '1' : '0', ...(baixar ? { baixar: '1' } : {}) });
-    if (CM_PDF.origem === 'autorizados') {
-      params.set('volume', CM_PDF.volume);
+    if (CM_PDF.origem === 'autorizados' || CM_PDF.origem === 'nao-autorizados') {
+      params.set('volume', CM_PDF.volume); params.set('pendentes', CM_PDF.pendentes ? '1' : '0');
       if (CM_PDF.todas) params.set('todas', '1');
       else CM_PDF.turmas.forEach(t => params.append('turmas', t));
     }
@@ -434,7 +435,7 @@ PAGINAS.cmpdf = async function () {
     const meu = ++seq; $('#pdfPrev').innerHTML = '<div class="loading"><span></span><b>Montando a prévia…</b></div>'; $('#pdfInfo').textContent = '';
     $('#pdfBaixar').disabled = true;
     $('#pdfLVolume').hidden = true;
-    if (CM_PDF.origem === 'autorizados' && !CM_PDF.todas && !CM_PDF.turmas.length) {
+    if ((CM_PDF.origem === 'autorizados' || CM_PDF.origem === 'nao-autorizados') && !CM_PDF.todas && !CM_PDF.turmas.length) {
       $('#pdfPrev').innerHTML = '<div class="empty"><b>Selecione pelo menos uma turma.</b></div>';
       return;
     }
@@ -442,14 +443,15 @@ PAGINAS.cmpdf = async function () {
       const r = await busca(false); if (meu !== seq) return;
       if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(r.blob);
       $('#pdfPrev').innerHTML = `<iframe class="cm-pdf-frame" title="Prévia do PDF" src="${url}#toolbar=0&view=FitH"></iframe><p class="kpi-note">Se a prévia não aparecer no seu navegador, use “Gerar PDF”.</p>`;
-      $('#pdfInfo').textContent = r.volumes > 1 ? `${r.total} autorizados · Volume ${CM_PDF.volume} de ${r.volumes} · ${r.alunos} aluno(s) · ${r.paginas} página(s)` : `${r.alunos} aluno(s) · ${r.paginas} página(s)`;
+      $('#pdfInfo').textContent = r.volumes > 1 ? `${r.total} aluno(s) · Volume ${CM_PDF.volume} de ${r.volumes} · ${r.alunos} aluno(s) · ${r.paginas} página(s)` : `${r.alunos} aluno(s) · ${r.paginas} página(s)`;
       $('#pdfVolume').innerHTML = Array.from({ length: r.volumes }, (_, i) => opt(i + 1, `Volume ${i + 1}`, CM_PDF.volume)).join('');
       $('#pdfLVolume').hidden = r.volumes < 2;
       $('#pdfBaixar').disabled = false;
     } catch (e) { if (meu === seq) $('#pdfPrev').innerHTML = `<div class="empty"><b>${esc(e.message)}</b></div>`; }
   };
   const atualizaVis = () => {
-    const modoAut = CM_PDF.origem === 'autorizados';
+    const modoAut = CM_PDF.origem === 'autorizados' || CM_PDF.origem === 'nao-autorizados';
+    $('#pdfLPend').hidden = CM_PDF.origem !== 'nao-autorizados';
     $('#pdfLTurma').hidden = CM_PDF.origem !== 'turma';
     $('#pdfLSel').hidden = CM_PDF.origem !== 'selecao';
     $('#pdfLAut').hidden = !modoAut;
@@ -458,7 +460,7 @@ PAGINAS.cmpdf = async function () {
   };
   const refaz = () => { CM_PDF.volume = 1; atualizaVis(); previa(); };
   const liga = (id, k, tipo) => { $(id).onchange = e => { CM_PDF[k] = tipo === 'chk' ? e.target.checked : e.target.value; refaz(); }; };
-  liga('#pdfOrigem', 'origem'); liga('#pdfTurma', 'turma'); liga('#pdfSel', 'selecao'); liga('#pdfOri', 'orientacao'); liga('#pdfPor', 'porlinha'); liga('#pdfMat', 'matricula', 'chk'); liga('#pdfAut', 'so_autorizados', 'chk');
+  liga('#pdfOrigem', 'origem'); liga('#pdfTurma', 'turma'); liga('#pdfSel', 'selecao'); liga('#pdfOri', 'orientacao'); liga('#pdfPor', 'porlinha'); liga('#pdfMat', 'matricula', 'chk'); liga('#pdfAut', 'so_autorizados', 'chk'); liga('#pdfPend', 'pendentes', 'chk');
   liga('#pdfTodas', 'todas', 'chk');
   $('#pdfTurmas').onchange = () => { CM_PDF.turmas = $$('#pdfTurmas input:checked').map(el => el.value); refaz(); };
   $('#pdfVolume').onchange = e => { CM_PDF.volume = Number(e.target.value); previa(); };

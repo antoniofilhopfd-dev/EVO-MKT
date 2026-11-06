@@ -6,7 +6,7 @@ import { autorizacaoDe, compararTurmaCm } from './carometro';
 
 /** PDF A4 do Carômetro: grade de fotos com o nome embaixo. Mesma função gera a prévia e o arquivo final. */
 export interface OpcoesPdf { titulo: string; subtitulo: string; orientacao: 'retrato' | 'paisagem'; porLinha: 4 | 5 | 6; matricula: boolean; mostrarTurma: boolean }
-export interface AlunoPdf { id: number; nome: string; matricula: string; turma: string; fotoId: number | null; autorizacao: string }
+export interface AlunoPdf { id: number; nome: string; matricula: string; turma: string; fotoId: number | null; autorizacao: string; motivo?: string }
 
 export async function carregarAlunosPdf(ids: number[]): Promise<AlunoPdf[]> {
   if (!ids.length) return [];
@@ -28,6 +28,24 @@ export async function carregarAutorizadosPdf(turmas: string[], hoje: string): Pr
     id: Number(r.id), nome: String(r.nome), matricula: String(r.matricula), turma: String(r.turma ?? ''),
     fotoId: r.foto_id ? Number(r.foto_id) : null, autorizacao: 'AUTORIZADO',
   }));
+}
+export const MOTIVOS_NAO = { NAO_AUTORIZADO: 'Não autoriza', REVOGADO: 'Revogado', VENCIDO: 'Vencido', SEM_RESPOSTA: 'Sem resposta' } as const;
+/** Quem NÃO pode ter a imagem usada: recusou, revogou, venceu. Com `pendentes`, entra também quem ainda não respondeu (sem autorização vigente). */
+export async function carregarNaoAutorizadosPdf(turmas: string[], hoje: string, pendentes: boolean): Promise<AlunoPdf[]> {
+  const filtro = turmas.length ? `AND a.turma IN (${turmas.map(() => '?').join(',')})` : '';
+  const rows = await q(`SELECT a.id,a.nome,a.matricula,a.turma,
+    (SELECT f.id FROM cm_fotos f WHERE f.aluno_id=a.id AND f.ativa=1 ORDER BY f.id DESC LIMIT 1) foto_id,
+    ${statusLiberacao} st, ${venceLiberacao} vence
+    FROM ui_alunos a ${joinsLiberacao} WHERE a.ativo=1 ${filtro}`, [Number(hoje.slice(0, 4)), ...turmas]);
+  const out: AlunoPdf[] = [];
+  for (const r of rows) {
+    const st = String(r.st ?? ''), vence = String(r.vence ?? '');
+    const vencido = st === 'VENCIDO' || (st === 'AUTORIZADO' && vence !== '' && vence < hoje);
+    const motivo = st === 'NAO_AUTORIZADO' ? MOTIVOS_NAO.NAO_AUTORIZADO : st === 'REVOGADO' ? MOTIVOS_NAO.REVOGADO : vencido ? MOTIVOS_NAO.VENCIDO : st === 'AUTORIZADO' ? '' : MOTIVOS_NAO.SEM_RESPOSTA;
+    if (!motivo || (motivo === MOTIVOS_NAO.SEM_RESPOSTA && !pendentes)) continue;
+    out.push({ id: Number(r.id), nome: String(r.nome), matricula: String(r.matricula), turma: String(r.turma ?? ''), fotoId: r.foto_id ? Number(r.foto_id) : null, autorizacao: 'NAO_AUTORIZADO', motivo });
+  }
+  return out;
 }
 export const ordenarAlunosPdf = (a: AlunoPdf[]) => a.sort((x, y) => compararTurmaCm(x.turma, y.turma) || x.nome.localeCompare(y.nome, 'pt-BR'));
 
@@ -68,7 +86,7 @@ export async function carometroPdf(alunos: AlunoPdf[], o: OpcoesPdf, lerFoto: (f
       doc.font('Helvetica').fontSize(7).fillColor('#8A95A8').text('Sem foto', x, y + fh / 2 + 14, { width: cw, align: 'center', lineBreak: false });
     }
     if (nomeNaCelula(doc, a.nome, x, y + fh + 4, cw).truncado) truncados++;
-    const extra = [o.mostrarTurma ? a.turma : '', o.matricula ? a.matricula : ''].filter(Boolean).join(' - ');
+    const extra = [o.mostrarTurma ? a.turma : '', o.matricula ? a.matricula : '', a.motivo ?? ''].filter(Boolean).join(' - ');
     if (extra) doc.font('Helvetica').fontSize(6.8).fillColor(COR.cinza).text(limpa(extra), x, y + fh + 4 + 8.5 * 1.18 * linhasNome + 1, { width: cw, align: 'center', lineBreak: false });
     col++; if (col >= o.porLinha) { col = 0; y += ch + gap; }
   }
