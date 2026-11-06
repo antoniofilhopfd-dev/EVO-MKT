@@ -149,10 +149,10 @@ PAGINAS.uinaoautorizados = async function () {
   if (!painel.isConnected) return;
   const turmas = [...new Set(rows.map(a => a.turma).filter(Boolean))].sort(uiCmpTurma);
   const cont = m => rows.filter(a => a.motivo === m).length;
-  const COR = { Recusou: 'bad', Revogado: 'bad', Vencido: 'warn', 'Sem resposta': 'mute' };
+  const COR = { 'Não autoriza': 'bad', Revogado: 'bad', Vencido: 'warn', 'Sem resposta': 'mute' };
   painel.innerHTML = `<div class="card">
-    <div class="db-tit"><h2>Alunos NÃO autorizados</h2></div>
-    <p class="kpi-note"><b>Não use a imagem destes alunos</b> em posts, vídeos ou anúncios. Recusou: ${fmtN(cont('Recusou'))} · Revogado: ${fmtN(cont('Revogado'))} · Vencido: ${fmtN(cont('Vencido'))} · Sem resposta: ${fmtN(cont('Sem resposta'))}.</p>
+    <div class="db-tit"><h2>Famílias que NÃO autorizam a imagem nas redes sociais</h2></div>
+    <p class="kpi-note"><b>A família não autoriza a imagem destes alunos nas redes sociais.</b> Não use em posts, vídeos ou anúncios. Não autoriza: ${fmtN(cont('Não autoriza'))} · Revogado: ${fmtN(cont('Revogado'))} · Vencido: ${fmtN(cont('Vencido'))} · Sem resposta: ${fmtN(cont('Sem resposta'))}.</p>
     <label class="ui-campo">Buscar por nome ou matrícula<input class="control" type="search" id="uiNaoBusca"></label>
     <label class="cm-chk"><input type="checkbox" id="uiNaoPend"> Incluir quem ainda não respondeu (sem resposta)</label>
     <details><summary>Filtrar turmas</summary>

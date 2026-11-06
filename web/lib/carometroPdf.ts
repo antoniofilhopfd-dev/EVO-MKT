@@ -29,7 +29,7 @@ export async function carregarAutorizadosPdf(turmas: string[], hoje: string): Pr
     fotoId: r.foto_id ? Number(r.foto_id) : null, autorizacao: 'AUTORIZADO',
   }));
 }
-export const MOTIVOS_NAO = { NAO_AUTORIZADO: 'Recusou', REVOGADO: 'Revogado', VENCIDO: 'Vencido', SEM_RESPOSTA: 'Sem resposta' } as const;
+export const MOTIVOS_NAO = { NAO_AUTORIZADO: 'Não autoriza', REVOGADO: 'Revogado', VENCIDO: 'Vencido', SEM_RESPOSTA: 'Sem resposta' } as const;
 /** Quem NÃO pode ter a imagem usada: recusou, revogou, venceu. Com `pendentes`, entra também quem ainda não respondeu (sem autorização vigente). */
 export async function carregarNaoAutorizadosPdf(turmas: string[], hoje: string, pendentes: boolean): Promise<AlunoPdf[]> {
   const filtro = turmas.length ? `AND a.turma IN (${turmas.map(() => '?').join(',')})` : '';

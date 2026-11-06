@@ -190,7 +190,7 @@ async function executarCarometro(c: Ctx): Promise<Response> {
       ids = (await q('SELECT aluno_id FROM cm_selecao_itens WHERE selecao_id=?', [s.id])).map((r) => Number(r.aluno_id));
       titulo = `Seleção: ${s.nome}`; mostrarTurma = true;
     } else if (modoAut) {
-      titulo = modoNao ? 'NÃO autorizados - não usar a imagem' : 'Alunos autorizados para uso de imagem';
+      titulo = modoNao ? 'NÃO autorizados - a família não autoriza a imagem nas redes sociais' : 'Alunos autorizados para uso de imagem';
       mostrarTurma = true;
     } else fail(400, 'Escolha a turma ou uma seleção.');
     if (ids.length > limitePdf) fail(400, 'O PDF aceita até 600 alunos.');
@@ -216,7 +216,7 @@ async function executarCarometro(c: Ctx): Promise<Response> {
       alunos = alunos.slice((volume - 1) * limitePdf, volume * limitePdf);
     }
     const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
-    const sub = `Ano letivo ${anoLetivo()}${modoNao ? (c.qs('pendentes') === '1' ? ' - recusaram, revogaram, vencidos e sem resposta' : ' - recusaram, revogaram ou vencidos') : ''}${soAut && !modoAut ? ` - somente com autorização de imagem (${alunos.length} de ${total})` : ''}`;
+    const sub = `Ano letivo ${anoLetivo()}${modoNao ? (c.qs('pendentes') === '1' ? ' - não autorizam, revogaram, vencidos e sem resposta' : ' - não autorizam, revogaram ou vencidos') : ''}${soAut && !modoAut ? ` - somente com autorização de imagem (${alunos.length} de ${total})` : ''}`;
     const r = await carometroPdf(alunos, { titulo, subtitulo: sub, orientacao: orient, porLinha: modoAut ? 5 : por, matricula: !modoAut && c.qs('matricula') === '1', mostrarTurma }, fotoPadrao, quando);
     await auditar(ator, c.qs('baixar') === '1' ? 'pdf-baixado' : 'pdf-previa', null, `${titulo}: ${alunos.length} aluno(s), ${r.paginas} página(s)`);
     const nome = modoAut ? `Carometro-${modoNao ? 'NaoAutorizados' : 'Autorizados'}${volumes > 1 ? '-Volume-' + volume : ''}.pdf` : `Carometro-${titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'lista'}.pdf`;
