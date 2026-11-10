@@ -10,4 +10,15 @@ assert.match(js,/Alcance não é somado entre perfis/);
 assert.match(visao,/relatorio-instagram-semanal\.html/);
 assert.match(visao,/relatorio-instagram\.html/);
 assert.match(mensal,/\/api\/instagram\/relatorio\.pdf/);
+
+// Regressões identificadas na homologação da branch.
+assert.doesNotThrow(()=>new (require('node:vm').Script)(js), 'JavaScript deve ter sintaxe válida');
+assert.match(js,/n\(per\?\.\[k\],k\)/, 'Taxa de engajamento atual mantém casas decimais');
+assert.match(js,/n\(ant\?\.\[k\],k\)/, 'Taxa de engajamento anterior mantém casas decimais');
+assert.match(js,/iso\(parse\(requested\)\)===requested/, 'Datas inexistentes devem ser recusadas');
+assert.match(js,/const parcial=fim>=hoje\(\)/, 'Semana atual permanece parcial até terminar');
+assert.match(js,/if\(meu!==pedido\)return/, 'Respostas antigas não sobrescrevem seleção recente');
+assert.match(js,/prev\.slice\(0,4\)/, 'Comparação entre anos consulta ano anterior');
+assert.match(js,/semana<start\(hoje\(\)\)/, 'Navegação não avança para semanas futuras');
+assert.match(js,/America\/Fortaleza/, 'Data local usa fuso da operação');
 console.log('Contrato estático do relatório semanal: OK (não substitui testes de integração).');
