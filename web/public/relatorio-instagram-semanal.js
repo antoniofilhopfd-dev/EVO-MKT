@@ -4,9 +4,9 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=
 const iso=d=>d.toISOString().slice(0,10),parse=s=>new Date(s+'T12:00:00Z'),add=(s,n)=>iso(new Date(parse(s).getTime()+n*86400000));
 const start=s=>add(s,-parse(s).getUTCDay()),fmt=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 const num=v=>v===null||v===undefined||v===''||!Number.isFinite(Number(v))?null:Number(v);
-const n=v=>num(v)===null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0});
+const n=(v,k)=>num(v)===null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:k==='engajamento'?1:0})+(k==='engajamento'?'%':'');
 const campos=[['Seguidores registrados','seguidores'],['Variação líquida de seguidores','novos'],['Alcance da conta','alcance'],['Visualizações','visualizacoes'],['Visitas ao perfil','visitasPerfil'],['Interações','interacoes'],['Engajamento (%)','engajamento']];
-const hoje=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const hoje=()=>{const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const v=k=>p.find(x=>x.type===k)?.value;return v('year')+'-'+v('month')+'-'+v('day')};
 let semana=start(hoje()),contas=[],pedido=0;
 const compara=(a,b,k)=>{a=num(a);b=num(b);if(a===null||b===null)return 'Sem base anterior';if(k==='engajamento')return (a-b>0?'+':'')+(a-b).toLocaleString('pt-BR',{maximumFractionDigits:1})+' p.p.';if(!b)return a?'Novo no período':'Estável';const v=(a-b)/b*100;return (v>0?'+':'')+v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%'};
 async function get(url){const r=await fetch(url,{credentials:'same-origin',headers:{'X-EVO':'1'}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||('Falha HTTP '+r.status));return d}
@@ -34,7 +34,7 @@ $('#pdf').onclick=()=>{if(!$('#pdf').disabled)window.print()};
 (async()=>{try{const d=await get('/api/instagram/contas');contas=d.contas||[];const q=new URLSearchParams(location.search),norm=s=>String(s||'').replace(/^@/,'').replace(/[._]/g,'').toLowerCase(),sel=contas.find(c=>c.ig===q.get('conta')||norm(c.usuario)===norm(q.get('perfil')))?.ig||d.principal||contas[0]?.ig;
 $('#perfil').innerHTML=contas.map(c=>'<option value="'+esc(c.ig)+'"'+(c.ig===sel?' selected':'')+'>@'+esc(c.usuario)+'</option>').join('');
 $('#modo').querySelector('option[value="comparativo"]').disabled=contas.length<2;
-const requested=q.get('semana');if(/^\d{4}-\d{2}-\d{2}$/.test(requested||'')&&requested<=hoje()&&start(requested)===requested)semana=requested;
+const requested=q.get('semana');if(/^\d{4}-\d{2}-\d{2}$/.test(requested||'')&&Number.isFinite(parse(requested).getTime())&&requested>= '2020-01-01'&&requested<=hoje()&&start(requested)===requested)semana=requested;
 if(!contas.length)throw Error('Nenhum perfil monitorado.');await carregar()
 }catch(e){$('#rel').innerHTML='<div class="msg">'+esc(e.message||'Falha ao consultar contas.')+'</div>'}})();
 })();
