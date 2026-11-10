@@ -32,7 +32,7 @@ $('#pdf').disabled=false;
 function ir(s){semana=s;carregar()}
 $('#atual').onclick=()=>ir(start(hoje()));$('#anterior').onclick=()=>ir(add(start(hoje()),-7));$('#voltar').onclick=()=>ir(add(semana,-7));$('#avancar').onclick=()=>{if(semana<start(hoje()))ir(add(semana,7))};
 $('#modo').onchange=()=>{$('#perfilWrap').hidden=$('#modo').value==='comparativo';carregar()};$('#perfil').onchange=carregar;
-$('#pdf').onclick=()=>{if(!$('#pdf').disabled)window.print()};
+$('#pdf').onclick=()=>{if($('#pdf').disabled)return;const modo=$('#modo').value,perfil=contas.find(c=>c.ig===$('#perfil').value)?.usuario||contas[0]?.usuario||'';const qs=new URLSearchParams({semana,modo,perfil});window.location.href='/api/instagram/relatorio-semanal.pdf?'+qs.toString()};
 (async()=>{try{const d=await get('/api/instagram/contas');contas=d.contas||[];const q=new URLSearchParams(location.search),norm=s=>String(s||'').replace(/^@/,'').replace(/[._]/g,'').toLowerCase(),sel=contas.find(c=>c.ig===q.get('conta')||norm(c.usuario)===norm(q.get('perfil')))?.ig||d.principal||contas[0]?.ig;
 $('#perfil').innerHTML=contas.map(c=>'<option value="'+esc(c.ig)+'"'+(c.ig===sel?' selected':'')+'>@'+esc(c.usuario)+'</option>').join('');
 $('#modo').querySelector('option[value="comparativo"]').disabled=contas.length<2;
