@@ -114,7 +114,7 @@ export async function operacaoRoute(c: Ctx) {
     const somar = (n: number) => new Date(dia.getTime() + n * 86400000).toISOString().slice(0, 10);
     const fim = somar(6), anterior = somar(-7), anos = [...new Set([inicio.slice(0, 4), anterior.slice(0, 4)])];
     const consultar = async (rota: string, params: Record<string, string>) => {
-      const qs = (k: string) => params[k] ?? c.qs(k);
+      const qs = (k: string) => params[k] ?? (k === 'perfil' ? '' : c.qs(k));
       const res = await desempenhoRoute({ ...c, path: rota, qs });
       if (!res.ok) return fail(res.status, 'Falha ao consultar dados do Instagram.');
       return res.json() as Promise<Record<string, any>>;
