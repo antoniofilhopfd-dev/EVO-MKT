@@ -9,7 +9,7 @@ import { q, q1 } from '../db';
 import { respostaPdf } from '../pdf';
 import { relatorioInstagramPdf } from '../igPdf';
 import { desempenhoRoute } from './desempenho';
-import { cabecalho, carregarLogo, cartoes, COR, dmy, gerarPdf, n0, PAGINA, tabela, titulo } from '../pdf';
+import { baixarVarias, cabecalho, carregarLogo, cartoes, COR, dmy, gerarPdf, imagemNaCaixa, n0, PAGINA, tabela, titulo } from '../pdf';
 import { requireInternal, requireAdmin } from '../auth';
 import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
@@ -150,14 +150,21 @@ export async function operacaoRoute(c: Ctx) {
         y = titulo(doc, y, 'Publicações da semana');
         const posts = (ranking.rows || []).filter((p: any) => normal(p.perfil) === normal(nome));
         if (!posts.length) { doc.fontSize(9).fillColor(COR.cinza).text('Nenhuma publicação sincronizada neste período.', PAGINA.m, y); y += 25; }
-        for (const p of posts) {
-          if (y > PAGINA.h - 105) { doc.addPage(); y = PAGINA.m; }
-          doc.font('Helvetica-Bold').fontSize(9).fillColor(COR.escuro).text(String(p.formato || 'Publicação') + ' - ' + String(p.quando || '').slice(0,10), PAGINA.m, y, {width: PAGINA.w - PAGINA.m*2});
-          y += 15;
-          doc.font('Helvetica').fontSize(8).fillColor(COR.texto).text(String(p.legenda || p.titulo || 'Sem legenda').slice(0,240).replace(/[^\x20-\xFF]/g,' '), PAGINA.m, y, {width: PAGINA.w - PAGINA.m*2, height: 40, ellipsis:true});
-          y += 44;
-          doc.fontSize(8).fillColor(COR.cinza).text('Alcance: '+numero(p.alcance)+'  |  Interações: '+numero(p.interacoes), PAGINA.m, y);
-          y += 24;
+        const imagens = await baixarVarias(posts.map((p: any) => String(p.miniatura || '')), 4);
+        for (const [i, p] of posts.entries()) {
+          const altura = 104;
+          if (y > PAGINA.h - PAGINA.m - altura - 35) { doc.addPage(); y = PAGINA.m; }
+          const imagem = imagens[i], fotoX = PAGINA.m, fotoW = 94;
+          if (imagem) imagemNaCaixa(doc, imagem, fotoX, y, fotoW, 94);
+          else {
+            doc.roundedRect(fotoX, y, fotoW, 94, 4).fill('#F1F4FA');
+            doc.font('Helvetica').fontSize(8).fillColor(COR.cinza).text('Imagem não disponível', fotoX + 7, y + 34, { width: fotoW - 14, align: 'center' });
+          }
+          const x = PAGINA.m + fotoW + 12, w = PAGINA.w - PAGINA.m - x;
+          doc.font('Helvetica-Bold').fontSize(9).fillColor(COR.escuro).text(String(p.formato || 'Publicação') + ' - ' + String(p.quando || '').slice(0,10), x, y, { width: w, lineBreak: false });
+          doc.font('Helvetica').fontSize(8).fillColor(COR.texto).text(String(p.legenda || p.titulo || 'Sem legenda').slice(0,220).replace(/[^\x20-\xFF]/g,' '), x, y + 17, { width: w, height: 52, ellipsis: true });
+          doc.fontSize(8).fillColor(COR.cinza).text('Alcance: '+numero(p.alcance)+'  |  Interações: '+numero(p.interacoes), x, y + 82, { width: w });
+          y += altura + 10;
         }
         y += 16;
       }
