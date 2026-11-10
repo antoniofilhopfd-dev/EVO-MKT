@@ -26,3 +26,9 @@ console.log('Contrato estático do relatório semanal: OK (não substitui testes
 // Regressão: perfil Instagram não é filtro editorial PERFIS do lerFiltros.
 const api=fs.readFileSync(path.resolve(__dirname,'../lib/api/operacao.ts'),'utf8');
 assert.match(api,/const qs = \(k: string\) => params\[k\] \?\? \(k === 'perfil' \? '' : c\.qs\(k\)\)/);
+
+// PDF: miniaturas dos posts, fallback e paginação A4.
+assert.match(api,/baixarVarias\(posts\.map/);
+assert.match(api,/imagemNaCaixa\(doc, imagem/);
+assert.match(api,/Imagem não disponível/);
+assert.match(api,/PAGINA\.h - PAGINA\.m - altura/);
