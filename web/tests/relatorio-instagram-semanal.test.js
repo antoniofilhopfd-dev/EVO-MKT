@@ -22,3 +22,7 @@ assert.match(js,/prev\.slice\(0,4\)/, 'Comparação entre anos consulta ano ante
 assert.match(js,/semana<start\(hoje\(\)\)/, 'Navegação não avança para semanas futuras');
 assert.match(js,/America\/Fortaleza/, 'Data local usa fuso da operação');
 console.log('Contrato estático do relatório semanal: OK (não substitui testes de integração).');
+
+// Regressão: perfil Instagram não é filtro editorial PERFIS do lerFiltros.
+const api=fs.readFileSync(path.resolve(__dirname,'../lib/api/operacao.ts'),'utf8');
+assert.match(api,/const qs = \(k: string\) => params\[k\] \?\? \(k === 'perfil' \? '' : c\.qs\(k\)\)/);
