@@ -11,9 +11,11 @@ vm.runInNewContext(script,contexto,{filename:'relatorio-instagram-semanal.js'});
 const drenar=async()=>{for(let i=0;i<25;i++)await Promise.resolve()};
 (async()=>{
 await drenar();
-assert.equal(chamadas.length,2);
+assert.equal(chamadas.length,3);
+assert.ok(chamadas.some(x=>x.includes('/instagram/ranking?de=2026-11-08&ate=2026-11-14')));
 assert.match(elementos['#rel'].innerHTML,/Relatório Semanal/);
 assert.match(elementos['#rel'].innerHTML,/120/);
+assert.match(elementos['#rel'].innerHTML,/Publicações da semana/);
 assert.match(elementos['#rel'].innerHTML,/100/);
 assert.match(elementos['#rel'].innerHTML,/16,7%/);
 assert.equal(elementos['#pdf'].disabled,false);
@@ -21,5 +23,5 @@ elementos['#modo'].value='comparativo';elementos['#modo'].onchange();await drena
 assert.match(elementos['#rel'].innerHTML,/@geracao\.evolucao/);
 assert.match(elementos['#rel'].innerHTML,/—/); // histórico parcial do segundo perfil
 elementos['#pdf'].onclick();assert.equal(impresso,1);
-console.log('PASS: 8 verificações funcionais com dados sintéticos');
+console.log('PASS: relatório semanal e requisição de publicações com dados sintéticos');
 })().catch(e=>{console.error(e);process.exitCode=1});
