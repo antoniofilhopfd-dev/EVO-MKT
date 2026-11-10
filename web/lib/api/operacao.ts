@@ -8,6 +8,8 @@ import { run } from '../db';
 import { q, q1 } from '../db';
 import { respostaPdf } from '../pdf';
 import { relatorioInstagramPdf } from '../igPdf';
+import { desempenhoRoute } from './desempenho';
+import { cabecalho, carregarLogo, cartoes, COR, dmy, gerarPdf, n0, PAGINA, tabela, titulo } from '../pdf';
 import { requireInternal, requireAdmin } from '../auth';
 import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
@@ -102,6 +104,65 @@ export async function operacaoRoute(c: Ctx) {
     await run('INSERT INTO ig_seguidores(conta,dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,?,0,0,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),atualizado_em=VALUES(atualizado_em)', [conta, alvo, n, 'manual ' + now()]);
     await audit(String(u.codigo), 'ig-seguidores-manual', 'instagram', mes);
     return json({ ok: true });
+  }
+  if (path === '/instagram/relatorio-semanal.pdf') {
+    await requireInternal(c);
+    if (c.method !== 'GET') return fail(405, 'Somente consulta.');
+    const inicio = c.qs('semana'), perfil = c.qs('perfil').replace(/^@/, ''), modo = c.qs('modo');
+    const dia = /^\d{4}-\d{2}-\d{2}$/.test(inicio) ? new Date(inicio + 'T12:00:00Z') : new Date(NaN);
+    if (!Number.isFinite(dia.getTime()) || dia.toISOString().slice(0, 10) !== inicio || dia.getUTCDay() !== 0) return fail(400, 'Semana inválida.');
+    const somar = (n: number) => new Date(dia.getTime() + n * 86400000).toISOString().slice(0, 10);
+    const fim = somar(6), anterior = somar(-7), anos = [...new Set([inicio.slice(0, 4), anterior.slice(0, 4)])];
+    const consultar = async (rota: string, params: Record<string, string>) => {
+      const qs = (k: string) => params[k] ?? c.qs(k);
+      const res = await desempenhoRoute({ ...c, path: rota, qs });
+      if (!res.ok) return fail(res.status, 'Falha ao consultar dados do Instagram.');
+      return res.json() as Promise<Record<string, any>>;
+    };
+    const historicos = await Promise.all(anos.map(ano => consultar('/instagram/ranking-contas', { visao: 'semana', ano })));
+    const periodos = historicos.flatMap(x => x.periodos || []);
+    const atual = periodos.find(x => x.inicio === inicio), ant = periodos.find(x => x.inicio === anterior);
+    const nomes = modo === 'comparativo'
+      ? (atual?.contas || ant?.contas || []).map((x: any) => String(x.usuario || ''))
+      : [perfil || String(atual?.contas?.[0]?.usuario || ant?.contas?.[0]?.usuario || '')];
+    if (!nomes.some(Boolean)) return fail(404, 'Nenhum perfil encontrado.');
+    const ranking = await consultar('/instagram/ranking', { de: inicio, ate: fim, perfil: '' });
+    const campos: [string, string][] = [['Seguidores', 'seguidores'], ['Novos seguidores', 'novos'], ['Alcance', 'alcance'], ['Visualizações', 'visualizacoes'], ['Visitas ao perfil', 'visitasPerfil'], ['Interações', 'interacoes'], ['Engajamento', 'engajamento']];
+    const numero = (v: any, eng = false) => v == null || v === '' || !Number.isFinite(Number(v)) ? '-' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: eng ? 1 : 0 }) + (eng ? '%' : '');
+    const buffer = await gerarPdf({ titulo: 'Relatório semanal - Instagram' }, 'Colégio Evolução - EVO MKT', async doc => {
+      const logo = await carregarLogo();
+      let y = cabecalho(doc, logo, 'Relatório Semanal - Instagram', [dmy(inicio) + ' a ' + dmy(fim)], ['Instagram orgânico']);
+      y += 14;
+      for (const nome of nomes.filter(Boolean)) {
+        const normal = (v: any) => String(v || '').replace(/^@/, '').toLowerCase();
+        const a = atual?.contas?.find((x: any) => normal(x.usuario) === normal(nome));
+        const b = ant?.contas?.find((x: any) => normal(x.usuario) === normal(nome));
+        if (y > PAGINA.h - 250) { doc.addPage(); y = PAGINA.m; }
+        y = titulo(doc, y, '@' + normal(nome));
+        y = cartoes(doc, y, [['Alcance','alcance'], ['Visualizações','visualizacoes'], ['Interações','interacoes'], ['Seguidores','seguidores']].map(([rot,k]) => ({rot,valor:numero(a?.[k])})));
+        y += 14;
+        y = tabela(doc, y, [{t:'Indicador',w:46},{t:'Semana',w:18,al:'right'},{t:'Anterior',w:18,al:'right'},{t:'Variação',w:18,al:'right'}], campos.map(([rot,k]) => {
+          const v = a?.[k], p = b?.[k], eng = k === 'engajamento';
+          const delta = v == null || p == null ? '-' : eng ? (Number(v)-Number(p)).toFixed(1)+' p.p.' : Number(p) ? ((Number(v)-Number(p))/Number(p)*100).toFixed(1)+'%' : '-';
+          return [rot, numero(v,eng), numero(p,eng), delta];
+        }));
+        y += 20;
+        y = titulo(doc, y, 'Publicações da semana');
+        const posts = (ranking.rows || []).filter((p: any) => normal(p.perfil) === normal(nome));
+        if (!posts.length) { doc.fontSize(9).fillColor(COR.cinza).text('Nenhuma publicação sincronizada neste período.', PAGINA.m, y); y += 25; }
+        for (const p of posts) {
+          if (y > PAGINA.h - 105) { doc.addPage(); y = PAGINA.m; }
+          doc.font('Helvetica-Bold').fontSize(9).fillColor(COR.escuro).text(String(p.formato || 'Publicação') + ' - ' + String(p.quando || '').slice(0,10), PAGINA.m, y, {width: PAGINA.w - PAGINA.m*2});
+          y += 15;
+          doc.font('Helvetica').fontSize(8).fillColor(COR.texto).text(String(p.legenda || p.titulo || 'Sem legenda').slice(0,240).replace(/[^\x20-\xFF]/g,' '), PAGINA.m, y, {width: PAGINA.w - PAGINA.m*2, height: 40, ellipsis:true});
+          y += 44;
+          doc.fontSize(8).fillColor(COR.cinza).text('Alcance: '+numero(p.alcance)+'  |  Interações: '+numero(p.interacoes), PAGINA.m, y);
+          y += 24;
+        }
+        y += 16;
+      }
+    });
+    return respostaPdf(buffer, 'Instagram-Semanal-' + inicio + '.pdf');
   }
   if (path === '/instagram/relatorio' || path === '/instagram/relatorio.pdf') {
     await requireInternal(c);
