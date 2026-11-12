@@ -108,7 +108,7 @@ async function carregar(){
   try{
     if ($('#modo').value==='comparativo') {
       if(contasRelatorio.length<2)throw new Error('São necessárias duas contas conectadas para o relatório conjunto.');
-      const ds=await Promise.all(contasRelatorio.map(async conta=>{const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+'+semanaQuery()+'&conta='+encodeURIComponent(conta.ig),{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha ao consultar uma das contas.');return d;}));
+      const ds=await Promise.all(contasRelatorio.map(async conta=>{const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+semanaQuery()+'&conta='+encodeURIComponent(conta.ig),{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha ao consultar uma das contas.');return d;}));
       if(meu!==pedido)return;
       $('#rel').innerHTML=comparativoHtml(ds);$('#baixar').disabled=false;return;
     }
