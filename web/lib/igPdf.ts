@@ -40,7 +40,7 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string, formato: '
   const per = d.periodo as { de: string; ate: string; parcial: boolean };
   const a = (d.atual ?? null) as Row | null, p = (d.anteriorMetricas ?? null) as Row | null;
   const posts = (d.posts as Row[]) ?? [];
-  const seg = num(d.seguidores), segA = num(d.seguidoresAnterior), novos = seg !== null && segA !== null ? seg - segA : null;
+  const seg = num(d.seguidores), segA = num(d.seguidoresAnterior), novos = !d.semanal && seg !== null && segA !== null ? seg - segA : null;
   const top = [...posts].sort((x, y) => (num(y.alcance) ?? 0) - (num(x.alcance) ?? 0)).slice(0, 5);
   const [logo, fotos] = await Promise.all([carregarLogo(), baixarVarias(top.map((x) => String(x.miniatura || '')))]);
   const somaPosts = (k: string) => posts.reduce((s, x) => s + (num(x[k]) ?? 0), 0);
@@ -60,7 +60,7 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string, formato: '
     if (interacoes !== null) itens.push({ rot: 'Interações', valor: n0(interacoes), var: variacao(interacoes, p ? num(p.interacoes) : null) });
     if (a && num(a.salvamentos) !== null) itens.push({ rot: 'Salvamentos', valor: n0(num(a.salvamentos)), var: variacao(num(a.salvamentos), p ? num(p.salvamentos) : null) });
     if (a && num(a.compartilhamentos) !== null) itens.push({ rot: 'Compartilhamentos', valor: n0(num(a.compartilhamentos)), var: variacao(num(a.compartilhamentos), p ? num(p.compartilhamentos) : null) });
-    itens.push({ rot: 'Publicações no mês', valor: n0(posts.length), var: { t: 'sincronizadas da Meta', cor: COR.cinza } });
+    itens.push({ rot: d.semanal ? 'Publicações na semana' : 'Publicações no mês', valor: n0(posts.length), var: { t: 'sincronizadas da Meta', cor: COR.cinza } });
     y = cartoes(doc, y, itens, 4, 52) + 2;
     if (!a) y = nota(doc, y, 'As métricas mensais da conta (alcance, visualizações, interações) deste mês ainda não foram carregadas da Meta (Instagram > Ranking > Carregar histórico); por isso não aparecem. Nada é estimado.');
     if (formato === 'resumido') { nota(doc, y + 6, 'Versao resumida: indicadores oficiais do periodo. Para graficos, publicacoes e rankings, selecione Detalhado.'); return; }
@@ -139,8 +139,8 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string, formato: '
     if (novos !== null) linhas.push(['Novos seguidores', (novos > 0 ? '+' : '') + n0(novos), '-']);
     if (a) for (const [r, k] of [['Alcance', 'alcance'], ['Visualizações', 'impressoes'], ['Visitas ao perfil', 'visitasPerfil'], ['Interações', 'interacoes'], ['Curtidas', 'curtidas'], ['Comentários', 'comentarios'], ['Salvamentos', 'salvamentos'], ['Compartilhamentos', 'compartilhamentos']] as [string, string][]) if (num(a[k]) !== null) linhas.push(lin(r, num(a[k]), p ? num(p[k]) : null));
     linhas.push(['Publicações sincronizadas', n0(posts.length), '-']);
-    if (!a && posts.length) linhas.push(['Interações (soma das publicações)', n0(somaPosts('interacoes')), '-']);
-    y = tabela(doc, y, [{ t: 'Indicador', w: 200 }, { t: 'Total no mês', w: 110, al: 'right' }, { t: 'vs. mês anterior', w: 120, al: 'right' }], linhas, { alturaLinha: 16 });
+    if (!a && posts.some((post) => num(post.interacoes) !== null)) linhas.push(['Interações (soma das publicações com dados)', n0(somaPosts('interacoes')), '-']);
+    y = tabela(doc, y, [{ t: 'Indicador', w: 200 }, { t: d.semanal ? 'Total na semana' : 'Total no mês', w: 110, al: 'right' }, { t: d.semanal ? 'Comparação' : 'vs. mês anterior', w: 120, al: 'right' }], linhas, { alturaLinha: 16 });
     // metas e comparativo: mês atual x anterior (só o que existe nos dois)
     const comp = [['Seguidores', seg, segA], ['Alcance', a ? num(a.alcance) : null, p ? num(p.alcance) : null], ['Visualizações', a ? num(a.impressoes) : null, p ? num(p.impressoes) : null], ['Interações', a ? num(a.interacoes) : null, p ? num(p.interacoes) : null]].filter((r) => r[1] !== null && r[2] !== null) as [string, number, number][];
     if (comp.length) {
