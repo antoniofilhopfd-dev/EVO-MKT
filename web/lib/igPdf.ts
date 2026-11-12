@@ -48,7 +48,7 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<B
 
   return gerarPdf({ titulo: `Relatório ${tipoRelatorio} - Instagram - ${nomeMes}` }, `Relatório ${tipoRelatorio} - Instagram${conta ? ' @' + conta : ''} · Período: ${dmy(per.de)} a ${dmy(per.ate)}${per.parcial ? ' (mês em andamento)' : ''} · Gerado em ${geradoEm}`, async (doc) => {
     let y = cabecalho(doc, logo, `Relatório ${tipoRelatorio} - Instagram`, [nomeMes, `Período: ${dmy(per.de)} a ${dmy(per.ate)}${per.parcial ? ' (mês em andamento)' : ''}`], [conta ? '@' + conta : 'Instagram', 'Perfil institucional']);
-    y = titulo(doc, y, 'Resumo do mês', 'INSTAGRAM ORGÂNICO');
+    y = titulo(doc, y, `Resumo ${d.semanal ? 'da semana' : 'do mês'}`, 'INSTAGRAM ORGÂNICO');
     y = nota(doc, y - 6, `Principais indicadores do Instagram no período de ${dmy(per.de)} a ${dmy(per.ate)}. Este relatório não inclui anúncios (Tráfego Pago).`);
     // indicadores: só os que a API real trouxe
     const itens: { rot: string; valor: string; var: { t: string; cor: string }; nota?: string }[] = [];
@@ -97,7 +97,7 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<B
     fmts.forEach((f, i) => { const yy = y + 50 + i * 20; doc.rect(x2 + 118, yy + 1, 7, 7).fill(CORES_FMT[f]); doc.font('Helvetica').fontSize(8).fillColor(COR.texto).text(f, x2 + 130, yy, { width: 60, lineBreak: false }); doc.font('Helvetica-Bold').text(`${totInt ? pct1((porFmt[f].inter / totInt) * 100) : '0'}%`, x2 + 190, yy, { width: 40, align: 'right', lineBreak: false }); });
     y += 152;
     // melhores conteúdos
-    y = garanteEspaco(doc, y, 150); y = titulo(doc, y, 'Melhores conteúdos do mês', 'MAIOR ALCANCE');
+    y = garanteEspaco(doc, y, 150); y = titulo(doc, y, `Melhores conteúdos ${d.semanal ? 'da semana' : 'do mês'}`, 'MAIOR ALCANCE');
     if (top.length) {
       const cw = (PAGINA.w - PAGINA.m * 2 - 4 * 6) / 5;
       top.forEach((x, i) => {
@@ -131,7 +131,7 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<B
       y = tabela(doc, y, [{ t: 'Post', w: 60 }, { t: 'Curtidas', w: 90, al: 'right' }, { t: 'Comentarios', w: 100, al: 'right' }, { t: 'Salvamentos', w: 100, al: 'right' }, { t: 'Compartilh.', w: 80, al: 'right' }], linhasInteracoes, { alturaLinha: 19 });
     }
     // resumo geral e metas/comparativo
-    y = garanteEspaco(doc, y, 90); y = titulo(doc, y, 'Resumo geral do mês', 'COMPARAÇÃO COM O MÊS ANTERIOR');
+    y = garanteEspaco(doc, y, 90); y = titulo(doc, y, `Resumo geral ${d.semanal ? 'da semana' : 'do mês'}`, d.semanal ? 'DADOS DA SEMANA' : 'COMPARAÇÃO COM O MÊS ANTERIOR');
     const lin = (rot: string, v: number | null, ant: number | null, mais = false): string[] => [rot, v === null ? '-' : (mais && v > 0 ? '+' : '') + n0(v), variacao(v, ant).t.replace(' vs. mes anterior', '')];
     const linhas: string[][] = [];
     if (seg !== null) linhas.push(lin('Seguidores (final do mês)', seg, segA));
