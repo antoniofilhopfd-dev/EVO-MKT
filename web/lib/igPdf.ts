@@ -157,3 +157,28 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string, formato: '
     nota(doc, y, 'Dados lidos da Meta (somente leitura); o EVO MKT não altera nada na plataforma. Alcance, visualizações e impressões são métricas diferentes e não são somadas entre si nem entre meses. Seguidores do fim do mês vêm do último registro sincronizado. Quando o mês anterior ou uma métrica não está disponível, o relatório indica em vez de estimar.');
   });
 }
+
+/** Comparativo direto em PDF: preserva cada conta separada, sem somar audiencias. */
+export async function relatorioInstagramComparativoPdf(dados: Row[], geradoEm: string, formato: 'resumido' | 'detalhado' = 'detalhado'): Promise<Buffer> {
+  const logo = await carregarLogo();
+  const periodo = dados[0]?.periodo as Row | undefined;
+  return gerarPdf({ titulo: 'Comparativo Instagram - EVO MKT' }, 'Comparativo Instagram · ' + geradoEm, async (doc) => {
+    let y = cabecalho(doc, logo, 'Comparativo Instagram', [periodo ? dmy(String(periodo.de)) + ' a ' + dmy(String(periodo.ate)) : '', 'Perfis analisados separadamente'], ['EVO MKT']);
+    const campos: [string, string][] = [['Alcance', 'alcance'], ['Visualizacoes', 'impressoes'], ['Interacoes', 'interacoes']];
+    const nomes = dados.map((d) => '@' + limpa(String(d.conta || 'Instagram')).slice(0, 25));
+    y = titulo(doc, y, 'Indicadores por perfil', 'SEM SOMAR ALCANCE ENTRE CONTAS');
+    const linhas = campos.map(([nome, campo]) => [nome, ...dados.map((d) => n0(num((d.atual as Row | null)?.[campo])))]);
+    linhas.push(['Publicacoes', ...dados.map((d) => n0(((d.posts as Row[]) || []).length))]);
+    const largura = (PAGINA.w - PAGINA.m * 2 - 170) / Math.max(1, dados.length);
+    y = tabela(doc, y, [{ t: 'Indicador', w: 170 }, ...nomes.map((n) => ({ t: n, w: largura, al: 'right' as const }))], linhas, { alturaLinha: 24 });
+    if (formato === 'resumido') { nota(doc, y + 10, 'Indicadores oficiais disponiveis no periodo. Sem estimativas e sem somar audiencias.'); return; }
+    for (const d of dados) {
+      y = garanteEspaco(doc, y + 20, 110);
+      y = titulo(doc, y, 'Publicacoes - @' + limpa(String(d.conta || 'Instagram')).slice(0, 35), 'TOP 10 POR ALCANCE');
+      const posts = [...((d.posts as Row[]) || [])].sort((a, b) => (num(b.alcance) ?? -1) - (num(a.alcance) ?? -1)).slice(0, 10);
+      if (!posts.length) { y = nota(doc, y, 'Nenhuma publicacao sincronizada no periodo.'); continue; }
+      y = tabela(doc, y, [{ t: 'Publicacao', w: 190 }, { t: 'Alcance', w: 80, al: 'right' }, { t: 'Visualiz.', w: 80, al: 'right' }, { t: 'Interacoes', w: 80, al: 'right' }], posts.map((p, i) => [String(i + 1) + '. ' + limpa(String(p.legenda || 'Sem legenda')).slice(0, 38), n0(num(p.alcance)), n0(num(p.visualizacoes)), n0(num(p.interacoes))]), { alturaLinha: 21 });
+    }
+    nota(doc, garanteEspaco(doc, y + 10, 35), 'Dados da Meta, somente leitura. Valores ausentes permanecem indisponiveis. Alcance de perfis diferentes nao deve ser somado.');
+  });
+}
