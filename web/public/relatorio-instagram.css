@@ -44,3 +44,13 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{background:#F1F4FA;t
  .relatorio-conta+.relatorio-conta,.relatorio-comparacao{break-before:page;page-break-before:always;margin-top:0}
  .relatorio-conta .rel,.relatorio-comparacao .rel{break-inside:auto;page-break-inside:auto}
 }
+
+/* Rankings detalhados de publicações */
+.rankings-metricas{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.ranking-metrica{border:1px solid #e6e9f0;border-radius:8px;padding:12px;min-width:0;break-inside:avoid}
+.ranking-metrica h4{font-size:13px;color:#00275f;margin:0 0 8px}
+.ranking-metrica ol{padding-left:22px;margin:0}
+.ranking-metrica li{font-size:11px;line-height:1.5;margin-bottom:6px;overflow-wrap:anywhere}
+.top .tx a{display:inline-block;color:#063996;font-size:11px;margin:4px 0}
+.top .m{display:flex;flex-wrap:wrap;gap:6px 12px}
+@media(max-width:600px){.rankings-metricas{grid-template-columns:1fr}}
