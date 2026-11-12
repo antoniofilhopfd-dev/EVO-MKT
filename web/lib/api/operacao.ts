@@ -160,6 +160,7 @@ export async function operacaoRoute(c: Ctx) {
     await requireInternal(c);
     if (c.method !== 'GET') return fail(405, 'O relatório é somente consulta.');
     const dados = await montarRelatorioInstagram(c);
+    const mes = String(dados.mes), semanal = Boolean(dados.semanal), inicioSemana = String((dados.periodo as Row).de);
     if (path === '/instagram/relatorio.pdf') {
       const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
       return respostaPdf(await relatorioInstagramPdf(dados, quando, c.qs('formato') === 'resumido' ? 'resumido' : 'detalhado'), `Relatorio-${semanal ? 'Semanal' : 'Mensal'}-Instagram${dados.conta ? '_' + String(dados.conta).replace(/^@/, '') : ''}_${semanal ? inicioSemana : mes}.pdf`);
