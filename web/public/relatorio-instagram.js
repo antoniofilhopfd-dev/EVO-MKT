@@ -59,7 +59,7 @@ function html(d){
   const comp=[['Seguidores',seg,segA],['Alcance',a?num(a.alcance):null,p?num(p.alcance):null],['Visualizações',a?num(a.impressoes):null,p?num(p.impressoes):null],['Interações',a?num(a.interacoes):null,p?num(p.interacoes):null]].filter(r=>r[1]!==null&&r[2]!==null);
   const mxC=Math.max(1,...comp.flatMap(r=>[r[1],r[2]]));
   const agora=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Fortaleza',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date());
-  return `<article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Relatório Mensal — Instagram</h1><p>${esc(nome)}</p></div><div class="conta"><b>${d.conta?'@'+esc(d.conta):'Instagram'}</b>Perfil institucional</div></header>
+  return `<article class="rel"><header class="cab"><img class="logo" src="/api/public/logo" alt="Colégio Evolução"><div class="tit"><h1>Relatório ${d.semanal?'Semanal':'Mensal'} — Instagram</h1><p>${esc(nome)}</p></div><div class="conta"><b>${d.conta?'@'+esc(d.conta):'Instagram'}</b>Perfil institucional</div></header>
   <div class="corpo"><div class="resumo"><div><h2>Resumo do mês</h2><p>Principais indicadores do Instagram orgânico no período. Não inclui anúncios (Tráfego Pago).</p></div><div class="periodo">Período do relatório<b>${DMA(per.de)} a ${DMA(per.ate)}${per.parcial?' (mês em andamento)':''}</b></div></div>
   ${d.periodoAlcance?.parcial?'<p class="nota">Alcance parcial da conta: '+esc(DMA(d.periodoAlcance.de))+' a '+esc(DMA(d.periodoAlcance.ate))+'. Período recuperado da Meta, não representa o mês completo.</p>':''}
     ${!a||num(a.alcance)===null?'<p class="nota">Alcance mensal: histórico indisponível para o período selecionado. Tente Instagram › Ranking › Carregar histórico para recuperar os dados da Meta. Não é possível deduzir o alcance da conta somando publicações ou semanas.</p>':''}
@@ -75,7 +75,8 @@ function html(d){
   <p class="nota">Dados lidos da Meta (somente leitura). Alcance, visualizações e impressões são métricas diferentes e não são somadas entre si nem entre meses. Seguidores do fim do mês vêm do último registro sincronizado.</p></div>
   <footer class="rodape"><img src="/api/public/logo" alt="Colégio Evolução"><span>Relatório Mensal — Instagram · Período: ${DMA(per.de)} a ${DMA(per.ate)} · Gerado em ${esc(agora)}</span></footer></article>`;
 }
-const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+($('#perfil').value?'&conta='+encodeURIComponent($('#perfil').value):'');
+const semanaQuery=()=>$('#semana').value?'&semana='+encodeURIComponent($('#semana').value):'';
+const consulta=()=>'mes='+encodeURIComponent($('#mes').value)+semanaQuery()+($('#perfil').value?'&conta='+encodeURIComponent($('#perfil').value):'');
 
 let contasRelatorio=[];
 function comparativoHtml(dados) {
@@ -107,7 +108,7 @@ async function carregar(){
   try{
     if ($('#modo').value==='comparativo') {
       if(contasRelatorio.length<2)throw new Error('São necessárias duas contas conectadas para o relatório conjunto.');
-      const ds=await Promise.all(contasRelatorio.map(async conta=>{const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+'&conta='+encodeURIComponent(conta.ig),{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha ao consultar uma das contas.');return d;}));
+      const ds=await Promise.all(contasRelatorio.map(async conta=>{const r=await fetch('/api/instagram/relatorio?mes='+encodeURIComponent($('#mes').value)+'+semanaQuery()+'&conta='+encodeURIComponent(conta.ig),{credentials:'same-origin',headers:{'X-EVO':'1'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Falha ao consultar uma das contas.');return d;}));
       if(meu!==pedido)return;
       $('#rel').innerHTML=comparativoHtml(ds);$('#baixar').disabled=false;return;
     }
@@ -133,7 +134,7 @@ async function baixar(){
 {
   const h=new Date(),q=new URLSearchParams(location.search);
   $('#mes').value=/^\d{4}-\d\d$/.test(q.get('mes')||'')?q.get('mes'):`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}`;
-  $('#atualiza').onclick=carregar;$('#mes').onchange=carregar;$('#perfil').onchange=carregar;$('#baixar').onclick=baixar;
+  $('#atualiza').onclick=carregar;$('#mes').onchange=carregar;$('#semana').onchange=()=>{if($('#semana').value){const dia=new Date($('#semana').value+'T12:00:00Z');if(dia.getUTCDay()!==0){$('#msg').textContent='Selecione um domingo como início da semana.';return}$('#mes').value=$('#semana').value.slice(0,7)}carregar();};$('#perfil').onchange=carregar;$('#baixar').onclick=baixar;
   $('#modo').onchange=()=>{const comp=$('#modo').value==='comparativo';$('#perfilWrap').hidden=comp;$('#baixar').textContent=comp?'Salvar PDF (relatório completo)':'Baixar PDF';carregar();};
   // perfis monitorados (só consulta): escolhe pelo ?conta= (id), ?perfil= (@usuário) ou o perfil principal
   (async()=>{
