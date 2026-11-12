@@ -177,7 +177,8 @@ export async function relatorioInstagramComparativoPdf(dados: Row[], geradoEm: s
       y = titulo(doc, y, 'Publicacoes - @' + limpa(String(d.conta || 'Instagram')).slice(0, 35), 'TOP 10 POR ALCANCE');
       const posts = [...((d.posts as Row[]) || [])].sort((a, b) => (num(b.alcance) ?? -1) - (num(a.alcance) ?? -1)).slice(0, 10);
       if (!posts.length) { y = nota(doc, y, 'Nenhuma publicacao sincronizada no periodo.'); continue; }
-      y = tabela(doc, y, [{ t: 'Publicacao', w: 190 }, { t: 'Alcance', w: 80, al: 'right' }, { t: 'Visualiz.', w: 80, al: 'right' }, { t: 'Interacoes', w: 80, al: 'right' }], posts.map((p, i) => [String(i + 1) + '. ' + limpa(String(p.legenda || 'Sem legenda')).slice(0, 38), n0(num(p.alcance)), n0(num(p.visualizacoes)), n0(num(p.interacoes))]), { alturaLinha: 21 });
+      const fotos = await baixarVarias(posts.map((p) => String(p.miniatura || '')));
+      y = tabela(doc, y, [{ t: 'Imagem', w: 52 }, { t: 'Publicacao', w: 160 }, { t: 'Alcance', w: 72, al: 'right' }, { t: 'Visualiz.', w: 72, al: 'right' }, { t: 'Interacoes', w: 74, al: 'right' }], posts.map((p, i) => [{ img: fotos[i] ?? null, vazio: 'Sem foto' }, String(i + 1) + '. ' + limpa(String(p.legenda || 'Sem legenda')).slice(0, 38), n0(num(p.alcance)), n0(num(p.visualizacoes)), n0(num(p.interacoes))]), { alturaLinha: 44 });
     }
     nota(doc, garanteEspaco(doc, y + 10, 35), 'Dados da Meta, somente leitura. Valores ausentes permanecem indisponiveis. Alcance de perfis diferentes nao deve ser somado.');
   });
