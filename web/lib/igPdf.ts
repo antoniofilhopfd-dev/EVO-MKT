@@ -36,6 +36,7 @@ function rosca(doc: Doc, cx: number, cy: number, r: number, fatias: { v: number;
 export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<Buffer> {
   const mes = String(d.mes), [ano, mm] = mes.split('-').map(Number);
   const nomeMes = `${MESES[mm - 1][0].toUpperCase()}${MESES[mm - 1].slice(1)} de ${ano}`;
+  const tipoRelatorio = d.semanal ? 'Semanal' : 'Mensal';
   const per = d.periodo as { de: string; ate: string; parcial: boolean };
   const a = (d.atual ?? null) as Row | null, p = (d.anteriorMetricas ?? null) as Row | null;
   const posts = (d.posts as Row[]) ?? [];
@@ -45,8 +46,8 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<B
   const somaPosts = (k: string) => posts.reduce((s, x) => s + (num(x[k]) ?? 0), 0);
   const conta = String(d.conta || '');
 
-  return gerarPdf({ titulo: `Relatório Mensal - Instagram - ${nomeMes}` }, `Relatório Mensal - Instagram${conta ? ' @' + conta : ''} · Período: ${dmy(per.de)} a ${dmy(per.ate)}${per.parcial ? ' (mês em andamento)' : ''} · Gerado em ${geradoEm}`, async (doc) => {
-    let y = cabecalho(doc, logo, 'Relatório Mensal - Instagram', [nomeMes, `Período: ${dmy(per.de)} a ${dmy(per.ate)}${per.parcial ? ' (mês em andamento)' : ''}`], [conta ? '@' + conta : 'Instagram', 'Perfil institucional']);
+  return gerarPdf({ titulo: `Relatório ${tipoRelatorio} - Instagram - ${nomeMes}` }, `Relatório ${tipoRelatorio} - Instagram${conta ? ' @' + conta : ''} · Período: ${dmy(per.de)} a ${dmy(per.ate)}${per.parcial ? ' (mês em andamento)' : ''} · Gerado em ${geradoEm}`, async (doc) => {
+    let y = cabecalho(doc, logo, `Relatório ${tipoRelatorio} - Instagram`, [nomeMes, `Período: ${dmy(per.de)} a ${dmy(per.ate)}${per.parcial ? ' (mês em andamento)' : ''}`], [conta ? '@' + conta : 'Instagram', 'Perfil institucional']);
     y = titulo(doc, y, 'Resumo do mês', 'INSTAGRAM ORGÂNICO');
     y = nota(doc, y - 6, `Principais indicadores do Instagram no período de ${dmy(per.de)} a ${dmy(per.ate)}. Este relatório não inclui anúncios (Tráfego Pago).`);
     // indicadores: só os que a API real trouxe
