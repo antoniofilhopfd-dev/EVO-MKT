@@ -135,7 +135,7 @@ async function baixar(){
 {
   const h=new Date(),q=new URLSearchParams(location.search);
   $('#mes').value=/^\d{4}-\d\d$/.test(q.get('mes')||'')?q.get('mes'):`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}`;
-  $('#atualiza').onclick=carregar;$('#mes').onchange=carregar;$('#semana').onchange=()=>{if($('#semana').value){const dia=new Date($('#semana').value+'T12:00:00Z');if(dia.getUTCDay()!==0){$('#msg').textContent='Selecione um domingo como início da semana.';return}$('#mes').value=$('#semana').value.slice(0,7)}carregar();};$('#perfil').onchange=carregar;$('#baixar').onclick=baixar;
+  $('#atualiza').onclick=carregar;$('#mes').onchange=()=>{if($('#semana').value&&!$('#semana').value.startsWith($('#mes').value))$('#semana').value='';carregar();};$('#semana').onchange=()=>{if($('#semana').value){const dia=new Date($('#semana').value+'T12:00:00Z');if(!Number.isFinite(dia.getTime())||dia.getUTCDay()!==0){$('#msg').textContent='Selecione um domingo válido como início da semana.';return}$('#mes').value=$('#semana').value.slice(0,7)}carregar();};$('#perfil').onchange=carregar;$('#baixar').onclick=baixar;
   $('#modo').onchange=()=>{const comp=$('#modo').value==='comparativo';$('#perfilWrap').hidden=comp;$('#baixar').textContent=comp?'Salvar PDF (relatório completo)':'Baixar PDF';carregar();};
   // perfis monitorados (só consulta): escolhe pelo ?conta= (id), ?perfil= (@usuário) ou o perfil principal
   (async()=>{
