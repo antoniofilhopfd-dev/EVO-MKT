@@ -7,7 +7,7 @@ import { listarNotificacoes } from '../notificacoes';
 import { run } from '../db';
 import { q, q1 } from '../db';
 import { respostaPdf } from '../pdf';
-import { relatorioInstagramPdf } from '../igPdf';
+import { relatorioInstagramPdf, relatorioInstagramComparativoPdf } from '../igPdf';
 import { requireInternal, requireAdmin } from '../auth';
 import { audit, getRow, listRows } from '../records';
 import { setSetting, setting } from '../settings';
@@ -155,6 +155,16 @@ export async function operacaoRoute(c: Ctx) {
     await run('INSERT INTO ig_seguidores(conta,dia,seguidores,seguindo,midias,atualizado_em) VALUES(?,?,?,0,0,?) ON DUPLICATE KEY UPDATE seguidores=VALUES(seguidores),atualizado_em=VALUES(atualizado_em)', [conta, alvo, n, 'manual ' + now()]);
     await audit(String(u.codigo), 'ig-seguidores-manual', 'instagram', mes);
     return json({ ok: true });
+  }
+  if (path === '/instagram/relatorio-comparativo.pdf') {
+    await requireInternal(c);
+    if (c.method !== 'GET') return fail(405, 'Somente consulta.');
+    const contas = await contasMonitoradas();
+    if (contas.length < 2) fail(400, 'Sao necessarias pelo menos duas contas monitoradas.');
+    const dados = await Promise.all(contas.map((conta) => montarRelatorioInstagram(c, conta.ig)));
+    const formato = c.qs('formato') === 'resumido' ? 'resumido' : 'detalhado';
+    const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
+    return respostaPdf(await relatorioInstagramComparativoPdf(dados, quando, formato), 'Relatorio-Comparativo-Instagram_' + String(dados[0].mes) + '.pdf');
   }
   if (path === '/instagram/relatorio' || path === '/instagram/relatorio.pdf') {
     await requireInternal(c);
