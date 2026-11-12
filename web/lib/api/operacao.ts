@@ -147,6 +147,7 @@ export async function operacaoRoute(c: Ctx) {
     // Totais mensais de conta não são atribuídos à semana sem snapshot semanal.
     const semanaInicio = c.qs('semana');
     const semanal = /^\\d{4}-\\d{2}-\\d{2}$/.test(semanaInicio) && semanaInicio.startsWith(mes);
+    if (semanaInicio && !semanal) fail(400, 'Informe um domingo válido do mês selecionado.');
     const inicioSemana = semanal ? semanaInicio : '';
     const fimSemana = semanal ? fmtDate(addDays(new Date(inicioSemana + 'T12:00:00Z'), 6)) : '';
     const postsPeriodo = semanal ? posts.filter((post) => String(post.publicado_em).slice(0, 10) >= inicioSemana && String(post.publicado_em).slice(0, 10) <= fimSemana) : posts;
