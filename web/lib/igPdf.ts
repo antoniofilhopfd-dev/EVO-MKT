@@ -113,6 +113,22 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<B
       });
       y += 140;
     } else y = nota(doc, y, 'Nenhuma publicação sincronizada neste mês.');
+    // Detalhamento auditável: cada indicador é individual, sem somar alcance entre posts.
+    if (posts.length) {
+      y = garanteEspaco(doc, y, 90);
+      y = titulo(doc, y, 'Metricas detalhadas das melhores publicacoes', 'ATE 10 POR ALCANCE');
+      const detalhados = [...posts].sort((a, b) => (num(b.alcance) ?? -1) - (num(a.alcance) ?? -1)).slice(0, 10);
+      const linhasDetalhes = detalhados.map((post, i) => {
+        const alcance = num(post.alcance), interacoes = num(post.interacoes);
+        const engajamento = alcance !== null && alcance > 0 && interacoes !== null ? pct1(interacoes / alcance * 100) + '%' : '-';
+        return [String(i + 1) + '. ' + limpa(String(post.legenda || 'Sem legenda')).slice(0, 36), n0(alcance), n0(num(post.visualizacoes)), n0(interacoes), engajamento];
+      });
+      y = tabela(doc, y, [{ t: 'Publicacao', w: 198 }, { t: 'Alcance', w: 60, al: 'right' }, { t: 'Visualiz.', w: 62, al: 'right' }, { t: 'Interacoes', w: 65, al: 'right' }, { t: 'Taxa', w: 45, al: 'right' }], linhasDetalhes, { alturaLinha: 19 });
+      y = garanteEspaco(doc, y, 85);
+      y = titulo(doc, y, 'Interacoes por publicacao', 'DADOS DISPONIVEIS DA META');
+      const linhasInteracoes = detalhados.map((post, i) => [String(i + 1), n0(num(post.curtidas)), n0(num(post.comentarios)), n0(num(post.salvos)), n0(num(post.compartilhamentos))]);
+      y = tabela(doc, y, [{ t: 'Post', w: 60 }, { t: 'Curtidas', w: 90, al: 'right' }, { t: 'Comentarios', w: 100, al: 'right' }, { t: 'Salvamentos', w: 100, al: 'right' }, { t: 'Compartilh.', w: 80, al: 'right' }], linhasInteracoes, { alturaLinha: 19 });
+    }
     // resumo geral e metas/comparativo
     y = garanteEspaco(doc, y, 90); y = titulo(doc, y, 'Resumo geral do mês', 'COMPARAÇÃO COM O MÊS ANTERIOR');
     const lin = (rot: string, v: number | null, ant: number | null, mais = false): string[] => [rot, v === null ? '-' : (mais && v > 0 ? '+' : '') + n0(v), variacao(v, ant).t.replace(' vs. mes anterior', '')];
