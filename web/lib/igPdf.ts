@@ -33,7 +33,7 @@ function rosca(doc: Doc, cx: number, cy: number, r: number, fatias: { v: number;
 }
 
 /** Relatório Mensal do Instagram (orgânico) em PDF A4 paginado, a partir dos mesmos dados da pré-visualização. Somente leitura. */
-export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<Buffer> {
+export async function relatorioInstagramPdf(d: Row, geradoEm: string, formato: 'resumido' | 'detalhado' = 'detalhado'): Promise<Buffer> {
   const mes = String(d.mes), [ano, mm] = mes.split('-').map(Number);
   const nomeMes = `${MESES[mm - 1][0].toUpperCase()}${MESES[mm - 1].slice(1)} de ${ano}`;
   const tipoRelatorio = d.semanal ? 'Semanal' : 'Mensal';
@@ -63,6 +63,7 @@ export async function relatorioInstagramPdf(d: Row, geradoEm: string): Promise<B
     itens.push({ rot: 'Publicações no mês', valor: n0(posts.length), var: { t: 'sincronizadas da Meta', cor: COR.cinza } });
     y = cartoes(doc, y, itens, 4, 52) + 2;
     if (!a) y = nota(doc, y, 'As métricas mensais da conta (alcance, visualizações, interações) deste mês ainda não foram carregadas da Meta (Instagram > Ranking > Carregar histórico); por isso não aparecem. Nada é estimado.');
+    if (formato === 'resumido') { nota(doc, y + 6, 'Versao resumida: indicadores oficiais do periodo. Para graficos, publicacoes e rankings, selecione Detalhado.'); return; }
     // gráficos: seguidores e alcance/visualizações
     const gw = (PAGINA.w - PAGINA.m * 2 - 8) / 2, gh = 150;
     y = garanteEspaco(doc, y, gh + 12);
