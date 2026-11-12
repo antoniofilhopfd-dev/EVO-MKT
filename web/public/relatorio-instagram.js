@@ -121,12 +121,13 @@ async function carregar(){
   }catch(e){if(meu===pedido){$('#rel').textContent='';const m=document.createElement('div');m.className='msg';m.textContent=e.message;$('#rel').appendChild(m)}}
 }
 async function baixar(){
-  if($('#modo').value==='comparativo'){$('#msg').textContent='O PDF conjunto ainda não está disponível para download direto. Selecione Conta individual para baixar o PDF sem impressão.';return;}
+
   const b=$('#baixar'),rot=b.textContent;b.disabled=true;b.textContent='Gerando PDF…';$('#msg').textContent='';
   try{
-    const r=await fetch('/api/instagram/relatorio.pdf?'+consulta(),{credentials:'same-origin',headers:{'X-EVO':'1'}});
+    const rota=$('#modo').value==='comparativo'?'/api/instagram/relatorio-comparativo.pdf?mes='+encodeURIComponent($('#mes').value)+semanaQuery():'/api/instagram/relatorio.pdf?'+consulta();
+    const r=await fetch(rota+'&formato='+encodeURIComponent($('#formato').value),{credentials:'same-origin',headers:{'X-EVO':'1'}});
     if(!r.ok){let m='Não foi possível gerar o PDF.';try{m=(await r.json()).error||m}catch{}throw new Error(m)}
-    const nome=(/filename="([^"]+)"/.exec(r.headers.get('content-disposition')||'')||[])[1]||'Relatorio-Mensal-Instagram.pdf';
+    const nome=(/filename="([^"]+)"/.exec(r.headers.get('content-disposition')||'')||[])[1]||'Relatorio-Instagram.pdf';
     const u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);$('#msg').textContent='PDF baixado.';
   }catch(e){$('#msg').textContent=e.message}
   b.disabled=false;b.textContent=rot;
