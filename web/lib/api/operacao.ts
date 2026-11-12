@@ -17,6 +17,59 @@ import { json } from './handlers';
 
 const ymd = (s: unknown) => String(s ?? '').slice(0, 10);
 
+
+async function montarRelatorioInstagram(c: Ctx, contaForcada?: string): Promise<Row> {
+    const lp = localParts(new Date());
+    const mes = /^\d{4}-\d{2}$/.test(c.qs('mes')) ? c.qs('mes') : `${lp.y}-${String(lp.m).padStart(2, '0')}`;
+    const [y, m] = mes.split('-').map(Number);
+    const ant = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+    const conta = await igContaValida(contaForcada || c.qs('conta'));
+    const linhas = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? conta) === conta);
+    const pega = (per: string) => linhas.find((r) => r.periodo === per) ?? null;
+    const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,seguidores_novos,visitas_perfil,miniatura,permalink FROM ig_posts WHERE conta=? AND publicado_em LIKE ? ORDER BY publicado_em DESC', [conta, mes + '%'])).map((p) => { const metricas = [p.curtidas, p.comentarios, p.salvos, p.compartilhamentos]; return { ...p, interacoes: metricas.some((v) => v !== null && v !== undefined && v !== '') ? metricas.reduce((total: number, v) => total + (v === null || v === undefined || v === '' ? 0 : Number(v)), 0) : null }; });
+    const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [conta, per + '%']))?.seguidores ?? null;
+    // série diária de seguidores do mês e semanas (dom–sáb) que tocam o mês; nada é estimado: sem leitura, a lista vem vazia
+    const serieSeguidores = (await q('SELECT dia,seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia', [conta, mes + '%'])).map((r) => ({ dia: String(r.dia), seguidores: Number(r.seguidores) }));
+    const ultimoDia = new Date(Date.UTC(y, m, 0)).getUTCDate(), iniMes = `${mes}-01`, fimMes = `${mes}-${String(ultimoDia).padStart(2, '0')}`;
+    const semanas = (await q('SELECT inicio,fim,alcance,visualizacoes,interacoes FROM ig_conta_semana WHERE conta=? AND fim>=? AND inicio<=? ORDER BY inicio', [conta, iniMes, fimMes])).map((r) => ({ inicio: String(r.inicio), fim: String(r.fim), alcance: r.alcance === null ? null : Number(r.alcance), visualizacoes: r.visualizacoes === null ? null : Number(r.visualizacoes), interacoes: r.interacoes === null ? null : Number(r.interacoes) }));
+    const hojeDia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date());
+    const parcial = hojeDia >= iniMes && hojeDia < fimMes;
+    // Para meses sem snapshot salvo, tenta recuperar métricas diretamente da Meta.
+    // Consulta somente leitura: não altera histórico nem fabrica alcance somando posts.
+    let atualRelatorio = pega(mes);
+    let origemAlcance = atualRelatorio?.alcance == null ? 'indisponivel' : 'historico';
+    let periodoAlcance: { de: string; ate: string; parcial: boolean } | null = null;
+    if (atualRelatorio?.alcance == null && iniMes <= hojeDia) {
+      try {
+        // A primeira leitura de seguidores é uma referência observável para o início
+        // do monitoramento; não pressupõe alcance anterior à data registrada.
+        const primeiraLeitura = serieSeguidores.map((r) => String(r.dia).slice(0, 10)).filter((d) => /^\\d{4}-\\d{2}-\\d{2}$/.test(d)).sort()[0];
+        const inicioConsulta = primeiraLeitura && primeiraLeitura > iniMes ? primeiraLeitura : iniMes;
+        const fimConsulta = parcial ? hojeDia : fimMes;
+        const metricas = await igMetricasJanela(conta, inicioConsulta, fimConsulta);
+        if (metricas.reach !== undefined && Number.isFinite(Number(metricas.reach))) {
+          atualRelatorio = { ...(atualRelatorio ?? {}), alcance: Number(metricas.reach) };
+          origemAlcance = 'meta_consulta';
+          periodoAlcance = { de: inicioConsulta, ate: fimConsulta, parcial: inicioConsulta !== iniMes || fimConsulta !== fimMes };
+        }
+      } catch (e) {
+        console.warn('[instagram/relatorio] alcance histórico não recuperado da Meta:', e instanceof Error ? e.message : String(e));
+      }
+    }
+    // Recorte semanal: usa apenas posts e snapshots realmente existentes na janela.
+    // Totais mensais de conta não são atribuídos à semana sem snapshot semanal.
+    const semanaInicio = c.qs('semana');
+    const semanal = /^\\d{4}-\\d{2}-\\d{2}$/.test(semanaInicio) && semanaInicio.startsWith(mes);
+    if (semanaInicio && !semanal) fail(400, 'Informe um domingo válido do mês selecionado.');
+    const inicioSemana = semanal ? semanaInicio : '';
+    const fimSemana = semanal ? fmtDate(addDays(new Date(inicioSemana + 'T12:00:00Z'), 6)) : '';
+    const postsPeriodo = semanal ? posts.filter((post) => String(post.publicado_em).slice(0, 10) >= inicioSemana && String(post.publicado_em).slice(0, 10) <= fimSemana) : posts;
+    const semanaRegistrada = semanal ? semanas.find((w) => w.inicio === inicioSemana && w.fim === fimSemana) : null;
+    const atualPeriodo = semanal ? (semanaRegistrada ? { alcance: semanaRegistrada.alcance, impressoes: semanaRegistrada.visualizacoes, interacoes: semanaRegistrada.interacoes } : null) : atualRelatorio;
+    const dados = { mes, anterior: ant, origemAlcance, periodoAlcance, periodo: { de: semanal ? inicioSemana : iniMes, ate: semanal ? fimSemana : (parcial ? hojeDia : fimMes), parcial: semanal ? hojeDia >= inicioSemana && hojeDia <= fimSemana : parcial, futuro: semanal ? hojeDia < inicioSemana : hojeDia < iniMes }, semanal, atual: atualPeriodo, anteriorMetricas: semanal ? null : pega(ant), seguidores: semanal ? null : await seg(mes), seguidoresAnterior: semanal ? null : await seg(ant), serieSeguidores: semanal ? serieSeguidores.filter((r) => r.dia >= inicioSemana && r.dia <= fimSemana) : serieSeguidores, semanas: semanal ? semanas.filter((w) => w.inicio === inicioSemana) : semanas, posts: postsPeriodo.sort((a, b) => (Number(b.interacoes) || 0) - (Number(a.interacoes) || 0)), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' };
+    return dados;
+}
+
 /** Linha do tempo de um registro: mudanças de status/responsável + eventos de auditoria. */
 async function timeline(mod: string, id: string): Promise<Row[]> {
   const out: Row[] = [];
@@ -106,54 +159,7 @@ export async function operacaoRoute(c: Ctx) {
   if (path === '/instagram/relatorio' || path === '/instagram/relatorio.pdf') {
     await requireInternal(c);
     if (c.method !== 'GET') return fail(405, 'O relatório é somente consulta.');
-    const lp = localParts(new Date());
-    const mes = /^\d{4}-\d{2}$/.test(c.qs('mes')) ? c.qs('mes') : `${lp.y}-${String(lp.m).padStart(2, '0')}`;
-    const [y, m] = mes.split('-').map(Number);
-    const ant = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
-    const conta = await igContaValida(c.qs('conta'));
-    const linhas = (await listRows('instagram')).filter((r) => r.origem === 'INSTAGRAM_API' && String(r.idExterno ?? conta) === conta);
-    const pega = (per: string) => linhas.find((r) => r.periodo === per) ?? null;
-    const posts = (await q('SELECT media_id,publicado_em,tipo,legenda,curtidas,comentarios,salvos,compartilhamentos,alcance,visualizacoes,seguidores_novos,visitas_perfil,miniatura,permalink FROM ig_posts WHERE conta=? AND publicado_em LIKE ? ORDER BY publicado_em DESC', [conta, mes + '%'])).map((p) => { const metricas = [p.curtidas, p.comentarios, p.salvos, p.compartilhamentos]; return { ...p, interacoes: metricas.some((v) => v !== null && v !== undefined && v !== '') ? metricas.reduce((total: number, v) => total + (v === null || v === undefined || v === '' ? 0 : Number(v)), 0) : null }; });
-    const seg = async (per: string) => (await q1('SELECT seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia DESC LIMIT 1', [conta, per + '%']))?.seguidores ?? null;
-    // série diária de seguidores do mês e semanas (dom–sáb) que tocam o mês; nada é estimado: sem leitura, a lista vem vazia
-    const serieSeguidores = (await q('SELECT dia,seguidores FROM ig_seguidores WHERE conta=? AND dia LIKE ? ORDER BY dia', [conta, mes + '%'])).map((r) => ({ dia: String(r.dia), seguidores: Number(r.seguidores) }));
-    const ultimoDia = new Date(Date.UTC(y, m, 0)).getUTCDate(), iniMes = `${mes}-01`, fimMes = `${mes}-${String(ultimoDia).padStart(2, '0')}`;
-    const semanas = (await q('SELECT inicio,fim,alcance,visualizacoes,interacoes FROM ig_conta_semana WHERE conta=? AND fim>=? AND inicio<=? ORDER BY inicio', [conta, iniMes, fimMes])).map((r) => ({ inicio: String(r.inicio), fim: String(r.fim), alcance: r.alcance === null ? null : Number(r.alcance), visualizacoes: r.visualizacoes === null ? null : Number(r.visualizacoes), interacoes: r.interacoes === null ? null : Number(r.interacoes) }));
-    const hojeDia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date());
-    const parcial = hojeDia >= iniMes && hojeDia < fimMes;
-    // Para meses sem snapshot salvo, tenta recuperar métricas diretamente da Meta.
-    // Consulta somente leitura: não altera histórico nem fabrica alcance somando posts.
-    let atualRelatorio = pega(mes);
-    let origemAlcance = atualRelatorio?.alcance == null ? 'indisponivel' : 'historico';
-    let periodoAlcance: { de: string; ate: string; parcial: boolean } | null = null;
-    if (atualRelatorio?.alcance == null && iniMes <= hojeDia) {
-      try {
-        // A primeira leitura de seguidores é uma referência observável para o início
-        // do monitoramento; não pressupõe alcance anterior à data registrada.
-        const primeiraLeitura = serieSeguidores.map((r) => String(r.dia).slice(0, 10)).filter((d) => /^\\d{4}-\\d{2}-\\d{2}$/.test(d)).sort()[0];
-        const inicioConsulta = primeiraLeitura && primeiraLeitura > iniMes ? primeiraLeitura : iniMes;
-        const fimConsulta = parcial ? hojeDia : fimMes;
-        const metricas = await igMetricasJanela(conta, inicioConsulta, fimConsulta);
-        if (metricas.reach !== undefined && Number.isFinite(Number(metricas.reach))) {
-          atualRelatorio = { ...(atualRelatorio ?? {}), alcance: Number(metricas.reach) };
-          origemAlcance = 'meta_consulta';
-          periodoAlcance = { de: inicioConsulta, ate: fimConsulta, parcial: inicioConsulta !== iniMes || fimConsulta !== fimMes };
-        }
-      } catch (e) {
-        console.warn('[instagram/relatorio] alcance histórico não recuperado da Meta:', e instanceof Error ? e.message : String(e));
-      }
-    }
-    // Recorte semanal: usa apenas posts e snapshots realmente existentes na janela.
-    // Totais mensais de conta não são atribuídos à semana sem snapshot semanal.
-    const semanaInicio = c.qs('semana');
-    const semanal = /^\\d{4}-\\d{2}-\\d{2}$/.test(semanaInicio) && semanaInicio.startsWith(mes);
-    if (semanaInicio && !semanal) fail(400, 'Informe um domingo válido do mês selecionado.');
-    const inicioSemana = semanal ? semanaInicio : '';
-    const fimSemana = semanal ? fmtDate(addDays(new Date(inicioSemana + 'T12:00:00Z'), 6)) : '';
-    const postsPeriodo = semanal ? posts.filter((post) => String(post.publicado_em).slice(0, 10) >= inicioSemana && String(post.publicado_em).slice(0, 10) <= fimSemana) : posts;
-    const semanaRegistrada = semanal ? semanas.find((w) => w.inicio === inicioSemana && w.fim === fimSemana) : null;
-    const atualPeriodo = semanal ? (semanaRegistrada ? { alcance: semanaRegistrada.alcance, impressoes: semanaRegistrada.visualizacoes, interacoes: semanaRegistrada.interacoes } : null) : atualRelatorio;
-    const dados = { mes, anterior: ant, origemAlcance, periodoAlcance, periodo: { de: semanal ? inicioSemana : iniMes, ate: semanal ? fimSemana : (parcial ? hojeDia : fimMes), parcial: semanal ? hojeDia >= inicioSemana && hojeDia <= fimSemana : parcial, futuro: semanal ? hojeDia < inicioSemana : hojeDia < iniMes }, semanal, atual: atualPeriodo, anteriorMetricas: semanal ? null : pega(ant), seguidores: semanal ? null : await seg(mes), seguidoresAnterior: semanal ? null : await seg(ant), serieSeguidores: semanal ? serieSeguidores.filter((r) => r.dia >= inicioSemana && r.dia <= fimSemana) : serieSeguidores, semanas: semanal ? semanas.filter((w) => w.inicio === inicioSemana) : semanas, posts: postsPeriodo.sort((a, b) => (Number(b.interacoes) || 0) - (Number(a.interacoes) || 0)), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' };
+    const dados = await montarRelatorioInstagram(c);
     if (path === '/instagram/relatorio.pdf') {
       const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
       return respostaPdf(await relatorioInstagramPdf(dados, quando, c.qs('formato') === 'resumido' ? 'resumido' : 'detalhado'), `Relatorio-${semanal ? 'Semanal' : 'Mensal'}-Instagram${dados.conta ? '_' + String(dados.conta).replace(/^@/, '') : ''}_${semanal ? inicioSemana : mes}.pdf`);
