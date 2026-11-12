@@ -120,7 +120,7 @@ async function carregar(){
   }catch(e){if(meu===pedido){$('#rel').textContent='';const m=document.createElement('div');m.className='msg';m.textContent=e.message;$('#rel').appendChild(m)}}
 }
 async function baixar(){
-  if($('#modo').value==='comparativo'){window.print();$('#msg').textContent='Na janela de impressão, escolha “Salvar como PDF”.';return;}
+  if($('#modo').value==='comparativo'){$('#msg').textContent='O PDF conjunto ainda não está disponível para download direto. Selecione Conta individual para baixar o PDF sem impressão.';return;}
   const b=$('#baixar'),rot=b.textContent;b.disabled=true;b.textContent='Gerando PDF…';$('#msg').textContent='';
   try{
     const r=await fetch('/api/instagram/relatorio.pdf?'+consulta(),{credentials:'same-origin',headers:{'X-EVO':'1'}});
