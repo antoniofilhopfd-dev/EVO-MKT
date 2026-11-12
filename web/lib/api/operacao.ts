@@ -59,7 +59,7 @@ async function montarRelatorioInstagram(c: Ctx, contaForcada?: string): Promise<
     // Recorte semanal: usa apenas posts e snapshots realmente existentes na janela.
     // Totais mensais de conta não são atribuídos à semana sem snapshot semanal.
     const semanaInicio = c.qs('semana');
-    const semanal = /^\\d{4}-\\d{2}-\\d{2}$/.test(semanaInicio) && semanaInicio.startsWith(mes);
+    const semanal = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(semanaInicio) && semanaInicio.startsWith(mes) && !Number.isNaN(Date.parse(semanaInicio + 'T12:00:00Z')) && new Date(semanaInicio + 'T12:00:00Z').getUTCDay() === 0;
     if (semanaInicio && !semanal) fail(400, 'Informe um domingo válido do mês selecionado.');
     const inicioSemana = semanal ? semanaInicio : '';
     const fimSemana = semanal ? fmtDate(addDays(new Date(inicioSemana + 'T12:00:00Z'), 6)) : '';
