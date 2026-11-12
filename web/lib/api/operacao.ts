@@ -156,7 +156,7 @@ export async function operacaoRoute(c: Ctx) {
     const dados = { mes, anterior: ant, origemAlcance, periodoAlcance, periodo: { de: semanal ? inicioSemana : iniMes, ate: semanal ? fimSemana : (parcial ? hojeDia : fimMes), parcial: semanal ? hojeDia >= inicioSemana && hojeDia <= fimSemana : parcial, futuro: semanal ? hojeDia < inicioSemana : hojeDia < iniMes }, semanal, atual: atualPeriodo, anteriorMetricas: semanal ? null : pega(ant), seguidores: semanal ? null : await seg(mes), seguidoresAnterior: semanal ? null : await seg(ant), serieSeguidores: semanal ? serieSeguidores.filter((r) => r.dia >= inicioSemana && r.dia <= fimSemana) : serieSeguidores, semanas: semanal ? semanas.filter((w) => w.inicio === inicioSemana) : semanas, posts: postsPeriodo.sort((a, b) => b.interacoes - a.interacoes), conta: (await contasMonitoradas()).find((x) => x.ig === conta)?.usuario ?? '' };
     if (path === '/instagram/relatorio.pdf') {
       const quando = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date());
-      return respostaPdf(await relatorioInstagramPdf(dados, quando), `Relatorio-Mensal-Instagram${dados.conta ? '_' + String(dados.conta).replace(/^@/, '') : ''}_${mes}.pdf`);
+      return respostaPdf(await relatorioInstagramPdf(dados, quando), `Relatorio-${semanal ? 'Semanal' : 'Mensal'}-Instagram${dados.conta ? '_' + String(dados.conta).replace(/^@/, '') : ''}_${semanal ? inicioSemana : mes}.pdf`);
     }
     return json(dados);
   }
